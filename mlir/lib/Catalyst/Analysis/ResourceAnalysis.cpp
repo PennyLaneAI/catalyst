@@ -44,6 +44,8 @@
 #include "Quantum/IR/QuantumInterfaces.h"
 #include "Quantum/IR/QuantumOps.h"
 
+#include "StringConstants.h"
+
 using namespace mlir;
 using namespace llvm;
 
@@ -77,6 +79,36 @@ static bool isCustomDialectOp(Operation *op) {
 static std::pair<bool, unsigned> composeModifiers(std::pair<bool, unsigned> outer,
                                                   std::pair<bool, unsigned> inner) {
     return {outer.first ^ inner.first, outer.second + inner.second};
+}
+
+/// Accumulate enclosing ctrl work-wire context. Borrowed takes precedence over zeroed.
+static std::pair<unsigned, bool> composeWorkWires(unsigned numWorkWires, bool isBorrowed,
+                                                  unsigned addWorkWires, StringRef workWireType) {
+    if (addWorkWires == 0) {
+        return {numWorkWires, isBorrowed};
+    }
+
+    return {numWorkWires + addWorkWires,
+            isBorrowed || workWireType == CTRL_WORK_WIRE_TYPE_BORROWED};
+}
+
+/// Op-level `ctrl_work_wires` count and type from a decomposable gate.
+static std::pair<unsigned, StringRef> getOpCtrlWorkWires(quantum::DecomposableGate gate) {
+    unsigned numWorkWires = 0;
+    for (const auto &[name, len] : gate.getWireLens()) {
+        if (name == CTRL_WORK_WIRES) {
+            numWorkWires = len;
+            break;
+        }
+    }
+    if (numWorkWires == 0) {
+        return {0, CTRL_WORK_WIRE_TYPE_ZEROED};
+    }
+    if (auto typeAttr =
+            dyn_cast_or_null<StringAttr>(gate.getStaticData().get(CTRL_WORK_WIRE_TYPE))) {
+        return {numWorkWires, typeAttr.getValue()};
+    }
+    return {numWorkWires, CTRL_WORK_WIRE_TYPE_BORROWED};
 }
 
 /// Returns the function in a caller-before callee order so that
@@ -325,9 +357,11 @@ void ResourceAnalysis::recordLoopBody(Operation *loopOp, ResourceResult bodyResu
 }
 
 void ResourceAnalysis::analyzeForLoop(scf::ForOp forOp, ResourceResult &result, bool isAdjoint,
-                                      unsigned numControlQubits) {
+                                      unsigned numControlQubits, unsigned numWorkWires,
+                                      bool isBorrowed) {
     ResourceResult bodyResult = makeEmptyResult();
-    analyzeRegion(forOp.getBodyRegion(), bodyResult, isAdjoint, numControlQubits);
+    analyzeRegion(forOp.getBodyRegion(), bodyResult, isAdjoint, numControlQubits, numWorkWires,
+                  isBorrowed);
 
     // Try to resolve a static trip count.
     auto tripCount = resolveForLoopTripCount(forOp);
@@ -340,9 +374,11 @@ void ResourceAnalysis::analyzeForLoop(scf::ForOp forOp, ResourceResult &result, 
 }
 
 void ResourceAnalysis::analyzeWhileLoop(scf::WhileOp whileOp, ResourceResult &result,
-                                        bool isAdjoint, unsigned numControlQubits) {
+                                        bool isAdjoint, unsigned numControlQubits,
+                                        unsigned numWorkWires, bool isBorrowed) {
     ResourceResult bodyResult = makeEmptyResult();
-    analyzeRegion(whileOp.getAfter(), bodyResult, isAdjoint, numControlQubits);
+    analyzeRegion(whileOp.getAfter(), bodyResult, isAdjoint, numControlQubits, numWorkWires,
+                  isBorrowed);
 
     auto tripCount = getEstimatedIterationsHint(whileOp);
     recordLoopBody(whileOp.getOperation(), std::move(bodyResult), tripCount, "while_loop_",
@@ -350,10 +386,12 @@ void ResourceAnalysis::analyzeWhileLoop(scf::WhileOp whileOp, ResourceResult &re
 }
 
 void ResourceAnalysis::analyzeIfOp(scf::IfOp ifOp, ResourceResult &result, bool isAdjoint,
-                                   unsigned numControlQubits) {
+                                   unsigned numControlQubits, unsigned numWorkWires,
+                                   bool isBorrowed) {
 
     ResourceResult thenResult = makeEmptyResult();
-    analyzeRegion(ifOp.getThenRegion(), thenResult, isAdjoint, numControlQubits);
+    analyzeRegion(ifOp.getThenRegion(), thenResult, isAdjoint, numControlQubits, numWorkWires,
+                  isBorrowed);
 
     // If a branch probability hint is present, compute the expected (average) resource counts
     // weighted by the probability, rather than the worst case.
@@ -364,7 +402,8 @@ void ResourceAnalysis::analyzeIfOp(scf::IfOp ifOp, ResourceResult &result, bool 
 
         ResourceResult elseResult = makeEmptyResult();
         if (!ifOp.getElseRegion().empty()) {
-            analyzeRegion(ifOp.getElseRegion(), elseResult, isAdjoint, numControlQubits);
+            analyzeRegion(ifOp.getElseRegion(), elseResult, isAdjoint, numControlQubits,
+                          numWorkWires, isBorrowed);
         }
 
         thenResult.multiplyBy(pThen);
@@ -380,14 +419,16 @@ void ResourceAnalysis::analyzeIfOp(scf::IfOp ifOp, ResourceResult &result, bool 
 
     if (!ifOp.getElseRegion().empty()) {
         ResourceResult elseResult = makeEmptyResult();
-        analyzeRegion(ifOp.getElseRegion(), elseResult, isAdjoint, numControlQubits);
+        analyzeRegion(ifOp.getElseRegion(), elseResult, isAdjoint, numControlQubits, numWorkWires,
+                      isBorrowed);
         thenResult.mergeWith(elseResult, ResourceResult::MergeMethod::Max);
     }
     result.mergeWith(thenResult);
 }
 
 void ResourceAnalysis::analyzeIndexSwitchOp(scf::IndexSwitchOp switchOp, ResourceResult &result,
-                                            bool isAdjoint, unsigned numControlQubits) {
+                                            bool isAdjoint, unsigned numControlQubits,
+                                            unsigned numWorkWires, bool isBorrowed) {
 
     // If branch probabilities are provided, compute the expected (average) resource counts.
     // `catalyst.estimated_probabilities` is an array of floats with one entry per case
@@ -399,7 +440,8 @@ void ResourceAnalysis::analyzeIndexSwitchOp(scf::IndexSwitchOp switchOp, Resourc
 
         for (auto &&[idx, caseRegion] : llvm::enumerate(caseRegions)) {
             ResourceResult caseResult = makeEmptyResult();
-            analyzeRegion(caseRegion, caseResult, isAdjoint, numControlQubits);
+            analyzeRegion(caseRegion, caseResult, isAdjoint, numControlQubits, numWorkWires,
+                          isBorrowed);
 
             double p = cast<FloatAttr>(probsAttr[idx]).getValueAsDouble();
             sumProb += p;
@@ -413,7 +455,8 @@ void ResourceAnalysis::analyzeIndexSwitchOp(scf::IndexSwitchOp switchOp, Resourc
         double pDefault = std::min(std::max(0.0, 1.0 - sumProb), 1.0);
 
         ResourceResult defaultResult = makeEmptyResult();
-        analyzeRegion(switchOp.getDefaultRegion(), defaultResult, isAdjoint, numControlQubits);
+        analyzeRegion(switchOp.getDefaultRegion(), defaultResult, isAdjoint, numControlQubits,
+                      numWorkWires, isBorrowed);
         defaultResult.multiplyBy(pDefault);
         expected.mergeWith(defaultResult, ResourceResult::MergeMethod::Sum);
 
@@ -429,7 +472,8 @@ void ResourceAnalysis::analyzeIndexSwitchOp(scf::IndexSwitchOp switchOp, Resourc
 
     for (auto &caseRegion : caseRegions) {
         ResourceResult caseResult = makeEmptyResult();
-        analyzeRegion(caseRegion, caseResult, isAdjoint, numControlQubits);
+        analyzeRegion(caseRegion, caseResult, isAdjoint, numControlQubits, numWorkWires,
+                      isBorrowed);
         if (first) {
             maxResult = std::move(caseResult);
             first = false;
@@ -440,16 +484,18 @@ void ResourceAnalysis::analyzeIndexSwitchOp(scf::IndexSwitchOp switchOp, Resourc
 
     // default region
     ResourceResult defaultResult = makeEmptyResult();
-    analyzeRegion(switchOp.getDefaultRegion(), defaultResult, isAdjoint, numControlQubits);
+    analyzeRegion(switchOp.getDefaultRegion(), defaultResult, isAdjoint, numControlQubits,
+                  numWorkWires, isBorrowed);
     maxResult.mergeWith(defaultResult, ResourceResult::MergeMethod::Max);
 
     result.mergeWith(maxResult);
 }
 
 void ResourceAnalysis::analyzePBCLayer(pbc::LayerOp layerOp, ResourceResult &result, bool isAdjoint,
-                                       unsigned numControlQubits) {
+                                       unsigned numControlQubits, unsigned numWorkWires,
+                                       bool isBorrowed) {
     for (auto &layerRegion : layerOp->getRegions()) {
-        analyzeRegion(layerRegion, result, isAdjoint, numControlQubits);
+        analyzeRegion(layerRegion, result, isAdjoint, numControlQubits, numWorkWires, isBorrowed);
     }
 }
 
@@ -462,42 +508,59 @@ void ResourceAnalysis::analyzePBCLayer(pbc::LayerOp layerOp, ResourceResult &res
  * @param result The ResourceResult to accumulate counts into.
  * @param isAdjoint Whether the current region is under an adjoint (quantum.adjoint) operation.
  * @param numControlQubits The number of control qubits added by the current region.
+ * @param numWorkWires The number of work wires from enclosing quantum.ctrl / qref.ctrl ops.
+ * @param isBorrowed Whether any enclosing ctrl work-wire type is borrowed
  */
 void ResourceAnalysis::analyzeRegion(Region &region, ResourceResult &result, bool isAdjoint,
-                                     unsigned numControlQubits) {
+                                     unsigned numControlQubits, unsigned numWorkWires,
+                                     bool isBorrowed) {
     for (Block &block : region) {
         for (Operation &op : block) {
             bool needsCollection = true;
 
             llvm::TypeSwitch<Operation &, void>(op)
                 .Case<quantum::AdjointOp, qref::AdjointOp>([&](auto adjOp) {
-                    analyzeRegion(adjOp.getRegion(), result, !isAdjoint, numControlQubits);
+                    analyzeRegion(adjOp.getRegion(), result, !isAdjoint, numControlQubits,
+                                  numWorkWires, isBorrowed);
                     needsCollection = false;
                 })
                 .Case<quantum::CtrlOp>([&](auto ctrlOp) {
+                    auto [nextWorkWires, nextBorrowed] =
+                        composeWorkWires(numWorkWires, isBorrowed, ctrlOp.getInWorkQubits().size(),
+                                         ctrlOp.getWorkWireType());
                     analyzeRegion(ctrlOp.getRegion(), result, isAdjoint,
-                                  numControlQubits + ctrlOp.getInCtrlQubits().size());
+                                  numControlQubits + ctrlOp.getInCtrlQubits().size(), nextWorkWires,
+                                  nextBorrowed);
                     needsCollection = false;
                 })
                 .Case<qref::CtrlOp>([&](auto ctrlOp) {
+                    auto [nextWorkWires, nextBorrowed] =
+                        composeWorkWires(numWorkWires, isBorrowed, ctrlOp.getWorkQubits().size(),
+                                         ctrlOp.getWorkWireType());
                     analyzeRegion(ctrlOp.getRegion(), result, isAdjoint,
-                                  numControlQubits + ctrlOp.getCtrlQubits().size());
+                                  numControlQubits + ctrlOp.getCtrlQubits().size(), nextWorkWires,
+                                  nextBorrowed);
                     needsCollection = false;
                 })
                 .Case([&](mlir::scf::ForOp forLoopOp) {
-                    analyzeForLoop(forLoopOp, result, isAdjoint, numControlQubits);
+                    analyzeForLoop(forLoopOp, result, isAdjoint, numControlQubits, numWorkWires,
+                                   isBorrowed);
                 })
                 .Case([&](mlir::scf::WhileOp whileOp) {
-                    analyzeWhileLoop(whileOp, result, isAdjoint, numControlQubits);
+                    analyzeWhileLoop(whileOp, result, isAdjoint, numControlQubits, numWorkWires,
+                                     isBorrowed);
                 })
                 .Case([&](mlir::scf::IfOp ifConditionalOp) {
-                    analyzeIfOp(ifConditionalOp, result, isAdjoint, numControlQubits);
+                    analyzeIfOp(ifConditionalOp, result, isAdjoint, numControlQubits, numWorkWires,
+                                isBorrowed);
                 })
                 .Case([&](mlir::scf::IndexSwitchOp switchOp) {
-                    analyzeIndexSwitchOp(switchOp, result, isAdjoint, numControlQubits);
+                    analyzeIndexSwitchOp(switchOp, result, isAdjoint, numControlQubits,
+                                         numWorkWires, isBorrowed);
                 })
                 .Case([&](pbc::LayerOp regionLayerOp) {
-                    analyzePBCLayer(regionLayerOp, result, isAdjoint, numControlQubits);
+                    analyzePBCLayer(regionLayerOp, result, isAdjoint, numControlQubits,
+                                    numWorkWires, isBorrowed);
                 })
                 .Default([&](Operation &op) {
                     // other operations - do nothing
@@ -507,7 +570,8 @@ void ResourceAnalysis::analyzeRegion(Region &region, ResourceResult &result, boo
                 collectOperation(&op, result, isAdjoint, numControlQubits);
                 if (collectDetailedOperations) {
                     result.collectDetailedOperations = true;
-                    collectDetailedOperation(&op, result, isAdjoint, numControlQubits);
+                    collectDetailedOperation(&op, result, isAdjoint, numControlQubits, numWorkWires,
+                                             isBorrowed);
                 }
             }
         }
@@ -530,9 +594,10 @@ void ResourceAnalysis::analyzeRegion(Region &region, ResourceResult &result, boo
  * @param result The ResourceResult to update with the operation's resource usage.
  * @param isAdjoint Whether the current region is under an adjoint (quantum.adjoint) operation.
  * @param numControlQubits The number of control qubits added by the current region.
+ * @param numWorkWires The number of work wires from enclosing ctrl regions.
  */
 void ResourceAnalysis::collectOperation(Operation *op, ResourceResult &result, bool isAdjoint,
-                                        unsigned numControlQubits) {
+                                        unsigned numControlQubits, unsigned numWorkWires) {
     // Collect extensions for the operation
     assert(result.extensions.size() == extensionAnalyses.size() &&
            "extension data/collector size mismatch");
@@ -567,7 +632,7 @@ void ResourceAnalysis::collectOperation(Operation *op, ResourceResult &result, b
         }
 
         uint64_t nParams = inst.getResourceNumParams();
-        uint64_t nQubits = inst.getResourceNumQubits() + nCtrlQubits;
+        uint64_t nQubits = inst.getResourceNumQubits() + nCtrlQubits + numWorkWires;
         result.operations[name][{nQubits, nParams}] += 1;
 
         // Ops may also allocate (e.g. mbqc.graph_state_prep, pbc.prepare, pbc.fabricate).
@@ -653,17 +718,30 @@ void ResourceAnalysis::collectOperation(Operation *op, ResourceResult &result, b
 }
 
 void ResourceAnalysis::collectDetailedOperation(Operation *op, ResourceResult &result,
-                                                bool isAdjoint, unsigned numControlQubits) const {
+                                                bool isAdjoint, unsigned numControlQubits,
+                                                unsigned numWorkWires, bool isBorrowed) const {
     if (auto inst = dyn_cast<quantum::DecomposableGate>(op)) {
         unsigned opCtrl = 0;
         if (auto gate = dyn_cast<quantum::QuantumGate>(op)) {
             opCtrl = gate.getCtrlQubitOperands().size();
         }
 
-        // Combine context based modifier context with the operation's modifier.
+        // Combine region modifier context with the operation's own modifiers.
         auto [adj, nCtrl] =
             composeModifiers({isAdjoint, numControlQubits}, {op->hasAttr("adjoint"), opCtrl});
-        std::string opID = inst.getGraphOpIdExplicitModifiers(adj, nCtrl);
+
+        // Get the operation's own work wires and type (If any).
+        auto [opWorkWires, opWorkType] = getOpCtrlWorkWires(inst);
+
+        // Combine the operation's own work wires and type with the enclosing region's work wires
+        // and type.
+        auto [finalWorkWires, finalBorrowed] =
+            composeWorkWires(numWorkWires, isBorrowed, opWorkWires, opWorkType);
+
+        // getGraphOpIdExplicitModifiers applies Adjoint/Ctrl/WorkWire modifiers to the operation's
+        // base GOID.
+        std::string opID =
+            inst.getGraphOpIdExplicitModifiers(adj, nCtrl, finalWorkWires, finalBorrowed);
         result.detailedOperations[opID] += 1;
         result.observedGraphOpIds.insert(opID);
         return;

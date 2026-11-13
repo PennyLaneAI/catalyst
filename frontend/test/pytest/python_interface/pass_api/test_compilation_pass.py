@@ -381,17 +381,16 @@ def _(self, op: quantum.MeasureOp, rewriter):
 integration_pass = compiler_transform(IntegrationTestPass)
 
 
-@pytest.mark.parametrize("capture", [True, False])
 class TestCompilationPassIntegration:
     """Integration tests for CompilationPass."""
 
-    def test_qjit_integration(self, run_filecheck_qjit, capture):
+    def test_qjit_integration(self, run_filecheck_qjit, capture_mode):
         """Test that passes created using CompilationPass can be used
         with qjit."""
 
         dev = qp.device("lightning.qubit", wires=1)
 
-        @qp.qjit(capture=capture, skip_preprocess=True, collect_decomp_rules=False)
+        @qp.qjit(capture=capture_mode, skip_preprocess=True, collect_decomp_rules=False)
         @integration_pass
         @qp.qnode(dev)
         def circuit():

@@ -112,7 +112,7 @@ class TestOQCCircuit:
         def circuit():
             return qp.probs()
 
-        with pytest.raises(CompileError, match="Please supply the number of shots on the qnode."):
+        with pytest.raises(CompileError, match="OQCDevice' only supports finite shot measurements"):
 
             circuit()
 

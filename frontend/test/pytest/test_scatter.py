@@ -16,10 +16,11 @@
 
 import jax
 import numpy as np
+import pennylane as qp
 import pytest
 from jax import numpy as jnp
 
-from catalyst import grad, qjit
+from catalyst import qjit
 
 
 def test_add_multiply():
@@ -94,7 +95,7 @@ def test_gather_derivative():
     x = jax.numpy.array([0.1, 0.2, 0.3, 0.4])
 
     expected = jax.grad(f)(x)
-    results = qjit(grad(f))(x)
+    results = qjit(qp.grad(f))(x)
     assert np.allclose(expected, results)
 
 

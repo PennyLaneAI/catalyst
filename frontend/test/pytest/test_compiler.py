@@ -31,7 +31,7 @@ import numpy as np
 import pennylane as qp
 import pytest
 
-from catalyst import grad, qjit
+from catalyst import qjit
 from catalyst.compiler import (
     CompileOptions,
     Compiler,
@@ -571,7 +571,7 @@ class TestCompilerState:
 
         @qjit(target=target)
         def f(x: float):
-            return grad(lambda y: y * y)(x)
+            return qp.grad(lambda y: y * y)(x)
 
         workspace = pathlib.Path(str(f.workspace))
         (output,) = workspace.glob("*.ll")

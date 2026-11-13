@@ -316,15 +316,16 @@ class TestCProgramGeneration:
         assert "main" in template
         assert "buff_0 = 1.0" in template  # argument was automaatically promoted
 
+    @pytest.mark.old_frontend
     def test_raises_error_if_tracing(self):
         """Test errors if c program generation requested during tracing."""
 
-        @qjit
+        @qjit(capture=False)
         def f(x: float):
             """Identity function."""
             return x
 
-        @qjit
+        @qjit(capture=False)
         def error_fn(x: float):
             """Should raise an error as we try to generate the C template during tracing."""
             return get_cmain(f, x)
@@ -409,6 +410,7 @@ class TestCProgramGeneration:
         shutil.rmtree(str(jit_f.workspace), ignore_errors=True)
         assert old_result * data == new_result
 
+    @pytest.mark.old_frontend
     @pytest.mark.parametrize(
         "pass_name",
         [
@@ -429,7 +431,7 @@ class TestCProgramGeneration:
             """Square function."""
             return x**2
 
-        jit_grad_f = qjit(value_and_grad(f), keep_intermediate=True)
+        jit_grad_f = qjit(value_and_grad(f), keep_intermediate=True, capture=False)
         # Create tmp workspaces for intermediates to avoid CI race conditions
         jit_grad_f.use_cwd_for_workspace = False
 

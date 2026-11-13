@@ -102,7 +102,7 @@ def qjit(
     seed=None,
     pass_plugins=None,
     dialect_plugins=None,
-    capture="global",
+    capture=True,
     skip_preprocess=False,
     collect_decomp_rules=True,
     enable_aot_compilation=True,
@@ -188,11 +188,11 @@ def qjit(
             This allows enabling capture locally for this QJIT without affecting the global
             ``qp.capture.enabled()`` state.
 
-            - ``"global"`` (default): Defer to ``qp.capture.enabled()`` to decide whether
-              to use program capture.
-            - ``True``: Force program capture on for this QJIT, regardless of the global setting.
+            - ``True`` (default): Force program capture on for this QJIT, regardless of the global setting.
               This allows using the new capture-based frontend without calling
               ``qp.capture.enable()`` globally.
+            - ``"global"`` : Defer to ``qp.capture.enabled()`` to decide whether
+              to use program capture.
             - ``False``: Force program capture off for this QJIT, using the old frontend,
               regardless of the global setting.
         skip_preprocess (bool): Controls whether or not to skip quantum device preprocessing.

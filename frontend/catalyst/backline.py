@@ -1054,6 +1054,8 @@ def _qec_pass_specs(code):
     """
     params = _QEC_CODES[code]
     return (
+        # Drops the unused decomposition rules captured with the circuit
+        ("symbol-dce", {}),
         ("convert-quantum-to-qecl", {"k": params.k}),
         ("symbol-dce", {}),
         ("inject-noise-to-qecl", {}),

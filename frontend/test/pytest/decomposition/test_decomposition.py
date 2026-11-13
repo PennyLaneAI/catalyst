@@ -51,6 +51,7 @@ from pennylane.wires import Wires
 from catalyst import qjit
 from catalyst.decomposition import GraphOpID, RuleLoweringWarning
 from catalyst.decomposition.decomposition_rules import (
+    RuleTraceInputs,
     _adjoint_folds_to_base,
     _rule_allocates_work_wires,
     _rule_is_compatible,
@@ -95,18 +96,18 @@ class TestGenericUtilities:
             ({"reg": 0, "x": 0}, {"x": None}, ["x", "reg"]),
             # Custom ops carry their params positionally, so only wires remain here (unchanged).
             ({"wires": 0}, {"0": None}, ["wires"]),
-            # Params are sorted, while wire registers retain declaration order for grouping.
+            # Parameters and wire registers retain their respective declaration orders.
             (
-                {"reg2": 0, "reg1": 0, "b": 0, "a": 0},
-                {"a": None, "b": None},
-                ["a", "b", "reg2", "reg1"],
+                {"reg2": 0, "reg1": 0, "a": 0, "b": 0},
+                {"b": None, "a": None},
+                ["b", "a", "reg2", "reg1"],
             ),
         ],
     )
     def test_ordered_kwarg_names_groups_params_before_wires(
         self, call_kwargs, dynamic_shape, expected
     ):
-        """Keyword parameters are sorted before declaration-ordered wire registers."""
+        """Parameters precede wire registers, preserving their respective declaration orders."""
         assert ordered_kwarg_names(call_kwargs, dynamic_shape) == expected
 
     def test_rule_call_operands_groups_wire_kwargs(self):
@@ -123,15 +124,73 @@ class TestGenericUtilities:
         wire_lens = {"reg2": 2, "empty_reg": 0, "reg1": 3}
         kwarg_names = ordered_kwarg_names(call_kwargs, dynamic_shape)
         ctrl_wires = jnp.array([5, 6])
+        ctrl_values = jnp.array([True, False])
 
-        operands = rule_call_operands(call_args, call_kwargs, kwarg_names, wire_lens, ctrl_wires)
+        trace_inputs = RuleTraceInputs(
+            call_args=call_args,
+            call_kwargs=call_kwargs,
+            kwarg_names=kwarg_names,
+            wire_lens=wire_lens,
+            ctrl_wires=ctrl_wires,
+            ctrl_values=ctrl_values,
+        )
+        operands = rule_call_operands(trace_inputs)
 
-        assert len(operands) == 5
+        assert len(operands) == 6
         np.testing.assert_array_equal(operands[0], 10.0)
         np.testing.assert_array_equal(operands[1], 12.0)
         np.testing.assert_array_equal(operands[2], 11.0)
         np.testing.assert_array_equal(operands[3], [3, 4, 0, 1, 2])
         np.testing.assert_array_equal(operands[4], [5, 6])
+        np.testing.assert_array_equal(operands[5], [True, False])
+
+    def test_rule_call_operands_preserves_hybrid_leaf_order(self):
+        """Hybrid leaves follow parameters and precede the base wires and control operands."""
+        trace_inputs = RuleTraceInputs(
+            call_args=(),
+            call_kwargs={"theta": jnp.array(0.25), "wires": jnp.array([0, 1])},
+            kwarg_names=["theta", "wires"],
+            wire_lens={"wires": 2},
+            ctrl_wires=jnp.array([2]),
+            ctrl_values=jnp.array([False]),
+            hybrid_leaves=(jnp.array([3.0, 4.0]), jnp.array([[5.0, 6.0], [7.0, 8.0]])),
+        )
+
+        operands = rule_call_operands(trace_inputs)
+
+        assert len(operands) == 6
+        np.testing.assert_array_equal(operands[0], 0.25)
+        np.testing.assert_array_equal(operands[1], [3.0, 4.0])
+        np.testing.assert_array_equal(operands[2], [[5.0, 6.0], [7.0, 8.0]])
+        np.testing.assert_array_equal(operands[3], [0, 1])
+        np.testing.assert_array_equal(operands[4], [2])
+        np.testing.assert_array_equal(operands[5], [False])
+
+    def test_rule_operands_without_wires_or_controls(self):
+        """A parameter-only rule retains an empty wire operand and reconstructs without controls."""
+        trace_inputs = RuleTraceInputs(
+            call_args=(np.float64(0.5),),
+            call_kwargs={},
+            kwarg_names=[],
+            wire_lens={},
+        )
+
+        operands = rule_call_operands(trace_inputs)
+
+        assert len(operands) == 2
+        np.testing.assert_array_equal(operands[0], 0.5)
+        assert operands[1].shape == (0,)
+
+        args, kwargs, ctrl_wires, ctrl_values, work_wires = unpack_rule_operands(
+            operands, n_params=1, kwarg_names=[], wire_lens={}, has_ctrl_wires=False
+        )
+
+        assert len(args) == 1
+        np.testing.assert_array_equal(args[0], 0.5)
+        assert kwargs == {}
+        assert ctrl_wires is None
+        assert ctrl_values is None
+        assert work_wires is None
 
     def test_unpack_rule_operands_restores_wire_kwargs(self):
         """Grouped base wires unpack into distinct registers, including an empty register."""
@@ -167,7 +226,14 @@ class TestGenericUtilities:
         kwarg_names = ["wires"]
 
         operands = rule_call_operands(
-            (), call_kwargs, kwarg_names, wire_lens, jnp.array([1, 2]), jnp.array([True, False])
+            RuleTraceInputs(
+                call_args=(),
+                call_kwargs=call_kwargs,
+                kwarg_names=kwarg_names,
+                wire_lens=wire_lens,
+                ctrl_wires=jnp.array([1, 2]),
+                ctrl_values=jnp.array([True, False]),
+            )
         )
         assert len(operands) == 3
         np.testing.assert_array_equal(operands[0], [0, 3])
@@ -181,6 +247,36 @@ class TestGenericUtilities:
         np.testing.assert_array_equal(ctrl_wires, [1, 2])
         np.testing.assert_array_equal(ctrl_values, [True, False])
         np.testing.assert_array_equal(work_wires, [3])
+
+    def test_unpack_rule_operands_restores_hybrid_arguments(self):
+        """Hybrid leaves reconstruct their nested argument without consuming wire or control inputs."""
+        hybrid_specs, _, _ = flatten_hybrid_args({"data": (Float[2], {"matrix": Float[2, 2]})})
+        operands = (
+            jnp.array(0.25),
+            jnp.array([3.0, 4.0]),
+            jnp.array([[5.0, 6.0], [7.0, 8.0]]),
+            jnp.array([0, 1]),
+            jnp.array([2]),
+            jnp.array([False]),
+        )
+
+        args, kwargs, ctrl_wires, ctrl_values, work_wires = unpack_rule_operands(
+            operands,
+            n_params=0,
+            kwarg_names=["theta", "wires"],
+            wire_lens={"wires": 2},
+            has_ctrl_wires=True,
+            hybrid_specs=hybrid_specs,
+        )
+
+        assert args == ()
+        np.testing.assert_array_equal(kwargs["theta"], 0.25)
+        np.testing.assert_array_equal(kwargs["data"][0], [3.0, 4.0])
+        np.testing.assert_array_equal(kwargs["data"][1]["matrix"], [[5.0, 6.0], [7.0, 8.0]])
+        np.testing.assert_array_equal(kwargs["wires"], [0, 1])
+        np.testing.assert_array_equal(ctrl_wires, [2])
+        np.testing.assert_array_equal(ctrl_values, [False])
+        assert work_wires is None
 
     def test_hybrid_operands_preserve_parameters_and_wires(self):
         """Nested parameters follow ordinary hybrid parameters; wires retain their mapping."""
@@ -740,9 +836,12 @@ class TestGenericUtilities:
         kwargs = prepare_dynamic_op_kwargs({"0": ShapedArray((), float)}, {"wires": 1})
 
         with qp.capture.toggle_ctx(False):
-            _, resource_ids, _ = collect_resources_for_op("RZ", kwargs, is_custom_op=True)
+            collected_rules = collect_resources_for_op("RZ", kwargs, is_custom_op=True)
 
-        assert resource_ids["_rz_to_rx_cliff"] == {
+        collected = next(
+            rule for rule in collected_rules if rule.source_rule.name == "_rz_to_rx_cliff"
+        )
+        assert collected.resource_counts_by_id == {
             "Hadamard{}{wires:1}{}": 2,
             "RX{0:[f64]}{wires:1}{}": 1,
         }
@@ -757,7 +856,7 @@ class TestGenericUtilities:
         with local_decomps():
             add_decomps("Adjoint(NoParams)", symbolic_rule)
             with qp.capture.toggle_ctx(False):
-                _, _, _, resource_ids = collect_symbolic_resources(
+                collected_rules, _ = collect_symbolic_resources(
                     NoParams,
                     "NoParams",
                     prepare_dynamic_op_kwargs({}, {"reg": 1}),
@@ -765,10 +864,82 @@ class TestGenericUtilities:
                     kind="adjoint",
                 )
 
-        assert resource_ids["symbolic_rule"] == {
+        (collected,) = collected_rules
+        assert collected.source_rule is symbolic_rule
+        assert collected.resource_counts_by_id == {
             "Hadamard{}{wires:1}{}": 2,
             "PauliX{}{wires:1}{}": 1,
         }
+
+
+class TestCollectedResources:
+    """Resource collection returns complete records in registry order."""
+
+    @pytest.mark.parametrize("kind", ["distributed", "adjoint", "control"])
+    @pytest.mark.parametrize("failure_stage", ["compute_resources", "graph_op_id"])
+    def test_failed_collection_keeps_successful_rules(self, kind, failure_stage, mocker):
+        """A failed rule is omitted without losing populated or empty resource results."""
+
+        @register_resources({qp.X(Wire[1]): 2})
+        def populated_rule(**_):
+            pass
+
+        @register_resources({qp.Z(Wire[1]): 1})
+        def failing_rule(**_):
+            pass
+
+        @register_resources({})
+        def empty_rule(**_):
+            pass
+
+        if failure_stage == "compute_resources":
+            mocker.patch.object(
+                failing_rule, "compute_resources", side_effect=ValueError("resource failure")
+            )
+        else:
+            original_get_id = GraphOpID.getGraphOpId
+
+            def get_id(op_id, *args, **kwargs):
+                if op_id.operator_name == "PauliZ":
+                    raise ValueError("resource failure")
+                return original_get_id(op_id, *args, **kwargs)
+
+            mocker.patch.object(GraphOpID, "getGraphOpId", autospec=True, side_effect=get_id)
+
+        kwargs = prepare_dynamic_op_kwargs({}, {"reg": 2})
+        lookup_name = "NoParams" if kind == "distributed" else symbolic_op_name("NoParams", kind)
+        with local_decomps():
+            add_decomps(lookup_name, populated_rule, failing_rule, empty_rule)
+            with pytest.warns(
+                RuleLoweringWarning,
+                match="Failed to get resources for the failing_rule decomposition rule: resource failure",
+            ) as recorded:
+                if kind == "distributed":
+                    collected_rules = collect_resources_for_op(
+                        "NoParams", kwargs, op_cls=NoParams, modifiers=ModifierState(True, 1)
+                    )
+                else:
+                    collected_rules, _ = collect_symbolic_resources(
+                        NoParams,
+                        "NoParams",
+                        kwargs,
+                        False,
+                        kind=kind,
+                        ctrl_wires=(2,) if kind == "control" else (),
+                        ctrl_values=(True,) if kind == "control" else (),
+                    )
+
+        assert len(recorded) == 1
+        populated, empty = collected_rules
+        assert populated.source_rule is populated_rule
+        assert populated.resource_counts_by_op == {qp.X(Wire[1]): 2}
+        resource_id = (
+            "C(Adjoint(PauliX)){}{wires:1}{}" if kind == "distributed" else "PauliX{}{wires:1}{}"
+        )
+        assert populated.resource_counts_by_id == {resource_id: 2}
+        assert empty.source_rule is empty_rule
+        assert empty.resource_counts_by_op == {}
+        assert empty.resource_counts_by_id == {}
 
 
 class TestPrecompiled:
@@ -1276,7 +1447,7 @@ class TestOnDemand:
 
         from catalyst.decomposition import decomposition_rules as dr
 
-        mocker.patch.object(dr, "collect_resources_for_op", return_value=({}, {}, []))
+        mocker.patch.object(dr, "collect_resources_for_op", return_value=[])
         failed_qjit = mocker.MagicMock(mlir_module=None)
         mocker.patch.object(dr.qp, "qjit", return_value=lambda _circuit: failed_qjit)
 
@@ -2250,14 +2421,10 @@ class TestApplicabilityFilterOrdering:
         rule = self._symbolic_rule(
             "inapplicable_sym_rule", applicable=False, resources_explode=True
         )
-        rules, _, name_to_resources, name_to_resource_ids = self._collect_symbolic(
-            rule, lookup_name, kind, ctrl_wires
-        )
+        collected_rules, _ = self._collect_symbolic(rule, lookup_name, kind, ctrl_wires)
 
         assert self._lowering_warnings(recwarn) == []
-        assert [r.name for r in rules] == []
-        assert name_to_resources == {}
-        assert name_to_resource_ids == {}
+        assert collected_rules == []
 
     @pytest.mark.parametrize("kind, lookup_name, ctrl_wires", SYMBOLIC_KINDS)
     def test_symbolic_raising_condition_is_reported(self, kind, lookup_name, ctrl_wires, recwarn):
@@ -2265,15 +2432,14 @@ class TestApplicabilityFilterOrdering:
         skipped, for both symbolic kinds."""
 
         rule = self._symbolic_rule("exploding_sym_rule", condition_explodes=True)
-        rules, _, name_to_resources, _ = self._collect_symbolic(rule, lookup_name, kind, ctrl_wires)
+        collected_rules, _ = self._collect_symbolic(rule, lookup_name, kind, ctrl_wires)
 
         # NOTE: the message names the base operator, which is what `collect_symbolic_resources`
         # hands down; the rule itself is registered against `lookup_name`.
         assert self._lowering_warnings(recwarn) == [
             "Excluded the exploding_sym_rule decomposition rule for NoParams; raised 'some error'"
         ]
-        assert [r.name for r in rules] == []
-        assert name_to_resources == {}
+        assert collected_rules == []
 
     def test_control_rule_needing_work_wires_is_skipped(self, recwarn):
         """Test that a ``C(Op)`` rule requiring a work wire is filtered out on this path.
@@ -2296,14 +2462,11 @@ class TestApplicabilityFilterOrdering:
         impl.__name__ = "ctrl_work_wire_rule"
         rule = register_condition(condition)(register_resources(resources)(impl))
 
-        rules, probe_args, name_to_resources, _ = self._collect_symbolic(
-            rule, "C(NoParams)", "control", (2,)
-        )
+        collected_rules, probe_args = self._collect_symbolic(rule, "C(NoParams)", "control", (2,))
 
         assert probe_args["work_wires"] == Wires([])
         assert self._lowering_warnings(recwarn) == []
-        assert [r.name for r in rules] == []
-        assert name_to_resources == {}
+        assert collected_rules == []
 
 
 class TestVerboseSolution:
@@ -2568,14 +2731,11 @@ class TestCustomRuleApplication:
 
             resources = qp.analyze(circuit, level="all-user")().resources
 
-        decomposed = resources["graph-decomposition"].counts
-        assert decomposed.get("NoParamsCustomOp", 0) == 0
-        assert decomposed.get("PauliX", 0) == 0  # assert that the second rule got used
-        assert decomposed.get("PauliY", 0) == 2  # assert that the second rule got used
+        assert resources["graph-decomposition"].counts == {"PauliY": 2}
 
-    @pytest.mark.parametrize("option", ["fixed_decomps", "alt_decomps"])
-    def test_fixed_and_alt_decomps_for_modifier_wrapped_op(self, option):
-        """Tests that fixed and alt decomps keyed by a modifier-wrapped operator name,
+    @pytest.mark.parametrize("option", ["fixed_decomps", "exclude_decomps"])
+    def test_fixed_and_exclude_decomps_for_modifier_wrapped_op(self, option):
+        """Tests that fixed and excluded decomps keyed by a modifier-wrapped operator name,
         which is quoted in the pass options, are respected."""
 
         @qp.register_resources({qp.X: 1})
@@ -2587,7 +2747,7 @@ class TestCustomRuleApplication:
             qp.Y(base.wires)
             qp.Y(base.wires)
 
-        rules = {"fixed_decomps": rule2, "alt_decomps": [rule2]}[option]
+        rules = {"fixed_decomps": rule2, "exclude_decomps": [rule1]}[option]
 
         with local_decomps():
 
@@ -2608,8 +2768,38 @@ class TestCustomRuleApplication:
         assert decomposed.get("PauliX", 0) == 0
         assert decomposed.get("PauliY", 0) == 2
 
+    @pytest.mark.parametrize("exclude_rule", [False, True])
+    def test_exclude_decomps(self, exclude_rule):
+        """Excluding the cheaper rule forces the graph pass to use the other rule."""
+
+        @qp.register_resources({qp.X: 1})
+        def custom_to_x(wires):
+            qp.X(wires)
+
+        @qp.register_resources({qp.Y: 2})
+        def custom_to_y(wires):
+            qp.Y(wires)
+            qp.Y(wires)
+
+        with local_decomps():
+            add_decomps(NoParamsCustomOp, custom_to_x, custom_to_y)
+
+            @qjit(capture=True, target="mlir")
+            @qp.decompose(
+                gate_set={qp.X, qp.Y},
+                exclude_decomps={NoParamsCustomOp: [custom_to_x.name]} if exclude_rule else None,
+            )
+            @qnode(qp.device("null.qubit", wires=1))
+            def circuit():
+                NoParamsCustomOp(0)
+
+            resources = qp.analyze(circuit, level="all-user")().resources
+
+        expected = {"PauliY": 2} if exclude_rule else {"PauliX": 1}
+        assert resources["graph-decomposition"].counts == expected
+
     def test_fix_decomp_invalid_name(self):
-        """Tests that an error is raised by referring to an inexistant rule name."""
+        """Tests that an error is raised by referring to a non-existent rule name."""
 
         @qjit(capture=True, target="mlir")
         @qp.decompose(gate_set={qp.X}, fixed_decomps={NoParamsCustomOp: "custom_rule"})
@@ -2617,8 +2807,8 @@ class TestCustomRuleApplication:
         def circuit():
             NoParamsCustomOp(0)
 
-        with pytest.raises(ValueError, match="Unknown decomposition rule"):
-            resources = qp.analyze(circuit, level="all-user")().resources
+        with pytest.raises(ValueError, match="Rule (.*) not found for operator"):
+            qp.analyze(circuit, level="all-user")().resources
 
     def test_fix_decomp_invalid_type(self):
         """Tests that an error is raised by referring to an invalid object."""
@@ -2632,7 +2822,7 @@ class TestCustomRuleApplication:
         def circuit():
             NoParamsCustomOp(0)
 
-        with pytest.raises(TypeError, match="fixed_decomps accepts rules or the names"):
+        with pytest.raises(AssertionError, match="Fixed decomposition rules must be"):
             qp.analyze(circuit, level="all-user")().resources
 
     def test_functional_adjoint_region_is_lowered(self):
@@ -2788,59 +2978,85 @@ class TestDecomposeAlias:
         # phaseshift is decomposed by the outer pass
         assert resources["graph-decomposition-2"].counts == {"RZ": 1, "GlobalPhase": 1}
 
-    def test_decompose_inline_fixed_decomps(self):
-        """Inline ``fixed_decomps`` rule bodies are registered for the graph pass."""
+    def test_decompose_exclusions_without_rule_collection(self):
+        """Exclusions can be forwarded when frontend rule collection is disabled."""
 
-        @register_resources({NoParams(Wire[1]): 1})
-        def rot_to_noparams(phi, theta, omega, wires):  # pylint: disable=unused-argument
-            NoParams(wires[0])
+        @qjit(capture=True, target="mlir", collect_decomp_rules=False)
+        @qp.decompose(gate_set={qp.RX}, exclude_decomps={qp.RX: list(qp.list_decomps(qp.RX))})
+        @qnode(qp.device("null.qubit", wires=1))
+        def circuit():
+            qp.RX(0.1, wires=0)
 
-        qp.decomposition.enable_graph()
-        try:
+        assert "exclude-decomps" in circuit.mlir
+        resources = qp.analyze(circuit, level="all-user")().resources
+        assert resources["graph-decomposition"].counts == {"RX": 1}
 
-            @qjit(capture=True, target="mlir")
-            @qp.decompose(
-                gate_set={"NoParams"},
-                fixed_decomps={qp.Rot: rot_to_noparams},
+    def test_decompose_rejects_alt_decomps(self):
+        """The public PennyLane entry point rejects the removed option."""
+        with pytest.raises(TypeError, match="alt_decomps"):
+            qp.decompose(gate_set={qp.RX}, alt_decomps={qp.RX: []})
+
+
+class TestResourceEstimate:
+    """Tests for ``resource-estimate`` using the ``qp.estimate`` path.
+
+    ``qp.estimate`` builds ``transform(pass_name="resource-estimate")(gate_set=...)``; under
+    capture that must go through ``_handle_decompose_transform`` and emit the
+    ``resource-estimate`` pass.
+    """
+
+    _resource_estimate = qp.transform(pass_name="resource-estimate")
+
+    def test_resource_estimate_requires_gate_set(self, tmp_path):
+        """resource-estimate without a gate set is rejected with a clear error."""
+        out = tmp_path / "resources.json"
+        with pytest.raises(ValueError, match="requires an explicit 'gate_set'"):
+
+            @qjit(capture=True, skip_preprocess=True, target="mlir")
+            @self._resource_estimate(
+                gate_set=None,
+                output_json=True,
+                output_fname=str(out),
             )
             @qnode(qp.device("null.qubit", wires=1))
             def circuit():
                 qp.Rot(0.1, 0.2, 0.3, wires=0)
                 return qp.probs()
 
-            mlir = circuit.mlir
-        finally:
-            qp.decomposition.disable_graph()
+            circuit()
 
-        # The inline rule body is registered (via add_decomps in a local scope) and captured into
-        # the module by the trace-time rule closure, and the circuit routes to graph-decomposition.
-        assert 'apply_registered_pass "graph-decomposition"' in mlir
-        assert "NoParams" in mlir
+    def test_resource_estimate_requires_output_json(self, tmp_path):
+        """resource-estimate without output_json is rejected with a clear error."""
+        out = tmp_path / "resources.json"
+        with pytest.raises(ValueError, match="requires an explicit 'output_json'"):
 
-    def test_decompose_inline_rules_require_rule_collection(self):
-        """Inline rules with ``collect_decomp_rules=False`` raise a clear error."""
+            @qjit(capture=True, skip_preprocess=True, target="mlir")
+            @self._resource_estimate(
+                gate_set={"RX", "RY", "RZ"},
+                output_fname=str(out),
+            )
+            @qnode(qp.device("null.qubit", wires=1))
+            def circuit():
+                qp.Rot(0.1, 0.2, 0.3, wires=0)
+                return qp.probs()
 
-        @register_resources({NoParams(Wire[1]): 1})
-        def rot_to_noparams(phi, theta, omega, wires):  # pylint: disable=unused-argument
-            NoParams(wires[0])
+            circuit()
 
-        qp.decomposition.enable_graph()
-        try:
-            with pytest.raises(NotImplementedError, match="collect_decomp_rules"):
+    def test_resource_estimate_requires_output_fname(self):
+        """resource-estimate without output_fname is rejected with a clear error."""
+        with pytest.raises(ValueError, match="requires an explicit 'output_fname'"):
 
-                @qjit(capture=True, target="mlir", collect_decomp_rules=False)
-                @qp.decompose(
-                    gate_set={"NoParams"},
-                    fixed_decomps={qp.Rot: rot_to_noparams},
-                )
-                @qnode(qp.device("null.qubit", wires=1))
-                def circuit():
-                    qp.Rot(0.1, 0.2, 0.3, wires=0)
-                    return qp.probs()
+            @qjit(capture=True, skip_preprocess=True, target="mlir")
+            @self._resource_estimate(
+                gate_set={"RX", "RY", "RZ"},
+                output_json=True,
+            )
+            @qnode(qp.device("null.qubit", wires=1))
+            def circuit():
+                qp.Rot(0.1, 0.2, 0.3, wires=0)
+                return qp.probs()
 
-                qp.analyze(circuit, level="all-user")()
-        finally:
-            qp.decomposition.disable_graph()
+            circuit()
 
 
 class TestNumericHamiltonianDecomposition:

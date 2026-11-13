@@ -101,6 +101,11 @@ struct ResourceTracker final {
      * Updates the gate type and size counts, and if depth tracking is enabled,
      * updates the depth of the wires involved in the operation.
      *
+     * @note An operation without any wires, i.e. a global phase without control wires, does not
+     * contribute to the depth. A global phase commutes with every other operation and has no
+     * physical effect, so it does not occupy a layer. A controlled global phase is a relative
+     * phase on its control wires, and is counted on those wires.
+     *
      * @param name The name of the operation
      * @param wires The wires the operation is being applied to
      * @param controlled_wires The control wires the operation is being applied to

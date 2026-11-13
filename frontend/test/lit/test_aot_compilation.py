@@ -18,7 +18,7 @@ import jax
 import pennylane as qp
 from jax.core import ShapedArray
 
-from catalyst import measure, qjit
+from catalyst import qjit
 
 """
 Currently unsupported:
@@ -35,7 +35,7 @@ def function_complex(x: complex, y: complex):
     y_r = y.real
     val = jax.numpy.arctan2(x_r, y_r)
     qp.RZ(val, wires=0)
-    return measure(wires=0)
+    return qp.expval(qp.Z(wires=0))
 
 
 print(function_complex.mlir)
@@ -50,7 +50,7 @@ def function_jaxnumpy_csingle(x: jax.numpy.csingle, y: jax.numpy.csingle):
     y_r = y.real
     val = jax.numpy.arctan2(x_r, y_r)
     qp.RZ(val, wires=0)
-    return measure(wires=0)
+    return qp.expval(qp.Z(wires=0))
 
 
 print(function_jaxnumpy_csingle.mlir)
@@ -65,7 +65,7 @@ def function_jaxnumpy_cdouble(x: jax.numpy.cdouble, y: jax.numpy.cdouble):
     y_r = y.real
     val = jax.numpy.arctan2(x_r, y_r)
     qp.RZ(val, wires=0)
-    return measure(wires=0)
+    return qp.expval(qp.Z(wires=0))
 
 
 print(function_jaxnumpy_cdouble.mlir)
@@ -80,7 +80,7 @@ def function_jaxnumpy_complex_(x: jax.numpy.complex_, y: jax.numpy.complex_):
     y_r = y.real
     val = jax.numpy.arctan2(x_r, y_r)
     qp.RZ(val, wires=0)
-    return measure(wires=0)
+    return qp.expval(qp.Z(wires=0))
 
 
 print(function_jaxnumpy_complex_.mlir)
@@ -95,7 +95,7 @@ def function_jaxnumpy_complex64(x: jax.numpy.complex64, y: jax.numpy.complex64):
     y_r = y.real
     val = jax.numpy.arctan2(x_r, y_r)
     qp.RZ(val, wires=0)
-    return measure(wires=0)
+    return qp.expval(qp.Z(wires=0))
 
 
 print(function_jaxnumpy_complex64.mlir)
@@ -110,7 +110,7 @@ def function_jaxnumpy_complex128(x: jax.numpy.complex128, y: jax.numpy.complex12
     y_r = y.real
     val = jax.numpy.arctan2(x_r, y_r)
     qp.RZ(val, wires=0)
-    return measure(wires=0)
+    return qp.expval(qp.Z(wires=0))
 
 
 print(function_jaxnumpy_complex128.mlir)
@@ -123,7 +123,7 @@ print(function_jaxnumpy_complex128.mlir)
 def function_bool(x: bool, y: bool):
     val = jax.numpy.arctan2(x, y)
     qp.RZ(val, wires=0)
-    return measure(wires=0)
+    return qp.expval(qp.Z(wires=0))
 
 
 print(function_bool.mlir)
@@ -136,7 +136,7 @@ print(function_bool.mlir)
 def function_int(x: int, y: int):
     val = jax.numpy.arctan2(x, y)
     qp.RZ(val, wires=0)
-    return measure(wires=0)
+    return qp.expval(qp.Z(wires=0))
 
 
 print(function_int.mlir)
@@ -149,7 +149,7 @@ print(function_int.mlir)
 def function_float(x: float, y: float):
     val = jax.numpy.arctan2(x, y)
     qp.RZ(val, wires=0)
-    return measure(wires=0)
+    return qp.expval(qp.Z(wires=0))
 
 
 print(function_float.mlir)
@@ -162,7 +162,7 @@ print(function_float.mlir)
 def function_jaxnumpy_float64(x: jax.numpy.float64, y: jax.numpy.float64):
     val = jax.numpy.arctan2(x, y)
     qp.RZ(val, wires=0)
-    return measure(wires=0)
+    return qp.expval(qp.Z(wires=0))
 
 
 print(function_jaxnumpy_float64.mlir)
@@ -175,7 +175,7 @@ print(function_jaxnumpy_float64.mlir)
 def function_jaxnumpy_double(x: jax.numpy.double, y: jax.numpy.double):
     val = jax.numpy.arctan2(x, y)
     qp.RZ(val, wires=0)
-    return measure(wires=0)
+    return qp.expval(qp.Z(wires=0))
 
 
 print(function_jaxnumpy_double.mlir)
@@ -188,7 +188,7 @@ print(function_jaxnumpy_double.mlir)
 def function_jaxnumpy_int_(x: jax.numpy.int_, y: jax.numpy.int_):
     val = jax.numpy.arctan2(x, y)
     qp.RZ(val, wires=0)
-    return measure(wires=0)
+    return qp.expval(qp.Z(wires=0))
 
 
 print(function_jaxnumpy_int_.mlir)
@@ -201,7 +201,7 @@ print(function_jaxnumpy_int_.mlir)
 def function_jaxnumpy_int64(x: jax.numpy.int64, y: jax.numpy.int64):
     val = jax.numpy.arctan2(x, y)
     qp.RZ(val, wires=0)
-    return measure(wires=0)
+    return qp.expval(qp.Z(wires=0))
 
 
 print(function_jaxnumpy_int64.mlir)
@@ -214,7 +214,7 @@ print(function_jaxnumpy_int64.mlir)
 def function_scalar_tensor_bool(x: ShapedArray([], bool), y: ShapedArray([], bool)):
     val = jax.numpy.arctan2(x, y)
     qp.RZ(val, wires=0)
-    return measure(wires=0)
+    return qp.expval(qp.Z(wires=0))
 
 
 print(function_scalar_tensor_bool.mlir)
@@ -227,7 +227,7 @@ print(function_scalar_tensor_bool.mlir)
 def function_scalar_tensor_int(x: ShapedArray([], int), y: ShapedArray([], int)):
     val = jax.numpy.arctan2(x, y)
     qp.RZ(val, wires=0)
-    return measure(wires=0)
+    return qp.expval(qp.Z(wires=0))
 
 
 print(function_scalar_tensor_int.mlir)
@@ -240,7 +240,7 @@ print(function_scalar_tensor_int.mlir)
 def function_scalar_tensor_float(x: ShapedArray([], float), y: ShapedArray([], float)):
     val = jax.numpy.arctan2(x, y)
     qp.RZ(val, wires=0)
-    return measure(wires=0)
+    return qp.expval(qp.Z(wires=0))
 
 
 print(function_scalar_tensor_float.mlir)
@@ -255,7 +255,7 @@ def function_scalar_tensor_jaxnumpy_float64(
 ):
     val = jax.numpy.arctan2(x, y)
     qp.RZ(val, wires=0)
-    return measure(wires=0)
+    return qp.expval(qp.Z(wires=0))
 
 
 print(function_scalar_tensor_jaxnumpy_float64.mlir)
@@ -270,7 +270,7 @@ def function_scalar_tensor_jaxnumpy_double(
 ):
     val = jax.numpy.arctan2(x, y)
     qp.RZ(val, wires=0)
-    return measure(wires=0)
+    return qp.expval(qp.Z(wires=0))
 
 
 print(function_scalar_tensor_jaxnumpy_double.mlir)
@@ -285,7 +285,7 @@ def function_scalar_tensor_jaxnumpy_int_(
 ):
     val = jax.numpy.arctan2(x, y)
     qp.RZ(val, wires=0)
-    return measure(wires=0)
+    return qp.expval(qp.Z(wires=0))
 
 
 print(function_scalar_tensor_jaxnumpy_int_.mlir)
@@ -300,7 +300,7 @@ def function_scalar_tensor_jaxnumpy_int64(
 ):
     val = jax.numpy.arctan2(x, y)
     qp.RZ(val, wires=0)
-    return measure(wires=0)
+    return qp.expval(qp.Z(wires=0))
 
 
 print(function_scalar_tensor_jaxnumpy_int64.mlir)
@@ -313,7 +313,7 @@ print(function_scalar_tensor_jaxnumpy_int64.mlir)
 def function_tensor_bool(x: ShapedArray([1], bool), y: ShapedArray([1], bool)):
     val = jax.numpy.arctan2(x[0], y[0])
     qp.RZ(val, wires=0)
-    return measure(wires=0)
+    return qp.expval(qp.Z(wires=0))
 
 
 print(function_tensor_bool.mlir)
@@ -326,7 +326,7 @@ print(function_tensor_bool.mlir)
 def function_tensor_int(x: ShapedArray([1], int), y: ShapedArray([1], int)):
     val = jax.numpy.arctan2(x[0], y[0])
     qp.RZ(val, wires=0)
-    return measure(wires=0)
+    return qp.expval(qp.Z(wires=0))
 
 
 print(function_tensor_int.mlir)
@@ -339,7 +339,7 @@ print(function_tensor_int.mlir)
 def function_tensor_float(x: ShapedArray([1], float), y: ShapedArray([1], float)):
     val = jax.numpy.arctan2(x[0], y[0])
     qp.RZ(val, wires=0)
-    return measure(wires=0)
+    return qp.expval(qp.Z(wires=0))
 
 
 print(function_tensor_float.mlir)
@@ -354,7 +354,7 @@ def function_tensor_jaxnumpy_float64(
 ):
     val = jax.numpy.arctan2(x[0], y[0])
     qp.RZ(val, wires=0)
-    return measure(wires=0)
+    return qp.expval(qp.Z(wires=0))
 
 
 print(function_tensor_jaxnumpy_float64.mlir)
@@ -369,7 +369,7 @@ def function_tensor_jaxnumpy_double(
 ):
     val = jax.numpy.arctan2(x[0], y[0])
     qp.RZ(val, wires=0)
-    return measure(wires=0)
+    return qp.expval(qp.Z(wires=0))
 
 
 print(function_tensor_jaxnumpy_double.mlir)
@@ -384,7 +384,7 @@ def function_tensor_jaxnumpy_int_(
 ):
     val = jax.numpy.arctan2(x[0], y[0])
     qp.RZ(val, wires=0)
-    return measure(wires=0)
+    return qp.expval(qp.Z(wires=0))
 
 
 print(function_tensor_jaxnumpy_int_.mlir)
@@ -399,7 +399,7 @@ def function_tensor_jaxnumpy_int64(
 ):
     val = jax.numpy.arctan2(x[0], y[0])
     qp.RZ(val, wires=0)
-    return measure(wires=0)
+    return qp.expval(qp.Z(wires=0))
 
 
 print(function_tensor_jaxnumpy_int64.mlir)

@@ -435,15 +435,7 @@ def _convert_decomp_target_spec(interpreter, target_spec):
     """Convert one target specification into Catalyst rule JAXPRs."""
 
     with take_current_trace():
-        operands = rule_call_operands(
-            target_spec.call_args,
-            target_spec.call_kwargs,
-            target_spec.kwarg_names,
-            target_spec.wire_lens,
-            target_spec.ctrl_wires,
-            target_spec.ctrl_values,
-            target_spec.hybrid_leaves,
-        )
+        operands = rule_call_operands(target_spec.trace_inputs)
         operands = [jax.ShapeDtypeStruct(operand.shape, operand.dtype) for operand in operands]
     out = []
     for rule in target_spec.rules:
