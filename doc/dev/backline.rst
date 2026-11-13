@@ -221,8 +221,9 @@ link they reach it through (``runtime/lib/transport/rdma/common/PeerLink.hpp``):
 
 * ``catalyst``: The default, used when ``peer=`` is left out. For the catalyst controllers
   (``cpu_verbs``, ``hwhs``, ``fpga_verbs``).
-* ``hsb``: For ``hsb_hwhs``, a controller behind NVIDIA's Holoscan Sensor Bridge.
-* ``balboa``: For ``balboa_hwhs``, a controller behind ETH Zurich's BALBOA.
+* ``hsb``: For ``hsb_hwhs``, a controller behind NVIDIA's `Holoscan Sensor Bridge`_.
+* ``balboa``: For ``balboa_hwhs``, a controller behind `BALBOA`_, the RDMA stack of ETH Zurich's
+  Coyote.
 
 A node placed on ``hsb_hwhs`` needs ``peer=hsb`` in its coprocessors' configs, and one on
 ``balboa_hwhs`` needs ``peer=balboa``. For example, a GPU coprocessor facing an ``hsb_hwhs``
@@ -354,11 +355,11 @@ image. The controller runs as root on the board and currently supports only BL16
     and ``/dev/mem``. Its coprocessors use the default, ``peer=catalyst``, and can leave ``peer``
     out.
 ``hsb_hwhs``
-    The HSB image, with NVIDIA's Holoscan Sensor Bridge as the network IP core.
+    The HSB image, with NVIDIA's `Holoscan Sensor Bridge`_ as the network IP core.
     In the coprocessor's config, set ``peer=hsb`` and set ``gid=`` to the RoCE v2 GID of its IPv4
     address.
 ``balboa_hwhs``
-    The BALBOA image, with ETH Zurich's BALBOA as the network IP core.
+    The BALBOA image, with ETH Zurich's `BALBOA`_ as the network IP core.
     In the coprocessor's config, set ``peer=balboa`` and set ``gid=`` to the RoCE v2 GID of its
     IPv4 address.
 
@@ -612,3 +613,5 @@ platform is built out.
 .. _pennylane.backline: https://docs.pennylane.ai/en/latest/code/qp_backline.html
 .. _Placement: https://docs.pennylane.ai/en/latest/code/qp_backline.html
 .. _Backline: https://docs.pennylane.ai/en/latest/code/qp_backline.html
+.. _Holoscan Sensor Bridge: https://github.com/nvidia-holoscan/holoscan-sensor-bridge
+.. _BALBOA: https://github.com/fpgasystems/Coyote
