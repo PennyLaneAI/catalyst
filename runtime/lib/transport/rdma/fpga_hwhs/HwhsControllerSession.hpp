@@ -63,8 +63,8 @@ class Region {
     std::shared_ptr<common::Context> ctx_;
 };
 
-// Demo mode settings
-struct DemoCfg {
+// Pacer settings
+struct PacerCfg {
     bool enable = false;
     std::uint64_t freq_num = 0;    // core-clock cycles between sends (200 MHz: 5 ms = 1'000'000)
     std::uint32_t cmd_cnt = 1;     // syndromes per run
@@ -84,7 +84,7 @@ class HwhsControllerSession final : public ControllerSession {
                           std::optional<MemKind> data_kind = std::nullopt,
                           std::optional<MemKind> sq_kind = std::nullopt,
                           std::optional<MemKind> reply_kind = std::nullopt, bool sw_poll = true,
-                          bool kick_ioctl = false, DemoCfg demo = {});
+                          bool kick_ioctl = false, PacerCfg pacer = {});
     ~HwhsControllerSession() override;
 
     HwhsControllerSession(const HwhsControllerSession &) = delete;
@@ -108,6 +108,8 @@ class HwhsControllerSession final : public ControllerSession {
     void write_data_slot(const void *src, std::uint64_t bytes, std::uint32_t decoder_id) override;
     void *reply_slot() override;
     int kick(std::uint32_t work_item_idx = 0) override;
+    bool self_paced() const override { return pacer_.enable; }
+    int run_paced() override;
 
   private:
     Region region_alloc(std::uint64_t size, int mem_type, int access);
@@ -143,16 +145,16 @@ class HwhsControllerSession final : public ControllerSession {
     // Currently, we only support memory-mapped kick() when kick_ioctl is set to false
     bool kick_ioctl_ = false;
 
-    // Demo mode settings
-    DemoCfg demo_;
+    // Pacer settings
+    PacerCfg pacer_;
     volatile std::uint32_t *hh_demo_doorbell_ = nullptr; // DEMO_CTRL in the mmap'd window
-    void demo_program();                                 // push DemoCfg into the engine
-    void demo_preload();                                 // fill the BRAM syndrome table
-    void demo_report() const;                            // print the demo mode results
-    void demo_dump_trace() const;                        // dump the trace memory
-    void demo_diff_dump() const;           // dump the diff between the expected and actual results
-    void demo_arm();                       // arm the demo mode
-    void demo_dump(const char *why) const; // dump the demo mode results
+    void pacer_program();                                // push PacerCfg into the engine
+    void pacer_preload();                                // fill the BRAM syndrome table
+    void pacer_report() const;                           // print the pacer mode results
+    void pacer_dump_trace() const;                       // dump the trace memory
+    void pacer_diff_dump() const;           // dump the diff between the expected and actual results
+    void pacer_arm();                       // arm the pacer mode
+    void pacer_dump(const char *why) const; // dump the pacer mode results
 
     // RDMA setup reused from devices/common.
     common::FdGuard oob_;
@@ -187,11 +189,11 @@ class HwhsControllerSession final : public ControllerSession {
     std::uint64_t kick_ns_ = 0;     // host clock at doorbell (sw-poll RTT)
     std::uint64_t last_rtt_ns_ = 0; // RTT reported to the app
 
-    // Demo mode bookkeeping
+    // Pacer bookkeeping
     std::uint32_t last_round_cnt_ = 0;
     std::uint64_t rounds_seen_ = 0;  // rounds the engine actually ran while we watched
-    bool demo_armed_ = false;        // the pacer level has been raised for this run
-    bool demo_finished_ = false;     // the engine hit cmd_cnt; no more rounds are coming
+    bool pacer_armed_ = false;       // the pacer level has been raised for this run
+    bool pacer_finished_ = false;    // the engine hit cmd_cnt; no more rounds are coming
     std::uint32_t err_cnt_base_ = 0; // since power-on error count
 
     // Report the collected per-round RTTs (min/percentiles/max/mean) on teardown.

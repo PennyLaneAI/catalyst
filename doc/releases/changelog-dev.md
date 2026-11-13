@@ -1169,6 +1169,10 @@
 * Updated `pylint` to version 4.1.3 in the development requirements and CI formatting workflow.
   [(#3459)](https://github.com/PennyLaneAI/catalyst/pull/3459)
 
+* A transport controller that issues its own rounds, such as `hwhs` with `pacer=hw`, now says so
+  through `ControllerSession::self_paced()`, and `start_benchmark` runs it with `run_paced()`.
+  [(#3463)](https://github.com/PennyLaneAI/catalyst/pull/3463)
+
 * The `cpu_verbs` and `gpu_verbs` transport backends reach their peer through a `PeerLink`
   instead of the shared `VerbsSessionBase`. Each coprocessor is one session over its link, and
   picks the link with a new `peer=` config key.
