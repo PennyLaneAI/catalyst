@@ -123,7 +123,7 @@ module {
     DecomposableGate op = *module->getOps<CustomOp>().begin();
 
     // Modifiers fold control-outermost
-    ASSERT_EQ(op.getGraphOpId(), "C(Adjoint(RX)){0:[f64]}{wires:1}{}");
+    ASSERT_EQ(op.getGraphOpId(), "1C(Adjoint(RX)){0:[f64]}{wires:1}{}");
 }
 
 TEST(DecomposableGateInterfaceTests, MultiControlledAdjointCustomOp) {
@@ -253,7 +253,7 @@ module {
     mlir::DictionaryAttr expectedStaticData = mlir::DictionaryAttr::get(&context, {entry});
     ASSERT_EQ(pcphase.getStaticData(), expectedStaticData);
 
-    ASSERT_EQ(pcphase.getGraphOpId(), "C(PCPhase){phi:[f64]}{wires:2}{dim = 0 : i64}");
+    ASSERT_EQ(pcphase.getGraphOpId(), "1C(PCPhase){phi:[f64]}{wires:2}{dim = 0 : i64}");
 }
 
 TEST(DecomposableGateInterfaceTests, GlobalPhaseOp) {
@@ -318,7 +318,7 @@ module {
     ASSERT_EQ(gphase.getStaticData().size(), 0);
 
     // Controlled unitary: the control wire is folded into the id (control-outermost).
-    ASSERT_EQ(gphase.getGraphOpId(), "C(GlobalPhase){phi:[f64]}{}{}");
+    ASSERT_EQ(gphase.getGraphOpId(), "1C(GlobalPhase){phi:[f64]}{}{}");
 }
 
 TEST(DecomposableGateInterfaceTests, QubitUnitaryOp) {
@@ -355,7 +355,7 @@ module {
 
     ASSERT_EQ(unitary.getStaticData().size(), 0);
 
-    ASSERT_EQ(unitary.getGraphOpId(), "C(QubitUnitary){U:[tensor<4x4xcomplex<f64>>]}{wires:2}{}");
+    ASSERT_EQ(unitary.getGraphOpId(), "1C(QubitUnitary){U:[tensor<4x4xcomplex<f64>>]}{wires:2}{}");
 }
 
 TEST(DecomposableGateInterfaceTests, OperatorOpQubits) {
@@ -444,7 +444,7 @@ module {
     ASSERT_EQ(op.getWireLens(), expectedWires);
     ASSERT_EQ(op.getNonCtrlQubitOperands().size(), 3u);
     ASSERT_EQ(op.getGraphOpId(),
-              "C(MultiControlledX){}{ctrl_work_wires:1,wires:1,work_wires:1}{"
+              "1C(MultiControlledX){}{ctrl_work_wires:1,wires:1,work_wires:1}{"
               "ctrl_work_wire_type = \"zeroed\", work_wire_type = \"borrowed\"}");
 }
 

@@ -272,7 +272,7 @@ class TestGenerateUID:
             variants = {
                 "StaticOp{}{wires:1}{}": base,
                 "Adjoint(StaticOp){}{wires:1}{}": qp.adjoint(base),
-                "C(StaticOp){}{wires:1}{}": qp.ctrl(base, control=[1]),
+                "1C(StaticOp){}{wires:1}{}": qp.ctrl(base, control=[1]),
                 "2C(Adjoint(StaticOp)){}{wires:1}{}": qp.ctrl(qp.adjoint(base), control=[1, 2]),
             }
 

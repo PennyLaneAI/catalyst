@@ -23,7 +23,7 @@ func.func @entry(%c: !quantum.bit, %q: !quantum.bit) attributes {llvm.emit_c_int
   return
 }
 
-// A controlled op that is already in the gate set stays untouched (its id `C(testT){}{wires:1}{}`
+// A controlled op that is already in the gate set stays untouched (its id `1C(testT){}{wires:1}{}`
 // matches the `C(testT)` gate-set entry -- it is NOT stripped to its base `testT`).
 // ALL-LABEL: func.func @ctrl_in_gateset(
 // ALL-SAME:  [[Q:%.+]]: !quantum.bit, [[C:%.+]]: !quantum.bit
@@ -48,7 +48,7 @@ func.func @decompose_to_ctrl(%q0: !quantum.bit, %q1: !quantum.bit) -> (!quantum.
 
 func.func private @cz_to_ct(%q0: !quantum.bit, %q1: !quantum.bit) -> (!quantum.bit, !quantum.bit) attributes {
     target_gate = "myCZ{}{wires:2}{}",
-    resources = {operations = {"C(testT){}{wires:1}{}" = 1 : i64}} } {
+    resources = {operations = {"1C(testT){}{wires:1}{}" = 1 : i64}} } {
   %true = arith.constant true
   %oq, %oc = quantum.custom "testT"() %q1 ctrls(%q0) ctrlvals(%true) : !quantum.bit ctrls !quantum.bit
   return %oc, %oq : !quantum.bit, !quantum.bit

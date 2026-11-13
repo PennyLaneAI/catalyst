@@ -30,7 +30,7 @@ func.func @distribute_ctrl_region(%q0: !quantum.bit, %q1: !quantum.bit) -> (!qua
 // ALL-LABEL: func.func private @cz_region
 func.func private @cz_region(%q0: !quantum.bit, %q1: !quantum.bit) -> (!quantum.bit, !quantum.bit) attributes {
     target_gate = "myCZ{}{wires:2}{}",
-    resources = {operations = {"C(testT){}{wires:1}{}" = 1 : i64}} } {
+    resources = {operations = {"1C(testT){}{wires:1}{}" = 1 : i64}} } {
   %true = arith.constant true
   %oc, %oq = quantum.ctrl(%q0) ctrlvals(%true) (%q1) : !quantum.bit -> !quantum.bit {
   ^bb0(%arg0: !quantum.bit):

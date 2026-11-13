@@ -33,8 +33,8 @@ func.func @parametric(%ctrl: !quantum.bit, %q: !quantum.bit, %theta: f64) -> (!q
 
 // C(RZ)(theta) -> C(PhaseShift)(theta): the parameter passes through, the control is value-agnostic.
 func.func private @ctrl_rz(%theta: f64, %q: !quantum.bit, %ctrl: !quantum.bit) -> (!quantum.bit, !quantum.bit) attributes {
-    target_gate = "C(TestRZ){0:[f64]}{wires:1}{}",
-    resources = {operations = {"C(TestPhaseShift){0:[f64]}{wires:1}{}" = 1 : i64}} } {
+    target_gate = "1C(TestRZ){0:[f64]}{wires:1}{}",
+    resources = {operations = {"1C(TestPhaseShift){0:[f64]}{wires:1}{}" = 1 : i64}} } {
   %true = arith.constant true
   %o, %oc = quantum.custom "TestPhaseShift"(%theta) %q ctrls(%ctrl) ctrlvals(%true) : !quantum.bit ctrls !quantum.bit
   return %o, %oc : !quantum.bit, !quantum.bit
