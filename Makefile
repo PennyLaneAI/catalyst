@@ -7,6 +7,8 @@ BLACKVERSIONMINOR := $(shell black --version 2> /dev/null | head -n1 | awk '{ pr
 BLACKVERSIONMINOR := $(if $(BLACKVERSIONMINOR),$(BLACKVERSIONMINOR),0)
 MK_ABSPATH := $(abspath $(lastword $(MAKEFILE_LIST)))
 MK_DIR := $(dir $(MK_ABSPATH))
+include $(MK_DIR)/Makefile.worktree
+CATALYST_MAIN_CHECKOUT_DIR ?= $(CATALYST_WORKTREE_CHECKOUT)
 LLVM_BUILD_DIR ?= $(MK_DIR)/mlir/llvm-project/build
 STABLEHLO_BUILD_DIR ?= $(MK_DIR)/mlir/stablehlo/build
 DIALECTS_SRC_DIR ?= $(MK_DIR)/mlir
@@ -92,6 +94,8 @@ endif
 help:
 	@echo "Please use \`make <target>' where <target> is one of"
 	@echo "  all                to build and install all Catalyst modules and its MLIR dependencies"
+	@echo "  worktree           to build and install this checkout using prebuilt LLVM, StableHLO and Enzyme"
+	@echo "                     CATALYST_MAIN_CHECKOUT_DIR=<checkout root> selects the shared dependencies"
 	@echo "  frontend           to install Catalyst Frontend"
 	@echo "  mlir               to build MLIR and custom Catalyst dialects"
 	@echo "  runtime            to build Catalyst Runtime"
@@ -100,6 +104,7 @@ help:
 	@echo "  docs               to build the documentation for Catalyst"
 	@echo "  wheel              to build the Catalyst wheel"
 	@echo "  clean              to uninstall Catalyst and delete frontend build and cache files"
+	@echo "  clean-worktree     to remove saved worktree setup and local build outputs, keeping dependencies"
 	@echo "  clean-mlir         to clean build files of MLIR and custom Catalyst dialects"
 	@echo "  clean-runtime      to clean build files of Catalyst Runtime"
 	@echo "  clean-oqc          to clean build files of OQC Runtime"
@@ -114,6 +119,33 @@ help:
 .PHONY: all catalyst
 all: runtime oqc mlir frontend
 catalyst: runtime dialects plugin frontend oqc
+
+.PHONY: worktree
+MAIN_MLIR_DIR := $(abspath $(CATALYST_MAIN_CHECKOUT_DIR))/mlir
+worktree: CATALYST_WORKTREE_CHECKOUT := $(abspath $(CATALYST_MAIN_CHECKOUT_DIR))
+worktree:
+	@printf '%s\n' "$(abspath $(CATALYST_MAIN_CHECKOUT_DIR))" > "$(CATALYST_WORKTREE_CONFIG)"
+	$(MAKE) all CATALYST_WORKTREE_CHECKOUT="$(abspath $(CATALYST_MAIN_CHECKOUT_DIR))"
+
+# Check shared dependencies before any build recipes run, including parallel builds.
+ifneq ($(filter worktree,$(MAKECMDGOALS)),)
+ifeq ($(strip $(CATALYST_MAIN_CHECKOUT_DIR)),)
+$(error Set CATALYST_MAIN_CHECKOUT_DIR to a Catalyst checkout with built LLVM, StableHLO and Enzyme)
+endif
+ifeq ($(realpath $(CATALYST_MAIN_CHECKOUT_DIR)),$(realpath $(MK_DIR)))
+$(error make worktree requires another checkout; run make all to build this checkout's dependencies)
+endif
+$(call check-worktree-dependency-versions,$(abspath $(CATALYST_MAIN_CHECKOUT_DIR)))
+ifeq ($(wildcard $(MAIN_MLIR_DIR)/llvm-project/build/lib/cmake/mlir/MLIRConfig.cmake),)
+$(error No LLVM/MLIR build found in $(MAIN_MLIR_DIR)/llvm-project/build; run make all in the main checkout first)
+endif
+ifeq ($(wildcard $(MAIN_MLIR_DIR)/stablehlo/build/lib/libStablehloOps.a),)
+$(error No StableHLO build found in $(MAIN_MLIR_DIR)/stablehlo/build; run make all in the main checkout first)
+endif
+ifeq ($(wildcard $(MAIN_MLIR_DIR)/Enzyme/build/Enzyme/libEnzymeStatic-*.a),)
+$(error No Enzyme build found in $(MAIN_MLIR_DIR)/Enzyme/build; run make all in the main checkout first)
+endif
+endif
 
 .PHONY: frontend
 frontend:
@@ -153,7 +185,9 @@ dialect-docs:
 # LLVM. For now we can run LLVM once in the begining if ENABLE_EXECUTOR is specified. The better
 # solution is perhaps to detactch the executor from runtime into its own target.
 ifeq ($(ENABLE_EXECUTOR), ON)
+ifeq ($(strip $(CATALYST_WORKTREE_CHECKOUT)),)
 runtime: mlir
+endif
 endif
 
 runtime:
@@ -297,7 +331,7 @@ plugin-wheel: plugin
 	rm -r $(MK_DIR)/standalone_plugin_wheel/standalone_plugin.egg-info
 	rm -r $(MK_DIR)/standalone_plugin_wheel/build
 
-.PHONY: clean clean-all clean-catalyst
+.PHONY: clean clean-all clean-catalyst clean-worktree
 clean:
 	@echo "uninstall catalyst and delete all temporary and cache files"
 	$(PYTHON) -m pip uninstall -y pennylane-catalyst
@@ -314,7 +348,13 @@ clean:
 clean-all: clean clean-mlir clean-runtime clean-oqc
 clean-catalyst: clean clean-dialects clean-runtime clean-oqc
 
-.PHONY: clean-mlir clean-dialects clean-plugin clean-llvm clean-stablehlo clean-enzyme
+clean-worktree: clean-dialects clean-plugin clean-dialect-docs clean-runtime clean-oqc
+	@echo "remove saved worktree setup and frontend build caches"
+	find frontend/catalyst -name "*.so" -not -path "*/third_party/*" -exec rm -v {} +
+	rm -rf $(MK_DIR)/build $(MK_DIR)/frontend/cmake-build $(MK_DIR)/frontend/catalyst/resources
+	rm -f $(CATALYST_WORKTREE_CONFIG)
+
+.PHONY: clean-mlir clean-dialects clean-plugin clean-dialect-docs clean-llvm clean-stablehlo clean-enzyme
 clean-mlir:
 	$(MAKE) -C mlir clean
 
@@ -323,6 +363,9 @@ clean-dialects:
 
 clean-plugin:
 	$(MAKE) -C mlir clean-plugin
+
+clean-dialect-docs:
+	$(MAKE) -C mlir clean-dialect-docs
 
 clean-llvm:
 	$(MAKE) -C mlir clean-llvm

@@ -8,6 +8,7 @@ NPROC ?= $(shell python3 -c "import os; print(os.cpu_count())")
 
 MK_ABSPATH := $(abspath $(lastword $(MAKEFILE_LIST)))
 MK_DIR := $(dir $(MK_ABSPATH))
+include $(MK_DIR)/../Makefile.worktree
 RT_BUILD_DIR ?= $(MK_DIR)/build
 DIST_DIR ?= $(MK_DIR)/dist
 CODE_COVERAGE ?= OFF

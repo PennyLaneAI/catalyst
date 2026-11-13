@@ -117,7 +117,21 @@ def get_lib_path(project, env_var):
     if INSTALLED:  # pragma: no cover
         return os.path.join(package_root, "lib")
 
-    return os.getenv(env_var, DEFAULT_LIB_PATHS.get(project, ""))
+    if env_var in os.environ:
+        return os.environ[env_var]
+
+    if project in ("llvm", "enzyme"):
+        config_path = Path(package_root).resolve().parents[1] / ".catalyst-worktree"
+        try:
+            main_checkout = config_path.read_text(encoding="utf-8").strip()
+        except FileNotFoundError:
+            main_checkout = ""
+        if main_checkout:
+            if project == "llvm":
+                return str(Path(main_checkout) / "mlir" / "llvm-project" / "build" / "lib")
+            return str(Path(main_checkout) / "mlir" / "Enzyme" / "build" / "Enzyme")
+
+    return DEFAULT_LIB_PATHS.get(project, "")
 
 
 def get_include_path():
