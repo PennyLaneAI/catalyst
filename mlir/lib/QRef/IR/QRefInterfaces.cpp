@@ -91,11 +91,12 @@ namespace catalyst {
 namespace qref {
 
 // Wrap an operator's base name with its op-level modifiers (name-wrap), so that `Op`,
-// `Adjoint(Op)`, `C(Op)`, and nested combinations like `C(Adjoint(Op))` are distinct graph
+// `Adjoint(Op)`, `<n>C(Op)`, and nested combinations like `<n>C(Adjoint(Op))` are distinct graph
 // identities. Modifiers are applied innermost-first in a canonical order (adjoint innermost,
-// control outermost) so a nested op has a single spelling.
+// control outermost) so a nested op has a single spelling. Specific control counts always
+// include the numeric prefix (including `1C`); `C` is reserved for generic control names.
 // An op that is both controlled and adjointed could otherwise be formed as
-// `C(Adjoint(Op))` or `Adjoint(C(Op))` which will produce two ids for one operator,
+// `<n>C(Adjoint(Op))` or `Adjoint(<n>C(Op))` which will produce two ids for one operator,
 // which would split the decomposition graph into two nodes and prevent rules from matching.
 // Always emitting the control-outermost form keeps such ops on a single node. The
 // caller appends the param/wire/static/uid groups. Extend this helper to support future op-level
@@ -106,9 +107,7 @@ static std::string wrapModifiers(std::string name, Operation *op) {
     }
     if (auto gate = mlir::dyn_cast<QuantumGate>(op)) {
         size_t numCtrl = gate.getCtrlQubitOperands().size();
-        if (numCtrl == 1) {
-            name = "C(" + name + ")";
-        } else if (numCtrl > 1) {
+        if (numCtrl > 0) {
             name = std::to_string(numCtrl) + "C(" + name + ")";
         }
     }
@@ -121,9 +120,9 @@ std::string defaultGetGraphOpId(Operation *op) {
 
     DecomposableGate gate = cast<DecomposableGate>(op);
 
-    // Fold op-level modifiers into the operator name so that `Op`, `Adjoint(Op)`, `C(Op)`, and
+    // Fold op-level modifiers into the operator name so that `Op`, `Adjoint(Op)`, `<n>C(Op)`, and
     // nested combinations are distinct in the graphOpId. Modifiers wrap only the name; the
-    // param/wire/static/uid groups follow, e.g. `C(Adjoint(Rot)){...}{wires...}`.
+    // param/wire/static/uid groups follow, e.g. `<n>C(Adjoint(Rot)){...}{wires...}`.
     ss << wrapModifiers(gate.getOperatorName(), op);
     printDynamicShape(gate.getDynamicShape(), ss);
     printWireLens(gate.getWireLens(), ss);

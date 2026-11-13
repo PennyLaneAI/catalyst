@@ -625,9 +625,7 @@ void ResourceAnalysis::collectOperation(Operation *op, ResourceResult &result, b
         }
         uint64_t nCtrlQubits = inst.getResourceNumCtrlQubits() + numControlQubits;
 
-        if (nCtrlQubits == 1) {
-            name = "C(" + name + ")";
-        } else if (nCtrlQubits > 1) {
+        if (nCtrlQubits > 0) {
             name = std::to_string(nCtrlQubits) + "C(" + name + ")";
         }
 
