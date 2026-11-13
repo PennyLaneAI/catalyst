@@ -155,6 +155,7 @@ PythonRuleLoweringFn loadAndResolve(std::string libQPDPath, std::string libpytho
         llvm::errs() << "[QPD-loader] dlopen succeeded but symbol "
                         "'getPythonRuleLoweringFunction' not found in '"
                      << path << "'\n";
+        return nullptr;
     }
 
     // resolve the proper python-decomposition lowering function via the getter
