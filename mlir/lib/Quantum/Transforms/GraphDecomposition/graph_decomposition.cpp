@@ -37,6 +37,7 @@
 #include "Catalyst/Analysis/ResourceResult.h"
 #include "Driver/Timer.h"
 #include "QRef/Transforms/Passes.h"
+#include "Quantum/IR/QuantumOps.h"
 #include "Quantum/Transforms/Passes.h"
 
 #include "DGBuilder.hpp"
@@ -89,6 +90,19 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
         ScopedDiagnosticTimer totalTimer("decomp:total");
 
         ModuleOp module = getOperation();
+
+        // On-demand discovery queries concrete operations. Put ambient adjoints and controls
+        // onto those operations before resource analysis and the Python callback inspect IDs.
+        auto modifierRegions = module.walk([](Operation *op) {
+            return isa<AdjointOp, CtrlOp>(op) ? WalkResult::interrupt() : WalkResult::advance();
+        });
+        if (modifierRegions.wasInterrupted()) {
+            OpPassManager modifiersPm("builtin.module");
+            modifiersPm.addPass(createModifiersLoweringPass());
+            if (failed(runPipeline(modifiersPm, module))) {
+                return signalPassFailure();
+            }
+        }
 
         ///////////////////////////
         // Step 1–2: Prepare and solve the decomposition graph
