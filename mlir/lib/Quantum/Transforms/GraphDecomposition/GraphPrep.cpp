@@ -492,8 +492,8 @@ namespace catalyst {
 namespace quantum {
 namespace GraphPrep {
 
-LogicalResult materializeSelectedRules(ModuleOp module, ModuleOp ruleLibrary,
-                                       const llvm::StringSet<> &selectedRules) {
+LogicalResult materializeSelectedLibraryRules(ModuleOp module, ModuleOp ruleLibrary,
+                                              const llvm::StringSet<> &selectedRules) {
     if (!ruleLibrary) {
         return success();
     }

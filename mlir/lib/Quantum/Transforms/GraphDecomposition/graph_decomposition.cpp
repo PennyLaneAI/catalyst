@@ -197,7 +197,8 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
             if (seenRules.empty()) {
                 return;
             }
-            if (failed(GraphPrep::materializeSelectedRules(module, ruleLibrary.get(), seenRules))) {
+            if (failed(GraphPrep::materializeSelectedLibraryRules(module, ruleLibrary.get(),
+                                                                  seenRules))) {
                 return signalPassFailure();
             }
             OpPassManager decomposePm("builtin.module");

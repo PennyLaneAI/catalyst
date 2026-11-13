@@ -20,11 +20,9 @@
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/StringSet.h"
-#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/OwningOpRef.h"
-
-#include "Catalyst/Analysis/ResourceAnalysis.h"
+#include "mlir/Support/LLVM.h"
 
 #include "DGBuilder.hpp"
 
@@ -61,8 +59,9 @@ prepareGraph(mlir::ModuleOp module, llvm::ArrayRef<std::string> opIDs, const Pre
              mlir::OwningOpRef<mlir::ModuleOp> &ruleLibrary);
 
 /// Import selected library rules and their transitive function dependencies.
-mlir::LogicalResult materializeSelectedRules(mlir::ModuleOp module, mlir::ModuleOp ruleLibrary,
-                                             const llvm::StringSet<> &selectedRules);
+mlir::LogicalResult materializeSelectedLibraryRules(mlir::ModuleOp module,
+                                                    mlir::ModuleOp ruleLibrary,
+                                                    const llvm::StringSet<> &selectedRules);
 
 } // namespace GraphPrep
 } // namespace quantum
