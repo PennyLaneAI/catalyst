@@ -151,8 +151,8 @@ class ModifierState:
     # in this exact order:
     # 1. control outermost
     # 2. adjoint innermost
-    # So a single op that is both controlled and adjointed always spells as ``C(Adjoint(Op))``,
-    # never ``Adjoint(C(Op))``. This is a canonicalization. So the two spellings denote the same
+    # So an op with one control that is also adjointed always spells as ``1C(Adjoint(Op))``,
+    # never ``Adjoint(1C(Op))``. This is a canonicalization. So the two spellings denote the same
     # operator and MUST map to the same graph node, or the solver would treat them as distinct gates
     # to match a rule against the op.
     # The parser (``parseOperator``) is a structural round-trip and does NOT re-order, so canonicity
@@ -186,11 +186,11 @@ class ModifierState:
     def _control_modifier(n_ctrl: int) -> str:
         """Return the graphOpId control-modifier token for ``n_ctrl`` controls.
 
-        A single control is written ``C`` and ``n > 1`` controls ``<n>C``, mirroring the compiler's
-        ``wrapModifiers``.
+        Every specific count is written ``<n>C``, including ``1C`` for one control, mirroring
+        the compiler's ``wrapModifiers``. ``C`` is reserved for any number of controls.
         """
         assert n_ctrl >= 1, "control modifier requires at least one control"
-        return "C" if n_ctrl == 1 else f"{n_ctrl}C"
+        return f"{n_ctrl}C"
 
     @staticmethod
     def _leading_modifier_kind(op_id: str) -> str | None:
@@ -228,7 +228,9 @@ class ModifierState:
     ) -> tuple[SerializedGraphOpID, int]:
         """Inverse of control name-wrapping given the base ``op_name``.
 
-        ``("RX", "2C(RX){...}")`` -> ``("RX{...}", 2)`` and ``("RX", "C(RX){...}")`` -> ``("RX{...}", 1)``.
+        ``("RX", "2C(RX){...}")`` -> ``("RX{...}", 2)`` and
+        ``("RX", "1C(RX){...}")`` -> ``("RX{...}", 1)``.
+        Generic ``C(...)`` names do not specify a count and cannot be unwrapped into a state.
 
         Args:
             op_name (str): the base operator's name
@@ -245,10 +247,13 @@ class ModifierState:
         while i < len(op_id) and op_id[i].isdigit():
             i += 1
         digits = op_id[:i]
-        n_ctrl = int(digits) if digits else 1
         prefix = f"{digits}C({op_name})"
-        if not op_id.startswith(prefix):
-            raise ValueError(f"{op_id!r} is not a control id for base op {op_name!r}")
+        if not digits or int(digits) < 1 or not op_id.startswith(prefix):
+            raise ValueError(
+                f"{op_id!r} is not a control id with an explicit positive count "
+                f"for base op {op_name!r}"
+            )
+        n_ctrl = int(digits)
         return SerializedGraphOpID(op_name + op_id[len(prefix) :]), n_ctrl
 
     @staticmethod

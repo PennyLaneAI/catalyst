@@ -45,9 +45,9 @@ func.func @circuit(%q: !quantum.bit, %c: !quantum.bit, %w: !quantum.bit)
 // C(Test_A) with one work wire -> two C(Test_B) with the same work-wire layout.
 func.func private @test_a_to_b(%q: !quantum.bit, %work: !quantum.bit, %ctrl: !quantum.bit, %cv: i1)
     -> (!quantum.bit, !quantum.bit, !quantum.bit) attributes {
-  target_gate = "C(Test_A){}{ctrl_work_wires:1,wires:1}{ctrl_work_wire_type = \22zeroed\22}",
+  target_gate = "1C(Test_A){}{ctrl_work_wires:1,wires:1}{ctrl_work_wire_type = \22zeroed\22}",
   resources = {operations = {
-      "C(Test_B){}{ctrl_work_wires:1,wires:1}{ctrl_work_wire_type = \22zeroed\22}" = 2 : i64
+      "1C(Test_B){}{ctrl_work_wires:1,wires:1}{ctrl_work_wire_type = \22zeroed\22}" = 2 : i64
   }}
 } {
   %oc, %ow, %oq = quantum.ctrl(%ctrl) ctrlvals(%cv)
