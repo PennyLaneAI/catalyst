@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// RUN: quantum-opt --instrument-classical-control --split-input-file %s | FileCheck %s
+// RUN: quantum-opt --tag-classical-control-measurements --instrument-classical-control --split-input-file %s | FileCheck %s
 
 // m = measure(0); cond(m, Z)(1)
 
@@ -22,7 +22,8 @@
 
 // CHECK-LABEL: func.func @cond_on_measurement
 func.func @cond_on_measurement(%q0: !quantum.bit, %q1: !quantum.bit) -> (!quantum.bit, !quantum.bit) {
-    // CHECK: [[M:%.+]], [[Q0:%.+]] = quantum.measure
+    // The tag of the measurement is removed.
+    // CHECK: [[M:%.+]], [[Q0:%.+]] = quantum.measure %arg0 : i1, !quantum.bit
     // CHECK-NEXT: [[TOKEN:%.+]] = call @__catalyst__rt__measurement_token() : () -> i64
     %m, %q0_1 = quantum.measure %q0 : i1, !quantum.bit
 

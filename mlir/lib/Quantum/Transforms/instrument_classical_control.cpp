@@ -24,6 +24,7 @@
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/Dominance.h"
+#include "mlir/IR/SymbolTable.h"
 #include "mlir/Interfaces/CallInterfaces.h"
 #include "mlir/Pass/Pass.h"
 
@@ -42,6 +43,9 @@ constexpr StringLiteral MeasurementTokenFnName = "__catalyst__rt__measurement_to
 constexpr StringLiteral BeginClassicalControlFnName = "__catalyst__rt__begin_classical_control";
 constexpr StringLiteral EndClassicalControlFnName = "__catalyst__rt__end_classical_control";
 
+/// Marks the measurements whose dependent classically controlled operations are instrumented.
+constexpr StringLiteral TrackedMeasurementAttrName = "quantum.track_classical_control";
+
 /// Return the measurement result of `op` if it is a measurement, or a null value otherwise.
 Value getMeasurementResult(Operation *op) {
     if (auto measureOp = dyn_cast<quantum::MeasureOp>(op)) {
@@ -54,6 +58,10 @@ Value getMeasurementResult(Operation *op) {
         return selectPPMOp.getMres();
     }
     return nullptr;
+}
+
+bool isTrackedMeasurement(Operation *op) {
+    return getMeasurementResult(op) && op->hasAttr(TrackedMeasurementAttrName);
 }
 
 bool isQuantumOp(Operation *op) {
@@ -70,7 +78,7 @@ bool mayApplyQuantumOps(Region &region) {
         .wasInterrupted();
 }
 
-/// Collects the measurements that classical values depend on.
+/// Collects the tracked measurements that classical values depend on.
 ///
 /// Dependencies are traced through the operands of classical operations, and through the values
 /// carried by scf control flow. The traversal stops at quantum operations other than
@@ -96,7 +104,7 @@ class MeasurementCollector {
 
             Operation *def = value.getDefiningOp();
             if (Value mres = getMeasurementResult(def)) {
-                if (value == mres) {
+                if (value == mres && isTrackedMeasurement(def)) {
                     measurements.insert(def);
                 }
                 continue;
@@ -174,7 +182,7 @@ class MeasurementCollector {
 /// measurements they depend on.
 class ClassicalControlInstrumenter {
   public:
-    explicit ClassicalControlInstrumenter(ModuleOp module) : module(module), domInfo(module) {}
+    explicit ClassicalControlInstrumenter(ModuleOp module) : domInfo(module) {}
 
     /// Wrap the execution of `region` in a classically controlled region of the runtime.
     void instrumentRegion(Region &region, Operation *controlledOp,
@@ -186,15 +194,15 @@ class ClassicalControlInstrumenter {
         Block &entry = region.front();
         OpBuilder builder(&entry, entry.begin());
         Value token = buildControlToken(builder, controlledOp, measurements);
-        func::CallOp::create(builder, controlledOp->getLoc(), getBeginClassicalControlFn(),
-                             ValueRange{token});
+        func::CallOp::create(builder, controlledOp->getLoc(),
+                             getBeginClassicalControlFn(controlledOp), ValueRange{token});
 
         for (Block &block : region) {
             if (block.mightHaveTerminator() &&
                 isa<RegionBranchTerminatorOpInterface>(block.getTerminator())) {
                 builder.setInsertionPoint(block.getTerminator());
-                func::CallOp::create(builder, controlledOp->getLoc(), getEndClassicalControlFn(),
-                                     ValueRange{});
+                func::CallOp::create(builder, controlledOp->getLoc(),
+                                     getEndClassicalControlFn(controlledOp), ValueRange{});
             }
         }
     }
@@ -204,50 +212,51 @@ class ClassicalControlInstrumenter {
     void instrumentOp(Operation *controlledOp, const SetVector<Operation *> &measurements) {
         OpBuilder builder(controlledOp);
         Value token = buildControlToken(builder, controlledOp, measurements);
-        func::CallOp::create(builder, controlledOp->getLoc(), getBeginClassicalControlFn(),
-                             ValueRange{token});
+        func::CallOp::create(builder, controlledOp->getLoc(),
+                             getBeginClassicalControlFn(controlledOp), ValueRange{token});
 
         builder.setInsertionPointAfter(controlledOp);
-        func::CallOp::create(builder, controlledOp->getLoc(), getEndClassicalControlFn(),
-                             ValueRange{});
+        func::CallOp::create(builder, controlledOp->getLoc(),
+                             getEndClassicalControlFn(controlledOp), ValueRange{});
     }
 
   private:
-    ModuleOp module;
     DominanceInfo domInfo;
     DenseMap<Operation *, Value> measurementTokens;
-    func::FuncOp measurementTokenFn;
-    func::FuncOp beginClassicalControlFn;
-    func::FuncOp endClassicalControlFn;
+    DenseMap<std::pair<Operation *, StringRef>, func::FuncOp> runtimeFns;
 
-    func::FuncOp getOrCreateRuntimeFn(func::FuncOp &cache, StringRef name, TypeRange inputs,
+    /// Return the declaration of the runtime function `name` in the nearest symbol table of
+    /// `user`, declaring it if needed. Nested modules compiled separately (e.g. for other
+    /// targets) are their own symbol tables, and need their own declarations.
+    func::FuncOp getOrCreateRuntimeFn(Operation *user, StringRef name, TypeRange inputs,
                                       TypeRange results) {
-        if (cache) {
-            return cache;
+        Operation *symbolTable = SymbolTable::getNearestSymbolTable(user);
+        func::FuncOp &fn = runtimeFns[{symbolTable, name}];
+        if (fn) {
+            return fn;
         }
-        cache = module.lookupSymbol<func::FuncOp>(name);
-        if (!cache) {
-            OpBuilder builder(module.getBodyRegion());
-            cache = func::FuncOp::create(builder, module.getLoc(), name,
-                                         builder.getFunctionType(inputs, results));
-            cache.setPrivate();
+        fn = dyn_cast_or_null<func::FuncOp>(SymbolTable::lookupSymbolIn(symbolTable, name));
+        if (!fn) {
+            OpBuilder builder(&symbolTable->getRegion(0));
+            fn = func::FuncOp::create(builder, symbolTable->getLoc(), name,
+                                      builder.getFunctionType(inputs, results));
+            fn.setPrivate();
         }
-        return cache;
+        return fn;
     }
 
-    func::FuncOp getMeasurementTokenFn() {
-        Type i64 = IntegerType::get(module.getContext(), 64);
-        return getOrCreateRuntimeFn(measurementTokenFn, MeasurementTokenFnName, {}, {i64});
+    func::FuncOp getMeasurementTokenFn(Operation *user) {
+        Type i64 = IntegerType::get(user->getContext(), 64);
+        return getOrCreateRuntimeFn(user, MeasurementTokenFnName, {}, {i64});
     }
 
-    func::FuncOp getBeginClassicalControlFn() {
-        Type i64 = IntegerType::get(module.getContext(), 64);
-        return getOrCreateRuntimeFn(beginClassicalControlFn, BeginClassicalControlFnName, {i64},
-                                    {});
+    func::FuncOp getBeginClassicalControlFn(Operation *user) {
+        Type i64 = IntegerType::get(user->getContext(), 64);
+        return getOrCreateRuntimeFn(user, BeginClassicalControlFnName, {i64}, {});
     }
 
-    func::FuncOp getEndClassicalControlFn() {
-        return getOrCreateRuntimeFn(endClassicalControlFn, EndClassicalControlFnName, {}, {});
+    func::FuncOp getEndClassicalControlFn(Operation *user) {
+        return getOrCreateRuntimeFn(user, EndClassicalControlFnName, {}, {});
     }
 
     /// Return the token of `measurement`, taken right after the measurement is performed.
@@ -259,8 +268,8 @@ class ClassicalControlInstrumenter {
 
         OpBuilder builder(measurement->getContext());
         builder.setInsertionPointAfter(measurement);
-        Value token = func::CallOp::create(builder, measurement->getLoc(), getMeasurementTokenFn(),
-                                           ValueRange{})
+        Value token = func::CallOp::create(builder, measurement->getLoc(),
+                                           getMeasurementTokenFn(measurement), ValueRange{})
                           .getResult(0);
         measurementTokens[measurement] = token;
         return token;
@@ -283,7 +292,7 @@ class ClassicalControlInstrumenter {
         }
         if (needsMostRecentToken) {
             tokens.push_back(func::CallOp::create(builder, controlledOp->getLoc(),
-                                                  getMeasurementTokenFn(), ValueRange{})
+                                                  getMeasurementTokenFn(controlledOp), ValueRange{})
                                  .getResult(0));
         }
 
@@ -300,8 +309,24 @@ class ClassicalControlInstrumenter {
 namespace catalyst {
 namespace quantum {
 
+#define GEN_PASS_DEF_TAGCLASSICALCONTROLMEASUREMENTSPASS
 #define GEN_PASS_DEF_INSTRUMENTCLASSICALCONTROLPASS
 #include "Quantum/Transforms/Passes.h.inc"
+
+struct TagClassicalControlMeasurementsPass
+    : public impl::TagClassicalControlMeasurementsPassBase<TagClassicalControlMeasurementsPass> {
+    using impl::TagClassicalControlMeasurementsPassBase<
+        TagClassicalControlMeasurementsPass>::TagClassicalControlMeasurementsPassBase;
+
+    void runOnOperation() final {
+        UnitAttr tag = UnitAttr::get(&getContext());
+        getOperation().walk([&](Operation *op) {
+            if (getMeasurementResult(op)) {
+                op->setAttr(TrackedMeasurementAttrName, tag);
+            }
+        });
+    }
+};
 
 struct InstrumentClassicalControlPass
     : public impl::InstrumentClassicalControlPassBase<InstrumentClassicalControlPass> {
@@ -310,6 +335,18 @@ struct InstrumentClassicalControlPass
 
     void runOnOperation() final {
         ModuleOp module = getOperation();
+
+        // Only the measurements of the devices tracking resources are tagged.
+        bool hasTrackedMeasurements = module
+                                          .walk([](Operation *op) {
+                                              return isTrackedMeasurement(op)
+                                                         ? WalkResult::interrupt()
+                                                         : WalkResult::advance();
+                                          })
+                                          .wasInterrupted();
+        if (!hasTrackedMeasurements) {
+            return;
+        }
 
         // Collect the classically controlled operations before modifying the IR.
         SmallVector<Operation *> controlFlowOps;
@@ -355,6 +392,8 @@ struct InstrumentClassicalControlPass
                 }
             }
         }
+
+        module.walk([](Operation *op) { op->removeAttr(TrackedMeasurementAttrName); });
     }
 };
 
