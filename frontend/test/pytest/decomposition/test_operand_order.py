@@ -26,7 +26,7 @@ import pytest
 from pennylane.decomposition import add_decomps, register_resources
 
 from catalyst.decomposition import GraphOpID
-from catalyst.decomposition.decomposition_rules import ordered_kwarg_names
+from catalyst.decomposition.rule_arguments import ordered_kwarg_names
 from catalyst.utils.exceptions import CompileError
 
 pytestmark = pytest.mark.usefixtures("use_capture")
@@ -162,13 +162,13 @@ class TestGraphOpIDLayout:
         """``dynamic_shape`` follows declaration order, while the id string is sorted."""
         gid = GraphOpID(ZetaAlphaOp(np.float64(0.1), np.float64(0.2), reg=[0, 1]))
         assert list(gid.dynamic_shape) == ["zeta", "alpha"]
-        assert gid.getGraphOpId().startswith("ZetaAlphaOp{alpha:")
+        assert str.startswith(gid.getGraphOpId(), "ZetaAlphaOp{alpha:")
 
     def test_wire_lens_in_operand_order(self):
         """``wire_lens`` follows declaration order, while the id string is sorted."""
         gid = GraphOpID(XAOp(x_wires=[0], a_wires=[1, 2]))
         assert list(gid.wire_lens.items()) == [("x_wires", 1), ("a_wires", 2)]
-        assert "{a_wires:2,x_wires:1}" in gid.getGraphOpId()
+        assert str.find(gid.getGraphOpId(), "{a_wires:2,x_wires:1}") >= 0
 
     def test_ordered_kwarg_names_keeps_dynamic_shape_order(self):
         """Rule params are laid out in ``dynamic_shape`` (operand) order, not sorted."""
@@ -340,4 +340,4 @@ def test_graph_op_id_metadata_matches_lowered_operands(op_name):
     assert all(gid.wire_lens[name] == len(qubit_map[name]) for name in qubit_map)
 
     if uid is not None:
-        assert gid.getGraphOpId().endswith(f"[{uid}]")
+        assert str.endswith(gid.getGraphOpId(), f"[{uid}]")

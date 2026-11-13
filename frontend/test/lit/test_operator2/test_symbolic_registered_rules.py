@@ -25,10 +25,10 @@ import pennylane as qp
 from operator2_dummy_gates import NoParams, SingleParam
 from pennylane.typing import Float, Wire
 
-from catalyst.decomposition.decomposition_rules import (
+from catalyst.decomposition.modifier_state import ModifierState
+from catalyst.decomposition.on_demand_rules import (
     materialize_reachable_rule_strings,
 )
-from catalyst.decomposition.modifier_state import ModifierState
 
 
 def _base_rule():
