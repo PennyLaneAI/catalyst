@@ -12,6 +12,29 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <cassert>
+#include <cstddef>
+#include <string>
+#include <utility>
+
+#include "llvm/ADT/STLExtras.h"
+#include "mlir/IR/Block.h"
+#include "mlir/IR/BuiltinAttributes.h"
+#include "mlir/IR/BuiltinTypeInterfaces.h"
+#include "mlir/IR/BuiltinTypes.h"
+#include "mlir/IR/Diagnostics.h"
+#include "mlir/IR/OpDefinition.h"
+#include "mlir/IR/Operation.h"
+#include "mlir/IR/TypeRange.h"
+#include "mlir/IR/Types.h"
+#include "mlir/IR/Value.h"
+#include "mlir/IR/ValueRange.h"
+#include "mlir/Support/LLVM.h"
+#include "mlir/Support/LogicalResult.h"
+#include "mlir/Support/WalkResult.h"
+
+#include "Quantum/IR/QuantumAttrDefs.h"
+#include "Quantum/IR/QuantumInterfaces.h"
 #define DEBUG_TYPE "split-to-single-terms"
 
 #include <cstdint>
@@ -481,9 +504,9 @@ struct SplitToSingleTermsPass : public impl::SplitToSingleTermsPassBase<SplitToS
     void runOnOperation() override {
         ModuleOp moduleOp = getOperation();
 
-        // Raise an error if any measurement processes aside from expval are found
+        // Raise an error if any terminal measurements aside from expval are found
         auto result = moduleOp.walk([&](Operation *op) {
-            if (auto measOp = dyn_cast<MeasurementProcess>(op)) {
+            if (auto measOp = dyn_cast<TerminalMeasurement>(op)) {
                 if (!isSupportedMeasOp(op)) {
                     op->emitError() << "unsupported measurement operation: " << op->getName()
                                     << " (only quantum.expval is supported)";

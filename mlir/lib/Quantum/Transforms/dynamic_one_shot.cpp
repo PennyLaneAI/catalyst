@@ -12,6 +12,28 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <cassert>
+#include <cstddef>
+#include <string>
+
+#include "llvm/ADT/APInt.h"
+#include "llvm/ADT/DenseMap.h"
+#include "llvm/ADT/STLExtras.h"
+#include "llvm/ADT/SmallPtrSet.h"
+#include "mlir/Dialect/Arith/IR/Arith.h"
+#include "mlir/IR/Attributes.h"
+#include "mlir/IR/Block.h"
+#include "mlir/IR/Builders.h"
+#include "mlir/IR/BuiltinTypeInterfaces.h"
+#include "mlir/IR/IRMapping.h"
+#include "mlir/IR/MLIRContext.h"
+#include "mlir/IR/OpDefinition.h"
+#include "mlir/IR/PatternMatch.h"
+#include "mlir/IR/TypeRange.h"
+#include "mlir/IR/Types.h"
+#include "mlir/IR/ValueRange.h"
+#include "mlir/Support/LLVM.h"
+#include "mlir/Support/LogicalResult.h"
 #define DEBUG_TYPE "dynamic-one-shot"
 
 #include <cstdint>
@@ -182,7 +204,7 @@ func::FuncOp splitQuantumAndPostProcessing(IRRewriter &builder, func::FuncOp qno
     // 2.1. Create the return op
     SmallVector<Value> MPResults;
     SmallVector<DictionaryAttr> MPResAttrs;
-    qKernel->walk([&](quantum::MeasurementProcess mp) {
+    qKernel->walk([&](quantum::TerminalMeasurement mp) {
         for (auto v : mp->getResults()) {
             MPResults.push_back(v);
             MPResAttrs.push_back(DictionaryAttr());
@@ -237,7 +259,7 @@ func::FuncOp splitQuantumAndPostProcessing(IRRewriter &builder, func::FuncOp qno
                 if (!operand.getDefiningOp()) {
                     continue;
                 }
-                if (isa<quantum::MeasurementProcess>(operand.getDefiningOp())) {
+                if (isa<quantum::TerminalMeasurement>(operand.getDefiningOp())) {
                     continue;
                 }
                 SetVector<Operation *> backwardSlice;
@@ -318,7 +340,7 @@ scf::ForOp createForLoop(IRRewriter &builder, Value shots, ValueRange loopIterAr
 }
 
 std::unordered_map<size_t, size_t>
-getDuplicateIndexPairs(SmallVector<quantum::MeasurementProcess> MPs) {
+getDuplicateIndexPairs(SmallVector<quantum::TerminalMeasurement> MPs) {
     std::unordered_map<size_t, size_t> pairs;
     std::unordered_map<Operation *, size_t> firstSeen; // Map of {MP -> first seen index}
 
@@ -776,9 +798,9 @@ LogicalResult prepareForLoopInitArgs(IRRewriter &builder, func::FuncOp oneShotKe
     Operation *retOp = oneShotKernel.getBody().back().getTerminator();
     assert(isa<func::ReturnOp>(retOp) && "Expected a qnode function to return values");
 
-    SmallVector<quantum::MeasurementProcess> qnodeMPs;
+    SmallVector<quantum::TerminalMeasurement> qnodeMPs;
     for (Value returnValue : retOp->getOperands()) {
-        auto mp = dyn_cast<quantum::MeasurementProcess>(returnValue.getDefiningOp());
+        auto mp = dyn_cast<quantum::TerminalMeasurement>(returnValue.getDefiningOp());
         assert(mp && "Classical qnode return values not supported in dynamic one-shot");
         qnodeMPs.push_back(mp);
     }

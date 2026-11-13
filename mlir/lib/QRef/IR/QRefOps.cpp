@@ -14,21 +14,49 @@
 
 #include "QRef/IR/QRefOps.h"
 
+#include <cmath>
+#include <cstddef>
 #include <cstdint>
 #include <limits>
+#include <optional>
+#include <string>
+#include <utility>
+#include <vector>
 
+#include "llvm/ADT/ArrayRef.h"
+#include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/STLExtras.h"
+#include "llvm/ADT/SmallVector.h"
+#include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/StringSet.h"
+#include "llvm/Support/Casting.h"
 #include "llvm/Support/LogicalResult.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
+#include "mlir/IR/Attributes.h"
+#include "mlir/IR/Block.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinAttributes.h"
+#include "mlir/IR/BuiltinTypeInterfaces.h"
+#include "mlir/IR/BuiltinTypes.h"
+#include "mlir/IR/MLIRContext.h"
+#include "mlir/IR/OpDefinition.h"
 #include "mlir/IR/OpImplementation.h"
+#include "mlir/IR/OperationSupport.h"
+#include "mlir/IR/PatternMatch.h"
+#include "mlir/IR/TypeRange.h"
+#include "mlir/IR/Value.h"
+#include "mlir/IR/ValueRange.h"
+#include "mlir/Support/LLVM.h"
+#include "mlir/Support/LogicalResult.h"
+#include "mlir/Support/WalkResult.h"
 
 #include "MBQC/IR/MBQCOps.h"
 #include "PBC/IR/PBCOps.h"
 #include "QRef/IR/QRefDialect.h"
+#include "QRef/IR/QRefInterfaces.h"
+#include "QRef/IR/QRefTypes.h"
 #include "Quantum/IR/QuantumInterfaces.h"
+#include "Quantum/IR/QuantumTypes.h"
 
 #include "StringConstants.h"
 
@@ -282,6 +310,37 @@ LogicalResult QubitUnitaryOp::verify() {
     return success();
 }
 
+LogicalResult MeasurementOp::verify() {
+    if (getQreg() && !getQubits().empty()) {
+        return emitOpError("must use either qubits or registers, but not both");
+    }
+    if (!getQreg() && !getArrQubitIndices().empty()) {
+        return emitOpError("index arrays require a register");
+    }
+
+    auto isClassical = [](Type type) {
+        bool classical = true;
+        type.walk([&](Type nested) {
+            if (isa<QubitType, QuregType, catalyst::quantum::QubitType,
+                    catalyst::quantum::QuregType, catalyst::quantum::ObservableType>(nested)) {
+                classical = false;
+            }
+        });
+        return classical;
+    };
+    for (Type type : getParams().getTypes()) {
+        if (!isClassical(type)) {
+            return emitOpError("params must have classical types, got ") << type;
+        }
+    }
+    for (Type type : getMres().getTypes()) {
+        if (!isClassical(type)) {
+            return emitOpError("mres must have classical types, got ") << type;
+        }
+    }
+    return success();
+}
+
 LogicalResult AdjointOp::verify() {
     auto res = this->getRegion().walk(
         [](catalyst::quantum::MeasurementProcess op) { return WalkResult::interrupt(); });
@@ -366,6 +425,19 @@ LogicalResult HermitianOp::verify() {
 // Quantum op builders.
 //===----------------------------------------------------------------------===//
 
+void MeasurementOp::build(OpBuilder &builder, OperationState &state, TypeRange mres,
+                          llvm::StringRef op_name, ValueRange params, ValueRange qubits,
+                          DictionaryAttr static_data) {
+    build(builder, state, mres, op_name, params, qubits, Value(), ValueRange(), static_data);
+}
+
+void MeasurementOp::build(OpBuilder &builder, OperationState &state, TypeRange mres,
+                          llvm::StringRef op_name, ValueRange params, Value qreg,
+                          ValueRange arr_qubit_indices, DictionaryAttr static_data) {
+    build(builder, state, mres, op_name, params, ValueRange(), qreg, arr_qubit_indices,
+          static_data);
+}
+
 void OperatorOp::build(OpBuilder &odsBuilder, OperationState &odsState, llvm::StringRef op_name,
                        ValueRange params, ValueRange qubits, ValueRange ctrl_qubits,
                        ValueRange ctrl_values, ValueRange forward_args, bool adjoint,
@@ -419,6 +491,138 @@ void OperatorOp::build(OpBuilder &odsBuilder, OperationState &odsState, llvm::St
 //===----------------------------------------------------------------------===//
 // Quantum op printers/parsers.
 //===----------------------------------------------------------------------===//
+
+void MeasurementOp::print(OpAsmPrinter &p) {
+    // 1. Measurement name
+    p << " ";
+    p.printAttributeWithoutType(getOpNameAttr());
+
+    auto printTypedOperands = [&](ValueRange operands) {
+        llvm::interleaveComma(operands, p,
+                              [&](Value value) { p << value << ": " << value.getType(); });
+    };
+
+    // 2. Variadic Inputs: (%arg0 : type, ...)
+    p << "(";
+    printTypedOperands(getParams());
+    p << ")";
+
+    // 3. Qubits or (Qreg and indices)
+    if (Value qreg = getQreg()) {
+        p << " quregs(" << qreg << ": " << qreg.getType() << ") indices(";
+        printTypedOperands(getArrQubitIndices());
+        p << ")";
+    } else {
+        p << " qubits(" << getQubits() << ")";
+    }
+
+    // 4. Optional static data
+    if (Attribute staticData = getStaticDataAttr()) {
+        p << " static_data = " << staticData;
+    }
+
+    // 5. Optional metadata
+    p.printOptionalAttrDict((*this)->getAttrs(), {"op_name", "static_data", "operandSegmentSizes",
+                                                  "resultSegmentSizes"});
+    p << " : ";
+
+    // 6. Result types
+    if (getOperation()->getNumResults() == 0) {
+        p << "()";
+    } else {
+        p << getOperation()->getResultTypes();
+    }
+}
+
+ParseResult MeasurementOp::parse(OpAsmParser &parser, OperationState &result) {
+    Builder &builder = parser.getBuilder();
+    auto *ctx = parser.getContext();
+    auto loc = parser.getCurrentLocation();
+
+    // 1. Parse measurement name
+    std::string name;
+    if (parser.parseString(&name)) {
+        return failure();
+    }
+    result.addAttribute("op_name", builder.getStringAttr(name));
+
+    SmallVector<OpAsmParser::UnresolvedOperand> params, qubits, indices;
+    SmallVector<Type> paramTypes, indexTypes, resultTypes;
+    auto parseTypedOperands = [&](auto &operands, auto &types) {
+        return parser.parseCommaSeparatedList(OpAsmParser::Delimiter::Paren, [&]() -> ParseResult {
+            OpAsmParser::UnresolvedOperand operand;
+            Type type;
+            if (parser.parseOperand(operand) || parser.parseColonType(type)) {
+                return failure();
+            }
+            operands.push_back(operand);
+            types.push_back(type);
+            return success();
+        });
+    };
+
+    // 2. Parse variadic params: (%arg0: type, ...)
+    if (parseTypedOperands(params, paramTypes)) {
+        return failure();
+    }
+
+    // 3. Parse qubits or (qreg and indices)
+    SmallVector<OpAsmParser::UnresolvedOperand> qregs;
+    Type qregType;
+    if (succeeded(parser.parseOptionalKeyword("qubits"))) {
+        if (parser.parseOperandList(qubits, OpAsmParser::Delimiter::Paren)) {
+            return failure();
+        }
+    } else {
+        OpAsmParser::UnresolvedOperand qreg;
+        if (parser.parseKeyword("quregs") || parser.parseLParen() || parser.parseOperand(qreg) ||
+            parser.parseColonType(qregType) || parser.parseRParen() ||
+            parser.parseKeyword("indices") || parseTypedOperands(indices, indexTypes)) {
+            return failure();
+        }
+        qregs.push_back(qreg);
+    }
+
+    // 4. Optional static data
+    if (succeeded(parser.parseOptionalKeyword("static_data"))) {
+        DictionaryAttr staticData;
+        if (parser.parseEqual() ||
+            parser.parseAttribute(staticData, "static_data", result.attributes)) {
+            return failure();
+        }
+    }
+
+    // 5. Optional metadata
+    if (parser.parseOptionalAttrDict(result.attributes) || parser.parseColon()) {
+        return failure();
+    }
+
+    // 6. Result types
+    if (succeeded(parser.parseOptionalLParen())) {
+        if (failed(parser.parseOptionalRParen()) &&
+            (parser.parseTypeList(resultTypes) || parser.parseRParen())) {
+            return failure();
+        }
+    } else if (parser.parseTypeList(resultTypes)) {
+        return failure();
+    }
+
+    // 7. Resolve operands
+    Type qubitType = QubitType::get(ctx);
+    if (parser.resolveOperands(params, paramTypes, loc, result.operands) ||
+        parser.resolveOperands(qubits, qubitType, result.operands) ||
+        (!qregs.empty() && parser.resolveOperands(qregs, qregType, result.operands)) ||
+        parser.resolveOperands(indices, indexTypes, loc, result.operands)) {
+        return failure();
+    }
+    result.addAttribute("operandSegmentSizes",
+                        builder.getDenseI32ArrayAttr({static_cast<int32_t>(params.size()),
+                                                      static_cast<int32_t>(qubits.size()),
+                                                      static_cast<int32_t>(qregs.size()),
+                                                      static_cast<int32_t>(indices.size())}));
+    result.addTypes(resultTypes);
+    return success();
+}
 
 static void printDenseI64ArrayAsList(OpAsmPrinter &p, DenseI64ArrayAttr attr) {
     p << "[";
@@ -977,6 +1181,11 @@ llvm::StringRef GlobalPhaseOp::getResourceName() { return "GlobalPhase"; }
 llvm::StringRef MultiRZOp::getResourceName() { return "MultiRZ"; }
 llvm::StringRef PCPhaseOp::getResourceName() { return "PCPhase"; }
 llvm::StringRef QubitUnitaryOp::getResourceName() { return "QubitUnitary"; }
+
+llvm::StringRef MeasurementOp::getResourceName() { return getOpName(); }
+uint64_t MeasurementOp::getResourceNumQubits() { return getQubits().size(); }
+uint64_t MeasurementOp::getResourceNumCtrlQubits() { return 0; }
+uint64_t MeasurementOp::getResourceNumParams() { return getParams().size(); }
 
 llvm::StringRef MeasureOp::getResourceName() { return "MidCircuitMeasure"; }
 uint64_t MeasureOp::getResourceNumQubits() { return 1; }
