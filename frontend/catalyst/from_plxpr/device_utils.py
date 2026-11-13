@@ -109,6 +109,9 @@ def create_device_preprocessing_pipeline(
     _gateset_preprocessing(
         pipeline, unsupported_transforms, device, execution_config, shots, capabilities
     )
+    _resource_tracking_preprocessing(
+        pipeline, unsupported_transforms, device, execution_config, shots, capabilities
+    )
 
     if unsupported_transforms and warn:
         warnings.warn(
@@ -321,6 +324,36 @@ def _gateset_preprocessing(
     pipeline.append(
         _safe_create_bound_transform(t, unsupported_transforms, args=targs, kwargs=tkwargs)
     )
+
+
+# pylint: disable=unused-argument
+def _resource_tracking_preprocessing(
+    pipeline: list[BoundTransform],
+    unsupported_transforms: list[str],
+    device: qp.devices.Device,
+    execution_config: ExecutionConfig,
+    shots: int,
+    capabilities: DeviceCapabilities,
+) -> None:
+    """Insert a `tag-classical-control-measurements` pass if the `device` tracks the circuit
+    depth at runtime, which is only the case for `null.qubit` with both resource tracking and
+    depth computation enabled.
+
+    The pass tags the measurements of the QNode, and the `instrument-classical-control` pass of
+    the bufferization stage informs the device which operations are classically controlled by
+    them, so that they are placed after these measurements in the tracked circuit depth.
+    """
+    device_kwargs = getattr(device, "device_kwargs", None) or {}
+    tracks_circuit_depth = (
+        device.name == "null.qubit"
+        and bool(device_kwargs.get("track_resources"))
+        and bool(device_kwargs.get("compute_depth"))
+    )
+    if not tracks_circuit_depth:
+        return
+
+    t = qp.transform(pass_name="tag-classical-control-measurements")
+    pipeline.append(_safe_create_bound_transform(t, unsupported_transforms))
 
 
 def _safe_create_bound_transform(

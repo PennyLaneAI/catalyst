@@ -275,6 +275,27 @@ TEST_CASE_METHOD(NullQubitRuntimeFixture, "Test null qubit circuit with pauli me
     CHECK(*result == false);
 }
 
+TEST_CASE_METHOD(NullQubitRuntimeFixture, "Test null qubit measurement with postselect",
+                 "[NullQubit]") {
+    QUBIT *q = __catalyst__rt__qubit_allocate();
+
+    CHECK(*__catalyst__qis__Measure(q, 1) == true);
+    CHECK(*__catalyst__qis__Measure(q, 0) == false);
+    CHECK(*__catalyst__qis__Measure(q, -1) == false); // no postselect
+}
+
+TEST_CASE_METHOD(NullQubitRuntimeFixture,
+                 "Test null qubit classical control without resource tracking", "[NullQubit]") {
+    QUBIT *q = __catalyst__rt__qubit_allocate();
+    __catalyst__qis__Measure(q, -1);
+
+    // The classical control hooks are no-ops when resources are not tracked
+    CHECK(__catalyst__rt__measurement_token() == 0);
+    __catalyst__rt__begin_classical_control(0);
+    __catalyst__rt__end_classical_control();
+    __catalyst__rt__end_classical_control();
+}
+
 TEST_CASE("Test __catalyst__qis__Sample with num_qubits=2 and PartialSample calling Hadamard, "
           "ControlledPhaseShift, IsingYY, and CRX quantum operations",
           "[CoreQIS]") {
@@ -1051,7 +1072,7 @@ TEST_CASE("Test NullQubit device resource tracking integration", "[NullQubit]") 
             CHECK(line.find("19") != std::string::npos);
         }
         if (line.find("depth") != std::string::npos) {
-            CHECK(line.find("18") != std::string::npos);
+            CHECK(line.find("19") != std::string::npos);
         }
         full_json += line + "\n";
     }
@@ -1069,6 +1090,50 @@ TEST_CASE("Test NullQubit device resource tracking integration", "[NullQubit]") 
         // Check that all measurements applied are present in the data
         CHECK(full_json.find(name) != std::string::npos);
     }
+
+    std::remove(RESOURCES_FILENAME.c_str()); // Remove the file automatically created by the device
+}
+
+TEST_CASE("Test NullQubit classical control resource tracking", "[NullQubit]") {
+    // The name of the file where the resource usage data is stored
+    const std::string RESOURCES_FILENAME = "__pennylane_resources_data_classical_control.json";
+
+    std::unique_ptr<NullQubit> sim =
+        std::make_unique<NullQubit>("{'track_resources':True, 'resources_filename':'" +
+                                    RESOURCES_FILENAME + "', 'compute_depth':True}");
+
+    std::vector<QubitIdType> Qs = sim->AllocateQubits(2);
+    CHECK(sim->GetMeasurementToken() == 0);
+
+    // m0 = measure(0); cond(m0, Z)(1)
+    sim->Measure(Qs[0], std::nullopt);
+    int64_t token = sim->GetMeasurementToken();
+    CHECK(token == 1);
+
+    sim->BeginClassicalControl(token);
+    sim->NamedOperation("PauliZ", {}, {Qs[1]}, false);
+    sim->EndClassicalControl();
+
+    CHECK_THROWS(sim->BeginClassicalControl(-1));
+    CHECK_THROWS(sim->EndClassicalControl());
+
+    sim->ReleaseQubits(Qs);
+    sim.reset(); // Destroy the device to trigger writing the resource data
+
+    std::ifstream resource_file_r(RESOURCES_FILENAME);
+    CHECK(resource_file_r.is_open()); // fail-fast if file failed to create
+
+    std::string full_json;
+    while (resource_file_r) {
+        std::string line;
+        std::getline(resource_file_r, line);
+        full_json += line + "\n";
+    }
+    resource_file_r.close();
+
+    // The conditional Z is applied after the measurement it depends on
+    CHECK(full_json.find("\"depth\": 2") != std::string::npos);
+    CHECK(full_json.find("\"num_gates\": 1") != std::string::npos);
 
     std::remove(RESOURCES_FILENAME.c_str()); // Remove the file automatically created by the device
 }
