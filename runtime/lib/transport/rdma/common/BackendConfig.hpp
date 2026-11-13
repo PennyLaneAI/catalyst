@@ -61,4 +61,17 @@ inline BackendConfig parse_backend_config(const std::string &config) {
     return BackendConfig{std::move(dev), gid};
 }
 
+/// The controller a coprocessor faces, which decides the protocol its link speaks.
+enum class Peer {
+    CATALYST, // another catalyst session, over RC; `peer=catalyst` or no `peer` key
+};
+
+/// The peer a coprocessor's `config` names.
+inline Peer peer_from_config(const std::string &config) {
+    const auto peer = configparser::find(config, "peer");
+    TP_CHECK(!peer || *peer == "catalyst", "config: unknown peer '%.*s' (want catalyst)",
+             static_cast<int>(peer ? peer->size() : 0), peer ? peer->data() : "");
+    return Peer::CATALYST;
+}
+
 } // namespace catalyst::transport::common

@@ -23,6 +23,17 @@
 #include <infiniband/verbs.h>
 
 namespace catalyst::transport::common {
+/// Sizes of one queue pair: send-queue depth, completion-queue depth and inline capacity.
+struct QpShape {
+    int sq_depth;
+    int cq_depth;
+    int inline_max;
+};
+
+/// The shape an RC link gives its queue pairs unless a backend asks otherwise: deep enough for a
+/// full ring of signaled sends, with inline capacity for a Payload.
+inline constexpr QpShape DEFAULT_QP_SHAPE{.sq_depth = 4096, .cq_depth = 4096, .inline_max = 256};
+
 class QueuePair {
   public:
     QueuePair(std::shared_ptr<ProtectionDomain> pd, std::shared_ptr<CompletionQueue> send_cq,

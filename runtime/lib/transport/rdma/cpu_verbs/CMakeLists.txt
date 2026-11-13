@@ -11,7 +11,7 @@ target_include_directories(cpu_verbs_impl PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/coprocessor
     ${runtime_includes}                      # Transport.hpp, TransportBackend.h
 )
-target_link_libraries(cpu_verbs_impl PUBLIC verbs_session_base)
+target_link_libraries(cpu_verbs_impl PUBLIC verbs_links)
 set_property(TARGET cpu_verbs_impl PROPERTY POSITION_INDEPENDENT_CODE ON)
 
 # Controller library

@@ -101,10 +101,8 @@ inline void cpu_relax() {
 }
 
 /**
- * @brief Interval between stop-token polls in a coprocessor's arrival spin.
- *
- * The count for how often the arrival spin looks at the stop token.
+ * @brief How often a coprocessor's spin looks at the stop token: every STOP_CHECK_MASK + 1 spins.
  */
-inline constexpr std::uint32_t STOP_CHECK_SPINS = 600'000'000;
+inline constexpr std::uint64_t STOP_CHECK_MASK = 0xFFFFF;
 
 } // namespace catalyst::transport::common
