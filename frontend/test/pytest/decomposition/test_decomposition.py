@@ -1740,7 +1740,12 @@ class TestSymbolicRules:
             op_cls=qp.Hadamard,
             modifiers=ModifierState(control_count=n_ctrl),
         )
-        (rule,) = get_rule_strings_from_module(module)
+        # Generic fallback rules can also decompose the same controlled target.
+        (rule,) = [
+            rule
+            for rule in get_rule_strings_from_module(module)
+            if 'frontend_name = "flip_zero_ctrl_values(_controlled_hadamard)"' in rule
+        ]
 
         assert f'target_gate = "{target_id}"' in rule
         assert resource in rule
