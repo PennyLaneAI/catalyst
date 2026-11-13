@@ -32,6 +32,7 @@ catalyst_runtime_install(rt_transport)
 #   fpga_verbs (RDMA)  libibverbs + ENABLE_TRANSPORT_FPGA
 #   fpga_hwhs (RDMA)   libibverbs + ENABLE_TRANSPORT_FPGA
 #   fpga_hsb (UIO)     ENABLE_TRANSPORT_FPGA, aarch64
+#   fpga_balboa (UIO)  ENABLE_TRANSPORT_FPGA, aarch64
 #
 # Shared libs under common/:
 #   common/interface   headers (WireProtocol, ConfigParser)         ::common
@@ -205,6 +206,13 @@ if(ENABLE_TRANSPORT_FPGA AND CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|arm64")
     add_subdirectory(rdma/fpga_hsb)
     add_dependencies(transport_all catalyst_transport_hsb_hwhs_controller)
     add_dependencies(transport_backends catalyst_transport_hsb_hwhs_controller)
+endif()
+
+# --- BALBOA (BALBOA RoCE v2 stack) --------------------------------------------
+if(ENABLE_TRANSPORT_FPGA AND CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|arm64")
+    add_subdirectory(rdma/fpga_balboa)
+    add_dependencies(transport_all catalyst_transport_balboa_hwhs_controller)
+    add_dependencies(transport_backends catalyst_transport_balboa_hwhs_controller)
 endif()
 
 # --- Memcpy (in-process shim) -------------------------------------------------

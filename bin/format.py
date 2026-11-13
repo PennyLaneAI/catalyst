@@ -29,6 +29,7 @@ BACKLINE_VENDOR = [
     "coproc/onnx/vendor",
     "rdma/fpga_hsb/hsb_regs.h",
     "rdma/fpga_hsb/hwhs_regs.h",
+    "rdma/fpga_balboa/hwhs_regs.h",
 ]
 
 IGNORE_PATTERNS = [

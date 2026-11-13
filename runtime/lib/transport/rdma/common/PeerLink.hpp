@@ -17,10 +17,11 @@
  * One end of a session's connection to its peer. A coprocessor's config names the peer with
  * `peer=` (BackendConfig.hpp), and the peer decides the protocol the link speaks:
  *
- * | peer     | link    | the other end                                       |
- * |----------|---------|-----------------------------------------------------|
- * | catalyst | RcLink  | another catalyst session, such as a controller      |
- * | hsb      | HsbLink | a controller behind NVIDIA's Holoscan Sensor Bridge |
+ * | peer     | link       | the other end                                       |
+ * |----------|------------|-----------------------------------------------------|
+ * | catalyst | RcLink     | another catalyst session, such as a controller      |
+ * | hsb      | HsbLink    | a controller behind NVIDIA's Holoscan Sensor Bridge |
+ * | balboa   | BalboaLink | a controller behind ETH Zurich's BALBOA             |
  *
  * The peer writes each request into a ring of frames that the session owns. The links are final,
  * so call one through its concrete type on the critical path to skip the virtual call.
