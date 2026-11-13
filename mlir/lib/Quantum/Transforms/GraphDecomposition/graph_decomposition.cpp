@@ -16,8 +16,10 @@
 #include <sstream>
 #include <string>
 #include <unordered_set>
+#include <utility>
 #include <vector>
 
+#include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/StringSet.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
@@ -32,6 +34,7 @@
 #include "stablehlo/dialect/StablehloOps.h"
 
 #include "Catalyst/Analysis/ResourceAnalysis.h"
+#include "Catalyst/Analysis/ResourceResult.h"
 #include "Driver/Timer.h"
 #include "QRef/Transforms/Passes.h"
 #include "Quantum/Transforms/Passes.h"
@@ -193,7 +196,7 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
                 }
             }
             // An empty target-rules option means "apply all" to decompose-lowering. An empty
-            // circuit plan instead means that no decomposition is needed.
+            // rule set instead means that no decomposition is needed.
             if (seenRules.empty()) {
                 return;
             }
