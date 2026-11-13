@@ -161,14 +161,18 @@ void CpuCoprocessorSession::run(std::stop_token st) {
 // A request is seen in the ring itself: the seq of the slot the peer writes next reaches the
 // expected value the moment the NIC's write lands, seq last. The peer fills the slots in order and
 // the controller's seq counts from 1, so request n is in slot n mod the ring's slots with seq n
-// + 1.
+// + 1. A later seq is taken too, so in a one-slot ring a lost request does not stall the loop.
 template <frame::Mode M, class Link>
 void CpuCoprocessorSession::serve(Link &link, std::stop_token st) {
-    std::uint64_t n = 0; // requests served
+    std::uint64_t slot = 0;   // the slot polled next
+    std::uint32_t expect = 1; // the lowest seq to take
     for (std::uint64_t spin = 0;; ++spin) {
-        const std::uint32_t seq = static_cast<std::uint32_t>(n + 1);
+        std::uint8_t *req = ring_buf_ + ring_.slot_offset(slot);
+        const std::uint32_t seq = std::atomic_ref<std::uint32_t>(
+                                      *reinterpret_cast<std::uint32_t *>(req + ring_.poll_offset()))
+                                      .load(std::memory_order_acquire);
         frame::FrameView r; // the incoming message
-        if (frame::poll<M>(ring_, ring_buf_ + ring_.slot_offset(n), seq, r)) {
+        if (frame::seq_reached(seq, expect) && frame::poll<M>(ring_, req, seq, r)) {
             const std::size_t len = M == frame::Mode::BL16 ? PAYLOAD_DATA_BYTES : r.len;
             std::uint64_t word = 0;
             std::memcpy(&word, r.data, std::min<std::size_t>(len, sizeof(word)));
@@ -191,7 +195,8 @@ void CpuCoprocessorSession::serve(Link &link, std::stop_token st) {
             }
             frame::stage<M>(ring_, send, r.fn_id, reply, nb);
             link.send(seq); // the controller matches the reply by it
-            ++n;
+            ++slot;
+            expect = seq + 1;
             continue;
         }
 
