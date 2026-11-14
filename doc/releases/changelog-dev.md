@@ -998,6 +998,11 @@
   ring now has one slot, so the next request is served.
   [(#3468)](https://github.com/PennyLaneAI/catalyst/pull/3468)
 
+* The `ppr-to-ppm` pass now supports PPRotation operations inside `quantum.adjoint` regions by
+  invoking `adjoint-lowering` before converting the reversed rotations to Pauli product
+  measurements.
+  [(#2934)](https://github.com/PennyLaneAI/catalyst/pull/2934)
+
 * A `qp.Backline` device with a `qec_code` no longer fails to compile circuits whose gates are
   `Operator2`. The unused decomposition rules captured with the circuit are now removed before
   `convert-quantum-to-qecl`, which could not convert them.

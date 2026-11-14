@@ -104,3 +104,21 @@ func.func @test_ppr_to_ppm_with_condition(%q0 : !quantum.bit, %q1 : !quantum.bit
     // CHECK:   scf.yield [[arg1]], [[arg2]], [[arg3]]
     // CHECK: }
 }
+
+// -----
+
+// CHECK-LABEL: @test_ppr_to_ppm_lowers_adjoint
+func.func @test_ppr_to_ppm_lowers_adjoint(%r: !quantum.reg) -> !quantum.reg {
+    // CHECK-NOT: quantum.adjoint
+    %r_out = quantum.adjoint(%r) : !quantum.reg {
+    ^bb0(%arg0: !quantum.reg):
+        %0 = quantum.extract %arg0[0] : !quantum.reg -> !quantum.bit
+        // CHECK: pbc.ppm ["Z", "Y"]
+        // CHECK: pbc.ppm ["X"]
+        // CHECK: pbc.ppr ["Z"](2)
+        %1 = pbc.ppr ["Z"](4) %0 : !quantum.bit
+        %2 = quantum.insert %arg0[0], %1 : !quantum.reg, !quantum.bit
+        quantum.yield %2 : !quantum.reg
+    }
+    return %r_out : !quantum.reg
+}
