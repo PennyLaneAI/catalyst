@@ -14,6 +14,7 @@
 
 #include "GraphPrep.hpp"
 
+#include <cmath>
 #include <cstdint>
 #include <memory>
 #include <string>
@@ -21,6 +22,7 @@
 #include <vector>
 
 #include "llvm/ADT/STLExtras.h"
+#include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/ADT/StringMap.h"
@@ -29,13 +31,17 @@
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/DebugLog.h"
 #include "llvm/Support/LogicalResult.h"
+#include "llvm/Support/raw_ostream.h"
 #include "mlir/AsmParser/AsmParser.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
+#include "mlir/IR/AsmState.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinOps.h"
+#include "mlir/IR/MLIRContext.h"
 #include "mlir/IR/OwningOpRef.h"
 #include "mlir/IR/SymbolTable.h"
 #include "mlir/Parser/Parser.h"
+#include "mlir/Support/LLVM.h"
 #include "mlir/Support/LogicalResult.h"
 #include "mlir/Support/WalkResult.h"
 
@@ -44,6 +50,7 @@
 #include "Quantum/IR/QuantumInterfaces.h"
 #include "Quantum/Transforms/QPDLoader.h"
 
+#include "DGBuilder.hpp"
 #include "DGTypes.hpp"
 #include "DecompUtils.hpp"
 
@@ -221,33 +228,73 @@ LogicalResult addRuleNode(func::FuncOp rule, std::vector<RuleNode> &ruleNodes) {
     return success();
 }
 
-LogicalResult loadBuiltInDecompositionRules(ModuleOp module, llvm::StringRef filename) {
+OwningOpRef<ModuleOp> loadPrecompiledRules(ModuleOp module, llvm::StringRef filename) {
     ParserConfig config(module.getContext());
-    OwningOpRef<ModuleOp> builtinModule = parseSourceFile<ModuleOp>(filename, config);
+    OwningOpRef<ModuleOp> precompiledModule = parseSourceFile<ModuleOp>(filename, config);
 
     SymbolTable symbolTable(module);
 
-    if (!builtinModule) {
+    if (!precompiledModule) {
         llvm::errs() << "failed to load built-in decomposition rules from '" << filename
                      << "': the rules file could not be parsed\n";
-        return failure();
+        return {};
     }
 
-    // add to module
-    for (auto rule : llvm::make_early_inc_range(builtinModule.get().getOps<func::FuncOp>())) {
-        // Independently compiled rule libraries can reuse the same name for a
-        // different target. Only skip the same rule; otherwise let the symbol table
-        // resolve the collision.
+    SymbolTable precompiledSymbolTable(precompiledModule.get());
+    llvm::SmallVector<func::FuncOp> worklist;
+    for (auto rule : llvm::make_early_inc_range(precompiledModule.get().getOps<func::FuncOp>())) {
+        if (!rule->hasAttr(DecompUtils::target_gate_attr_name)) {
+            continue;
+        }
         auto existing = symbolTable.lookup<func::FuncOp>(rule.getName());
         if (existing && existing->getAttr("target_gate") == rule->getAttr("target_gate") &&
             existing->getAttr("frontend_name") == rule->getAttr("frontend_name") &&
             existing->getAttr("resources") == rule->getAttr("resources")) {
+            // References to a reused rule will resolve to the existing circuit symbol when
+            // dependent functions are materialized.
+            precompiledSymbolTable.erase(rule);
             continue;
         }
-        rule->remove();
-        symbolTable.insert(rule);
+        worklist.push_back(rule);
     }
-    return success();
+
+    // Prepare rule functions and their dependencies, not the library's setup, teardown or
+    // capture entry point. Helpers with the same name may have different signatures.
+    llvm::SmallPtrSet<Operation *, 16> required;
+    while (!worklist.empty()) {
+        func::FuncOp function = worklist.pop_back_val();
+        if (!required.insert(function).second) {
+            continue;
+        }
+        auto uses = SymbolTable::getSymbolUses(function);
+        if (!uses) {
+            function.emitError("cannot inspect precompiled rule dependencies");
+            return {};
+        }
+        for (const auto &use : *uses) {
+            if (auto dependency = dyn_cast_or_null<func::FuncOp>(
+                    SymbolTable::lookupSymbolIn(precompiledModule.get(), use.getSymbolRef()))) {
+                worklist.push_back(dependency);
+            }
+        }
+    }
+
+    llvm::SmallVector<func::FuncOp> functions;
+    for (auto function : precompiledModule.get().getOps<func::FuncOp>()) {
+        if (required.contains(function)) {
+            functions.push_back(function);
+        }
+    }
+
+    // Rename inside the source symbol table so every call is updated before moving functions.
+    for (auto function : functions) {
+        if (symbolTable.lookup(function.getName()) &&
+            failed(precompiledSymbolTable.renameToUnique(function, {&symbolTable}))) {
+            function.emitError("cannot rename a precompiled rule dependency");
+            return {};
+        }
+    }
+    return precompiledModule;
 }
 
 /**
@@ -410,11 +457,12 @@ LogicalResult getRuleNodes(ModuleOp module, llvm::StringRef filename,
                            llvm::StringMap<llvm::StringSet<>> &opToExcludedDecompNames,
                            [[maybe_unused]] llvm::StringRef libQPDPath,
                            [[maybe_unused]] llvm::StringRef libpythonPath,
-                           std::vector<RuleNode> &rules) {
+                           std::vector<RuleNode> &rules, OwningOpRef<ModuleOp> &ruleLibrary) {
 
-    // Load pre-compiled rules (ignore failure, we can try to solve without) into the module
+    // Read library candidates separately from the circuit. Ignore a missing library: rules
+    // already captured in the circuit may still be sufficient to solve the graph.
     if (!filename.empty()) {
-        std::ignore = loadBuiltInDecompositionRules(module, filename);
+        ruleLibrary = loadPrecompiledRules(module, filename);
     }
 
     // Lower compile-time rules into the module
@@ -431,6 +479,10 @@ LogicalResult getRuleNodes(ModuleOp module, llvm::StringRef filename,
             loadDecompositionRules(module, opToFixedDecompName, opToExcludedDecompNames, rules))) {
         return failure();
     }
+    if (ruleLibrary && failed(loadDecompositionRules(ruleLibrary.get(), opToFixedDecompName,
+                                                     opToExcludedDecompNames, rules))) {
+        return failure();
+    }
     return success();
 }
 
@@ -440,8 +492,51 @@ namespace catalyst {
 namespace quantum {
 namespace GraphPrep {
 
+LogicalResult materializeSelectedLibraryRules(ModuleOp module, ModuleOp ruleLibrary,
+                                              const llvm::StringSet<> &selectedRules) {
+    if (!ruleLibrary) {
+        return success();
+    }
+
+    llvm::SmallVector<func::FuncOp> worklist;
+    for (auto function : ruleLibrary.getOps<func::FuncOp>()) {
+        if (selectedRules.contains(function.getName())) {
+            worklist.push_back(function);
+        }
+    }
+    llvm::SmallPtrSet<Operation *, 16> required;
+    while (!worklist.empty()) {
+        auto function = worklist.pop_back_val();
+        if (!required.insert(function).second) {
+            continue;
+        }
+        auto uses = SymbolTable::getSymbolUses(function);
+        if (!uses) {
+            return function.emitError("cannot inspect selected rule dependencies");
+        }
+        for (const auto &use : *uses) {
+            if (auto dependency = dyn_cast_or_null<func::FuncOp>(
+                    SymbolTable::lookupSymbolIn(ruleLibrary, use.getSymbolRef()))) {
+                worklist.push_back(dependency);
+            }
+        }
+    }
+
+    // Names and callers were resolved before graph construction. Preserve those names when
+    // importing only the functions needed by the chosen decomposition.
+    SymbolTable symbolTable(module);
+    for (auto function : llvm::make_early_inc_range(ruleLibrary.getOps<func::FuncOp>())) {
+        if (required.contains(function)) {
+            function->remove();
+            symbolTable.insert(function);
+        }
+    }
+    return success();
+}
+
 std::unique_ptr<DecompositionGraph> prepareGraph(ModuleOp module, ArrayRef<std::string> opIDs,
-                                                 const PrepOptions &opts) {
+                                                 const PrepOptions &opts,
+                                                 OwningOpRef<ModuleOp> &ruleLibrary) {
     LLVM_DEBUG(llvm::dbgs() << "Running GraphPrep with options:\n");
     LLVM_DEBUG({
         llvm::dbgs() << "targetGateSetOption\n";
@@ -482,7 +577,7 @@ std::unique_ptr<DecompositionGraph> prepareGraph(ModuleOp module, ArrayRef<std::
 
     if (failed(getRuleNodes(module, opts.bytecodeRulesFile, opToFixedDecompName,
                             opToExcludedDecompNames, opts.libQPDPath, opts.libpythonPath,
-                            setOfRules))) {
+                            setOfRules, ruleLibrary))) {
         return nullptr;
     }
 

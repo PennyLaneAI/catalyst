@@ -61,4 +61,28 @@ inline BackendConfig parse_backend_config(const std::string &config) {
     return BackendConfig{std::move(dev), gid};
 }
 
+/// The controller a coprocessor faces, which decides the protocol its link speaks.
+enum class Peer {
+    CATALYST, // another catalyst session, over RC; `peer=catalyst` or no `peer` key
+    HSB,      // `peer=hsb`: a controller behind NVIDIA's Holoscan Sensor Bridge (HsbWire.hpp)
+    BALBOA,   // `peer=balboa`: a controller behind ETH Zurich's BALBOA (BalboaWire.hpp)
+};
+
+/// The peer a coprocessor's `config` names.
+inline Peer peer_from_config(const std::string &config) {
+    const auto peer = configparser::find(config, "peer");
+    if (!peer || *peer == "catalyst") {
+        return Peer::CATALYST;
+    }
+    if (*peer == "hsb") {
+        return Peer::HSB;
+    }
+    if (*peer == "balboa") {
+        return Peer::BALBOA;
+    }
+
+    TP_FAIL("config: unknown peer '%.*s' (want catalyst|hsb|balboa)",
+            static_cast<int>(peer->size()), peer->data());
+}
+
 } // namespace catalyst::transport::common

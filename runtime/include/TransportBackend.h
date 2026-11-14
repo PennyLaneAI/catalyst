@@ -41,13 +41,15 @@
 //   - a version newer than CATALYST_TRANSPORT_ABI_VERSION: refused, naming both versions;
 //   - a role missing from `roles`: refused;
 //   - a coprocessor from a backend older than version 3: refused, since version 3 changed the
-//     CoprocessorFn signature the coprocessor calls.
+//     CoprocessorFn signature the coprocessor calls;
+//   - a controller from a backend older than version 4 is never asked ControllerSession's
+//     self_paced() or run_paced(), which version 4 added.
 // Otherwise a backend built against an older version keeps working, because the session interface
 // in Transport.hpp follows these rules:
 //   - virtual methods are only appended, never removed or reordered;
 //   - the session base classes gain no data members;
 //   - the runtime never calls a method added in version N on a backend reporting a lower version.
-#define CATALYST_TRANSPORT_ABI_VERSION 3u
+#define CATALYST_TRANSPORT_ABI_VERSION 4u
 #define CATALYST_TRANSPORT_ABI_VERSION_SYMBOL "CatalystTransportAbiVersion"
 #define CATALYST_TRANSPORT_QUERY_CAPS_SYMBOL "CatalystTransportQueryCaps"
 

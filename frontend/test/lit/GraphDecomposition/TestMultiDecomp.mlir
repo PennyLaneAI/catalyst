@@ -12,22 +12,25 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// RUN: catalyst --tool=opt --split-input-file --pass-pipeline='builtin.module(graph-decomposition{inline-rule-body gate-set=testRX=1.0 bytecode-rules="%BYTECODE_PATH"})' %s | FileCheck %s --check-prefixes FIRST
+// RUN: catalyst --tool=opt --split-input-file --pass-pipeline='builtin.module(graph-decomposition{inline-rule-body gate-set=testRX=1.0 bytecode-rules="%PRECOMPILED_BYTECODE_PATH"})' %s | FileCheck %s --check-prefixes FIRST
 
-// RUN: catalyst --tool=opt --split-input-file --pass-pipeline='builtin.module(graph-decomposition{inline-rule-body gate-set=testRX=1.0 bytecode-rules="%BYTECODE_PATH"},graph-decomposition{inline-rule-body gate-set=testRZ=1.0,testRY=1.0 bytecode-rules="%BYTECODE_PATH"})' %s | FileCheck %s --check-prefixes SECOND
+// RUN: catalyst --tool=opt --split-input-file --pass-pipeline='builtin.module(graph-decomposition{inline-rule-body gate-set=testRX=1.0 bytecode-rules="%PRECOMPILED_BYTECODE_PATH"},graph-decomposition{inline-rule-body gate-set=testRZ=1.0,testRY=1.0 bytecode-rules="%PRECOMPILED_BYTECODE_PATH"})' %s | FileCheck %s --check-prefixes SECOND
 
-func.func @circuit() -> !quantum.bit {
+// CHECK-LABEL: func.func @circuit
+func.func @circuit() {
     %0 = quantum.alloc(2) : !quantum.reg
     %q = quantum.extract %0[0] : !quantum.reg -> !quantum.bit
-    // FIRST-NOT: testPauliX
+    // CHECK-NOT: testPauliX
+
     // FIRST: testRX
 
-    // SECOND-NOT: testPauliX
     // SECOND-NOT: testRX
     // SECOND: testRZ
     // SECOND: testRY
     // SECOND: testRZ
     %qout = quantum.custom "testPauliX"() %q : !quantum.bit
-    return %qout : !quantum.bit
+    %1 = quantum.insert %0[0], %qout : !quantum.reg, !quantum.bit
+    quantum.dealloc %1 : !quantum.reg
+    return
 }
 

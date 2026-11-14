@@ -16,22 +16,24 @@
 // this .so and resolves CatalystTransportCoprocessorFactory (see TransportBackend.h).
 // The coprocessor function is bound after construction via set_coprocessor_fn()
 // (by the coprocessor-side harness); a freshly built session defaults to the
-// built-in echo.
+// built-in echo. The link faces the peer the config names with `peer=` (PeerLink.hpp).
 
 #include <string>
 
 #include "BackendConfig.hpp"
 #include "CpuCoprocessorSession.hpp"
+#include "PeerLink.hpp"
 #include "TransportBackend.h"
 
 namespace {
 catalyst::transport::CoprocessorSession *make_cpu_coprocessor(const std::string &config) {
     namespace common = catalyst::transport::common;
-    const auto cfg = common::parse_backend_config(config);
-    auto *session = new catalyst::transport::cpu_verbs::CpuCoprocessorSession(
-        cfg.dev, cfg.gid, common::frame::geometry_from_config(config));
-    session->set_thread_affinity(common::configparser::parse_optional_index(config, "cpu_pin", -1),
-                                 common::configparser::parse_optional_index(config, "rt", 0) != 0);
+    namespace cpu_verbs = catalyst::transport::cpu_verbs;
+    const int cpu = common::configparser::parse_optional_index(config, "cpu_pin", -1);
+    const bool rt = common::configparser::parse_optional_index(config, "rt", 0) != 0;
+    auto *session =
+        new cpu_verbs::CpuCoprocessorSession(common::make_coprocessor_link(config, "cpu_verbs"));
+    session->set_thread_affinity(cpu, rt);
     return session;
 }
 } // namespace

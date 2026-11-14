@@ -27,7 +27,7 @@ from pennylane.decomposition.utils import to_name
 from catalyst.compiler import _options_to_cli_flags, _quantum_opt
 from catalyst.utils.exceptions import CompileError
 from catalyst.utils.runtime_environment import (
-    BYTECODE_FILE_PATH,
+    PRECOMPILED_BYTECODE_PATH,
     get_lib_path,
     get_libpython_path,
 )
@@ -1775,7 +1775,7 @@ def graph_decomposition_setup_inputs(
     gate_set: Iterable[type | str] | dict[type | str, float],
     fixed_decomps: dict[str, DecompositionRule | str] | None = None,
     exclude_decomps: dict[str, list[str] | tuple[str, ...]] | None = None,
-    bytecode_rules: str = BYTECODE_FILE_PATH,
+    bytecode_rules: str = PRECOMPILED_BYTECODE_PATH,
     libQPD_path: Path | None = None,
     libpython_path: Path | None = None,
     verbose: bool = False,
@@ -1789,6 +1789,9 @@ def graph_decomposition_setup_inputs(
     allows multiple decomposition rules to be defined for a quantum operation,
     and the graph solver will determine the optimal decomposition rules to apply,
     minimizing the overall gate count or the cost according to user-specified weights.
+
+    The same options are also used by the ``-resource-estimate`` MLIR compiler analysis pass for
+    the graph-based resource estimation.
 
     .. note::
 
@@ -1931,6 +1934,10 @@ def graph_decomposition_setup_inputs(
 
 graph_decomposition = qp.transform(
     pass_name="graph-decomposition", setup_inputs=graph_decomposition_setup_inputs
+)
+
+resource_estimate = qp.transform(
+    pass_name="resource-estimate", setup_inputs=graph_decomposition_setup_inputs
 )
 
 __all__ = [

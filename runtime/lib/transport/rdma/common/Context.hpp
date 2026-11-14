@@ -19,6 +19,16 @@
 #include <infiniband/verbs.h>
 
 namespace catalyst::transport::common {
+
+/// The IPv4 address (host byte order) and netdev MAC behind an IPv4-mapped RoCE GID.
+struct Ipv4Gid {
+    std::uint32_t ip = 0;
+    std::uint8_t mac[6] = {};
+};
+
+/// The IPv4-mapped GID of `ip` (host byte order).
+ibv_gid ipv4_mapped_gid(std::uint32_t ip);
+
 /**
  * @class Context
  * @brief RAII wrapper for an RDMA device context (`ibv_context`).
@@ -55,7 +65,14 @@ class Context {
      */
     ibv_gid gid(std::uint8_t port, int idx) const;
 
+    /**
+     * @brief Reads the IPv4 address and netdev MAC behind GID `idx`, which has to be an
+     * IPv4-mapped (RoCE v2) one.
+     */
+    Ipv4Gid ipv4_gid(std::uint8_t port, int idx) const;
+
   private:
+    std::string dev_name_;
     ibv_context *ctx_ = nullptr;
 };
 } // namespace catalyst::transport::common

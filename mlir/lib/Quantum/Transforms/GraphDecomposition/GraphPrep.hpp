@@ -19,10 +19,10 @@
 
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/StringRef.h"
-#include "mlir/Dialect/Func/IR/FuncOps.h"
+#include "llvm/ADT/StringSet.h"
 #include "mlir/IR/BuiltinOps.h"
-
-#include "Catalyst/Analysis/ResourceAnalysis.h"
+#include "mlir/IR/OwningOpRef.h"
+#include "mlir/Support/LLVM.h"
 
 #include "DGBuilder.hpp"
 
@@ -49,12 +49,19 @@ struct PrepOptions {
  * @brief Prepare a decomposition graph from a module.
  *
  * Gathers rules for the target gateset in addition to the passed in opIDs and builds a
- * DecompositionGraph.
+ * DecompositionGraph. Parsed library functions remain in ruleLibrary until the solver selects
+ * which rules to materialize.
  *
  * Returns nullptr on failure.
  */
 std::unique_ptr<DecompGraph::Solver::DecompositionGraph>
-prepareGraph(mlir::ModuleOp module, llvm::ArrayRef<std::string> opIDs, const PrepOptions &opts);
+prepareGraph(mlir::ModuleOp module, llvm::ArrayRef<std::string> opIDs, const PrepOptions &opts,
+             mlir::OwningOpRef<mlir::ModuleOp> &ruleLibrary);
+
+/// Import selected library rules and their transitive function dependencies.
+mlir::LogicalResult materializeSelectedLibraryRules(mlir::ModuleOp module,
+                                                    mlir::ModuleOp ruleLibrary,
+                                                    const llvm::StringSet<> &selectedRules);
 
 } // namespace GraphPrep
 } // namespace quantum

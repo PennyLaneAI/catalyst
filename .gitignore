@@ -36,6 +36,7 @@ mlir/build-docs
 # Development
 venv
 .venv
+.catalyst-worktree
 
 # Cache files
 .cache

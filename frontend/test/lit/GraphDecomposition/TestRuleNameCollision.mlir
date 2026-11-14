@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// RUN: catalyst --tool=opt --pass-pipeline='builtin.module(graph-decomposition{inline-rule-body gate-set=testRZ=1.0,testRY=1.0 fixed-decomps=testHadamard=h_to_rz_ry bytecode-rules="%BYTECODE_PATH"})' %s | FileCheck %s
+// RUN: catalyst --tool=opt --pass-pipeline='builtin.module(graph-decomposition{inline-rule-body gate-set=testRZ=1.0,testRY=1.0 fixed-decomps=testHadamard=h_to_rz_ry bytecode-rules="%PRECOMPILED_BYTECODE_PATH"})' %s | FileCheck %s
 
 // A name collision with an independently compiled rule must not hide the library rule.
 // CHECK-LABEL: func.func @circuit

@@ -1,5 +1,4 @@
 set(FRONTEND_LIT_TEST_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../../frontend/test/lit")
-set(DECOMP_RULES_BYTECODE_PATH "${FRONTEND_LIT_TEST_DIR}/GraphDecomposition/test_rules.mlirbc")
 
 configure_lit_site_cfg(
     ${CMAKE_CURRENT_SOURCE_DIR}/lit.site.cfg.py.in
@@ -9,9 +8,9 @@ configure_lit_site_cfg(
 )
 
 add_custom_target(create_test_bytecode
-    quantum-opt --emit-bytecode ${FRONTEND_LIT_TEST_DIR}/GraphDecomposition/test_rules.mlir -o ${DECOMP_RULES_BYTECODE_PATH}
+    quantum-opt --emit-bytecode ${FRONTEND_LIT_TEST_DIR}/GraphDecomposition/test_rules.mlir -o ${PRECOMPILED_BYTECODE_PATH}
     DEPENDS quantum-opt
-    BYPRODUCTS ${DECOMP_RULES_BYTECODE_PATH}
+    BYPRODUCTS ${PRECOMPILED_BYTECODE_PATH}
 )
 
 add_lit_testsuite(check-frontend "Run the frontend tests"

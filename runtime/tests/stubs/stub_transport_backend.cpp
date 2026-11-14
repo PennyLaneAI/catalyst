@@ -45,6 +45,12 @@ struct StubController : ControllerSession {
     void *reply_slot() override { return &reply; }
 };
 
+// A controller that issues its own rounds, as a backend with a hardware pacer does.
+struct StubPacedController : StubController {
+    bool self_paced() const override { return true; }
+    int run_paced() override { return 0; }
+};
+
 struct StubCoprocessor : CoprocessorSession {
     int connect(const ConnectInfo &) override { return 0; }
     MemRegion alloc_memory(std::size_t, MemKind) override { return {}; }
@@ -70,7 +76,11 @@ struct StubLaunchOnceCoprocessor : StubCoprocessor {
 
 } // namespace
 
-extern "C" ControllerSession *CatalystTransportControllerFactory(const char *) {
+extern "C" ControllerSession *CatalystTransportControllerFactory(const char *config) {
+    const std::string cfg = config ? config : "";
+    if (cfg == "paced") {
+        return new StubPacedController();
+    }
     return new StubController();
 }
 
