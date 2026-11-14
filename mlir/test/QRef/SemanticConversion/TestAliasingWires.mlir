@@ -23,7 +23,7 @@ func.func @nested_ctrl_same_wire() -> f64 attributes {quantum.node} {
   %0 = qref.alloc(10) : !qref.reg<10>
   // expected-note@+1 {{first use of the qubit}}
   %1 = qref.get %0[1] : !qref.reg<10> -> !qref.bit
-  // expected-error@+1 {{ctrl qubits and the qubits used inside the ctrl region must refer to distinct qubits}}
+  // expected-error@+1 {{ctrl qubits, work qubits and the qubits used inside the ctrl region must refer to distinct qubits}}
   qref.ctrl(%1) ctrlvals(%false) {
     // expected-note@+1 {{aliasing use of the same qubit}}
     %5 = qref.get %0[1] : !qref.reg<10> -> !qref.bit
@@ -47,10 +47,48 @@ func.func @ctrl_on_target() attributes {quantum.node} {
   %r = qref.alloc(2) : !qref.reg<2>
   // expected-note@+1 {{first use of the qubit}}
   %c = qref.get %r[1] : !qref.reg<2> -> !qref.bit
-  // expected-error@+1 {{ctrl qubits and the qubits used inside the ctrl region must refer to distinct qubits}}
+  // expected-error@+1 {{ctrl qubits, work qubits and the qubits used inside the ctrl region must refer to distinct qubits}}
   qref.ctrl(%c) ctrlvals(%true) {
     // expected-note@+1 {{aliasing use of the same qubit}}
     %t = qref.get %r[1] : !qref.reg<2> -> !qref.bit
+    qref.custom "PauliX"() %t : !qref.bit
+  }
+  qref.dealloc %r : !qref.reg<2>
+  return
+}
+
+// -----
+
+// qp.ctrl(qp.X(1), control=0, work_wires=[1]): work wire overlapping with target
+func.func @ctrl_work_wire_on_target() attributes {quantum.node} {
+  %true = arith.constant true
+  %r = qref.alloc(2) : !qref.reg<2>
+  %c = qref.get %r[0] : !qref.reg<2> -> !qref.bit
+  // expected-note@+1 {{first use of the qubit}}
+  %w = qref.get %r[1] : !qref.reg<2> -> !qref.bit
+  // expected-error@+1 {{ctrl qubits, work qubits and the qubits used inside the ctrl region must refer to distinct qubits}}
+  qref.ctrl(%c) ctrlvals(%true) work_wires(%w) {
+    // expected-note@+1 {{aliasing use of the same qubit}}
+    %t = qref.get %r[1] : !qref.reg<2> -> !qref.bit
+    qref.custom "PauliX"() %t : !qref.bit
+  }
+  qref.dealloc %r : !qref.reg<2>
+  return
+}
+
+// -----
+
+// qp.ctrl(qp.X(0), control=1, work_wires=[1]): work wire overlapping with control
+func.func @ctrl_work_wire_on_target() attributes {quantum.node} {
+  %true = arith.constant true
+  %r = qref.alloc(2) : !qref.reg<2>
+  // expected-note@+1 {{first use of the qubit}}
+  %c = qref.get %r[1] : !qref.reg<2> -> !qref.bit
+  // expected-note@+1 {{aliasing use of the same qubit}}
+  %w = qref.get %r[1] : !qref.reg<2> -> !qref.bit
+  // expected-error@+1 {{ctrl qubits, work qubits and the qubits used inside the ctrl region must refer to distinct qubits}}
+  qref.ctrl(%c) ctrlvals(%true) work_wires(%w) {
+    %t = qref.get %r[0] : !qref.reg<2> -> !qref.bit
     qref.custom "PauliX"() %t : !qref.bit
   }
   qref.dealloc %r : !qref.reg<2>
@@ -105,6 +143,35 @@ func.func @call_alias() attributes {quantum.node} {
   func.call @uses_q_and_r1(%r, %q) : (!qref.reg<3>, !qref.bit) -> ()
   qref.dealloc %r : !qref.reg<3>
   return
+}
+
+// -----
+
+
+// CHECK-LABEL: test_aliasing_getops
+func.func @test_aliasing_getops() attributes {quantum.node} {
+
+    // CHECK: [[qreg:%.+]] = quantum.alloc( 2) : !quantum.reg
+    %a = qref.alloc(2) : !qref.reg<2>
+    %q0 = qref.get %a[0] : !qref.reg<2> -> !qref.bit
+    %q1 = qref.get %a[1] : !qref.reg<2> -> !qref.bit
+
+    // CHECK: [[bit0:%.+]] = quantum.extract [[qreg]][ 0] : !quantum.reg -> !quantum.bit
+    // CHECK: [[bit1:%.+]] = quantum.extract [[qreg]][ 1] : !quantum.reg -> !quantum.bit
+    // CHECK: [[CNOT1:%.+]]:2 = quantum.custom "CNOT"() [[bit0]], [[bit1]] : !quantum.bit, !quantum.bit
+    qref.custom "CNOT"() %q0, %q1 : !qref.bit, !qref.bit
+
+    %q0_again = qref.get %a[0] : !qref.reg<2> -> !qref.bit
+    %q1_again = qref.get %a[1] : !qref.reg<2> -> !qref.bit
+
+    // CHECK: [[CNOT2:%.+]]:2 = quantum.custom "CNOT"() [[CNOT1]]#0, [[CNOT1]]#1 : !quantum.bit, !quantum.bit
+    qref.custom "CNOT"() %q0_again, %q1_again : !qref.bit, !qref.bit
+
+    // CHECK: [[insert0:%.+]] = quantum.insert [[qreg]][ 0], [[CNOT2]]#0 : !quantum.reg, !quantum.bit
+    // CHECK: [[insert1:%.+]] = quantum.insert [[insert0]][ 1], [[CNOT2]]#1 : !quantum.reg, !quantum.bit
+    // CHECK: quantum.dealloc [[insert1]] : !quantum.reg
+    qref.dealloc %a : !qref.reg<2>
+    return
 }
 
 // -----

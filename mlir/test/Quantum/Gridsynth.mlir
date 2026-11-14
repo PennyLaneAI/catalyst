@@ -19,9 +19,9 @@
 
 // COMMENT: Check that the external helpers are declared in the module
 
-// CHECK-DAG: func.func private @rs_decomposition_get_size(f64, f64, i1) -> index
-// CHECK-DAG: func.func private @rs_decomposition_get_gates(memref<?xindex>, f64, f64, i1)
-// CHECK-DAG: func.func private @rs_decomposition_get_phase(f64, f64, i1) -> f64
+// CHECK-DAG: func.func private @rs_decomposition_get_size(f64, f64, i1 {llvm.zeroext}) -> index
+// CHECK-DAG: func.func private @rs_decomposition_get_gates(memref<?xindex>, f64, f64, i1 {llvm.zeroext})
+// CHECK-DAG: func.func private @rs_decomposition_get_phase(f64, f64, i1 {llvm.zeroext}) -> f64
 
 // COMMENT: Test the defined decomposition function
 
@@ -168,8 +168,8 @@
 // PPR:         [[RES:%.+]] = pbc.ppr ["Z"](-8) [[LOOP_QBIT]]
 // PPR:         scf.yield [[RES]]
 // PPR:       }
-// COM: expected T and other entries (3.0590 + 1.5324) * log2(1/0.01) + 1.1278 + 4.2326
-// PPR:       } {catalyst.estimated_iterations = 35.8{{[0-9]+}} : f64}
+// COM: expected T and other entries 3.0590 * log2(1/0.01) + 1.1278 + 0.0
+// PPR:       } {catalyst.estimated_iterations = 21.4{{[0-9]+}} : f64}
 // PPR:       memref.dealloc [[MEM]]
 // PPR:       quantum.gphase([[PHASE]])
 // PPR:       return [[LOOP_RES]] : !quantum.bit
@@ -192,9 +192,9 @@ func.func @test_rz_decomposition(%arg0: !quantum.bit) -> !quantum.bit {
 // -----
 
 // Check that the external helpers are declared in the module 
-// CHECK-DAG: func.func private @rs_decomposition_get_size(f64, f64, i1) -> index
-// CHECK-DAG: func.func private @rs_decomposition_get_gates(memref<?xindex>, f64, f64, i1)
-// CHECK-DAG: func.func private @rs_decomposition_get_phase(f64, f64, i1) -> f64
+// CHECK-DAG: func.func private @rs_decomposition_get_size(f64, f64, i1 {llvm.zeroext}) -> index
+// CHECK-DAG: func.func private @rs_decomposition_get_gates(memref<?xindex>, f64, f64, i1 {llvm.zeroext})
+// CHECK-DAG: func.func private @rs_decomposition_get_phase(f64, f64, i1 {llvm.zeroext}) -> f64
 
 // CHECK-LABEL: @test_phaseshift_decomposition
 // CHECK-SAME: ([[Q_IN:%.+]]: !quantum.bit, [[PHI:%.+]]: f64)

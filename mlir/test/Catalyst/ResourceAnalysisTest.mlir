@@ -42,6 +42,8 @@ func.func @basic_gates() {
     return
 }
 
+// -----
+
 // Operator2 gates
 
 // CHECK-LABEL: "operator2_gates"
@@ -373,6 +375,161 @@ func.func @pbc_estimated_iterations_loop(%arg0: !quantum.bit, %n: index) -> !qua
 
 // -----
 
+// PBC ops around a while loop: parent depth covers only the ops outside the loop, and the loop
+// is a layer boundary, so X and Y stay in separate layers even though they act on different
+// qubits. Loop body depth stays in while_loop_<N>.
+
+// CHECK-LABEL: "pbc_while_loop_depth": {
+// CHECK: "extended_fields"
+// CHECK:   "pbc_depth":
+// CHECK:       "any_commuting_depth": 2
+// CHECK:       "qubit_disjoint_depth": 2
+// CHECK: "function_calls"
+// CHECK:   "static":
+// CHECK:       "while_loop_1": 3
+
+// CHECK-LABEL: "while_loop_1": {
+// CHECK: "extended_fields"
+// CHECK:   "pbc_depth":
+// CHECK:       "any_commuting_depth": 1
+// CHECK:       "qubit_disjoint_depth": 1
+func.func @pbc_while_loop_depth(%q0: !quantum.bit, %q1: !quantum.bit, %n: index)
+    -> (!quantum.bit, !quantum.bit) {
+    %c0 = arith.constant 0 : index
+    %c1 = arith.constant 1 : index
+
+    %x = pbc.ppr ["X"](4) %q0 : !quantum.bit
+    %r:2 = scf.while (%i = %c0, %q = %x) : (index, !quantum.bit) -> (index, !quantum.bit) {
+        %cond = arith.cmpi slt, %i, %n : index
+        scf.condition(%cond) %i, %q : index, !quantum.bit
+    } do {
+    ^bb0(%i: index, %q: !quantum.bit):
+        %z = pbc.ppr ["Z"](4) %q : !quantum.bit
+        %inext = arith.addi %i, %c1 : index
+        scf.yield %inext, %z : index, !quantum.bit
+    } attributes {catalyst.estimated_iterations = 3 : i64}
+    %y = pbc.ppr ["Y"](4) %q1 : !quantum.bit
+
+    return %r#1, %y : !quantum.bit, !quantum.bit
+}
+
+// -----
+
+// A while loop inside an if/else is still lifted into while_loop_<N>, so the then branch adds no
+// gates or layers to the parent: the parent counts X plus the else branch's Y (2 gates, depth 2).
+// The loop body's two gates (Z then X) form two layers in while_loop_1.
+
+// CHECK-LABEL: "pbc_while_loop_in_if_depth": {
+// CHECK: "extended_fields"
+// CHECK:   "pbc_depth":
+// CHECK:       "any_commuting_depth": 2
+// CHECK:       "qubit_disjoint_depth": 2
+// CHECK: "function_calls"
+// CHECK:   "static":
+// CHECK:       "while_loop_1": 3
+// CHECK: "quantum_operations"
+// CHECK:   "1"
+// CHECK:       "PPR-pi/4": 2
+
+// CHECK-LABEL: "while_loop_1": {
+// CHECK: "extended_fields"
+// CHECK:   "pbc_depth":
+// CHECK:       "any_commuting_depth": 2
+// CHECK:       "qubit_disjoint_depth": 2
+// CHECK: "quantum_operations"
+// CHECK:   "1"
+// CHECK:       "PPR-pi/4": 2
+func.func @pbc_while_loop_in_if_depth(%q0: !quantum.bit, %cond: i1, %n: index) -> !quantum.bit {
+    %c0 = arith.constant 0 : index
+    %c1 = arith.constant 1 : index
+
+    %x = pbc.ppr ["X"](4) %q0 : !quantum.bit
+    %r = scf.if %cond -> !quantum.bit {
+        %w:2 = scf.while (%i = %c0, %q = %x) : (index, !quantum.bit) -> (index, !quantum.bit) {
+            %c = arith.cmpi slt, %i, %n : index
+            scf.condition(%c) %i, %q : index, !quantum.bit
+        } do {
+        ^bb0(%i: index, %q: !quantum.bit):
+            %z = pbc.ppr ["Z"](4) %q : !quantum.bit
+            %zx = pbc.ppr ["X"](4) %z : !quantum.bit
+            %inext = arith.addi %i, %c1 : index
+            scf.yield %inext, %zx : index, !quantum.bit
+        } attributes {catalyst.estimated_iterations = 3 : i64}
+        scf.yield %w#1 : !quantum.bit
+    } else {
+        %y = pbc.ppr ["Y"](4) %x : !quantum.bit
+        scf.yield %y : !quantum.bit
+    }
+
+    return %r : !quantum.bit
+}
+
+// -----
+
+// Nested while loops: each body is lifted into its own entry (inner while_loop_1, outer
+// while_loop_2), and each entry's gate count and depth cover only the ops directly in that body.
+
+// CHECK-LABEL: "pbc_nested_while_loop_depth": {
+// CHECK: "extended_fields"
+// CHECK:   "pbc_depth":
+// CHECK:       "any_commuting_depth": 1
+// CHECK:       "qubit_disjoint_depth": 1
+// CHECK: "function_calls"
+// CHECK:   "static":
+// CHECK:       "while_loop_2": 2
+// CHECK: "quantum_operations"
+// CHECK:   "1"
+// CHECK:       "PPR-pi/4": 1
+
+// CHECK-LABEL: "while_loop_1": {
+// CHECK: "extended_fields"
+// CHECK:   "pbc_depth":
+// CHECK:       "any_commuting_depth": 1
+// CHECK:       "qubit_disjoint_depth": 1
+// CHECK: "quantum_operations"
+// CHECK:   "1"
+// CHECK:       "PPR-pi/4": 1
+
+// CHECK-LABEL: "while_loop_2": {
+// CHECK: "extended_fields"
+// CHECK:   "pbc_depth":
+// CHECK:       "any_commuting_depth": 1
+// CHECK:       "qubit_disjoint_depth": 1
+// CHECK: "function_calls"
+// CHECK:   "static":
+// CHECK:       "while_loop_1": 3
+// CHECK: "quantum_operations"
+// CHECK:   "1"
+// CHECK:       "PPR-pi/4": 1
+func.func @pbc_nested_while_loop_depth(%q0: !quantum.bit, %n: index, %m: index) -> !quantum.bit {
+    %c0 = arith.constant 0 : index
+    %c1 = arith.constant 1 : index
+
+    %x = pbc.ppr ["X"](4) %q0 : !quantum.bit
+    %outer:2 = scf.while (%i = %c0, %q = %x) : (index, !quantum.bit) -> (index, !quantum.bit) {
+        %ci = arith.cmpi slt, %i, %n : index
+        scf.condition(%ci) %i, %q : index, !quantum.bit
+    } do {
+    ^bb0(%i: index, %q: !quantum.bit):
+        %z = pbc.ppr ["Z"](4) %q : !quantum.bit
+        %inner:2 = scf.while (%j = %c0, %p = %z) : (index, !quantum.bit) -> (index, !quantum.bit) {
+            %cj = arith.cmpi slt, %j, %m : index
+            scf.condition(%cj) %j, %p : index, !quantum.bit
+        } do {
+        ^bb0(%j: index, %p: !quantum.bit):
+            %y = pbc.ppr ["Y"](4) %p : !quantum.bit
+            %jnext = arith.addi %j, %c1 : index
+            scf.yield %jnext, %y : index, !quantum.bit
+        } attributes {catalyst.estimated_iterations = 3 : i64}
+        %inext = arith.addi %i, %c1 : index
+        scf.yield %inext, %inner#1 : index, !quantum.bit
+    } attributes {catalyst.estimated_iterations = 2 : i64}
+
+    return %outer#1 : !quantum.bit
+}
+
+// -----
+
 // PBC depth is per-function only; callers without inline PBC ops report no depth
 // even when they call a helper that contains PBC ops.
 
@@ -507,12 +664,18 @@ func.func @estimated_iterations_loop(%arg0: !quantum.bit, %n: index) -> !quantum
 
 // -----
 
-// A fractional catalyst.estimated_iterations on a while loop scales the body's resource
-// counts by the (possibly non-integer) expected iteration count: 2 gates * 2.5 = 5.
+// A fractional catalyst.estimated_iterations on a while loop lifts the body into while_loop_<N>
+// and records the (possibly non-integer) call count on the parent.
 
 // CHECK-LABEL: "estimated_iterations_while_fractional": {
+// CHECK: "function_calls"
+// CHECK:   "static":
+// CHECK:       "while_loop_1": 2.5
+// CHECK: "quantum_operations": {}
+
+// CHECK-LABEL: "while_loop_1": {
 // CHECK: "quantum_operations"
-// CHECK:     "PauliZ": 5
+// CHECK:     "PauliZ": 2
 func.func @estimated_iterations_while_fractional(%arg0: !quantum.bit, %n: index) -> !quantum.bit {
     %c0 = arith.constant 0 : index
     %c1 = arith.constant 1 : index
@@ -527,6 +690,37 @@ func.func @estimated_iterations_while_fractional(%arg0: !quantum.bit, %n: index)
         %inext = arith.addi %i, %c1 : index
         scf.yield %inext, %q2 : index, !quantum.bit
     } attributes {catalyst.estimated_iterations = 2.5 : f64}
+
+    return %r#1 : !quantum.bit
+}
+
+// -----
+
+// Input-driven dynamic while loop: no estimated_iterations hint, so the body is lifted into
+// "dyn_while_loop_1" and the parent records function_calls.dynamic.
+
+// CHECK-LABEL: "dyn_while_loop_1": {
+// CHECK: "quantum_operations"
+// CHECK:   "PauliX": 1
+
+// CHECK-LABEL: "dynamic_while_loop": {
+// CHECK: "function_calls"
+// CHECK:   "dynamic":
+// CHECK:       "dyn_while_loop_1": "{{0x[0-9a-f]+}}"
+// CHECK: "quantum_operations": {}
+func.func @dynamic_while_loop(%arg0: !quantum.bit, %n: index) -> !quantum.bit {
+    %c0 = arith.constant 0 : index
+    %c1 = arith.constant 1 : index
+
+    %r:2 = scf.while (%i = %c0, %q = %arg0) : (index, !quantum.bit) -> (index, !quantum.bit) {
+        %cond = arith.cmpi slt, %i, %n : index
+        scf.condition(%cond) %i, %q : index, !quantum.bit
+    } do {
+    ^bb0(%i: index, %q: !quantum.bit):
+        %out = quantum.custom "PauliX"() %q : !quantum.bit
+        %inext = arith.addi %i, %c1 : index
+        scf.yield %inext, %out : index, !quantum.bit
+    }
 
     return %r#1 : !quantum.bit
 }
@@ -640,25 +834,25 @@ func.func @static_for_with_call_in_loop(%arg0: !quantum.bit) -> !quantum.bit {
 // -----
 
 // CHECK-LABEL: "dyn_for_loop_1": {
-// CHECK: "quantum_operations"
-// CHECK:   "PauliZ": 1
-
-// CHECK-LABEL: "dyn_for_loop_2": {
 // CHECK: "function_calls"
 // CHECK:   "static":
 // CHECK:       "nested_inner_loop_helper": 1
 // CHECK: "quantum_operations": {}
 
+// CHECK-LABEL: "dyn_for_loop_2": {
+// CHECK: "quantum_operations"
+// CHECK:   "PauliZ": 1
+
 // CHECK-LABEL: "nested_inner_loop_helper": {
 // CHECK: "function_calls"
 // CHECK:   "dynamic":
-// CHECK:       "dyn_for_loop_1": "{{0x[0-9a-f]+}}"
+// CHECK:       "dyn_for_loop_2": "{{0x[0-9a-f]+}}"
 // CHECK: "quantum_operations": {}
 
 // CHECK-LABEL: "outer_dyn_loop_calls_nested_helper": {
 // CHECK: "function_calls"
 // CHECK:   "dynamic":
-// CHECK:       "dyn_for_loop_2": "{{0x[0-9a-f]+}}"
+// CHECK:       "dyn_for_loop_1": "{{0x[0-9a-f]+}}"
 // CHECK: "quantum_operations": {}
 func.func private @nested_inner_loop_helper(%arg0: !quantum.bit, %c4 : index) -> !quantum.bit {
     %c0 = arith.constant 0 : index
@@ -2038,10 +2232,33 @@ func.func private @my_helper(%arg0: !quantum.bit) -> !quantum.bit {
 // Recursive calls are skipped when flattening resources, so the pass should
 // warn that resource counts may be incomplete.
 
+// expected-warning@+1 {{ResourceAnalysis encountered recursive call to 'recursive'. Recursive calls are not flattened, so resource counts may be incomplete.}}
 func.func @recursive(%arg0: !quantum.bit) -> !quantum.bit {
-    // expected-warning@below {{ResourceAnalysis encountered recursive call to 'recursive'. Recursive calls are not flattened, so resource counts may be incomplete.}}
     %out = func.call @recursive(%arg0) : (!quantum.bit) -> !quantum.bit
     return %out : !quantum.bit
+}
+
+// -----
+
+// A controlled self-call must warn and complete without creating an unbounded
+// sequence of modifier contexts.
+
+// CHECK-NOT: C_recursive_controlled
+// CHECK-LABEL: "recursive_controlled": {
+// CHECK: "function_calls"
+// CHECK:   "static":
+// CHECK:     "recursive_controlled": 1
+// CHECK: "quantum_operations": {}
+
+// expected-warning@+1 {{ResourceAnalysis encountered recursive call to 'recursive_controlled'. Recursive calls are not flattened, so resource counts may be incomplete.}}
+func.func @recursive_controlled(%q: !quantum.bit, %c: !quantum.bit) -> (!quantum.bit, !quantum.bit) {
+    %true = arith.constant true
+    %oc, %oq = quantum.ctrl(%c) ctrlvals(%true) (%q) : !quantum.bit -> !quantum.bit {
+    ^bb0(%a: !quantum.bit):
+        %r:2 = func.call @recursive_controlled(%a, %c) : (!quantum.bit, !quantum.bit) -> (!quantum.bit, !quantum.bit)
+        quantum.yield %r#0 : !quantum.bit
+    }
+    return %oq, %oc : !quantum.bit, !quantum.bit
 }
 
 // -----

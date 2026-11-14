@@ -20,7 +20,7 @@
 
 func.func private @circuit.nodealloc(%arg0: f32) -> (!quantum.reg)
 
-// CHECK-DAG:   llvm.func @__catalyst__rt__toggle_recorder(i1)
+// CHECK-DAG:   llvm.func @__catalyst__rt__toggle_recorder(i1 {llvm.zeroext})
 // CHECK-DAG:   llvm.func @__catalyst__qis__Gradient(i64, ...)
 
 // CHECK-LABEL: func.func @adjoint(%arg0: f32, %arg1: index) {{.+}} {

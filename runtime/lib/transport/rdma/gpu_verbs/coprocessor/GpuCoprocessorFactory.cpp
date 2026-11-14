@@ -28,29 +28,27 @@
 
 #include "BackendConfig.hpp"
 #include "GpuCoprocessorSession.hpp"
+#include "PeerLink.hpp"
 #include "TransportBackend.h"
 
 namespace {
 catalyst::transport::CoprocessorSession *make_gpu_coprocessor(const std::string &config) {
-    const auto cfg = catalyst::transport::common::parse_backend_config(config);
-    // The persistent kernels read 16 B frames.
-    // TODO: lift this once they read frames through the frame codec.
-    const auto ring = catalyst::transport::common::frame::geometry_from_config(config);
-    TP_CHECK(ring.mode == catalyst::transport::common::frame::Mode::BL16,
-             "gpu_verbs reads 16 B frames, but its config asks for another frame layout");
+    namespace common = catalyst::transport::common;
+    namespace gpu_verbs = catalyst::transport::gpu_verbs;
     // `gpu` is optional and defaults to device 0
-    const int gpu_device = catalyst::transport::common::configparser::parse_optional_index(
-        config, "gpu", /*fallback=*/0);
-    auto *session = new catalyst::transport::gpu_verbs::GpuCoprocessorSession(cfg.dev, cfg.gid,
-                                                                              gpu_device, ring);
-    session->set_thread_affinity(
-        catalyst::transport::common::configparser::parse_optional_index(config, "cpu_pin", -1),
-        catalyst::transport::common::configparser::parse_optional_index(config, "rt", 0) != 0);
+    const int gpu_device = common::configparser::parse_optional_index(config, "gpu", 0);
+    const int cpu = common::configparser::parse_optional_index(config, "cpu_pin", -1);
+    const bool rt = common::configparser::parse_optional_index(config, "rt", 0) != 0;
+    auto *session = new gpu_verbs::GpuCoprocessorSession(
+        gpu_device, common::make_coprocessor_link(config, "gpu_verbs",
+                                                  gpu_verbs::GpuCoprocessorSession::FWD_QP_SHAPE));
+    session->set_thread_affinity(cpu, rt);
     return session;
 }
 } // namespace
 
 GENERATE_TRANSPORT_COPROCESSOR_FACTORY(CatalystTransportCoprocessor, make_gpu_coprocessor)
 CATALYST_TRANSPORT_BACKEND_CAPS("gpu_verbs", CATALYST_TRANSPORT_ROLE_BIT_COPROCESSOR,
-                                CATALYST_TRANSPORT_MEM_BIT(GpuHbm), CATALYST_TRANSPORT_FRAME_BL16,
-                                CATALYST_TRANSPORT_CONV_BIT(LaunchOnce), 8, 8, 1)
+                                CATALYST_TRANSPORT_MEM_BIT(GpuHbm),
+                                CATALYST_TRANSPORT_FRAME_BL16 | CATALYST_TRANSPORT_FRAME_BLV,
+                                CATALYST_TRANSPORT_CONV_BIT(LaunchOnce), UINT32_MAX, UINT32_MAX, 1)

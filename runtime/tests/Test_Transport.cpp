@@ -99,12 +99,42 @@ TEST_CASE("a versioned backend is loaded only for the roles it reports", "[trans
                         ContainsSubstring("backend 'stub' does not provide the coprocessor role"));
 }
 
+TEST_CASE("start_benchmark hands a self-paced controller's run to run_paced", "[transport]") {
+    auto *s = __catalyst__transport__create(STUB_BACKEND_PATH, "paced",
+                                            CATALYST_TRANSPORT_ROLE_CONTROLLER, "");
+    REQUIRE(s != nullptr);
+    REQUIRE(__catalyst__transport__set_message_sizes(s, 0, 8, 8) == CATALYST_TRANSPORT_OK);
+    std::uint64_t samples[4] = {};
+    std::uint64_t rounds = 0;
+    CHECK(__catalyst__transport__start_benchmark(s, 4, 0, 0, samples, sizeof(samples), &rounds) ==
+          CATALYST_TRANSPORT_OK);
+    CHECK(rounds == 0); // a paced run's rounds are the backend's to record
+    __catalyst__transport__destroy(s);
+}
+
+TEST_CASE("start_benchmark does not ask a backend before version 4 whether it paces itself",
+          "[transport]") {
+    // The version-2 stub's controller would say yes, so the rounds counted here show it was not
+    // asked.
+    auto *s = __catalyst__transport__create(STUB_V2_BACKEND_PATH, "paced",
+                                            CATALYST_TRANSPORT_ROLE_CONTROLLER, "");
+    REQUIRE(s != nullptr);
+    REQUIRE(__catalyst__transport__set_message_sizes(s, 0, 8, 8) == CATALYST_TRANSPORT_OK);
+    std::uint64_t samples[4] = {};
+    std::uint64_t rounds = 0;
+    CHECK(__catalyst__transport__start_benchmark(s, 4, 0, 0, samples, sizeof(samples), &rounds) ==
+          CATALYST_TRANSPORT_OK);
+    CHECK(rounds == 4);
+    __catalyst__transport__destroy(s);
+}
+
 TEST_CASE("a backend built for a newer ABI is refused, naming both versions", "[transport]") {
     CHECK(__catalyst__transport__create(STUB_V99_BACKEND_PATH, "cfg",
                                         CATALYST_TRANSPORT_ROLE_CONTROLLER, "abi_v99") == nullptr);
-    REQUIRE_THROWS_WITH(__catalyst__transport__check_session(nullptr, "create"),
-                        ContainsSubstring("transport ABI version 99") &&
-                            ContainsSubstring("supports up to 3"));
+    REQUIRE_THROWS_WITH(
+        __catalyst__transport__check_session(nullptr, "create"),
+        ContainsSubstring("transport ABI version 99") &&
+            ContainsSubstring("supports up to " + std::to_string(CATALYST_TRANSPORT_ABI_VERSION)));
 }
 
 TEST_CASE("in-tree backends report their capabilities", "[transport]") {
@@ -206,6 +236,49 @@ TEST_CASE("set_coprocessor_fn binds through the setter the backend implements", 
     REQUIRE(s != nullptr);
     CHECK(__catalyst__transport__set_coprocessor_fn(s, "") == CATALYST_TRANSPORT_OK);
     __catalyst__transport__destroy(s);
+}
+
+// Launchers for the launch-once stub: one with no info, one built for the version-1 frame layout,
+// and one built for this runtime's.
+extern "C" int capi_test_launcher_no_info(const catalyst::transport::CoprocLaunchDesc *, void *) {
+    return 0;
+}
+extern "C" int capi_test_launcher_v1(const catalyst::transport::CoprocLaunchDesc *, void *) {
+    return 0;
+}
+extern "C" const catalyst::transport::CoprocessorFnInfo *capi_test_launcher_v1_info() {
+    static constexpr catalyst::transport::CoprocessorFnInfo info{.abi_version = 1};
+    return &info;
+}
+extern "C" int capi_test_launcher(const catalyst::transport::CoprocLaunchDesc *, void *) {
+    return 0;
+}
+extern "C" const catalyst::transport::CoprocessorFnInfo *capi_test_launcher_info() {
+    static constexpr catalyst::transport::CoprocessorFnInfo info{
+        .abi_version = CATALYST_COPROCESSOR_LAUNCHER_MIN_ABI_VERSION};
+    return &info;
+}
+
+TEST_CASE("set_coprocessor_fn binds a launcher built for this frame layout", "[transport]") {
+    auto *s = __catalyst__transport__create(STUB_BACKEND_PATH, "launch_once",
+                                            CATALYST_TRANSPORT_ROLE_COPROCESSOR, "");
+    REQUIRE(s != nullptr);
+    CHECK(__catalyst__transport__set_coprocessor_fn(s, "capi_test_launcher") ==
+          CATALYST_TRANSPORT_OK);
+    __catalyst__transport__destroy(s);
+}
+
+TEST_CASE("set_coprocessor_fn refuses a launcher built for an older frame layout", "[transport]") {
+    // Its engine would write replies the backend never recognises, so the session would hang.
+    for (const char *symbol : {"capi_test_launcher_no_info", "capi_test_launcher_v1"}) {
+        auto *s = __catalyst__transport__create(STUB_BACKEND_PATH, "launch_once",
+                                                CATALYST_TRANSPORT_ROLE_COPROCESSOR, "");
+        REQUIRE(s != nullptr);
+        CerrCapture cerr;
+        CHECK(__catalyst__transport__set_coprocessor_fn(s, symbol) == CATALYST_TRANSPORT_ERR);
+        CHECK(cerr.str().find("built for an older frame layout") != std::string::npos);
+        __catalyst__transport__destroy(s);
+    }
 }
 
 TEST_CASE("the __call variants raise an error when the call fails", "[transport]") {

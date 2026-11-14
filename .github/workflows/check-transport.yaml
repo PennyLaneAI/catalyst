@@ -116,8 +116,9 @@ jobs:
         # Every `make` below has to see identical values: a flag that differs between two calls
         # makes the `configure` prerequisite reset the cmake cache and drop the built .sos.
         # LLVM_BUILD_DIR is the exception and is set later -- runtime's Makefile reads it, and
-        # the runtime build runs before that tree exists. CATALYST_LIB_DIR is set here so the
-        # frontend build sees it, or precompile_decomposition_rules only warns.
+        # the runtime build runs before that tree exists. CATALYST_LIB_DIR and CATALYST_BIN_DIR
+        # are set here because `make frontend` runs precompile_decomposition_rules, which needs
+        # the libraries and the catalyst executable.
         run: |
           sudo apt-get update
           # libibverbs-dev: without it the RDMA backends are silently skipped at configure
@@ -133,6 +134,7 @@ jobs:
             echo "RT_BUILD_DIR=$(pwd)/runtime-build"
             echo "DIALECTS_BUILD_DIR=$(pwd)/quantum-build"
             echo "CATALYST_LIB_DIR=$(pwd)/quantum-build/lib"
+            echo "CATALYST_BIN_DIR=$(pwd)/quantum-build/bin"
             echo "PYTHONPATH=${PYTHONPATH:-}:$(pwd)/quantum-build/python_packages/quantum"
           } >> "$GITHUB_ENV"
 
@@ -313,7 +315,6 @@ jobs:
           echo "$DIALECTS_BUILD_DIR/bin" >> $GITHUB_PATH
           echo "RUNTIME_LIB_DIR=$RT_BUILD_DIR/lib" >> $GITHUB_ENV
           echo "MLIR_LIB_DIR=$LLVM_BUILD_DIR/lib" >> $GITHUB_ENV
-          echo "CATALYST_BIN_DIR=$DIALECTS_BUILD_DIR/bin" >> $GITHUB_ENV
           echo "CATALYST_TRANSPORT_PATH=$RT_BUILD_DIR/lib" >> $GITHUB_ENV
 
       # Here rather than with requirements.txt: this pulls ~2.5GB from an external index, and
@@ -350,9 +351,8 @@ jobs:
         env:
           # Without this Triton discards ptxas diagnostics, leaving codegen failures as "status 255".
           TRITON_DUMP_PTXAS_LOG: "1"
-        # Everything but the out_of_process RDMA case: that one launches a catalyst-executor
-        # subprocess, which needs a runtime built with ENABLE_EXECUTOR=ON -- left off here to keep
-        # the runtime build ahead of LLVM, so the binary is absent and the spawn fails rather than
-        # skipping. No workflow sets that flag, so the param runs nowhere in CI; see the header.
+        # The cases that launch a catalyst-executor subprocess skip: they need a runtime built with
+        # ENABLE_EXECUTOR=ON, left off here to keep the runtime build ahead of LLVM. No workflow
+        # sets that flag, so they run nowhere in CI; see the header.
         run: |
-          python3 -m pytest -v -rs -k "not out_of_process" frontend/test/pytest/test_backline.py
+          python3 -m pytest -v -rs frontend/test/pytest/test_backline.py

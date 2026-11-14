@@ -64,24 +64,24 @@ catalyst::transport::ControllerSession *make_hwhs_controller(const std::string &
     const bool cpu_poll = pick(config, "reply_poll", "sw", {"sw", "hw"}) == "sw";
     const bool kick_ioctl = pick(config, "kick", "mmap", {"mmap", "ioctl"}) == "ioctl";
 
-    catalyst::transport::hwhs::DemoCfg demo;
-    demo.enable = pick(config, "demo", "off", {"off", "hw"}) == "hw";
-    demo.freq_num = number(config, "demo_freq", 0);
-    demo.cmd_cnt = static_cast<std::uint32_t>(number(config, "demo_cnt", 1));
-    demo.syn_depth = static_cast<std::uint32_t>(number(config, "demo_depth", 256));
-    demo.bram_pa = number(config, "demo_bram", 0x80000000);
-    demo.freq_span = static_cast<std::uint32_t>(number(config, "demo_span", 0));
-    demo.lfsr_seed = static_cast<std::uint32_t>(number(config, "demo_seed", 0));
-    //   demo_trace=<pa>    physical address the BD maps the RTT trace RAM at.
-    //   demo_table=<file>  a byte-for-byte image of the BRAM table
-    //   demo_trace_out=<f> where to write the trace
-    demo.trace_pa = number(config, "demo_trace", 0x92000000);
-    demo.trace_out = std::string{cp::find(config, "demo_trace_out").value_or("")};
-    demo.table_path = std::string{cp::find(config, "demo_table").value_or("")};
+    catalyst::transport::hwhs::PacerCfg pacer;
+    pacer.enable = pick(config, "pacer", "off", {"off", "hw"}) == "hw";
+    pacer.freq_num = number(config, "pacer_freq", 0);
+    pacer.cmd_cnt = static_cast<std::uint32_t>(number(config, "pacer_cnt", 1));
+    pacer.syn_depth = static_cast<std::uint32_t>(number(config, "pacer_depth", 256));
+    pacer.bram_pa = number(config, "pacer_bram", 0x80000000);
+    pacer.freq_span = static_cast<std::uint32_t>(number(config, "pacer_span", 0));
+    pacer.lfsr_seed = static_cast<std::uint32_t>(number(config, "pacer_seed", 0));
+    //   pacer_trace=<pa>    physical address the BD maps the RTT trace RAM at.
+    //   pacer_table=<file>  a byte-for-byte image of the BRAM table
+    //   pacer_trace_out=<f> where to write the trace
+    pacer.trace_pa = number(config, "pacer_trace", 0x92000000);
+    pacer.trace_out = std::string{cp::find(config, "pacer_trace_out").value_or("")};
+    pacer.table_path = std::string{cp::find(config, "pacer_table").value_or("")};
 
     return new catalyst::transport::hwhs::HwhsControllerSession(
         fpga.dev, fpga.gid, fpga.ring, fpga.stride_log2, fpga.data_mem, sq_kind, fpga.reply_mem,
-        cpu_poll, kick_ioctl, demo);
+        cpu_poll, kick_ioctl, pacer);
 }
 
 } // namespace

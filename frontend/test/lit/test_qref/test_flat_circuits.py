@@ -97,6 +97,32 @@ def test_dynamic_control_values(x: float, val: bool):
 print(test_dynamic_control_values.mlir)
 
 
+# CHECK-LABEL: func.func public @test_ctrl_work_wire_type(
+@qp.qjit(capture=True, target="mlir", collect_decomp_rules=False)
+@qp.qnode(qp.device("null.qubit", wires=2))
+def test_ctrl_work_wire_type(angle: float):
+    """Lower both explicit work-wire types from qp.ctrl to qref.ctrl."""
+
+    # CHECK: [[false:%.+]] = arith.constant false
+    # CHECK: [[reg:%.+]] = qref.alloc( 2) : !qref.reg<2>
+    # CHECK: [[ctrl:%.+]] = qref.get [[reg]][ 1] : !qref.reg<2> -> !qref.bit
+    # CHECK: qref.ctrl([[ctrl]]) ctrlvals([[false]]) {
+    # CHECK: qref.custom "RX"
+    # CHECK: }
+    qp.ctrl(qp.RX, control=1, control_values=False, work_wire_type="borrowed")(angle, 0)
+
+    # CHECK: [[ctrl:%.+]] = qref.get [[reg]][ 1] : !qref.reg<2> -> !qref.bit
+    # CHECK: qref.ctrl([[ctrl]]) ctrlvals([[false]]) attributes {work_wire_type = "zeroed"} {
+    # CHECK: qref.custom "RX"
+    # CHECK: }
+    qp.ctrl(qp.RX, control=1, control_values=False, work_wire_type="zeroed")(angle, 0)
+
+    return qp.state()
+
+
+print(test_ctrl_work_wire_type.mlir)
+
+
 # CHECK: func.func public @test_measure() -> tensor<2xf64>
 @qp.qjit(capture=True, target="mlir", collect_decomp_rules=False)
 @qp.qnode(qp.device("null.qubit", wires=3))
@@ -147,6 +173,7 @@ def test_dynamic_qubit_allocation(i: int):
     Test dynamic qubit allocation.
     """
     # CHECK-DAG: [[false:%.+]] = arith.constant false
+    # CHECK-DAG: [[true:%.+]] = arith.constant true
 
     # CHECK: [[reg_device:%.+]] = qref.alloc( 3) : !qref.reg<3>
 
@@ -175,7 +202,7 @@ def test_dynamic_qubit_allocation(i: int):
         # CHECK: qref.pcphase({{%.+}}, dim : 0) [[alloc_q0]], [[alloc_q1]] : !qref.bit, !qref.bit
         qp.PCPhase(0.1, dim=0, wires=[q[0], q[1]])
 
-        # CHECK: qref.custom "PhaseShift"({{%.+}}) [[alloc_q0]] : !qref.bit
+        # CHECK: qref.gphase({{%.+}}) ctrls([[alloc_q0]]) ctrlvals([[true]]) : ctrls !qref.bit
         qp.ctrl(qp.GlobalPhase(np.pi / 4), control=[q[0]])
 
         # CHECK: qref.paulirot ["X"]({{%.+}}) [[alloc_q0]] : !qref.bit
@@ -336,7 +363,7 @@ def test_global_phase():
     """
     Test global phase.
     """
-    # CHECK-DAG: [[neg_angle:%.+]] = arith.constant -0.78539816339744828 : f64
+    # CHECK-DAG: [[true:%.+]] = arith.constant true
     # CHECK-DAG: [[angle:%.+]] = arith.constant 0.78539816339744828 : f64
 
     # CHECK: [[reg:%.+]] = qref.alloc( 4) : !qref.reg<4>
@@ -345,7 +372,7 @@ def test_global_phase():
     qp.GlobalPhase(np.pi / 4)
 
     # CHECK: [[q0:%.+]] = qref.get [[reg]][ 0] : !qref.reg<4> -> !qref.bit
-    # CHECK: qref.custom "PhaseShift"([[neg_angle]]) [[q0]] : !qref.bit
+    # CHECK: qref.gphase([[angle]]) ctrls([[q0]]) ctrlvals([[true]]) : ctrls !qref.bit
     qp.ctrl(qp.GlobalPhase(np.pi / 4), control=[0])
 
     return qp.expval(qp.X(0))
@@ -377,13 +404,14 @@ def test_global_phase_ctrl_value_false():
 print(test_global_phase_ctrl_value_false.mlir)
 
 
-# CHECK: func.func public @test_unitary(%arg0: tensor<2x2xf64>, %arg1: tensor<4x4xf64>, %arg2: tensor<1xi1>) -> tensor<f64>
+# CHECK: func.func public @test_unitary(%arg0: tensor<2x2xf64>, %arg1: tensor<4x4xf64>) -> tensor<f64>
 @qp.qjit(capture=True, target="mlir", collect_decomp_rules=False)
 @qp.qnode(qp.device("null.qubit", wires=4))
 def test_unitary():
     """
     Test unitary.
     """
+    # CHECK: [[true:%.+]] = arith.constant true
     # CHECK: [[reg:%.+]] = qref.alloc( 4) : !qref.reg<4>
 
     # CHECK: [[q1:%.+]] = qref.get [[reg]][ 1] : !qref.reg<4> -> !qref.bit
@@ -391,12 +419,11 @@ def test_unitary():
     # CHECK: qref.unitary([[mat2]] : tensor<2x2xcomplex<f64>>) [[q1]] : !qref.bit
     qp.QubitUnitary(np.identity(2), wires=[1])
 
-    # CHECK: [[q0:%.+]] = qref.get [[reg]][ 0] : !qref.reg<4> -> !qref.bit
     # CHECK: [[q1:%.+]] = qref.get [[reg]][ 1] : !qref.reg<4> -> !qref.bit
     # CHECK: [[q2:%.+]] = qref.get [[reg]][ 2] : !qref.reg<4> -> !qref.bit
-    # CHECK: qref.operator "ControlledQubitUnitary"(%arg1: tensor<4x4xf64>, %arg2: tensor<1xi1>) qubits([[q0]], [[q1]], [[q2]])
-    # CHECK:   static_data = {unitary_check = false, work_wire_type = "borrowed"}
-    # CHECK:   param_map = {U = [0], control_values = [1]} qubit_map = {wires = [0, 1, 2], work_wires = []}
+    # CHECK: [[q0:%.+]] = qref.get [[reg]][ 0] : !qref.reg<4> -> !qref.bit
+    # CHECK: [[mat4:%.+]] = stablehlo.convert %arg1 : (tensor<4x4xf64>) -> tensor<4x4xcomplex<f64>>
+    # CHECK: qref.unitary([[mat4]] : tensor<4x4xcomplex<f64>>) [[q1]], [[q2]] ctrls([[q0]]) ctrlvals([[true]]) : !qref.bit, !qref.bit ctrls !qref.bit
     qp.ctrl(qp.QubitUnitary(np.identity(4), wires=[1, 2]), control=[0])
 
     return qp.expval(qp.X(0))

@@ -22,8 +22,11 @@ from dataclasses import dataclass, replace
 from typing import ClassVar
 
 import pennylane as qp
+from pennylane.decomposition.resources import resolve_work_wire_type
 from pennylane.ops.op_math.adjoint2 import Adjoint2
 from pennylane.ops.op_math.controlled2 import ControlledOp2
+
+from catalyst.decomposition.type_utils import SerializedGraphOpID
 
 
 @dataclass(frozen=True)
@@ -32,17 +35,23 @@ class ModifierState:
 
     Current modifiers are adjoints and controls.
     Default values are False for `adjoint` and 0 for `control_count`.
+    Controls may be accompanied by work wires and a work wire type. These control work wires
+    are distinct from standard operator work wires.
 
     Attributes:
         adjoint: Whether the operator is adjointed.
         control_count: How many controls are applied to the operator.
+        num_work_wires: How many work wires are available to the controls.
+        work_wire_type: The type of those work wires, ``"zeroed"`` or ``"borrowed"``.
 
     Raises:
-        ValueError: If `control_count` is negative.
+        ValueError: If `control_count` is negative, or there are work wires without any controls.
     """
 
     adjoint: bool = False
     control_count: int = 0
+    num_work_wires: int = 0
+    work_wire_type: str = "borrowed"
 
     def __post_init__(self):
         """Performs validation of the modifier state."""
@@ -51,12 +60,26 @@ class ModifierState:
 
         if not isinstance(self.adjoint, bool):
             raise ValueError(f"Adjoint can be True or False, got {self.adjoint}")
+        if not isinstance(self.num_work_wires, int) or self.num_work_wires < 0:
+            raise ValueError(f"Modifier counts cannot be negative, got {self.num_work_wires}")
+        if self.num_work_wires and not self.control_count:
+            raise ValueError(f"Control work wires require at least one control, got {self}")
+        if not self.num_work_wires:
+            object.__setattr__(self, "work_wire_type", "borrowed")
 
     def compose(self, inner: ModifierState) -> ModifierState:
         """Return the result of composing the current modifiers with `inner`."""
+        work_wire_type = resolve_work_wire_type(
+            range(self.num_work_wires),
+            self.work_wire_type,
+            range(inner.num_work_wires),
+            inner.work_wire_type,
+        )
         return ModifierState(
             self.adjoint != inner.adjoint,
             self.control_count + inner.control_count,
+            self.num_work_wires + inner.num_work_wires,
+            work_wire_type,
         )
 
     @property
@@ -86,24 +109,41 @@ class ModifierState:
             op_name = self._wrap_modifier_name(op_name, self._control_modifier(self.control_count))
         return op_name
 
-    def wrap_id(self, op_id: str) -> str:
+    def wrap_id(self, op_id: SerializedGraphOpID) -> SerializedGraphOpID:
         """Wrap a graphOpId's name, preserving its parameter, wire, static-data and UID suffix."""
         if not self.is_modified:
             return op_id
         assert "{" in op_id, f"Malformed op id for graph decomposition, got {op_id}"
         split = op_id.find("{")
-        return self.wrap_name(op_id[:split]) + op_id[split:]
+        wrapped_id = SerializedGraphOpID(self.wrap_name(op_id[:split]) + op_id[split:])
+        if self.num_work_wires:
+            # Imported lazily because GraphOpID also uses ModifierState.
+            from catalyst.decomposition.graph_op_id import add_ctrl_work_wires_to_id
 
-    def wrap_callable(self, body: Callable, ctrl_wires=None, ctrl_values=None) -> Callable:
+            wrapped_id = add_ctrl_work_wires_to_id(
+                wrapped_id, self.num_work_wires, self.work_wire_type
+            )
+        return wrapped_id
+
+    def wrap_callable(
+        self, body: Callable, ctrl_wires=None, ctrl_values=None, work_wires=None
+    ) -> Callable:
         """Apply adjoint and control regions to a rule body in canonical nesting order.
 
         ``ctrl_wires`` supplies the rule's control-wire operand when the state is controlled.
         ``ctrl_values`` supplies its control-value operand, defaulting to all ones.
+        ``work_wires`` supplies the dynamic control work-wire operand.
         """
         if self.adjoint:
             body = qp.adjoint(body)
         if self.is_controlled:
-            body = qp.ctrl(body, control=list(ctrl_wires), control_values=ctrl_values)
+            body = qp.ctrl(
+                body,
+                control=list(ctrl_wires),
+                control_values=ctrl_values,
+                work_wires=work_wires,
+                work_wire_type=self.work_wire_type,
+            )
         return body
 
     # Canonical nesting order for op-level modifiers, listed OUTERMOST first. The compiler's
@@ -164,15 +204,15 @@ class ModifierState:
         return None
 
     @staticmethod
-    def name_unwrap_adjoint(op_name: str, op_id: str) -> str:
+    def name_unwrap_adjoint(op_name: str, op_id: SerializedGraphOpID) -> SerializedGraphOpID:
         """Inverse of :meth:`wrap_id` with an adjoint state given the base ``op_name``.
 
         Args:
             op_name (str): the base operator's name
-            op_id (str): the adjoint graphOpId to unwrap
+            op_id (SerializedGraphOpID): the adjoint graphOpId to unwrap
 
         Returns:
-            str: the base operator's graphOpId
+            SerializedGraphOpID: the base operator's graphOpId
 
         Raises:
             ValueError: if ``op_id`` is not an adjoint id for ``op_name``
@@ -180,20 +220,22 @@ class ModifierState:
         prefix = f"Adjoint({op_name})"
         if not op_id.startswith(prefix):
             raise ValueError(f"{op_id!r} is not an adjoint id for base op {op_name!r}")
-        return op_name + op_id[len(prefix) :]
+        return SerializedGraphOpID(op_name + op_id[len(prefix) :])
 
     @staticmethod
-    def name_unwrap_control(op_name: str, op_id: str):
+    def name_unwrap_control(
+        op_name: str, op_id: SerializedGraphOpID
+    ) -> tuple[SerializedGraphOpID, int]:
         """Inverse of control name-wrapping given the base ``op_name``.
 
         ``("RX", "2C(RX){...}")`` -> ``("RX{...}", 2)`` and ``("RX", "C(RX){...}")`` -> ``("RX{...}", 1)``.
 
         Args:
             op_name (str): the base operator's name
-            op_id (str): the controlled graphOpId to unwrap
+            op_id (SerializedGraphOpID): the controlled graphOpId to unwrap
 
         Returns:
-            str: the base operator's graphOpId
+            SerializedGraphOpID: the base operator's graphOpId
             int: the number of controls
 
         Raises:
@@ -207,7 +249,7 @@ class ModifierState:
         prefix = f"{digits}C({op_name})"
         if not op_id.startswith(prefix):
             raise ValueError(f"{op_id!r} is not a control id for base op {op_name!r}")
-        return op_name + op_id[len(prefix) :], n_ctrl
+        return SerializedGraphOpID(op_name + op_id[len(prefix) :]), n_ctrl
 
     @staticmethod
     def peel_modifiers(op: qp.core.Operator2) -> tuple[qp.core.Operator2, ModifierState]:
@@ -222,7 +264,8 @@ class ModifierState:
 
         The walk terminates structurally: each step moves to ``op.base``, one wrapper shallower,
         and the chain ends at the first non-symbolic operator. The layers compose as
-        :meth:`ModifierState.compose` does, so adjoints cancel pairwise and control counts add.
+        :meth:`ModifierState.compose` does, so adjoints cancel pairwise, control and work-wire
+        counts add, and work-wire types merge as they do in PennyLane.
 
         Args:
             op (Operator2): the operator to unwrap
@@ -236,24 +279,41 @@ class ModifierState:
             if isinstance(op, Adjoint2):
                 layer = ModifierState(adjoint=True)
             elif isinstance(op, ControlledOp2):
-                layer = ModifierState(control_count=len(op.control_wires))
+                layer = ModifierState(
+                    control_count=len(op.control_wires),
+                    num_work_wires=len(op.work_wires),
+                    work_wire_type=op.work_wire_type,
+                )
             else:
                 return op, modifiers
             modifiers = modifiers.compose(layer)
             op = op.base
 
     @classmethod
-    def from_graph_op_id(cls, op_name: str, op_id: str) -> tuple[str, ModifierState]:
+    def from_graph_op_id(
+        cls, op_name: str, op_id: SerializedGraphOpID
+    ) -> tuple[SerializedGraphOpID, ModifierState]:
         """Recover the base id and modifiers supplied by the compiler's on-demand loader."""
         base_id = op_id
         modifiers = cls()
-        if op_id.startswith("Adjoint(") and not op_name.startswith("Adjoint("):
-            base_id = cls.name_unwrap_adjoint(op_name, op_id)
-            modifiers = cls(adjoint=True)
-        elif cls._leading_modifier_kind(op_id) == "C" and not op_name.startswith("Adjoint("):
-            # A controlled op-id (`C(op)` / `<n>C(op)`): recover the base id and control count so the
-            # closure synthesizes the matching `<n>C(...)` rules.
-            base_id, n_ctrls = cls.name_unwrap_control(op_name, op_id)
-            modifiers = cls(control_count=n_ctrls)
+        if cls._leading_modifier_kind(op_id) == "C" and not op_name.startswith("Adjoint("):
+            # Controls are outermost, including on a controlled adjoint.
+            name = op_id.split("{", 1)[0]
+            inner_name = (
+                f"Adjoint({op_name})" if name.endswith(f"(Adjoint({op_name}))") else op_name
+            )
+            base_id, n_ctrls = cls.name_unwrap_control(inner_name, op_id)
+
+            # Imported lazily because GraphOpID also uses ModifierState.
+            from catalyst.decomposition.graph_op_id import remove_ctrl_work_wires_from_id
+
+            base_id, n_work, work_wire_type = remove_ctrl_work_wires_from_id(base_id)
+            modifiers = cls(
+                control_count=n_ctrls, num_work_wires=n_work, work_wire_type=work_wire_type
+            )
+
+        if base_id.startswith("Adjoint(") and not op_name.startswith("Adjoint("):
+            base_id = cls.name_unwrap_adjoint(op_name, base_id)
+            modifiers = replace(modifiers, adjoint=True)
 
         return base_id, modifiers

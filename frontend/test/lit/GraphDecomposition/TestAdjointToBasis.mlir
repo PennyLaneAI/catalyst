@@ -12,10 +12,17 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// RUN: catalyst --tool=opt --pass-pipeline='builtin.module(graph-decomposition{gate-set=testHadamard=1.0 alt-decomps=Adjoint(testU){}{wires:1}{}=adj_u,Adjoint(testHadamard){}{wires:1}{}=adj_h})' %s | FileCheck %s --check-prefixes=ALL,CALL
+// RUN: catalyst --tool=opt --pass-pipeline='builtin.module(graph-decomposition{gate-set=testHadamard=1.0})' %s | FileCheck %s --check-prefixes=ALL,CALL
 
-// RUN: catalyst --tool=opt --pass-pipeline='builtin.module(graph-decomposition{inline-rule-body gate-set=testHadamard=1.0 alt-decomps=Adjoint(testU){}{wires:1}{}=adj_u,Adjoint(testHadamard){}{wires:1}{}=adj_h})' %s | FileCheck %s --check-prefixes=ALL,INLINE
+// RUN: catalyst --tool=opt --pass-pipeline='builtin.module(graph-decomposition{inline-rule-body gate-set=testHadamard=1.0})' %s | FileCheck %s --check-prefixes=ALL,INLINE
 
+
+// GraphDecomposition only solves GOIDs reachable from an entry function.
+func.func @entry(%q: !quantum.bit) attributes {llvm.emit_c_interface} {
+  %0 = call @self_adjoint(%q) : (!quantum.bit) -> !quantum.bit
+  %1 = call @distribution(%q) : (!quantum.bit) -> !quantum.bit
+  return
+}
 
 // ALL-LABEL: func.func @self_adjoint(
 // ALL-SAME:  [[Q:%.+]]: !quantum.bit

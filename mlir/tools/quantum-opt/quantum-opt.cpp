@@ -38,6 +38,7 @@
 #include "Ion/IR/IonDialect.h"
 #include "MBQC/IR/MBQCDialect.h"
 #include "Mitigation/IR/MitigationDialect.h"
+#include "PBC/Analysis/PBCDepthAnalysis.h"
 #include "PBC/IR/PBCDialect.h"
 #include "PauliFrame/IR/PauliFrameDialect.h"
 #include "QRef/IR/QRefDialect.h"
@@ -63,6 +64,7 @@ int main(int argc, char **argv) {
     llvm::cl::AddExtraVersionPrinter(catalyst::printVersion);
     mlir::registerAllPasses();
     catalyst::registerAllPasses();
+    catalyst::pbc::registerPBCResourceAnalysisExtensions();
     mlirRegisterAllStablehloPasses();
     mlir::stablehlo::registerOptimizationPasses();
 

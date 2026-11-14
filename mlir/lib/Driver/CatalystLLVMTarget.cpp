@@ -16,8 +16,8 @@
 
 #include "llvm/IR/LegacyPassManager.h"
 #include "llvm/MC/TargetRegistry.h"
-#include "llvm/Support/FileSystem.h"
 #include "llvm/Support/TargetSelect.h"
+#include "llvm/Support/raw_ostream.h"
 #include "llvm/Target/TargetMachine.h"
 #include "llvm/Target/TargetOptions.h"
 #include "llvm/TargetParser/Host.h"
@@ -40,16 +40,8 @@ void catalyst::driver::registerLLVMTranslations(DialectRegistry &registry) {
 LogicalResult catalyst::driver::compileObjectFile(const CompilerOptions &options,
                                                   std::shared_ptr<llvm::Module> llvmModule,
                                                   llvm::TargetMachine *targetMachine,
-                                                  StringRef filename) {
+                                                  llvm::raw_fd_ostream &dest) {
     using namespace llvm;
-
-    std::error_code errCode;
-    raw_fd_ostream dest(filename, errCode, sys::fs::OF_None);
-
-    if (errCode) {
-        CO_MSG(options, Verbosity::Urgent, "could not open file: " << errCode.message() << "\n");
-        return failure();
-    }
 
     legacy::PassManager pm;
     if (targetMachine->addPassesToEmitFile(pm, dest, nullptr, CodeGenFileType::ObjectFile)) {
@@ -58,6 +50,5 @@ LogicalResult catalyst::driver::compileObjectFile(const CompilerOptions &options
     }
 
     pm.run(*llvmModule);
-    dest.flush();
     return success();
 }

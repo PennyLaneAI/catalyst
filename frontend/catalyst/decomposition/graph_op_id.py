@@ -14,14 +14,17 @@
 
 """Python implementation of Graph Operator ID."""
 
+import re
 from collections.abc import Mapping, Sequence
 from typing import Any
 
 import pennylane as qp
+from jax._src.lib.mlir import ir
 from pennylane.pytrees import flatten
 
 from catalyst.decomposition.modifier_state import ModifierState
 from catalyst.decomposition.type_utils import (
+    SerializedGraphOpID,
     convert_item_to_mlir_type,
     post_process_concretize_leaves,
     replace_wires_with_placeholder_wires,
@@ -30,6 +33,18 @@ from catalyst.from_plxpr.uid import generate_uid
 from catalyst.jax_extras.lowering import get_mlir_attribute_from_pyval, mlir_build_context
 
 _SPECIAL_LOWERINGS = {}
+
+# The work wires available to an operator's controls are spelled in its wire and static-data
+# groups under these names. They are namespaced so that they cannot collide with an operator's own
+# ``work_wires``/``work_wire_type`` arguments, e.g. on ``C(MultiControlledX)``.
+CTRL_WORK_WIRES = "ctrl_work_wires"
+CTRL_WORK_WIRE_TYPE = "ctrl_work_wire_type"
+
+_ID_GROUPS = re.compile(
+    r"(?P<name>[^{]*)(?P<dynamic>\{[^{}]*\})\{(?P<wires>[^{}]*)\}(?P<static>\{.*\})"
+    r"(?P<uid>\[-?\d+\])?",
+    re.DOTALL,
+)
 
 
 def _is_custom_op(op_cls, avals_in):
@@ -92,15 +107,99 @@ def build_graph_op_id(
     *,
     modifiers: ModifierState = ModifierState(),
     uid: int | None = None,
-) -> str:
-    """Build a canonical frontend GraphOpID from its identity components."""
+) -> SerializedGraphOpID:
+    """Build a canonical frontend GraphOpID from its identity components.
+
+    Work wires available to the controls are spelled as a ``ctrl_work_wires`` wire-group entry
+    together with a ``ctrl_work_wire_type`` static-data entry. Without work wires neither appears,
+    so such an id is unchanged.
+    """
+    if modifiers.num_work_wires:
+        wire_lens = {**wire_lens, CTRL_WORK_WIRES: modifiers.num_work_wires}
+        static_data = {**static_data, CTRL_WORK_WIRE_TYPE: modifiers.work_wire_type}
+
     name = modifiers.wrap_name(operator_name)
 
     dynamic_id = format_dynamic_params_for_id(dict(sorted(dynamic_shape.items())))
     wire_id = "{" + ",".join(f"{key}:{value}" for key, value in sorted(wire_lens.items())) + "}"
-    static_id = format_static_data_dict_for_id(dict(static_data))
+    static_id = format_static_data_dict_for_id(dict(sorted(static_data.items())))
     uid_id = f"[{uid}]" if uid is not None else ""
-    return name + dynamic_id + wire_id + static_id + uid_id
+    return SerializedGraphOpID(name + dynamic_id + wire_id + static_id + uid_id)
+
+
+def add_ctrl_work_wires_to_id(
+    op_id: SerializedGraphOpID, num_work_wires: int, work_wire_type: str
+) -> SerializedGraphOpID:
+    """Spell control work wires into a finished, controlled GraphOpID string.
+
+    This is :func:`build_graph_op_id`'s work-wire spelling for callers that only hold an id string.
+    The static-data group is re-printed through MLIR so that its entries stay in the attribute
+    printer's sorted order.
+
+    Args:
+        op_id (SerializedGraphOpID): a controlled GraphOpID carrying no control work wires yet
+        num_work_wires (int): the number of work wires available to the controls
+        work_wire_type (str): their type, ``"zeroed"`` or ``"borrowed"``
+
+    Returns:
+        SerializedGraphOpID: the GraphOpID with work wires spelled, or ``op_id`` without work wires
+
+    Raises:
+        ValueError: if ``op_id`` is malformed or already spells control work wires
+    """
+    if not num_work_wires:
+        return op_id
+
+    match = _ID_GROUPS.fullmatch(op_id)
+    if match is None:
+        raise ValueError(f"Malformed op id for graph decomposition, got {op_id}")
+
+    wire_lens = dict(entry.split(":") for entry in match["wires"].split(",") if entry)
+    if CTRL_WORK_WIRES in wire_lens:
+        raise ValueError(f"{op_id!r} already spells control work wires")
+    wire_lens[CTRL_WORK_WIRES] = str(num_work_wires)
+    wire_id = "{" + ",".join(f"{key}:{value}" for key, value in sorted(wire_lens.items())) + "}"
+
+    with mlir_build_context():
+        static = ir.DictAttr(ir.Attribute.parse(match["static"]))
+        entries = {static[i].name: static[i].attr for i in range(len(static))}
+        entries[CTRL_WORK_WIRE_TYPE] = ir.StringAttr.get(work_wire_type)
+        static_id = str(ir.DictAttr.get(entries))
+
+    return SerializedGraphOpID(
+        match["name"] + match["dynamic"] + wire_id + static_id + (match["uid"] or "")
+    )
+
+
+def remove_ctrl_work_wires_from_id(
+    op_id: SerializedGraphOpID,
+) -> tuple[SerializedGraphOpID, int, str]:
+    """Remove control work-wire metadata, returning the base id, count and type.
+
+    Preserve the operator's own wire groups, static attributes and UID. The compiler's on-demand
+    loader passes a finished id, so parse its static attributes with the same MLIR printer used
+    when adding control work wires.
+    """
+    match = _ID_GROUPS.fullmatch(op_id)
+    if match is None:
+        raise ValueError(f"Malformed op id for graph decomposition, got {op_id}")
+
+    wire_lens = dict(entry.split(":") for entry in match["wires"].split(",") if entry)
+    if CTRL_WORK_WIRES not in wire_lens:
+        return op_id, 0, "borrowed"
+    num_work_wires = int(wire_lens.pop(CTRL_WORK_WIRES))
+    wire_id = "{" + ",".join(f"{key}:{value}" for key, value in sorted(wire_lens.items())) + "}"
+
+    with mlir_build_context():
+        static = ir.DictAttr(ir.Attribute.parse(match["static"]))
+        entries = {static[i].name: static[i].attr for i in range(len(static))}
+        work_wire_type = ir.StringAttr(entries.pop(CTRL_WORK_WIRE_TYPE)).value
+        static_id = str(ir.DictAttr.get(entries))
+
+    base_id = SerializedGraphOpID(
+        match["name"] + match["dynamic"] + wire_id + static_id + (match["uid"] or "")
+    )
+    return base_id, num_work_wires, work_wire_type
 
 
 class GraphOpID:
@@ -165,15 +264,16 @@ class GraphOpID:
         elif issubclass(type(self.op), tuple(_SPECIAL_LOWERINGS.keys())):  # special cases
             return {
                 argname: [convert_item_to_mlir_type(argtype, is_special_lowering=True)]
-                for argname, argtype in sorted(self.op.dynamic_args.items())
+                for argname, argtype in self.op.dynamic_args.items()
             }
         else:
+            # Same traversal as ``_process_params``: dynamic args, then the numeric leaves of
+            # non-wire hybrid args, in declaration order (i.e. operand order). Do not sort.
             dynamic_shape = {
                 argname: [convert_item_to_mlir_type(argtype)]
-                for argname, argtype in sorted(self.op.dynamic_args.items())
+                for argname, argtype in self.op.dynamic_args.items()
             }
-            # Collect additional dynamic params from hybrid args (have to match _process_params).
-            for argname, value in sorted(self.op.hybrid_args.items()):
+            for argname, value in self.op.hybrid_args.items():
                 if argname in self.op.wire_argnames:  # do not include wires
                     continue
                 # skip operators
@@ -184,13 +284,15 @@ class GraphOpID:
             return dynamic_shape
 
     def parse_wire_lens(self) -> dict[str, int]:
-        """Return a dictionary of wire arg names to lengths."""
-        wire_lens = {}
-        for wire_name, wire_arg in sorted(self.op.wire_args.items()):
-            if wire_name not in self.op.hybrid_argnames:
-                wire_lens[wire_name] = len(wire_arg)
-        # match hybrid arg wires collection from _process_qubits (have to match generated IR op)
-        for argname, value in sorted(self.op.hybrid_args.items()):
+        """Return a dictionary of wire arg names to lengths, in operand order."""
+        # Same traversal as ``_process_qubits``: pure wire args (empty ones included), then the
+        # hybrid args that carry qubits, in declaration order (i.e. operand order). Do not sort.
+        wire_lens = {
+            wire_name: len(wire_arg)
+            for wire_name, wire_arg in self.op.wire_args.items()
+            if wire_name not in self.op.hybrid_argnames
+        }
+        for argname, value in self.op.hybrid_args.items():
             # Descend through nested operators: their wires are qubit operands of this operator.
             leaves, _ = flatten(value, is_leaf=_is_wires)
             count = sum(len(leaf) for leaf in leaves if _is_wires(leaf))
@@ -205,7 +307,7 @@ class GraphOpID:
             return {}
         return {
             static_argname: getattr(self.op, static_argname)
-            for static_argname in sorted(self.op.compilable_argnames)
+            for static_argname in self.op.compilable_argnames
         }
 
     def parse_extra_data(self):
@@ -214,6 +316,7 @@ class GraphOpID:
             hybrid_lens = []
             hybrid_trees = []
             hybrid_args = []
+            # Must be the ``wire_lens`` tuple the lowering hashes: pure wire args in operand order
             filtered_wire_lens = tuple(
                 length
                 for name, length in self.wire_lens.items()
@@ -256,7 +359,7 @@ class GraphOpID:
         """Return the name of the operator."""
         return self.operator_name
 
-    def _build_id(self, modifiers: ModifierState) -> str:
+    def _build_id(self, modifiers: ModifierState) -> SerializedGraphOpID:
         """Return the GraphOpId of the base operator under the given modifiers."""
         uid = None
         if self.extra_data:
@@ -271,7 +374,7 @@ class GraphOpID:
             uid=uid,
         )
 
-    def getGraphOpId(self, modifiers: ModifierState = ModifierState()) -> str:
+    def getGraphOpId(self, modifiers: ModifierState = ModifierState()) -> SerializedGraphOpID:
         """
         Return the GraphOpId as a string.
 
@@ -284,7 +387,7 @@ class GraphOpID:
         """
         return self._build_id(modifiers.compose(self.modifiers))
 
-    def getBaseGraphOpId(self) -> str:
+    def getBaseGraphOpId(self) -> SerializedGraphOpID:
         """Return the GraphOpId of the base operator alone, leaving off the modifiers wrapping it.
 
         The base is what owns the decomposition rules, so this is the id to look them up under.

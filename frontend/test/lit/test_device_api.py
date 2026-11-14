@@ -79,11 +79,11 @@ def test_circuit():
     @qp.set_shots(2048)
     @qp.qnode(device=dev)
     def circuit():
-        # CHECK:   quantum.custom "Hadamard"
+        # CHECK:   qref.custom "Hadamard"
         qp.Hadamard(wires=0)
-        # CHECK:   quantum.custom "CNOT"
+        # CHECK:   qref.custom "CNOT"
         qp.CNOT(wires=[0, 1])
-        # CHECK:   quantum.namedobs [[QBIT:.*]][ PauliZ]
+        # CHECK:   qref.namedobs [[QBIT:.*]][ PauliZ]
         # CHECK:   quantum.expval
         return qp.expval(qp.PauliZ(wires=0))
 
@@ -108,12 +108,12 @@ def test_preprocess():
     def circuit_split():
         qp.Hadamard(wires=0)
         qp.CNOT(wires=[0, 1])
-        # CHECK:   quantum.custom "Hadamard"
-        # CHECK:   quantum.custom "CNOT"
-        # CHECK:   quantum.namedobs [[QBIT:.*]][ PauliZ]
-        # CHECK-NOT:   quantum.custom "Hadamard"
-        # CHECK-NOT:   quantum.custom "CNOT"
-        # CHECK:   quantum.namedobs [[QBIT:.*]][ PauliY]
+        # CHECK:   qref.custom "Hadamard"
+        # CHECK:   qref.custom "CNOT"
+        # CHECK:   qref.namedobs [[QBIT:.*]][ PauliZ]
+        # CHECK-NOT:   qref.custom "Hadamard"
+        # CHECK-NOT:   qref.custom "CNOT"
+        # CHECK:   qref.namedobs [[QBIT:.*]][ PauliY]
         # CHECK:    return [[RETURN:.*]]: tensor<f64>, tensor<f64>
         return qp.expval(qp.PauliZ(wires=0)), qp.expval(qp.PauliY(wires=0))
 

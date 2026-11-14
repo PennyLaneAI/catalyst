@@ -12,9 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// RUN: catalyst --tool=opt --pass-pipeline='builtin.module(graph-decomposition{gate-set=C(V)=1.0 alt-decomps=C(U){}{wires:1}{}=[dedicated,distribute]})' %s | FileCheck %s --check-prefixes=ALL,CALL
+// RUN: catalyst --tool=opt --pass-pipeline='builtin.module(graph-decomposition{gate-set=C(V)=1.0})' %s | FileCheck %s --check-prefixes=ALL,CALL
 
-// RUN: catalyst --tool=opt --pass-pipeline='builtin.module(graph-decomposition{inline-rule-body gate-set=C(V)=1.0 alt-decomps=C(U){}{wires:1}{}=[dedicated,distribute]})' %s | FileCheck %s --check-prefixes=ALL,INLINE
+// RUN: catalyst --tool=opt --pass-pipeline='builtin.module(graph-decomposition{inline-rule-body gate-set=C(V)=1.0})' %s | FileCheck %s --check-prefixes=ALL,INLINE
 
 // ALL-LABEL: func.func @competing(
 // ALL-SAME:  %[[Q:.*]]: !quantum.bit, %[[C:.*]]: !quantum.bit

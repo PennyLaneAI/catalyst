@@ -26,14 +26,14 @@ from catalyst.jit import _ensure_capture_mode as ensure_capture_mode
 class TestCaptureKwarg:
     """Test suite for the capture kwarg functionality."""
 
-    def test_capture_kwarg_default_is_global(self):
-        """Test that the default value of capture is 'global'."""
+    def test_capture_kwarg_default_is_true(self):
+        """Test that the default value of capture is True."""
 
         @qjit
         def f(x):
             return x * 2
 
-        assert f.compile_options.capture == "global"
+        assert f.compile_options.capture is True
 
     def test_capture_kwarg_true(self):
         """Test that capture=True is accepted."""
@@ -156,7 +156,7 @@ class TestCaptureKwargIntegration:
 
         dev = qp.device(backend, wires=2)
 
-        @qjit(capture=True, collect_decomp_rules=False)
+        @qjit(capture=True)
         @qp.qnode(dev)
         def circuit(theta):
             assert qp.capture.enabled()
@@ -223,7 +223,7 @@ class TestCaptureKwargIntegration:
         dev = qp.device(backend, wires=1)
         qp.capture.disable()
 
-        @qjit(capture=True, collect_decomp_rules=False)
+        @qjit(capture=True)
         @qp.qnode(dev)
         def circuit_capture(theta):
             assert qp.capture.enabled()
@@ -328,7 +328,7 @@ class TestCaptureCompileOptionsIdentity:
         assert opts_true.capture is True
         assert opts_false.capture is False
         assert opts_global.capture == "global"
-        assert opts_default.capture == "global"  # Default should be "global"
+        assert opts_default.capture is True
 
     def test_different_capture_produces_different_qjit_objects(self, backend):
         """Test that different capture settings produce independent QJIT objects.
@@ -345,7 +345,7 @@ class TestCaptureCompileOptionsIdentity:
         def make_circuit_capture():
             compilation_count["capture"] += 1
 
-            @qjit(capture=True, collect_decomp_rules=False)
+            @qjit(capture=True)
             @qp.qnode(dev)
             def circuit(x):
                 qp.RX(x, wires=0)

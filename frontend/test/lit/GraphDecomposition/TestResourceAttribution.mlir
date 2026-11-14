@@ -30,7 +30,7 @@ func.func @circuit() {
 // CHECK-SAME: operations
 // CHECK-SAME: testRX
 // CHECK-SAME: testRZ
-func.func @fixed_decomp(%q0 : !quantum.bit) -> !quantum.bit attributes {target_gate = "testHadamard{}{wires:1}{}", frontend_name = "fixed_decomp" } {
+func.func private @fixed_decomp(%q0 : !quantum.bit) -> !quantum.bit attributes {target_gate = "testHadamard{}{wires:1}{}", frontend_name = "fixed_decomp" } {
     %cst = arith.constant 1.5707963267948966 : f64
     %q1 = quantum.custom "testRX"(%cst) %q0 : !quantum.bit
     %q2 = quantum.custom "testRZ"(%cst) %q1 : !quantum.bit

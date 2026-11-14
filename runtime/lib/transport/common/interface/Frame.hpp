@@ -37,6 +37,13 @@
 #include "Error.hpp"
 #include "WireProtocol.hpp"
 
+// Layout helpers a GPU kernel calls too. The rest of the codec is host-only.
+#if defined(__HIPCC__) || defined(__CUDACC__)
+#define FRAME_HOST_DEVICE __host__ __device__
+#else
+#define FRAME_HOST_DEVICE
+#endif
+
 namespace catalyst::transport::common::frame {
 
 /// A frame layout. Matches the CATALYST_TRANSPORT_FRAME_* bit a backend's caps report.
@@ -73,10 +80,20 @@ struct RingGeometry {
     std::uint32_t slots = 256;                  // a power of two; config key frame_slots
     std::uint32_t stride = sizeof(PayloadSlot); // a power of two, >= 64
 
-    constexpr std::size_t region_bytes() const { return std::size_t{slots} * stride; }
+    FRAME_HOST_DEVICE constexpr std::size_t region_bytes() const {
+        return std::size_t{slots} * stride;
+    }
     /// Byte offset of the slot round `cursor` uses.
-    constexpr std::size_t slot_offset(std::uint64_t cursor) const {
+    FRAME_HOST_DEVICE constexpr std::size_t slot_offset(std::uint64_t cursor) const {
         return static_cast<std::size_t>(cursor & (slots - 1)) * stride;
+    }
+    /// Byte offset of the payload within a frame.
+    FRAME_HOST_DEVICE std::size_t data_offset() const {
+        return mode == Mode::BL16 ? 0 : sizeof(BlvHeader);
+    }
+    /// Byte offset of the word a receiver polls: BL16's seq, or BLV's completion word.
+    FRAME_HOST_DEVICE std::size_t poll_offset() const {
+        return mode == Mode::BL16 ? offsetof(Payload, seq_num) : stride - BLV_COMPLETION_BYTES;
     }
 };
 
@@ -130,6 +147,11 @@ struct FrameView {
     std::uint32_t fn_id = 0;      // which function on the coprocessor handles it
     std::uint32_t seq = 0;        // the round's sequence number, cursor + 1
 };
+
+/// Whether `seq` is `expect` or later, across the 32-bit wrap.
+FRAME_HOST_DEVICE inline bool seq_reached(std::uint32_t seq, std::uint32_t expect) {
+    return static_cast<std::int32_t>(seq - expect) >= 0;
+}
 
 namespace detail {
 inline void require_mode(Mode mode) {
