@@ -49,8 +49,8 @@ func.func @decompose_to_controlled(%ctrl: !quantum.bit, %q: !quantum.bit) -> (!q
 }
 
 func.func private @v_to_ctrl_t(%q: !quantum.bit, %ctrl: !quantum.bit) -> (!quantum.bit, !quantum.bit) attributes {
-    target_gate = "C(V){}{wires:1}{}",
-    resources = {operations = {"C(TestT){}{wires:1}{}" = 1 : i64}} } {
+    target_gate = "1C(V){}{wires:1}{}",
+    resources = {operations = {"1C(TestT){}{wires:1}{}" = 1 : i64}} } {
   %true = arith.constant true
   %o, %oc = quantum.custom "TestT"() %q ctrls(%ctrl) ctrlvals(%true) : !quantum.bit ctrls !quantum.bit
   return %o, %oc : !quantum.bit, !quantum.bit

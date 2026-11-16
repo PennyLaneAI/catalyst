@@ -14,25 +14,36 @@
 
 #pragma once
 #include <cstdint>
+#include <string>
+#include <vector>
 
-#include "VerbsSessionBase.hpp"
+#include "Frame.hpp"
+#include "MemoryRegion.hpp"
+#include "RcLink.hpp"
+#include "Transport.hpp"
+#include "WireProtocol.hpp"
 
 namespace catalyst::transport::cpu_verbs {
 
 // Controller role: caller-driven. The caller commits a work item,
 // writes the outbound payload into data_slot(), kick()s one round,
 // then collect()s the reply.
-class CpuControllerSession : public common::VerbsSessionBase<ControllerSession> {
-    using Base = common::VerbsSessionBase<ControllerSession>;
-
+class CpuControllerSession final : public ControllerSession {
   public:
     explicit CpuControllerSession(std::string dev, int gid_idx,
-                                  common::frame::RingGeometry ring = common::frame::BL16_RING)
-        : Base(std::move(dev), gid_idx, "cpu_verbs", common::DEFAULT_QP_SHAPE, ring) {}
-    // Drains the fwd CQ before the base's verbs objects go away. stop() is
+                                  common::frame::RingGeometry ring = common::frame::BL16_RING);
+    // Drains the fwd CQ before the link's verbs objects go away. stop() is
     // idempotent, so calling it here and from start() is harmless.
     ~CpuControllerSession() override { stop(); }
 
+    CpuControllerSession(const CpuControllerSession &) = delete;
+    CpuControllerSession &operator=(const CpuControllerSession &) = delete;
+
+    int connect(const ConnectInfo &info) override;
+    MemRegion alloc_memory(std::size_t size, MemKind kind) override;
+    PeerRef exchange_keys(const MemRegion &local) override;
+    void establish_channel(const ChannelDesc &desc, const MemRegion &local,
+                           const PeerRef &peer) override;
     void start() override;
     void stop() override;
     int collect(void *const *replies, const std::uint64_t *replies_bytes, std::size_t n) override;
@@ -46,10 +57,12 @@ class CpuControllerSession : public common::VerbsSessionBase<ControllerSession> 
     void write_data_slot(const void *src, std::uint64_t bytes, std::uint32_t decoder_id) override;
     void *reply_slot() override;
 
-  protected:
-    bool oob_listens() const override { return false; }
-
   private:
+    common::RcLink link_;
+    common::frame::RingGeometry ring_;
+    std::vector<common::MemoryRegion> regions_; // handed out by alloc_memory()
+    std::uint8_t *ring_buf_ = nullptr; // the ring replies land in, from establish_channel()
+
     // Sizes from commit_work_item are fixed in CPU controller.
     std::uint64_t in_bytes_ = sizeof(common::Payload::value);
     std::uint64_t out_bytes_ = sizeof(common::Payload::value);
@@ -58,7 +71,6 @@ class CpuControllerSession : public common::VerbsSessionBase<ControllerSession> 
     // in place through data_slot(), and kick() stages it under the last fn_id.
     bool staged_ = false;
     std::uint32_t fn_id_ = 0;
-    int signaled_outstanding_ = 0;
     std::uint64_t kick_ns_ = 0, rtt_ns_ = 0;
 };
 
