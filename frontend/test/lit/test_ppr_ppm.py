@@ -21,7 +21,7 @@
 import numpy as np
 import pennylane as qp
 
-from catalyst import measure, qjit
+from catalyst import qjit
 from catalyst.passes import (
     commute_ppr,
     merge_ppr_ppm,
@@ -49,7 +49,7 @@ def test_convert_clifford_to_ppr():
         qp.S(1)
         qp.T(0)
         qp.CNOT([0, 1])
-        return measure(0)
+        qp.measure(0)
 
     print(circuit.mlir_opt)
 
@@ -74,21 +74,22 @@ def test_commute_ppr():
     @to_ppr
     @qp.qnode(qp.device("null.qubit", wires=2))
     def cir_commute_ppr():
-        # CHECK: %0 = quantum.alloc( 2)
-        # CHECK: %1 = quantum.extract %0[ 0]
-        # CHECK: %2 = pbc.ppr ["X"](8) %1
-        # CHECK: %3 = pbc.ppr ["Z"](4) %2
-        # CHECK: %4 = pbc.ppr ["X"](4) %3
-        # CHECK: %5 = pbc.ppr ["Z"](4) %4
-        # CHECK: %6 = quantum.extract %0[ 1]
-        # CHECK: %7 = pbc.ppr ["Z"](8) %6
-        # CHECK: %8 = pbc.ppr ["Z"](4) %7
+        # CHECK: [[reg:%.+]] = quantum.alloc( 2)
+        # CHECK: [[q0:%.+]] = quantum.extract [[reg]][ 0]
+        # CHECK: [[q1:%.+]] = quantum.extract [[reg]][ 1]
+        # CHECK: [[rx8:%.+]] = pbc.ppr ["X"](8) [[q0]]
+        # CHECK: [[rz4:%.+]] = pbc.ppr ["Z"](4) [[rx8]]
+        # CHECK: [[rx4:%.+]] = pbc.ppr ["X"](4) [[rz4]]
+        # CHECK: {{%.+}} = pbc.ppr ["Z"](4) [[rx4]]
+        # CHECK: [[rz8:%.+]] = pbc.ppr ["Z"](8) [[q1]]
+        # CHECK: {{%.+}} = pbc.ppr ["Z"](4) [[rz8]]
         qp.H(0)
         qp.S(1)
         qp.T(0)
         qp.T(1)
         qp.CNOT([0, 1])
-        return measure(0), measure(1)
+        qp.measure(0)
+        qp.measure(1)
 
     print(cir_commute_ppr.mlir_opt)
 
@@ -116,7 +117,8 @@ def test_commute_ppr_max_pauli_size():
         qp.S(0)
         qp.H(0)
         qp.T(0)
-        return measure(0), measure(1)
+        qp.measure(0)
+        qp.measure(1)
 
     print(cir_commute_ppr_max_pauli_size.mlir_opt)
 
@@ -143,7 +145,8 @@ def test_merge_ppr_ppm():
         qp.H(0)
         qp.S(1)
         qp.CNOT([0, 1])
-        return measure(0), measure(1)
+        qp.measure(0)
+        qp.measure(1)
 
     print(cir_merge_ppr_ppm.mlir_opt)
 
@@ -172,7 +175,8 @@ def test_merge_ppr_ppm_max_pauli_size():
         qp.T(0)
         qp.T(1)
         qp.CNOT([0, 1])
-        return measure(0), measure(1)
+        qp.measure(0)
+        qp.measure(1)
 
     print(cir_merge_ppr_ppm_max_pauli_size.mlir_opt)
 
@@ -327,7 +331,8 @@ def test_clifford_to_ppm():
             qp.CNOT(wires=[0, 1])
             qp.T(0)
             qp.T(1)
-            return [measure(0), measure(1)]
+            qp.measure(0)
+            qp.measure(1)
 
         # CHECK-LABEL: public @cir_clifford_to_ppm_with_params
         @ppm_compilation(
@@ -346,7 +351,8 @@ def test_clifford_to_ppm():
                 qp.CNOT(wires=[idx + 1, (idx + 2) % 5])
                 qp.T(idx)
                 qp.T(idx + 1)
-            return [measure(idx) for idx in range(5)]
+            for idx in range(5):
+                qp.measure(idx)
 
         return cir_clifford_to_ppm(), cir_clifford_to_ppm_with_params()
 
@@ -386,7 +392,8 @@ def test_reduce_t_depth():
             qp.H(wires=i)
             qp.T(wires=i)
 
-        return [measure(wires=i) for i in range(n)]
+        for i in range(n):
+            qp.measure(wires=i)
 
     print(test_reduce_t_depth_workflow.mlir_opt)
 
@@ -422,7 +429,7 @@ def test_ppr_to_mbqc():
         # CHECK: quantum.measure
         qp.H(0)
         qp.CNOT([0, 1])
-        return measure(1)
+        qp.measure(1)
 
     print(test_ppr_to_mbqc_workflow.mlir_opt)
 

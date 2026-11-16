@@ -187,4 +187,8 @@ def MeasurementProcess : Interface<"MeasurementProcess">,
     let cppNamespace = "::catalyst::quantum";
 }
 
+def Observable : OpInterface<"Observable"> {
+    let cppNamespace = "::catalyst::qref";
+}
+
 #endif // QREF_INTERFACES

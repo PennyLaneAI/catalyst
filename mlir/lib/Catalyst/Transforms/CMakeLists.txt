@@ -25,7 +25,6 @@ file(GLOB SRC
     RegisterInactiveCallbackPass.cpp
     ResolveRuntimeSymbols.cpp
     ResourceAnalysisPass.cpp
-    RegisterDecompRuleResourcePass.cpp
     SplitMultipleTapes.cpp
     TBAAPatterns.cpp
     TBAATagsPass.cpp

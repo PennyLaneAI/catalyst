@@ -752,7 +752,7 @@ def CtrlOp : Region_Op<"ctrl", [NoTerminator, AttrSizedOperandSegments]> {
         Variadic<QubitRefType>:$ctrl_qubits,
         Variadic<I1>:$ctrl_values,
         Variadic<QubitRefType>:$work_qubits,
-        DefaultValuedAttr<StrAttr, "\"borrowed\"">:$work_wire_type
+        DefaultValuedAttr<StrAttr, "::catalyst::CTRL_WORK_WIRE_TYPE_BORROWED">:$work_wire_type
     );
 
     let assemblyFormat = [{
@@ -770,7 +770,7 @@ def CtrlOp : Region_Op<"ctrl", [NoTerminator, AttrSizedOperandSegments]> {
 // Hence they are Pure, i.e. removable if no users
 
 class Observable_Op<string mnemonic, list<Trait> traits = []> :
-        QRef_Op<mnemonic, traits # [Pure]>;
+        QRef_Op<mnemonic, traits # [Pure, Observable]>;
 
 def ComputationalBasisOp : Observable_Op<"compbasis", [AttrSizedOperandSegments]> {
     let summary = "Define a pseudo-observable of the computational basis for use in measurements";
@@ -885,8 +885,12 @@ def MeasurementOp : QRef_Op<"measurement", [
             qubits(%q) static_data = {plane = "XY"} : i1
 
         %bits = qref.measurement "MeasureMany"()
-            quregs(%reg: !qref.reg<?>) indices(%wires: tensor<?xi64>)
             : tensor<?xi1>
+
+        // Note: PPM example shown below is the 1:1 lowering to the corresponding example in PPMeasurementOp.
+        %result = qref.measurement "PauliMeasure"()
+            qubits(%q0, %q1, %q2)
+            static_data = {pauli_word = "XIZ"} : i1
         ```
 
         An empty result list is written `: ()`. Measurement names and static

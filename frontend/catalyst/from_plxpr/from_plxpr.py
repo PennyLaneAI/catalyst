@@ -340,72 +340,64 @@ def handle_qnode(
     )
 
 
-def _require_decompose_gate_set(tkwargs):
-    """Reject a qp.decompose without a gate set, which the graph-decomposition pass needs."""
+def _require_decompose_gate_set(tkwargs, is_resource_estimate=False):
+    """Reject a qp.decompose or qp.estimate without a gate set, which the pass needs."""
+    transform_name = "qp.estimate" if is_resource_estimate else "qp.decompose"
     if tkwargs.get("gate_set") is None:
         raise ValueError(
-            "qp.decompose requires an explicit 'gate_set' under qjit; the graph-based decomposition "
+            f"{transform_name} requires an explicit 'gate_set' under qjit; the graph-based decomposition "
             "has no default target gate set."
         )
 
 
+def _require_resource_estimate_args(output_json, output_fname):
+    """Reject a qp.estimate without output_json and output_fname, which the resource-estimate pass needs."""
+    if output_json is None:
+        raise ValueError("resource-estimate pass requires an explicit 'output_json'.")
+    if output_fname is None:
+        raise ValueError(
+            "resource-estimate pass requires an explicit 'output_fname'. "
+            "The pass does not have a default output file."
+        )
+
+
 # pylint: disable=too-many-positional-arguments
-def _handle_decompose_transform(self, inner_jaxpr, consts, non_const_args, tkwargs):
-    """Route a captured ``qp.decompose`` onto the ``graph-decomposition`` pass.
+def _handle_decompose_transform(
+    self, inner_jaxpr, consts, non_const_args, tkwargs, is_resource_estimate=False
+):
+    """Route a captured ``qp.decompose`` or ``qp.estimate`` onto the ``graph-decomposition``
+    or ``resource-estimate`` pass.
 
     ``qp.decompose`` is an alias for :func:`catalyst.passes.graph_decomposition`.
+    ``qp.estimate`` is an alias for ``catalyst.passes.builtin_passes.resource_estimate``.
     """
     # Local imports avoid an import cycle (catalyst.passes imports from_plxpr indirectly).
-    from pennylane.decomposition import DecompositionRule, add_decomps, list_decomps, local_decomps
+    from catalyst.passes.builtin_passes import graph_decomposition, resource_estimate
 
-    from catalyst.passes.builtin_passes import graph_decomposition
+    _require_decompose_gate_set(tkwargs, is_resource_estimate)
 
-    _require_decompose_gate_set(tkwargs)
-
-    fixed_decomps = tkwargs.get("fixed_decomps") or {}
-    alt_decomps = tkwargs.get("alt_decomps") or {}
-
-    # FIXME: The graph_decomposition pass currently requires rule collection to be enabled, but this
-    # is not strictly necessary. We should remove this restriction once the pass is updated to not
-    # require rule collection when we automate this part.
-    if (fixed_decomps or alt_decomps) and not self._collect_decomp_rules:
-        raise NotImplementedError(
-            "Inline fixed_decomps/alt_decomps with qp.decompose require rule collection "
-            "(collect_decomp_rules=True)."
-        )
+    if is_resource_estimate:
+        _require_resource_estimate_args(tkwargs.get("output_json"), tkwargs.get("output_fname"))
 
     next_eval = copy(self)
-    with local_decomps():
-        for op, rule in fixed_decomps.items():
-            _add_decomp_or_verify_name_exists(op, rule)
-        for op, rules in alt_decomps.items():
-            add_decomps(op, *rules)
+    # Reusing the graph_decomposition transform (not a fork) guarantees identical pass options
+    # to the explicit catalyst.passes.graph_decomposition entry point.
+    bound_transform = resource_estimate if is_resource_estimate else graph_decomposition
+    bound_transform_params = {
+        "gate_set": tkwargs["gate_set"],
+        "fixed_decomps": tkwargs.get("fixed_decomps") or None,
+        "exclude_decomps": tkwargs.get("exclude_decomps") or None,
+    }
+    bound_pass = bound_transform(**bound_transform_params)
 
-        # Reusing the graph_decomposition transform (not a fork) guarantees identical pass options
-        # to the explicit catalyst.passes.graph_decomposition entry point.
-        bound_pass = graph_decomposition(
-            gate_set=tkwargs["gate_set"],
-            fixed_decomps=fixed_decomps or None,
-            alt_decomps=alt_decomps or None,
-        )
-        next_eval._pass_pipeline.insert(0, bound_pass)
+    # Set resource-estimate options after graph_decomposition_setup_inputs.
+    if is_resource_estimate:
+        bound_pass.kwargs["output_json"] = tkwargs["output_json"]
+        bound_pass.kwargs["output_fname"] = tkwargs["output_fname"]
 
-        return next_eval.eval(inner_jaxpr, consts, *non_const_args)
+    next_eval._pass_pipeline.insert(0, bound_pass)
 
-
-def _add_decomp_or_verify_name_exists(op, rule):
-
-    from pennylane.decomposition import DecompositionRule, add_decomps, list_decomps
-
-    if isinstance(rule, DecompositionRule):
-        add_decomps(op, rule)
-
-    elif isinstance(rule, str):
-        if rule not in list_decomps(op):
-            raise ValueError(f"Unknown decomposition rule with name {rule}")
-
-    else:
-        raise TypeError(f"fixed_decomps accepts rules or the names of rules. Got {rule}")
+    return next_eval.eval(inner_jaxpr, consts, *non_const_args)
 
 
 # pylint: disable=too-many-arguments
@@ -426,10 +418,13 @@ def handle_transform(
     non_const_args = args[_tuple_to_slice(args_slice)]
     targs = args[_tuple_to_slice(targs_slice)]
     pl_tkwargs = _tuple_to_dict(tkwargs)
+    is_resource_estimate = transform.pass_name == "resource-estimate"
 
     # qp.decompose is routed to the graph-decomposition pass (see _handle_decompose_transform).
-    if transform == pl_decompose:
-        return _handle_decompose_transform(self, inner_jaxpr, consts, non_const_args, pl_tkwargs)
+    if transform == pl_decompose or is_resource_estimate:
+        return _handle_decompose_transform(
+            self, inner_jaxpr, consts, non_const_args, pl_tkwargs, is_resource_estimate
+        )
 
     if transform.pass_name is None:
         raise ValueError(

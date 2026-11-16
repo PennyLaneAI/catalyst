@@ -12,15 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Unit tests for the ``graph_decomposition`` decorator: its pass option builder in
-builtin_passes.py, and its trace-time handling of controlled / controlled-adjoint Operator2 ops."""
+"""Unit tests for the ``graph_decomposition`` pass option builder."""
 
 from pathlib import Path
 
-import numpy as np
 import pennylane as qp
 import pytest
-from pennylane.decomposition import DecompositionRule, register_resources
+from pennylane.decomposition import register_resources
 
 from catalyst.passes.builtin_passes import graph_decomposition_setup_inputs
 
@@ -35,113 +33,115 @@ def _setup(**kwargs):
     return options
 
 
-def _plain_rule():
-    """A bare decomposition function (has ``__name__``, is not a ``DecompositionRule``)."""
-
-    def x_to_rx(wire):  # pylint: disable=unused-argument
-        ...
-
-    return x_to_rx
-
-
-def _registered_rule():
-    """A PennyLane ``DecompositionRule`` (from ``@register_resources``.
-
-    Its ``.name`` is the reference; as of PennyLane #10144, it also has a ``.__name__``
-    which isn't always interchangable with ``.name``.
-    """
-
-    @register_resources(lambda: {})
-    def h_to_rz(wire):  # pylint: disable=unused-argument
-        ...
-
-    return h_to_rz
-
-
 class TestRuleRefName:
-    """Cover every branch of the ``rule_ref_name`` closure."""
+    """Test accepted and rejected fixed rule references."""
 
     def test_string_rule_reference(self):
         """A rule given as a name string is passed through unchanged."""
-        options = _setup(fixed_decomps={qp.PauliX: "custom_x_rule"})
-        assert options["fixed_decomps"] == {"PauliX": "custom_x_rule"}
+        with qp.decomposition.local_decomps():
+
+            @register_resources({})
+            def custom_x_rule(wire):
+                del wire
+
+            qp.add_decomps(qp.PauliX, custom_x_rule)
+            options = _setup(fixed_decomps={qp.PauliX: "custom_x_rule"})
+            assert options["fixed_decomps"] == {"PauliX": "custom_x_rule"}
 
     def test_decomposition_rule_reference(self):
         """A ``DecompositionRule`` resolves via ``.name``."""
-        rule = _registered_rule()
-        assert isinstance(rule, DecompositionRule)
+        with qp.decomposition.local_decomps():
 
-        options = _setup(fixed_decomps={qp.Hadamard: rule})
-        assert options["fixed_decomps"] == {"Hadamard": "h_to_rz"}
+            @register_resources({})
+            def h_to_rz(wire):
+                del wire
 
-    def test_decomposition_rule_name_wins_over_dunder_name(self):
-        """Test that .name is preferred over .__name__."""
-
-        rule = _registered_rule()
-        rule.name = "h_to_rz_renamed"
-        assert rule.__name__ == "h_to_rz"
-
-        options = _setup(fixed_decomps={qp.Hadamard: rule})
-        # Renamed .name is used
-        assert options["fixed_decomps"] == {"Hadamard": "h_to_rz_renamed"}
+            qp.add_decomps(qp.Hadamard, h_to_rz)
+            options = _setup(fixed_decomps={qp.Hadamard: h_to_rz})
+            assert options["fixed_decomps"] == {"Hadamard": "h_to_rz"}
 
     def test_plain_function_reference(self):
-        """A bare decomposition function resolves via its ``__name__`` (the final fallback
-        branch)."""
-        options = _setup(fixed_decomps={qp.PauliX: _plain_rule()})
-        assert options["fixed_decomps"] == {"PauliX": "x_to_rx"}
+        """A bare function raises an exception."""
+        with pytest.raises(AssertionError, match="must be"):
+
+            def function(wire):
+                del wire
+
+            _setup(fixed_decomps={qp.PauliX: function})
 
 
 class TestFixedDecompsOption:
-    """Cover the ``if fixed_decomps:`` block."""
+    """Cover the ``fixed_decomps`` option."""
 
-    def test_absent_when_not_provided(self):
-        """No ``fixed_decomps`` key is emitted when the argument is omitted (falsy branch)."""
+    def test_omitted_and_empty_options(self):
+        """Omitted options are absent, while an explicit empty mapping is preserved."""
         assert "fixed_decomps" not in _setup()
-        assert "fixed_decomps" not in _setup(fixed_decomps={})
+        assert "fixed_decomps" not in _setup(fixed_decomps=None)
+        assert _setup(fixed_decomps={})["fixed_decomps"] == {}
 
     def test_maps_ops_and_rules_by_name(self):
-        """Each operator and its single rule are name-resolved into the ``fixed_decomps`` option,
-        across all three rule-reference kinds."""
-        options = _setup(
-            fixed_decomps={
-                qp.PauliX: _plain_rule(),  # -> __name__
-                qp.Hadamard: _registered_rule(),  # -> DecompositionRule.name
-                qp.T: "custom_t_rule",  # -> str
-            }
-        )
+        """Registered rule objects and names are converted to pass options."""
+        with qp.decomposition.local_decomps():
+
+            @register_resources({})
+            def x_to_rx(wire):
+                del wire
+
+            @register_resources({})
+            def h_to_rz(wire):
+                del wire
+
+            qp.add_decomps(qp.PauliX, x_to_rx)
+            qp.add_decomps(qp.Hadamard, h_to_rz)
+            options = _setup(fixed_decomps={qp.PauliX: x_to_rx.name, qp.Hadamard: h_to_rz})
+
         assert options["fixed_decomps"] == {
             "PauliX": "x_to_rx",
             "Hadamard": "h_to_rz",
-            "T": "custom_t_rule",
         }
-        assert "alt_decomps" not in options
 
 
-class TestAltDecompsOption:
-    """Cover the ``if alt_decomps:`` block."""
+class TestExcludeDecompsOption:
+    """Cover the ``exclude_decomps`` option."""
 
-    def test_absent_when_not_provided(self):
-        """No ``alt_decomps`` key is emitted when the argument is omitted (falsy branch)."""
-        assert "alt_decomps" not in _setup()
-        assert "alt_decomps" not in _setup(alt_decomps={})
+    def test_omitted_and_empty_options(self):
+        """Omitted options are absent, while an explicit empty mapping is preserved."""
+        assert "exclude_decomps" not in _setup()
+        assert "exclude_decomps" not in _setup(exclude_decomps=None)
+        assert _setup(exclude_decomps={})["exclude_decomps"] == {}
 
     def test_maps_op_to_tuple_of_rule_names(self):
-        """An operator maps to a tuple of name-resolved alternative rules, mixing all three
-        rule-reference kinds."""
-        options = _setup(
-            alt_decomps={qp.Hadamard: [_plain_rule(), _registered_rule(), "custom_rule"]}
-        )
-        assert options["alt_decomps"] == {"Hadamard": ("x_to_rx", "h_to_rz", "custom_rule")}
-        assert "fixed_decomps" not in options
+        """Excluded rule names are converted to a tuple in the pass options."""
+        options = _setup(exclude_decomps={qp.Hadamard: ["x_to_rx", "h_to_rz", "custom_rule"]})
+        assert options["exclude_decomps"] == {"Hadamard": ("x_to_rx", "h_to_rz", "custom_rule")}
+
+    def test_modifier_wrapped_name_is_preserved(self):
+        """Symbolic operator names are preserved for the MLIR pass."""
+        options = _setup(exclude_decomps={"Adjoint(Hadamard)": ["custom_rule"]})
+        assert options["exclude_decomps"] == {"Adjoint(Hadamard)": ("custom_rule",)}
+
+    def test_coexists_with_fixed_decomps(self):
+        """Exclusions and fixed rule selections are separate pass options."""
+        with qp.decomposition.local_decomps():
+
+            @register_resources({})
+            def h_to_rz(wire):
+                del wire
+
+            qp.add_decomps(qp.Hadamard, h_to_rz)
+            options = _setup(
+                fixed_decomps={qp.Hadamard: h_to_rz.name},
+                exclude_decomps={qp.Hadamard: ["custom_rule"]},
+            )
+        assert options["fixed_decomps"] == {"Hadamard": "h_to_rz"}
+        assert options["exclude_decomps"] == {"Hadamard": ("custom_rule",)}
 
 
 class TestVerboseOption:
     """Cover the ``verbose`` option."""
 
     def test_absent_when_not_requested(self):
-        """Test the option is omitted unless asked for, so an ordinary compilation emits the same pass
-        options it did before this option existed."""
+        """The verbosity option is omitted unless requested."""
         assert "verbose" not in _setup()
         assert "verbose" not in _setup(verbose=False)
 
@@ -151,7 +151,14 @@ class TestVerboseOption:
 
     def test_coexists_with_other_options(self):
         """Test requesting verbosity leaves the rest of the pass options untouched."""
-        options = _setup(verbose=True, fixed_decomps={qp.PauliX: "custom_x_rule"})
+        with qp.decomposition.local_decomps():
+
+            @register_resources({})
+            def custom_x_rule(wire):
+                del wire
+
+            qp.add_decomps(qp.PauliX, custom_x_rule)
+            options = _setup(verbose=True, fixed_decomps={qp.PauliX: custom_x_rule.name})
         assert options["verbose"] is True
         assert options["fixed_decomps"] == {"PauliX": "custom_x_rule"}
         assert options["gate_set"] == {"RX": 1.0}

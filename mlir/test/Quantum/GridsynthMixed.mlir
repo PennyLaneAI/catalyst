@@ -19,9 +19,9 @@
 // ERROR: for the --method option: Cannot find option named 'unknown'!
 
 // CHECK-DAG: func.func private @__catalyst__rt__random_double() -> f64
-// CHECK-DAG: func.func private @rs_mixed_decomposition_get_size(f64, f64, i1, f64) -> index
-// CHECK-DAG: func.func private @rs_mixed_decomposition_get_gates(memref<?xindex>, f64, f64, i1, f64)
-// CHECK-DAG: func.func private @rs_mixed_decomposition_get_phase(f64, f64, i1, f64) -> f64
+// CHECK-DAG: func.func private @rs_mixed_decomposition_get_size(f64, f64, i1 {llvm.zeroext}, f64) -> index
+// CHECK-DAG: func.func private @rs_mixed_decomposition_get_gates(memref<?xindex>, f64, f64, i1 {llvm.zeroext}, f64)
+// CHECK-DAG: func.func private @rs_mixed_decomposition_get_phase(f64, f64, i1 {llvm.zeroext}, f64) -> f64
 
 // COMMENT: One uniform sample is shared by the three runtime calls.
 

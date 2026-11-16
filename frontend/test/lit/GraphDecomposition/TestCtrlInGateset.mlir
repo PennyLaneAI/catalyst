@@ -12,11 +12,18 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// RUN: catalyst --tool=opt --pass-pipeline='builtin.module(graph-decomposition{gate-set=C(testT)=1.0 alt-decomps=myCZ{}{wires:2}{}=cz_to_ct})' %s | FileCheck %s --check-prefixes=ALL,CALL
+// RUN: catalyst --tool=opt --pass-pipeline='builtin.module(graph-decomposition{gate-set=C(testT)=1.0})' %s | FileCheck %s --check-prefixes=ALL,CALL
 
-// RUN: catalyst --tool=opt --pass-pipeline='builtin.module(graph-decomposition{inline-rule-body gate-set=C(testT)=1.0 alt-decomps=myCZ{}{wires:2}{}=cz_to_ct})' %s | FileCheck %s --check-prefixes=ALL,INLINE
+// RUN: catalyst --tool=opt --pass-pipeline='builtin.module(graph-decomposition{inline-rule-body gate-set=C(testT)=1.0})' %s | FileCheck %s --check-prefixes=ALL,INLINE
 
-// A controlled op that is already in the gate set stays untouched (its id `C(testT){}{wires:1}{}`
+// GraphDecomposition only solves GOIDs reachable from an entry function.
+func.func @entry(%c: !quantum.bit, %q: !quantum.bit) attributes {llvm.emit_c_interface} {
+  %0:2 = call @ctrl_in_gateset(%c, %q) : (!quantum.bit, !quantum.bit) -> (!quantum.bit, !quantum.bit)
+  %1:2 = call @decompose_to_ctrl(%c, %q) : (!quantum.bit, !quantum.bit) -> (!quantum.bit, !quantum.bit)
+  return
+}
+
+// A controlled op that is already in the gate set stays untouched (its id `1C(testT){}{wires:1}{}`
 // matches the `C(testT)` gate-set entry -- it is NOT stripped to its base `testT`).
 // ALL-LABEL: func.func @ctrl_in_gateset(
 // ALL-SAME:  [[Q:%.+]]: !quantum.bit, [[C:%.+]]: !quantum.bit
@@ -41,7 +48,7 @@ func.func @decompose_to_ctrl(%q0: !quantum.bit, %q1: !quantum.bit) -> (!quantum.
 
 func.func private @cz_to_ct(%q0: !quantum.bit, %q1: !quantum.bit) -> (!quantum.bit, !quantum.bit) attributes {
     target_gate = "myCZ{}{wires:2}{}",
-    resources = {operations = {"C(testT){}{wires:1}{}" = 1 : i64}} } {
+    resources = {operations = {"1C(testT){}{wires:1}{}" = 1 : i64}} } {
   %true = arith.constant true
   %oq, %oc = quantum.custom "testT"() %q1 ctrls(%q0) ctrlvals(%true) : !quantum.bit ctrls !quantum.bit
   return %oc, %oq : !quantum.bit, !quantum.bit

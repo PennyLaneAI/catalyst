@@ -1004,7 +1004,7 @@ def CtrlOp : Region_Op<"ctrl", [SingleBlockImplicitTerminator<"YieldOp">,
         Variadic<QubitType>:$in_ctrl_qubits,
         Variadic<I1>:$in_ctrl_values,
         Variadic<QubitType>:$in_work_qubits,
-        DefaultValuedAttr<StrAttr, "\"borrowed\"">:$work_wire_type,
+        DefaultValuedAttr<StrAttr, "::catalyst::CTRL_WORK_WIRE_TYPE_BORROWED">:$work_wire_type,
         Variadic<AnyTypeOf<[QuregType, QubitType]>>:$args
     );
 
@@ -1043,7 +1043,7 @@ def YieldOp : Quantum_Op<"yield", [Pure, ReturnLike, Terminator, ParentOneOf<["A
 // -----
 
 class Observable_Op<string mnemonic, list<Trait> traits = []> :
-        Quantum_Op<mnemonic, traits # [Pure]>;
+        Quantum_Op<mnemonic, traits # [Pure, Observable]>;
 
 def ComputationalBasisOp : Observable_Op<"compbasis", [AttrSizedOperandSegments]> {
     let summary = "Define a pseudo-observable of the computational basis for use in measurements";
@@ -1273,6 +1273,12 @@ def MeasurementOp : Quantum_Op<"measurement", [
         %bits, %out_reg = quantum.measurement "MeasureMany"()
             quregs(%reg) indices(%wires: tensor<?xi64>)
             : tensor<?xi1>, !quantum.reg
+
+        // Note: PPM example shown below is the 1:1 lowering to the corresponding example in PPMeasurementOp.
+        %result, %out:3 = quantum.measurement "PauliMeasure"()
+            qubits(%q0, %q1, %q2)
+            static_data = {pauli_word = "XIZ"}
+            : i1, !quantum.bit, !quantum.bit, !quantum.bit
         ```
 
         An empty result list is written `: ()`. Measurement names and static

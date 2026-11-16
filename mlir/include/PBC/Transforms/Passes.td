@@ -22,14 +22,14 @@ include "mlir/IR/EnumAttr.td"
 //                               Enums
 //===----------------------------------------------------------------------===//
 
-def DecomposeMethod : I32EnumAttr<"DecomposeMethod", "Decomposition method", 
+def DecomposeMethod : I32EnumAttr<"DecomposeMethod", "Decomposition method",
     [
         I32EnumAttrCase<"AutoCorrected", 0, "auto-corrected">,
         I32EnumAttrCase<"CliffordCorrected", 1, "clifford-corrected">,
         I32EnumAttrCase<"PauliCorrected", 2, "pauli-corrected">,
-    ]> { 
+    ]> {
     let cppNamespace = "catalyst::pbc";
-    let genSpecializedAttr = 0; 
+    let genSpecializedAttr = 0;
 }
 
 //===----------------------------------------------------------------------===//
@@ -94,7 +94,7 @@ def ToPPRPass : Pass<"to-ppr"> {
 
 def CommutePPRPass : Pass<"commute-ppr"> {
     let summary = "Commutate CliffordT operations to PPRotation operations.";
-    
+
     let dependentDialects = [ "catalyst::pbc::PBCDialect" ];
 
     let options = [MaxPauliSizeOption];
@@ -102,7 +102,7 @@ def CommutePPRPass : Pass<"commute-ppr"> {
 
 def MergePPRIntoPPMPass : Pass<"merge-ppr-ppm"> {
     let summary = "Absorb Clifford operations into Pauli Product Measurement operations.";
-    
+
     let dependentDialects = [ "catalyst::pbc::PBCDialect" ];
 
     let options = [MaxPauliSizeOption];
@@ -110,7 +110,7 @@ def MergePPRIntoPPMPass : Pass<"merge-ppr-ppm"> {
 
 def DecomposeNonCliffordPPRPass : Pass<"decompose-non-clifford-ppr"> {
     let summary = "Decompose non-Clifford PPRotation operations to set of Pauli Product Measurement operations.";
-    
+
     let dependentDialects = [ "catalyst::pbc::PBCDialect", "scf::SCFDialect" ];
 
     let options = [DecomposeMethodOption, AvoidYMeasureOption];
@@ -160,13 +160,53 @@ def DecomposeArbitraryPPRPass : Pass<"decompose-arbitrary-ppr"> {
 
 def UnrollConditionalPPRPPMPass : Pass<"unroll-conditional-ppr-ppm"> {
     let summary = "Lower conditional PPR/PPM operations into normal PPR/PPM using scf conditional dialect.";
-    
+
     let dependentDialects = [ "catalyst::pbc::PBCDialect", "scf::SCFDialect" ];
+}
+
+def CollapseConditionalPPRPass : Pass<"pbc-ref-collapse-if-ppr"> {
+    let summary = "Collapse scf.if on pi/2 rotations into their inline form (ref sem only)";
+    let description = [{
+        Replaces each `scf.if` without results whose branches only contain pi/2 `pbc.ref.ppr`
+        operations, uncontrolled global phases and operations without memory effects with the
+        contents of its branches:
+
+        - The PPR operations become conditional on the branch condition (negated in the else
+          branch), and-ed with their own condition, if any.
+        - The global phases are dropped: a phase applied under a classical condition is global
+          within each outcome.
+        - The other operations are hoisted.
+
+        Nested branches collapse from the inside out.
+
+        For example:
+
+        ```mlir
+        %m = pbc.ref.ppm ["Z"] %q0 : i1
+        scf.if %m {
+            pbc.ref.ppr ["X"](2) %q1
+        } else {
+            pbc.ref.ppr ["Z"](2) %q1
+        }
+        ```
+
+        becomes:
+
+        ```mlir
+        %m = pbc.ref.ppm ["Z"] %q0 : i1
+        pbc.ref.ppr ["X"](2) %q1 cond(%m)
+        %true = arith.constant true
+        %not_m = arith.xori %m, %true : i1
+        pbc.ref.ppr ["Z"](2) %q1 cond(%not_m)
+        ```
+    }];
+
+    let dependentDialects = [ "mlir::arith::ArithDialect" ];
 }
 
 def LowerPBCInitOpsPass : Pass<"lower-pbc-init-ops"> {
     let summary = "Lower PBC initialization ops (prepare, fabricate) to quantum dialect op (set_basis_state).";
-    
+
     let dependentDialects = [ "catalyst::pbc::PBCDialect"];
 }
 

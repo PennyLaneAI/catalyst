@@ -19,10 +19,35 @@ from typing import Callable
 
 import pennylane as qp
 from jax.extend.core import ClosedJaxpr
+from pennylane.core import Operator2
 from pennylane.core.operator import abstractify
 
 from catalyst.decomposition.graph_op_id import GraphOpID
 from catalyst.decomposition.modifier_state import ModifierState
+from catalyst.decomposition.type_utils import SerializedGraphOpID
+
+ResourceEntry = tuple[SerializedGraphOpID, int]
+
+
+@dataclass(frozen=True)
+class RuleIdentity:
+    """Dataclass with information needed to distinguish unique decomposition rules.
+
+    Attributes:
+        target_gate: The GraphOpID of the gate this decomposition rule applies to
+        frontend_name: the name used to identify this decomposition rule in the frontend
+        resources: sorted pairs of GraphOpIDs and integer resource counts for the rule.
+    """
+
+    target_gate: SerializedGraphOpID
+    frontend_name: str
+    resources: tuple[ResourceEntry, ...]
+
+    def __post_init__(self) -> None:
+        """Require canonical resource ordering for cache lookup and deduplication."""
+        assert self.resources == tuple(
+            sorted(self.resources)
+        ), "RuleIdentity resources must be sorted for correctness."
 
 
 @dataclass(frozen=True)
@@ -48,7 +73,7 @@ class OpDecompRequest:
             adjoint and control transform regions around it.
     """
 
-    base_id: str
+    base_id: SerializedGraphOpID
     op_name: str
     op_cls: type | None
     dynamic_shape: dict
@@ -61,7 +86,7 @@ class OpDecompRequest:
     @classmethod
     def from_operation(
         cls,
-        op,
+        op: Operator2,
         modifier_context: ModifierState = ModifierState(),
     ) -> "OpDecompRequest":
         """Build a request from a settled captured Operator2 instance.
@@ -71,7 +96,7 @@ class OpDecompRequest:
         properties by removing tracers (no leaks) and giving shapes/dtypes to Python constants.
 
         Ambient modifiers compose with symbolic wrappers already carried by ``op``: adjoints
-        cancel pairwise and control counts add.
+        cancel pairwise, while control counts and work wires add.
         """
         with qp.capture.pause():
             op = abstractify(op)
@@ -106,27 +131,24 @@ class TracedRule:
     more than once while preserving distinct alternatives with identical resource counts.
 
     Attributes:
-        pyfun: Python callable retained for naming and lowering the function.
+        prepared_rule_fn: Adapted rule callable retained for naming and lowering the function.
         closed_jaxpr: Converted Catalyst JAXPR containing the rule body.
         target_gate: Full GraphOpID of the operation decomposed by the rule.
         resources: GraphOpID-to-multiplicity mapping produced by the rule.
         frontend_name: PennyLane rule name used for fixed and alternative rule selection.
     """
 
-    pyfun: Callable
+    prepared_rule_fn: Callable[..., None]
     closed_jaxpr: ClosedJaxpr
-    target_gate: str
-    resources: dict[str, int]
+    target_gate: SerializedGraphOpID
+    resources: dict[SerializedGraphOpID, int]
     frontend_name: str
 
     @property
-    def identifier(self) -> tuple:
+    def identifier(self) -> RuleIdentity:
         """Rule identifier for deduplication."""
-
-        return (
-            self.target_gate,
-            self.frontend_name,
-            tuple(sorted(self.resources.items())),
+        return RuleIdentity(
+            self.target_gate, self.frontend_name, tuple(sorted(self.resources.items()))
         )
 
 
@@ -139,12 +161,13 @@ class DecompositionScope:
         definitions: Map of rule identifiers to traced rules, in first-seen order.
     """
 
-    roots: dict[str, tuple[OpDecompRequest, set[ModifierState]]] = field(default_factory=dict)
-    definitions: dict[tuple, TracedRule] = field(default_factory=dict)
+    roots: dict[SerializedGraphOpID, tuple[OpDecompRequest, set[ModifierState]]] = field(
+        default_factory=dict
+    )
+    definitions: dict[RuleIdentity, TracedRule] = field(default_factory=dict)
 
     def record_root(self, request: OpDecompRequest) -> None:
         """Record root nodes for later decomp rule capture, which are explored recursively."""
-
         previous = self.roots.get(request.base_id)
         if previous is None:
             self.roots[request.base_id] = (request, {request.modifier_state})
@@ -153,5 +176,4 @@ class DecompositionScope:
 
     def record_definition(self, traced_rule: TracedRule) -> None:
         """Record a definition once, preserving first-seen order."""
-
         self.definitions.setdefault(traced_rule.identifier, traced_rule)

@@ -170,7 +170,7 @@ class CompileOptions:
     seed: Optional[int] = None
     pass_plugins: Optional[Set[Path]] = None
     dialect_plugins: Optional[Set[Path]] = None
-    capture: bool | Literal["global"] = "global"
+    capture: bool | Literal["global"] = True
     skip_preprocess: bool = False
     runtime_artifacts: tuple[str, ...] = ()
     collect_decomp_rules: bool = True
