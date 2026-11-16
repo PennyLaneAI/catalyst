@@ -1861,9 +1861,13 @@ class TestOnDemand:
         scope = capture.call_args.args[0]
         assert list(scope.roots) == [base_id]
         assert scope.roots[base_id][1] == set(states)
+        # Generic controlled fallbacks can share a target with the rule registered here.
+        empty_rule_headers = [
+            line for line in module_str.splitlines() if 'frontend_name = "empty_rule"' in line
+        ]
         for request in requests:
             escaped_id = request["op_id"].replace('"', "\\22")
-            assert module_str.count(f'target_gate = "{escaped_id}"') == 1
+            assert sum(f'target_gate = "{escaped_id}"' in line for line in empty_rule_headers) == 1
         assert requests[0]["wire_lens"] == {"reg": 1}
 
     def test_reachable_wrapper_keeps_valid_roots_with_unregistered_class(self):
