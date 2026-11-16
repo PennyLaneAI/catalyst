@@ -927,15 +927,10 @@ struct MeasurementOpPattern : public OpConversionPattern<MeasurementOp> {
                 return rewriter.notifyMatchFailure(op, "invalid Pauli word");
             }
         }
-        // PPM has no postselection. The frontend represents an unset value as
-        // either None or -1.
+        // PPM has no postselection. The frontend represents an unset value as None.
         if (auto postselect = staticData.get("postselect")) {
             auto none = dyn_cast<TypeAttr>(postselect);
-            auto integer = dyn_cast<IntegerAttr>(postselect);
-            bool noPostselect = integer && !integer.getType().isUnsignedInteger() &&
-                                integer.getValue().getBitWidth() > 1 &&
-                                integer.getValue().isAllOnes();
-            if (!(none && isa<NoneType>(none.getValue())) && !noPostselect) {
+            if (!(none && isa<NoneType>(none.getValue()))) {
                 return rewriter.notifyMatchFailure(op, "postselection is not supported by PPM");
             }
         }
