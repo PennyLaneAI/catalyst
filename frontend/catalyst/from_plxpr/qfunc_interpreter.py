@@ -27,11 +27,13 @@ from jax.core import take_current_trace
 from pennylane.capture import PlxprInterpreter, pause
 from pennylane.capture.base_interpreter import jaxpr_to_jaxpr
 from pennylane.capture.primitives import adjoint_transform_prim as plxpr_adjoint_transform_prim
+from pennylane.capture.primitives import (
+    barrier_p,
+)
 from pennylane.capture.primitives import cond_prim as pl_cond_prim
 from pennylane.capture.primitives import ctrl_transform_prim as plxpr_ctrl_transform_prim
 from pennylane.capture.primitives import measure_prim as plxpr_measure_prim
 from pennylane.capture.primitives import (
-    barrier_p,
     operator_p,
 )
 from pennylane.capture.primitives import pauli_measure_prim as plxpr_pauli_measure_prim

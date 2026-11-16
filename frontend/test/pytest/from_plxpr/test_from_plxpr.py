@@ -432,6 +432,7 @@ class TestBarrierPrimitive:
     @pytest.mark.parametrize("only_visual", [False, True])
     def test_barrier_metadata(self, wires, only_visual):
         """Preserve wire counts and visual metadata instead of using the legacy path."""
+
         @qp.qnode(qp.device("lightning.qubit", wires=2))
         def circuit():
             qp.Barrier(wires=wires, only_visual=only_visual)
@@ -451,6 +452,7 @@ class TestBarrierPrimitive:
 
     def test_dynamic_wire(self):
         """Map a traced Barrier wire to a qubit before Operator2 lowering."""
+
         @qp.qnode(qp.device("lightning.qubit", wires=2))
         def circuit(wire):
             qp.Barrier(wires=[0, wire])
