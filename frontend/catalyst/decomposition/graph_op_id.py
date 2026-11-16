@@ -244,8 +244,7 @@ class GraphOpID:
         self.op = op
         self.is_custom_op = self.parse_is_custom_op()
 
-        # Prod2 uses "Prod" for device dispatch; MLIR lowering uses its class name.
-        self.operator_name = type(op).__name__ if isinstance(op, qp.ops.Prod2) else op.name
+        self.operator_name = type(op).__name__ if
         self.dynamic_shape = self.parse_dynamic_shape()
         self.wire_lens = self.parse_wire_lens()
         self.static_data = self.parse_static_data()
