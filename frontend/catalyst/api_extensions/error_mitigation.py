@@ -34,6 +34,7 @@ from catalyst.api_extensions.rem_postprocessing import (
     rem_check_calibration_matrices,
 )
 from catalyst.jax_primitives import Folding, func_p, quantum_kernel_p, rem_p, zne_p
+from catalyst.jax_primitives_utils import detect_measurement_process
 from catalyst.jax_tracer import Function
 from catalyst.utils.callables import CatalystCallable
 
@@ -444,7 +445,7 @@ class RemCallable(CatalystCallable):
         assert callable(
             callable_fn
         ), "expected callable set as param on the first operation in rem target"
-        mp_kind = _detect_measurement_process(jaxpr)
+        mp_kind = detect_measurement_process(jaxpr)
         assert mp_kind is not None, (
             "measurement process must be one of CountsMP, ProbsMP or SampleMP. "
             "Other measurement processes such as observables are not supported yet."
@@ -537,22 +538,6 @@ def _wrap_callable(fn):
     elif isinstance(fn, Callable):  # Keep at the bottom
         return Function(fn)
     raise TypeError(f"Target must be callable, got: {type(fn)}")
-
-
-def _detect_measurement_process(jaxpr):
-    """Walk the inner jaxpr for a probs/sample/counts primitive; return its name or None.
-
-    Mirrors the detection logic in :func:`_rem_abstract_eval`.
-    """
-    for eqn in jaxpr.eqns:
-        inner = eqn.params.get("call_jaxpr", None)
-        if inner is None:
-            continue
-        for op_eq in inner.eqns:
-            pname = str(op_eq.primitive)
-            if pname in ("probs", "sample", "counts"):
-                return pname
-    return None
 
 
 def _record_results(fn, results):

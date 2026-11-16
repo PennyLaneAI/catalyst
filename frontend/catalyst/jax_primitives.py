@@ -26,7 +26,7 @@ import jax
 import numpy as np
 import pennylane as qp
 from jax._src import core, source_info_util, util
-from jax._src.core import pytype_aval_mappings, subjaxprs
+from jax._src.core import pytype_aval_mappings
 from jax._src.interpreters import partial_eval as pe
 from jax._src.lax.lax import _merge_dyn_shape, _nary_lower_hlo, cos_p, sin_p
 from jax._src.lib.mlir import ir
@@ -126,6 +126,7 @@ with Patcher(
         ApplyRegisteredPassOp,
         cache,
         create_call_op,
+        detect_measurement_process,
         get_cached,
         get_call_jaxpr,
         get_symbolref,
@@ -1104,14 +1105,7 @@ def _rem_abstract_eval(*args, run_calibration, jaxpr, fn):  # pylint: disable=un
     device_qubit_count = len(qnode.device.wires)
     device_shot_count = qnode.shots.total_shots
 
-    mp = None
-    for eqn in subjaxprs(jaxpr):
-        for op_eq in eqn.eqns:
-            if str(op_eq.primitive) in ("probs", "counts", "sample"):
-                mp = str(op_eq.primitive)
-                break
-        if mp is not None:
-            break
+    mp = detect_measurement_process(jaxpr)
 
     if mp == "probs":
         prob_size = 2 << (device_qubit_count - 1)

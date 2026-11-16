@@ -65,6 +65,23 @@ def get_call_equation(jaxpr):
     raise AssertionError("No call_jaxpr found in the JAXPR.")
 
 
+def detect_measurement_process(jaxpr):
+    """Walk the inner jaxpr for a probs/sample/counts primitive; return its name or None.
+
+    Used by :func:`_rem_abstract_eval` and by ``mitigate_with_rem`` to select the REM
+    post-processing.
+    """
+    for eqn in jaxpr.eqns:
+        inner = eqn.params.get("call_jaxpr", None)
+        if inner is None:
+            continue
+        for op_eq in inner.eqns:
+            pname = str(op_eq.primitive)
+            if pname in ("probs", "sample", "counts"):
+                return pname
+    return None
+
+
 def lower_jaxpr(ctx, jaxpr, metadata=None, fn=None):
     """Lowers a call primitive jaxpr, may be either func_p or quantum_kernel_p
 
