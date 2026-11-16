@@ -739,18 +739,26 @@ def _decomposition_rule_abstract(*, pyfun, func_jaxpr, is_qreg, num_params):
 
 @decomp_definition_p.def_abstract_eval
 def _decomposition_definition_abstract(
-    *, pyfun, func_jaxpr, target_gate, resources, frontend_name, num_wires, skip_body=False
+    *, pyfun, func_jaxpr, target_gate, resources, frontend_name, num_wires, estimate_decomps=False
 ):
     return ()
 
 
 def _decomposition_definition_lowering(
-    ctx, *, pyfun, func_jaxpr, target_gate, resources, frontend_name, num_wires, skip_body=False
+    ctx,
+    *,
+    pyfun,
+    func_jaxpr,
+    target_gate,
+    resources,
+    frontend_name,
+    num_wires,
+    estimate_decomps=False,
 ):
     """Lower a finalized Catalyst decomposition rule as a definition or declaration."""
     # differentiate functions in the lowering cache
-    metadata = (target_gate, resources, frontend_name, num_wires, skip_body)
-    if skip_body:
+    metadata = (target_gate, resources, frontend_name, num_wires, estimate_decomps)
+    if estimate_decomps:
         key = (pyfun, *metadata)
         func_op = get_cached(ctx, key)
         if func_op is None:

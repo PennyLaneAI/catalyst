@@ -440,7 +440,7 @@ def _convert_decomp_target_spec(
     interpreter: PLxPRToQuantumJaxprInterpreter,
     target_spec: DecompTargetSpec,
     precompiled_rule_identities: frozenset[RuleIdentity] = frozenset(),
-    skip_body: bool = False,
+    estimate_decomps: bool = False,
 ) -> list[TracedRule]:
     """Convert rules into Catalyst JAXPRs, retaining only their signatures if requested."""
     with take_current_trace():
@@ -463,7 +463,7 @@ def _convert_decomp_target_spec(
             prepared_rule_fn.__name__ = "__builtin_" + prepared_rule_fn.__name__
 
         with take_current_trace():
-            if skip_body:
+            if estimate_decomps:
                 converted = jax.make_jaxpr(lambda *args: None)(QrefQreg(), *operands)
             else:
                 try:
@@ -514,7 +514,7 @@ def _capture_scope_rules(
     precompiled_rule_identities: frozenset[RuleIdentity] | None = None,
 ) -> None:
     """Populate one scope, loading cached identities unless the caller supplies them."""
-    if scope.skip_rule_bodies:
+    if scope.estimate_decomps:
         # Emit every declaration, including rules whose implementations are precompiled.
         precompiled_rule_identities = frozenset()
     elif precompiled_rule_identities is None:
@@ -526,7 +526,10 @@ def _capture_scope_rules(
             warnings.warn(f"Failed to load precompiled rules: {e}")
     for target_spec in walk_reachable_decomp_rule_sets(list(scope.roots.values())):
         for traced_rule in _convert_decomp_target_spec(
-            interpreter, target_spec, precompiled_rule_identities, skip_body=scope.skip_rule_bodies
+            interpreter,
+            target_spec,
+            precompiled_rule_identities,
+            estimate_decomps=scope.estimate_decomps,
         ):
             scope.record_definition(traced_rule)
 
@@ -551,7 +554,7 @@ def capture_and_bind_kernel_rules(
             resources=tuple(sorted(traced_rule.resources.items())),
             frontend_name=traced_rule.frontend_name,
             num_wires=None,
-            skip_body=scope.skip_rule_bodies,
+            estimate_decomps=scope.estimate_decomps,
         )
 
 

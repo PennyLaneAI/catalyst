@@ -2,11 +2,11 @@
 
 <h3>New features since last release</h3>
 
-* The new `qjit(skip_decomp_rule_bodies=True)` option collects reachable decomposition rules
-  as function declarations with their signatures and resource attributes, without tracing or
-  compiling their implementations. Resource estimation can use these declarations even when
-  a rule's body cannot be compiled. This option requires program capture and
-  `collect_decomp_rules=True`, and defaults to `False`.
+* The new `qjit(estimate_decomps=True)` option prepares reachable decomposition rules for
+  resource estimation using their registered resource counts, without tracing or compiling
+  their implementations. `qp.estimate` can use these rules even when their implementations
+  cannot be compiled. This option requires program capture and `collect_decomp_rules=True`,
+  and defaults to `False`.
 
 * Backline can drive a VPK120 whose FPGA carries NVIDIA's Holoscan Sensor Bridge (HSB), through
   the new `hsb_hwhs` controller backend. Its coprocessors stay `cpu_verbs` and `gpu_verbs`,

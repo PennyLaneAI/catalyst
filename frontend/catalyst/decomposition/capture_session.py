@@ -160,14 +160,14 @@ class DecompositionScope:
     Attributes:
         roots: Map of (base) GraphOpID to a request object and observed modifier states.
         definitions: Map of rule identifiers to traced rules, in first-seen order.
-        skip_rule_bodies: Whether to retain rule signatures and resources without tracing bodies.
+        estimate_decomps: Whether to prepare rules for resource estimation without tracing bodies.
     """
 
     roots: dict[SerializedGraphOpID, tuple[OpDecompRequest, set[ModifierState]]] = field(
         default_factory=dict
     )
     definitions: dict[RuleIdentity, TracedRule] = field(default_factory=dict)
-    skip_rule_bodies: bool = False
+    estimate_decomps: bool = False
 
     def record_root(self, request: OpDecompRequest) -> None:
         """Record root nodes for later decomp rule capture, which are explored recursively."""

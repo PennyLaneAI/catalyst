@@ -983,8 +983,8 @@ def test_rule_uses_size_agnostic_qreg():
     assert 'target_gate = "RepeatedGate{}{wires:1}{}"' in mlir
 
 
-@pytest.mark.parametrize("skip_rule_bodies", [False, True])
-def test_multiple_qnodes_capture_and_materialize_locally(mocker, skip_rule_bodies):
+@pytest.mark.parametrize("estimate_decomps", [False, True])
+def test_multiple_qnodes_capture_and_materialize_locally(mocker, estimate_decomps):
     """Each QNode captures and materializes its definitions in its own nested module."""
 
     import catalyst.from_plxpr.qfunc_interpreter as capture_frontend
@@ -1010,7 +1010,7 @@ def test_multiple_qnodes_capture_and_materialize_locally(mocker, skip_rule_bodie
     with qp.decomposition.local_decomps():
         qp.add_decomps(RepeatedGate, empty_rule)
 
-        @qjit(capture=True, target="mlir", skip_decomp_rule_bodies=skip_rule_bodies)
+        @qjit(capture=True, target="mlir", estimate_decomps=estimate_decomps)
         def workflow():
             return first(), second()
 
@@ -1037,7 +1037,7 @@ def _rule_funcops(compiled):
 
 @pytest.mark.parametrize("adjoint", [False, True])
 @pytest.mark.parametrize("controlled", [False, True])
-def test_skip_rule_bodies_preserves_signatures_and_resources(mocker, adjoint, controlled):
+def test_estimate_decomps_preserves_signatures_and_resources(mocker, adjoint, controlled):
     """Custom rule declarations match definitions, including parameters and modifier operands."""
     import catalyst.from_plxpr.qfunc_interpreter as capture_frontend
 
@@ -1076,7 +1076,7 @@ def test_skip_rule_bodies_preserves_signatures_and_resources(mocker, adjoint, co
         qp.add_decomps(ParameterizedGate, root_rule)
         qp.add_decomps(RepeatedGate, leaf_rule)
         definitions = qjit(circuit, target="mlir")
-        declarations = qjit(circuit, target="mlir", skip_decomp_rule_bodies=True)
+        declarations = qjit(circuit, target="mlir", estimate_decomps=True)
 
     target_names = {
         ModifierState(adjoint=adjoint, control_count=2 if controlled else 0).wrap_name(name)
@@ -1107,7 +1107,7 @@ def test_skip_rule_bodies_preserves_signatures_and_resources(mocker, adjoint, co
     assert declarations.mlir_module.operation.verify()
 
 
-def test_skip_rule_bodies_does_not_trace_implementations(mocker):
+def test_estimate_decomps_does_not_trace_implementations(mocker):
     """Resource-only rules remain available even if their implementations cannot be captured."""
     import catalyst.from_plxpr.qfunc_interpreter as capture_frontend
 
@@ -1128,7 +1128,7 @@ def test_skip_rule_bodies_does_not_trace_implementations(mocker):
     with qp.decomposition.local_decomps():
         qp.add_decomps(RepeatedGate, unavailable_rule, empty_rule)
 
-        @qjit(target="mlir", skip_decomp_rule_bodies=True)
+        @qjit(target="mlir", estimate_decomps=True)
         @qp.qnode(qp.device("null.qubit", wires=1))
         def circuit():
             RepeatedGate(0)
@@ -1147,7 +1147,7 @@ def test_skip_rule_bodies_does_not_trace_implementations(mocker):
     assert all(len(op.regions[0].blocks) == 0 for op in rules)
 
 
-def test_skip_rule_bodies_includes_precompiled_rules(mocker):
+def test_estimate_decomps_includes_precompiled_rules(mocker):
     """Matching cached implementations still have declarations with their current resources."""
     import catalyst.from_plxpr.qfunc_interpreter as capture_frontend
 
@@ -1172,21 +1172,21 @@ def test_skip_rule_bodies_includes_precompiled_rules(mocker):
             return qp.state()
 
         definitions = qjit(circuit, target="mlir")
-        declarations = qjit(circuit, target="mlir", skip_decomp_rule_bodies=True)
+        declarations = qjit(circuit, target="mlir", estimate_decomps=True)
 
     assert not _rule_funcops(definitions)
     assert len(_rule_funcops(declarations)) == 1
 
 
 @pytest.mark.parametrize("capture, collect_rules", [(True, False), (False, True)])
-def test_skip_rule_bodies_requires_capture_and_collection(capture, collect_rules):
+def test_estimate_decomps_requires_capture_and_collection(capture, collect_rules):
     """Disabling capture or rule collection takes precedence over requesting declarations."""
 
     @qjit(
         target="mlir",
         capture=capture,
         collect_decomp_rules=collect_rules,
-        skip_decomp_rule_bodies=True,
+        estimate_decomps=True,
     )
     @qp.qnode(qp.device("null.qubit", wires=1))
     def circuit():
@@ -1226,7 +1226,7 @@ def test_resource_estimate_uses_declarations(tmp_path, estimate_api):
             return qp.state()
 
         if estimate_api == "qp.estimate":
-            compiled = qjit(circuit, target="mlir", skip_decomp_rule_bodies=True)
+            compiled = qjit(circuit, target="mlir", estimate_decomps=True)
             assert all(len(op.regions[0].blocks) == 0 for op in _rule_funcops(compiled))
             counts = qp.estimate(compiled, target={"RepeatedGate"})().resources.quantum_operations
         else:
@@ -1238,7 +1238,7 @@ def test_resource_estimate_uses_declarations(tmp_path, estimate_api):
                 transformed,
                 target="mlir_opt",
                 skip_preprocess=True,
-                skip_decomp_rule_bodies=True,
+                estimate_decomps=True,
             )
             resources = json.loads(output.read_text())
             counts = resources["circuit"]["quantum_operations"]["-1"]
