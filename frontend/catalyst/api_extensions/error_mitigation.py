@@ -446,10 +446,11 @@ class RemCallable(CatalystCallable):
             callable_fn
         ), "expected callable set as param on the first operation in rem target"
         mp_kind = detect_measurement_process(jaxpr)
-        assert mp_kind is not None, (
-            "measurement process must be one of CountsMP, ProbsMP or SampleMP. "
-            "Other measurement processes such as observables are not supported yet."
-        )
+        if mp_kind is None:
+            raise NotImplementedError(
+                "Measurement process must be one of CountsMP, ProbsMP or SampleMP.\n"
+                + "Other measurement processes such as observables are not supported yet."
+            )
         self._mp_kind = mp_kind
 
         qnode_obj = jaxpr.eqns[0].params.get("qnode", None)

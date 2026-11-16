@@ -628,7 +628,7 @@ def test_unsupported_measurement():
     def mitigated():
         return mitigate_with_rem(qnode)()
 
-    with pytest.raises(AssertionError, match="measurement process must be one of"):
+    with pytest.raises(NotImplementedError, match="Measurement process must be one of"):
         catalyst.qjit(mitigated)
 
 
