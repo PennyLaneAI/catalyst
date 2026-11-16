@@ -897,9 +897,8 @@ mlir::DictionaryAttr QubitUnitaryOp::getStaticData() {
     return mlir::DictionaryAttr::get(getContext(), {});
 }
 
-// Return the entries of a name -> operand-indices map (`param_map`/`qubit_map`) in operand order.
-// The dictionary attribute itself is sorted by name, which is not an operand order. Entries
-// without operands (e.g. an empty wire argument) have no position and go last, in name order.
+// Return named parameter groups in operand order, rather than dictionary (name) order.
+// Groups without operands have no position and go last, in name order.
 static llvm::SmallVector<std::pair<llvm::StringRef, llvm::ArrayRef<int64_t>>>
 getEntriesInOperandOrder(mlir::DictionaryAttr map) {
     llvm::SmallVector<std::pair<llvm::StringRef, llvm::ArrayRef<int64_t>>> entries;
@@ -947,7 +946,8 @@ DynamicShape OperatorOp::getDynamicShape() {
 WireLens OperatorOp::getWireLens() {
     WireLens wireLens;
 
-    for (auto [name, indices] : getEntriesInOperandOrder(getQubitMap())) {
+    for (mlir::NamedAttribute entry : getQubitMap()) {
+        auto indices = cast<mlir::DenseI64ArrayAttr>(entry.getValue()).asArrayRef();
         size_t numQubits;
         if (getQreg()) {
             numQubits = 0;
@@ -960,7 +960,7 @@ WireLens OperatorOp::getWireLens() {
             numQubits = indices.size();
         }
 
-        wireLens.emplace_back(name.str(), numQubits);
+        wireLens.emplace_back(entry.getName().getValue().str(), numQubits);
     }
 
     return wireLens;
