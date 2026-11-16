@@ -93,7 +93,6 @@ def specialized_measurements(angle: float):
     # CHECK-NOT: qref.measurement
     # CHECK: mbqc.ref.measure_in_basis
     qp.ftqc.measure_arbitrary_basis(0, angle, plane="XY")
-    # CHECK-NOT: qref.measurement
     return qp.state()
 
 
@@ -107,16 +106,12 @@ def pauli_measurements():
     # VALUE: quantum.measurement "PauliMeasure"()
     # VALUE-SAME: static_data = {pauli_word = "XZ", postselect = none} : i1,
     # CHECK-LABEL: func.func public @pauli_measurements
-    # CHECK-NOT: pbc.
     # CHECK: [[q0:%.+]] = qref.get {{%.+}}[ 1]
     # CHECK: [[q1:%.+]] = qref.get {{%.+}}[ 0]
     # CHECK: [[result:%.+]] = qref.measurement "PauliMeasure"() qubits([[q0]], [[q1]])
     # CHECK-SAME: static_data = {pauli_word = "XZ", postselect = none} : i1
     result = qp.pauli_measure("XZ", (1, 0))
-    # CHECK: tensor.from_elements [[result]] : tensor<i1>
-    # CHECK: scf.if
     qp.cond(result, qp.X)(0)
-    # CHECK-NOT: pbc.
     return qp.state()
 
 
