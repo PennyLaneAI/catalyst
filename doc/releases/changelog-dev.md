@@ -389,7 +389,7 @@
     [(#3053)](https://github.com/PennyLaneAI/catalyst/pull/3053)
     [(#3229)](https://github.com/PennyLaneAI/catalyst/pull/3229)
     [(#3251)](https://github.com/PennyLaneAI/catalyst/pull/3251)
-    [(#XXXX)](https://github.com/PennyLaneAI/catalyst/pull/XXXX)
+    [(#3481)](https://github.com/PennyLaneAI/catalyst/pull/3481)
 
     The format of `graphOpID` is as follows:
         op_name{dynamic_shape_dictionary}{wire_lens_dictionary}{static_data_dictionary}[UID]
