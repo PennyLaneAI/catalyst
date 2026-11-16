@@ -20,6 +20,7 @@ from typing import Any
 
 import pennylane as qp
 from jax._src.lib.mlir import ir
+from pennylane.decomposition.utils import to_name
 from pennylane.pytrees import flatten
 
 from catalyst.decomposition.modifier_state import ModifierState

@@ -665,6 +665,12 @@ class TestGenericUtilities:
         # Pylint does not infer str methods on NewType values.
         assert str.startswith(GraphOpID(op).getGraphOpId(), id)
 
+    def test_prod2_graph_op_id_name(self):
+        """Prod2 uses its registry name rather than its legacy device-dispatch name."""
+        op = qp.ops.Prod2((qp.X(0), qp.Z(1)))
+
+        assert GraphOpID(op).getGraphOpId().partition("{")[0] == "Prod2"
+
     @pytest.mark.parametrize(
         "op, expected_adjoint, expected_controls",
         [
