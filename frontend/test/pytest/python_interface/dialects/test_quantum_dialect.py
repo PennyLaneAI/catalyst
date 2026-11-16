@@ -17,6 +17,7 @@ import pytest
 from xdsl.dialects.builtin import (
     ArrayAttr,
     ComplexType,
+    DictionaryAttr,
     Float64Type,
     IntegerAttr,
     StringAttr,
@@ -63,6 +64,7 @@ expected_ops_names = {
     "InitializeOp": "quantum.init",
     "InsertOp": "quantum.insert",
     "MCMObsOp": "quantum.mcmobs",
+    "MeasurementOp": "quantum.measurement",
     "MeasureOp": "quantum.measure",
     "MultiRZOp": "quantum.multirz",
     "NamedObsOp": "quantum.namedobs",
@@ -198,6 +200,16 @@ expected_ops_init_kwargs = {
     "MCMObsOp": [
         {"operands": (bool_ssa,), "result_types": (obs,)},
         {"operands": ((bool_ssa, bool_ssa, bool_ssa),), "result_types": (obs,)},
+    ],
+    "MeasurementOp": [
+        {
+            "operands": ((), (q0,), None, ()),
+            "result_types": ((i1,), (QubitType(),), None),
+            "properties": {
+                "op_name": StringAttr("Measurement"),
+                "static_data": DictionaryAttr({}),
+            },
+        }
     ],
     "MeasureOp": [
         {"in_qubit": q0, "postselect": int_ssa},
@@ -346,6 +358,31 @@ class TestCustomVerifiers:
 class TestAssemblyFormat:
     """Lit tests for assembly format of operations/attributes in the Quantum
     dialect."""
+
+    def test_generic_measurement(self, run_filecheck, pretty_print):
+        """Generic measurements round-trip with classical results and both wire modes."""
+        program = """
+        func.func @measurements(%q: !quantum.bit, %reg: !quantum.reg,
+                               %angle: tensor<f64>, %indices: tensor<2xi64>) {
+          // CHECK: "quantum.measurement"(
+          // CHECK-SAME: op_name = "RotatedMeasurement"
+          // CHECK-SAME: static_data = {plane = "XY"}
+          // CHECK-SAME: -> (i1, f64, !quantum.bit)
+          %m, %value, %out = quantum.measurement "RotatedMeasurement"(%angle: tensor<f64>)
+              qubits(%q) static_data = {plane = "XY"} : i1, f64, !quantum.bit
+          // CHECK: "quantum.measurement"(
+          // CHECK-SAME: op_name = "Discard"
+          // CHECK-SAME: -> !quantum.bit
+          %discard = quantum.measurement "Discard"() qubits(%out) : !quantum.bit
+          // CHECK: "quantum.measurement"(
+          // CHECK-SAME: op_name = "RegisterMeasurement"
+          // CHECK-SAME: : (!quantum.reg, tensor<2xi64>) -> (tensor<2xi1>, !quantum.reg)
+          %bits, %out_reg = quantum.measurement "RegisterMeasurement"() quregs(%reg)
+              indices(%indices: tensor<2xi64>) : tensor<2xi1>, !quantum.reg
+          return
+        }
+        """
+        run_filecheck(program, roundtrip=True, verify=True, pretty_print=pretty_print)
 
     def test_qubit_qreg_operations(self, run_filecheck, pretty_print):
         """Test that the assembly format for operations for allocation/deallocation of
