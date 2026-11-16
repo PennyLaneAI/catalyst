@@ -15,7 +15,10 @@
 """Tests for trace-embedded decomposition-rule definitions."""
 
 import json
+import warnings
 
+import jax
+import jax.numpy as jnp
 import pennylane as qp
 import pytest
 from jax._src.lib.mlir import ir
@@ -24,10 +27,23 @@ from pennylane.typing import Float, Wire
 
 from catalyst import qjit
 from catalyst.decomposition.capture_session import OpDecompRequest, RuleIdentity
-from catalyst.decomposition.decomposition_rules import walk_reachable_decomp_rule_sets
+from catalyst.decomposition.decomposition_rules import (
+    DecompRuleSpec,
+    DecompTargetSpec,
+    RuleTraceInputs,
+    walk_reachable_decomp_rule_sets,
+)
 from catalyst.decomposition.modifier_state import ModifierState
+from catalyst.decomposition.rule_lowering_warning import RuleLoweringWarning
 from catalyst.decomposition.type_utils import SerializedGraphOpID
+from catalyst.from_plxpr.qfunc_interpreter import (
+    PLxPRToQuantumJaxprInterpreter,
+    _convert_decomp_target_spec,
+)
+from catalyst.from_plxpr.qref_jax_primitives import QrefQreg
 from catalyst.jax_primitives import decomp_definition_p, decomprule_p
+from catalyst.jax_tracer import lower_jaxpr_to_mlir
+from catalyst.utils.exceptions import CompileError
 
 # MLIR prints the quotes inside a string attribute as `\22`.
 ZEROED = "{ctrl_work_wire_type = \\22zeroed\\22}"
@@ -390,6 +406,100 @@ def test_tracing_recovers_missed_cache(mocker):
     # ensure rules were compiled
     assert 'frontend_name = "first_rule"' in mlir
     assert 'frontend_name = "second_rule"' in mlir
+
+
+@pytest.fixture
+def convert_rules(use_capture):
+    """Convert a batch of prepared single-wire rule bodies."""
+    interpreter = PLxPRToQuantumJaxprInterpreter(
+        qp.device("null.qubit", wires=1), qp.measurements.Shots(), None, {}
+    )
+
+    def convert(rules, *, reject_noninvertible=False):
+        target_spec = DecompTargetSpec(
+            rules=[DecompRuleSpec(rule, rule.__name__, {}, {}) for rule in rules],
+            trace_inputs=RuleTraceInputs(
+                call_args=(),
+                call_kwargs={"wires": jnp.array([0])},
+                kwarg_names=["wires"],
+                wire_lens={"wires": 1},
+            ),
+            target_id=SerializedGraphOpID("RepeatedGate{}{wires:1}{}"),
+            num_qreg_qubits=1,
+            modifier_context=ModifierState(),
+            reject_noninvertible=reject_noninvertible,
+        )
+        return _convert_decomp_target_spec(interpreter, target_spec)
+
+    return convert
+
+
+def test_rule_conversion_rejects_noninvertible_body(convert_rules):
+    """Reject measurement-containing bodies while retaining an invertible alternative."""
+
+    def measured_rule(wires):
+        qp.measure(wires[0])
+
+    def valid_rule(wires):
+        del wires
+
+    converted = convert_rules([measured_rule, valid_rule], reject_noninvertible=True)
+
+    assert [rule.frontend_name for rule in converted] == ["valid_rule"]
+
+
+def test_rule_conversion_recovers_from_failure(convert_rules, mocker):
+    """Warn about a failed conversion and continue converting alternative rules."""
+
+    def failed_rule(wires):
+        del wires
+
+    def valid_rule(wires):
+        del wires
+
+    original_call = PLxPRToQuantumJaxprInterpreter.__call__
+
+    def fail_first_conversion(interpreter, *args):
+        if convert.call_count == 1:
+            raise ValueError("conversion failed")
+        return original_call(interpreter, *args)
+
+    convert = mocker.patch.object(
+        PLxPRToQuantumJaxprInterpreter,
+        "__call__",
+        autospec=True,
+        side_effect=fail_first_conversion,
+    )
+    with pytest.warns(
+        RuleLoweringWarning,
+        match=r"Failed to convert the failed_rule decomposition rule for "
+        r"RepeatedGate\{\}\{wires:1\}\{\}: conversion failed",
+    ):
+        converted = convert_rules([failed_rule, valid_rule])
+
+    assert convert.call_count == 2
+    assert [rule.frontend_name for rule in converted] == ["valid_rule"]
+
+
+def test_rule_conversion_propagates_compile_error(convert_rules, mocker):
+    """Fatal compiler errors propagate without becoming recovery warnings."""
+
+    def failed_rule(wires):
+        del wires
+
+    error = CompileError("fatal conversion failure")
+    convert = mocker.patch.object(
+        PLxPRToQuantumJaxprInterpreter, "__call__", autospec=True, side_effect=error
+    )
+
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always", RuleLoweringWarning)
+        with pytest.raises(CompileError) as exc_info:
+            convert_rules([failed_rule])
+
+    assert exc_info.value is error
+    convert.assert_called_once()
+    assert not any(issubclass(warning.category, RuleLoweringWarning) for warning in caught)
 
 
 def test_distributed_control_context_reopens_descendants():
@@ -1033,6 +1143,39 @@ def _rule_funcops(compiled):
 
     compiled.mlir_module.operation.walk(collect)
     return rules
+
+
+def test_estimate_decomps_reuses_declaration_cache():
+    """Repeated declarations share a function, with a separate cache entry for its body."""
+
+    def rule(*args):
+        del args
+
+    signature = jax.make_jaxpr(rule)(QrefQreg(), jnp.array([0]))
+
+    def definitions():
+        for estimate_decomps in (True, True, False, True):
+            decomp_definition_p.bind(
+                pyfun=rule,
+                func_jaxpr=signature,
+                target_gate="RepeatedGate{}{wires:1}{}",
+                resources=(),
+                frontend_name="rule",
+                num_wires=None,
+                estimate_decomps=estimate_decomps,
+            )
+        return 0
+
+    module, _ = lower_jaxpr_to_mlir(jax.make_jaxpr(definitions)(), "rule_cache", [])
+    rules = [
+        op
+        for op in module.body.operations
+        if op.operation.name == "func.func" and "target_gate" in op.attributes
+    ]
+
+    assert len(rules) == 2
+    assert sorted(len(op.regions[0].blocks) for op in rules) == [0, 1]
+    assert module.operation.verify()
 
 
 @pytest.mark.parametrize("adjoint", [False, True])
