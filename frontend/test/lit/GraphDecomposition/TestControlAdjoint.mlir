@@ -12,9 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// RUN: catalyst --tool=opt --pass-pipeline='builtin.module(graph-decomposition{gate-set=C(Adjoint(H))=1.0,C(H)=1.0 alt-decomps=C(Adjoint(U)){}{wires:1}{}=ctrl_adj_u,C(U){}{wires:1}{}=ctrl_u})' %s | FileCheck %s --check-prefixes=ALL,CALL
+// RUN: catalyst --tool=opt --pass-pipeline='builtin.module(graph-decomposition{gate-set=C(Adjoint(H))=1.0,C(H)=1.0})' %s | FileCheck %s --check-prefixes=ALL,CALL
 
-// RUN: catalyst --tool=opt --pass-pipeline='builtin.module(graph-decomposition{inline-rule-body gate-set=C(Adjoint(H))=1.0,C(H)=1.0 alt-decomps=C(Adjoint(U)){}{wires:1}{}=ctrl_adj_u,C(U){}{wires:1}{}=ctrl_u})' %s | FileCheck %s --check-prefixes=ALL,INLINE
+// RUN: catalyst --tool=opt --pass-pipeline='builtin.module(graph-decomposition{inline-rule-body gate-set=C(Adjoint(H))=1.0,C(H)=1.0})' %s | FileCheck %s --check-prefixes=ALL,INLINE
+
+// GraphDecomposition only solves GOIDs reachable from an entry function.
+func.func @entry(%ctrl: !quantum.bit, %q: !quantum.bit) attributes {llvm.emit_c_interface} {
+  %0:2 = call @controlled_adjoint(%ctrl, %q) : (!quantum.bit, !quantum.bit) -> (!quantum.bit, !quantum.bit)
+  %1:2 = call @plain_controlled(%ctrl, %q) : (!quantum.bit, !quantum.bit) -> (!quantum.bit, !quantum.bit)
+  return
+}
 
 // ALL-LABEL: func.func @controlled_adjoint(
 // ALL-SAME:  %[[Q:.*]]: !quantum.bit, %[[C:.*]]: !quantum.bit
@@ -50,8 +57,8 @@ func.func @plain_controlled(%ctrl: !quantum.bit, %q: !quantum.bit) -> (!quantum.
 
 // C(Adjoint(U)) -> two C(Adjoint(H)).
 func.func private @ctrl_adj_u(%q: !quantum.bit, %ctrl: !quantum.bit) -> (!quantum.bit, !quantum.bit) attributes {
-    target_gate = "C(Adjoint(U)){}{wires:1}{}",
-    resources = {operations = {"C(Adjoint(H)){}{wires:1}{}" = 2 : i64}} } {
+    target_gate = "1C(Adjoint(U)){}{wires:1}{}",
+    resources = {operations = {"1C(Adjoint(H)){}{wires:1}{}" = 2 : i64}} } {
   %true = arith.constant true
   %a, %ac = quantum.custom "H"() %q adj ctrls(%ctrl) ctrlvals(%true) : !quantum.bit ctrls !quantum.bit
   %b, %bc = quantum.custom "H"() %a adj ctrls(%ac) ctrlvals(%true) : !quantum.bit ctrls !quantum.bit
@@ -60,8 +67,8 @@ func.func private @ctrl_adj_u(%q: !quantum.bit, %ctrl: !quantum.bit) -> (!quantu
 
 // C(U) -> a single C(H).
 func.func private @ctrl_u(%q: !quantum.bit, %ctrl: !quantum.bit) -> (!quantum.bit, !quantum.bit) attributes {
-    target_gate = "C(U){}{wires:1}{}",
-    resources = {operations = {"C(H){}{wires:1}{}" = 1 : i64}} } {
+    target_gate = "1C(U){}{wires:1}{}",
+    resources = {operations = {"1C(H){}{wires:1}{}" = 1 : i64}} } {
   %true = arith.constant true
   %o, %oc = quantum.custom "H"() %q ctrls(%ctrl) ctrlvals(%true) : !quantum.bit ctrls !quantum.bit
   return %o, %oc : !quantum.bit, !quantum.bit

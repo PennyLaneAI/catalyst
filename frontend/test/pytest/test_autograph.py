@@ -41,7 +41,6 @@ from catalyst.api_extensions import (
     measure,
     vjp,
     vmap,
-    while_loop,
 )
 from catalyst.autograph import autograph_source, disable_autograph, run_autograph
 from catalyst.autograph.transformer import TRANSFORMER
@@ -131,6 +130,7 @@ class TestSourceCodeInfo:
 
         assert result.split("\n")[1] == '    raise RuntimeError("Test failure")'
 
+    @pytest.mark.old_frontend
     def test_qjit(self):
         """Test source info retrieval for a qjit function."""
 
@@ -147,10 +147,11 @@ class TestSourceCodeInfo:
             ),
         ):
             try:
-                qjit(autograph=True)(main)
+                qjit(autograph=True, capture=False)(main)
             except RuntimeError as e:
                 assert e.args == ("Test failure",)
 
+    @pytest.mark.old_frontend
     def test_qnode(self):
         """Test source info retrieval for a qnode function."""
 
@@ -168,10 +169,11 @@ class TestSourceCodeInfo:
             ),
         ):
             try:
-                qjit(autograph=True)(main)
+                qjit(autograph=True, capture=False)(main)
             except RuntimeError as e:
                 assert e.args == ("Test failure",)
 
+    @pytest.mark.old_frontend
     def test_func(self):
         """Test source info retrieval for a nested function."""
 
@@ -191,7 +193,7 @@ class TestSourceCodeInfo:
             ),
         ):
             try:
-                qjit(autograph=True)(main)
+                qjit(autograph=True, capture=False)(main)
             except RuntimeError as e:
                 assert e.args == ("Test failure",)
 
@@ -228,20 +230,22 @@ class TestIntegration:
 
         assert qjit(autograph=True)(fn)(3) == 9
 
+    @pytest.mark.old_frontend
     def test_lambda(self):
         """Test autograph on a lambda function."""
 
         fn = lambda x: x**2
-        fn = qjit(autograph=True)(fn)
+        fn = qjit(autograph=True, capture=False)(fn)
 
         assert hasattr(fn.user_function, "ag_unconverted")
         assert check_cache(fn.original_function)
         assert fn(4) == 16
 
+    @pytest.mark.old_frontend
     def test_classical_function(self):
         """Test autograph on a purely classical function."""
 
-        @qjit(autograph=True)
+        @qjit(autograph=True, capture=False)
         def fn(x):
             return x**2
 
@@ -249,13 +253,14 @@ class TestIntegration:
         assert check_cache(fn.original_function)
         assert fn(4) == 16
 
+    @pytest.mark.old_frontend
     def test_nested_function(self):
         """Test autograph on nested classical functions."""
 
         def inner(x):
             return x**2
 
-        @qjit(autograph=True)
+        @qjit(autograph=True, capture=False)
         def fn(x: int):
             return inner(x)
 
@@ -264,10 +269,11 @@ class TestIntegration:
         assert check_cache(inner)
         assert fn(4) == 16
 
+    @pytest.mark.old_frontend
     def test_qnode(self):
         """Test autograph on a QNode."""
 
-        @qjit(autograph=True)
+        @qjit(autograph=True, capture=False)
         @qp.qnode(qp.device("lightning.qubit", wires=1))
         def fn(x: float):
             qp.RY(x, wires=0)
@@ -277,6 +283,7 @@ class TestIntegration:
         assert check_cache(fn.original_function.func)
         assert fn(np.pi) == -1
 
+    @pytest.mark.old_frontend
     def test_indirect_qnode(self):
         """Test autograph on a QNode called from within a classical function."""
 
@@ -285,7 +292,7 @@ class TestIntegration:
             qp.RY(x, wires=0)
             return qp.expval(qp.PauliZ(0))
 
-        @qjit(autograph=True)
+        @qjit(autograph=True, capture=False)
         def fn(x: float):
             return inner(x)
 
@@ -294,6 +301,7 @@ class TestIntegration:
         assert check_cache(inner.func)
         assert fn(np.pi) == -1
 
+    @pytest.mark.old_frontend
     def test_multiple_qnode(self):
         """Test autograph on multiple QNodes called from different classical functions."""
 
@@ -307,7 +315,7 @@ class TestIntegration:
             qp.RX(x, wires=0)
             return qp.expval(qp.PauliZ(0))
 
-        @qjit(autograph=True)
+        @qjit(autograph=True, capture=False)
         def fn(x: float):
             return inner1(x) + inner2(x)
 
@@ -317,16 +325,17 @@ class TestIntegration:
         assert check_cache(inner2.func)
         assert fn(np.pi) == -2
 
+    @pytest.mark.old_frontend
     def test_nested_qjit(self):
         """Test autograph on a QJIT function called from within the compilation entry point."""
 
-        @qjit
+        @qjit(capture=False)
         @qp.qnode(qp.device("lightning.qubit", wires=1))
         def inner(x):
             qp.RY(x, wires=0)
             return qp.expval(qp.PauliZ(0))
 
-        @qjit(autograph=True)
+        @qjit(autograph=True, capture=False)
         def fn(x: float):
             return inner(x)
 
@@ -335,6 +344,7 @@ class TestIntegration:
         assert check_cache(inner.user_function.func)
         assert fn(np.pi) == -1
 
+    @pytest.mark.old_frontend
     @pytest.mark.parametrize("adjoint_fn", [adjoint, qp.adjoint])
     def test_adjoint_wrapper(self, adjoint_fn):
         """Test conversion is happening succesfully on functions wrapped with 'adjoint'."""
@@ -342,7 +352,7 @@ class TestIntegration:
         def inner(x):
             qp.RY(x, wires=0)
 
-        @qjit(autograph=True)
+        @qjit(autograph=True, capture=False)
         @qp.qnode(qp.device("lightning.qubit", wires=1))
         def fn(x: float):
             adjoint_fn(inner)(x)
@@ -352,6 +362,7 @@ class TestIntegration:
         assert check_cache(inner)
         assert np.allclose(fn(np.pi), [0.0, 1.0])
 
+    @pytest.mark.old_frontend
     @pytest.mark.parametrize("ctrl_fn", [ctrl, qp.ctrl])
     def test_ctrl_wrapper(self, ctrl_fn):
         """Test conversion is happening succesfully on functions wrapped with 'ctrl'."""
@@ -359,7 +370,7 @@ class TestIntegration:
         def inner(x):
             qp.RY(x, wires=0)
 
-        @qjit(autograph=True)
+        @qjit(autograph=True, capture=False)
         @qp.qnode(qp.device("lightning.qubit", wires=2))
         def fn(x: float):
             ctrl_fn(inner, control=1)(x)
@@ -369,13 +380,14 @@ class TestIntegration:
         assert check_cache(inner)
         assert np.allclose(fn(np.pi), [1.0, 0.0, 0.0, 0.0])
 
+    @pytest.mark.old_frontend
     def test_grad_wrapper(self):
         """Test conversion is happening succesfully on functions wrapped with 'grad'."""
 
         def inner(x):
             return 2 * x
 
-        @qjit(autograph=True)
+        @qjit(autograph=True, capture=False)
         def fn(x: float):
             return grad(inner)(x)
 
@@ -383,13 +395,14 @@ class TestIntegration:
         assert check_cache(inner)
         assert fn(3) == 2.0
 
+    @pytest.mark.old_frontend
     def test_jacobian_wrapper(self):
         """Test conversion is happening succesfully on functions wrapped with 'jacobian'."""
 
         def inner(x):
             return 2 * x, x**2
 
-        @qjit(autograph=True)
+        @qjit(autograph=True, capture=False)
         def fn(x: float):
             return jacobian(inner)(x)
 
@@ -419,6 +432,7 @@ class TestIntegration:
         assert np.allclose(fn(3)[0], tuple([jnp.array(6.0), jnp.array(9.0)]))
         assert np.allclose(fn(3)[1], jnp.array(8.0))
 
+    @pytest.mark.old_frontend
     @pytest.mark.parametrize("jvp_func", [jvp, qp.jvp])
     def test_jvp_wrapper(self, jvp_func):
         """Test conversion is happening succesfully on functions wrapped with 'jvp'."""
@@ -426,7 +440,7 @@ class TestIntegration:
         def inner(x):
             return 2 * x, x**2
 
-        @qjit(autograph=True)
+        @qjit(autograph=True, capture=False)
         def fn(x: float):
             return jvp_func(inner, (x,), (1.0,))
 
@@ -490,6 +504,7 @@ class TestIntegration:
 
             circuit()
 
+    @pytest.mark.old_frontend
     def test_tape_transform(self):
         """Test if tape transform is applied when autograph is on."""
 
@@ -499,7 +514,7 @@ class TestIntegration:
         def my_quantum_transform(tape):
             raise NotImplementedError
 
-        @qjit(autograph=True)
+        @qjit(autograph=True, capture=False)
         def f(x):
             @my_quantum_transform
             @qp.qnode(dev)
@@ -513,11 +528,12 @@ class TestIntegration:
         with pytest.raises(NotImplementedError):
             f(0.5)
 
+    @pytest.mark.old_frontend
     def test_mcm_one_shot(self):
         """Test if mcm one-shot miss transforms."""
         dev = qp.device("lightning.qubit", wires=5)
 
-        @qjit(autograph=True)
+        @qjit(autograph=True, capture=False)
         @qp.set_shots(20)
         @qp.qnode(dev, mcm_method="one-shot", postselect_mode="hw-like")
         def func(x):
@@ -542,40 +558,44 @@ class TestCodePrinting:
         with pytest.raises(AutoGraphError, match="function was not converted by AutoGraph"):
             autograph_source(fn)
 
+    @pytest.mark.old_frontend
     def test_lambda(self):
         """Test printing on a lambda function."""
 
         fn = lambda x: x**2
-        qjit(autograph=True)(fn)
+        qjit(autograph=True, capture=False)(fn)
 
         assert autograph_source(fn)
 
+    @pytest.mark.old_frontend
     def test_classical_function(self):
         """Test printing on a purely classical function."""
 
-        @qjit(autograph=True)
+        @qjit(autograph=True, capture=False)
         def fn(x):
             return x**2
 
         assert autograph_source(fn)
 
+    @pytest.mark.old_frontend
     def test_nested_function(self):
         """Test printing on nested classical functions."""
 
         def inner(x):
             return x**2
 
-        @qjit(autograph=True)
+        @qjit(autograph=True, capture=False)
         def fn(x: int):
             return inner(x)
 
         assert autograph_source(fn)
         assert autograph_source(inner)
 
+    @pytest.mark.old_frontend
     def test_qnode(self):
         """Test printing on a QNode."""
 
-        @qjit(autograph=True)
+        @qjit(autograph=True, capture=False)
         @qp.qnode(qp.device("lightning.qubit", wires=1))
         def fn(x: float):
             qp.RY(x, wires=0)
@@ -583,6 +603,7 @@ class TestCodePrinting:
 
         assert autograph_source(fn)
 
+    @pytest.mark.old_frontend
     def test_indirect_qnode(self):
         """Test printing on a QNode called from within a classical function."""
 
@@ -591,13 +612,14 @@ class TestCodePrinting:
             qp.RY(x, wires=0)
             return qp.expval(qp.PauliZ(0))
 
-        @qjit(autograph=True)
+        @qjit(autograph=True, capture=False)
         def fn(x: float):
             return inner(x)
 
         assert autograph_source(fn)
         assert autograph_source(inner)
 
+    @pytest.mark.old_frontend
     def test_multiple_qnode(self):
         """Test printing on multiple QNodes called from different classical functions."""
 
@@ -611,7 +633,7 @@ class TestCodePrinting:
             qp.RX(x, wires=0)
             return qp.expval(qp.PauliZ(0))
 
-        @qjit(autograph=True)
+        @qjit(autograph=True, capture=False)
         def fn(x: float):
             return inner1(x) + inner2(x)
 
@@ -619,16 +641,17 @@ class TestCodePrinting:
         assert autograph_source(inner1)
         assert autograph_source(inner2)
 
+    @pytest.mark.old_frontend
     def test_nested_qjit(self):
         """Test printing on a QJIT function called from within the compilation entry point."""
 
-        @qjit
+        @qjit(capture=False)
         @qp.qnode(qp.device("lightning.qubit", wires=1))
         def inner(x):
             qp.RY(x, wires=0)
             return qp.expval(qp.PauliZ(0))
 
-        @qjit(autograph=True)
+        @qjit(autograph=True, capture=False)
         def fn(x: float):
             return inner(x)
 
@@ -708,11 +731,10 @@ class TestConditionals:
             if x > 4:
                 qp.PauliX(wires=0)
 
-            return measure(wires=0)
+            return qp.probs(wires=0)
 
-        # pylint: disable=singleton-comparison
-        assert circuit(3) == False
-        assert circuit(6) == True
+        assert np.allclose(circuit(3), [1.0, 0.0])
+        assert np.allclose(circuit(6), [0.0, 1.0])
 
     def test_branch_return_mismatch(self, backend, capture_mode):
         """Test that an exception is raised when the true branch returns a value without an else
@@ -742,21 +764,20 @@ class TestConditionals:
     def test_branch_no_multi_return_mismatch(self, backend):
         """Test that case when the return types of all branches do not match."""
         # pylint: disable=using-constant-test
-        m = qp.measure if qp.capture.enabled() else measure
 
         @qjit(autograph=True)
         @qp.qnode(qp.device(backend, wires=1))
         def circuit():
             if True:
-                res = m(wires=0)
+                res = qp.probs(wires=0)
             elif False:
                 res = 0.0
             else:
-                res = m(wires=0)
+                res = qp.probs(wires=0)
 
             return res
 
-        assert 0.0 == circuit()
+        assert np.allclose(circuit(), [1.0, 0.0])
 
     def test_multiple_return(self):
         """Test return statements from different branches with autograph."""
@@ -774,30 +795,29 @@ class TestConditionals:
     def test_multiple_return_early(self, backend, capfd):
         """Test that returning early is possible."""
 
-        _measure = qp.measure if qp.capture.enabled() else measure
-
         @qjit(autograph=True)
         @qp.qnode(qp.device(backend, wires=1))
         def f(x: float):
             qp.RY(x, wires=0)
 
-            m = _measure(0)
+            m = qp.measure(0)
             if not m:
-                return 0
+                return qp.expval(qp.Z(0))
 
             debug.print("illegal fruit")
-            return 1
+            return qp.expval(qp.Z(0))
 
         assert capfd.readouterr() == ("", "")
 
-        assert f(0) == 0
+        assert np.allclose(f(0), 1.0)
 
         assert capfd.readouterr() == ("", "")
 
-        assert f(np.pi) == 1
+        assert np.allclose(f(np.pi), -1.0)
 
         assert capfd.readouterr() == ("illegal fruit\n", "")
 
+    @pytest.mark.old_frontend
     def test_multiple_return_mismatched_type(self):
         """Test that different obervables cannot be used in different branches."""
 
@@ -808,7 +828,7 @@ class TestConditionals:
 
             return qp.expval(qp.PauliZ(0))
 
-        qjitted = qjit(autograph=True)(f)
+        qjitted = qjit(autograph=True, capture=False)(f)
 
         with pytest.raises(TypeError, match="requires a consistent return structure"):
             qjitted(True)
@@ -886,11 +906,12 @@ class TestForLoops:
         result = f()
         assert np.allclose(result, jnp.sqrt(2) / 2)
 
+    @pytest.mark.old_frontend
     def test_for_in_object_list(self):
         """Test for loop over a Python list that is *not* convertible to an array.
         The behaviour should fall back to standard Python."""
 
-        @qjit(autograph=True)
+        @qjit(autograph=True, capture=False)
         @qp.qnode(qp.device("lightning.qubit", wires=1))
         def f():
             params = ["0", "1", "2"]
@@ -948,6 +969,7 @@ class TestForLoops:
     # With conversion always taking place, the user needs to be careful to manually wrap
     # objects accessed via loop iteration indices into arrays (see test case above).
     # The warning here is actionable.
+    @pytest.mark.old_frontend
     def test_for_in_static_range_indexing_numeric_list(self):
         """Test for loop over a Python range with static bounds that is used to index an
         array-compatible Python list. This should fall back to Python with a warning."""
@@ -962,11 +984,12 @@ class TestForLoops:
         with pytest.warns(
             match=r"TracerIntegerConversionError:    The __index__\(\) method was called"
         ):
-            qjit(autograph=True)(f)
+            qjit(autograph=True, capture=False)(f)
 
     # This case is slightly problematic because there is no way for the user to compile this for
     # loop correctly. Fallback to a Python loop is always necessary, and will result in a warning.
     # The warning here is not actionable.
+    @pytest.mark.old_frontend
     def test_for_in_static_range_indexing_object_list(self):
         """Test for loop over a Python range with static bounds that is used to index an
         array-incompatible Python list. This should fall back to Python with a warning."""
@@ -981,7 +1004,7 @@ class TestForLoops:
         with pytest.warns(
             match=r"TracerIntegerConversionError:    The __index__\(\) method was called"
         ):
-            qjit(autograph=True)(f)
+            qjit(autograph=True, capture=False)(f)
 
     def test_for_in_dynamic_range(self, capture_mode):
         """Test for loop over a Python range with dynamic bounds."""
@@ -1015,6 +1038,7 @@ class TestForLoops:
     # with a slight modification of the user code (see test case above).
     # Raising the warning is vital here to notify the user that this use case is actually supported,
     # but requires a modification. Without it, the user may simply conclude it is unsupported.
+    @pytest.mark.old_frontend
     def test_for_in_dynamic_range_indexing_numeric_list(self):
         """Test for loop over a Python range with dynamic bounds that is used to index an
         array-compatible Python list. The fallback to Python will first raise a warning,
@@ -1031,9 +1055,10 @@ class TestForLoops:
             match=r"TracerIntegerConversionError:    The __index__\(\) method was called"
         ):
             with pytest.raises(jax.errors.TracerIntegerConversionError, match="__index__"):
-                qjit(autograph=True)(f)(3)
+                qjit(autograph=True, capture=False)(f)(3)
 
     # This use case is never possible, regardless of whether AutoGraph is used or not.
+    @pytest.mark.old_frontend
     def test_for_in_dynamic_range_indexing_object_list(self):
         """Test for loop over a Python range with dynamic bounds that is used to index an
         array-incompatible Python list. The fallback to Python will first raise a warning,
@@ -1050,7 +1075,7 @@ class TestForLoops:
             match=r"TracerIntegerConversionError:    The __index__\(\) method was called"
         ):
             with pytest.raises(jax.errors.TracerIntegerConversionError, match="__index__"):
-                qjit(autograph=True)(f)(3)
+                qjit(autograph=True, capture=False)(f)(3)
 
     def test_for_in_enumerate_array(self, capture_mode):
         """Test for loop over a Python enumeration on an array."""
@@ -1123,11 +1148,12 @@ class TestForLoops:
         result = f()
         assert np.allclose(result, [1.0, jnp.sqrt(2) / 2, 0.0])
 
+    @pytest.mark.old_frontend
     def test_for_in_enumerate_object_list(self):
         """Test for loop over a Python enumeration on a list that is *not* convertible to an array.
         The behaviour should fall back to standard Python."""
 
-        @qjit(autograph=True)
+        @qjit(autograph=True, capture=False)
         @qp.qnode(qp.device("lightning.qubit", wires=3))
         def f():
             params = ["0", "1", "2"]
@@ -1138,11 +1164,12 @@ class TestForLoops:
         result = f()
         assert np.allclose(result, [1.0, jnp.sqrt(2) / 2, 0.0])
 
+    @pytest.mark.old_frontend
     def test_for_in_other_iterable_object(self):
         """Test for loop over arbitrary iterable Python objects.
         The behaviour should fall back to standard Python."""
 
-        @qjit(autograph=True)
+        @qjit(autograph=True, capture=False)
         @qp.qnode(qp.device("lightning.qubit", wires=1))
         def f():
             params = {"a": 0.0, "b": 1 / 4 * jnp.pi, "c": 2 / 4 * jnp.pi}
@@ -1289,6 +1316,7 @@ class TestForLoops:
 
         assert f2() == 18
 
+    @pytest.mark.old_frontend
     def test_uninitialized_variables(self, monkeypatch):
         """Verify errors for (potentially) uninitialized loop variables."""
         monkeypatch.setattr("catalyst.autograph_strict_conversion", True)
@@ -1299,7 +1327,7 @@ class TestForLoops:
 
             return acc
 
-        f1_qjit = qjit(autograph=True)(f1)
+        f1_qjit = qjit(autograph=True, capture=False)(f1)
 
         with pytest.raises(AutoGraphError, match="'acc' is potentially uninitialized"):
             f1_qjit()
@@ -1311,7 +1339,7 @@ class TestForLoops:
 
             return x
 
-        f2_qjit = qjit(autograph=True)(f2)
+        f2_qjit = qjit(autograph=True, capture=False)(f2)
 
         with pytest.raises(AutoGraphError, match="'x' is potentially uninitialized"):
             f2_qjit()
@@ -1324,7 +1352,7 @@ class TestForLoops:
 
             return c
 
-        f3_qjit = qjit(autograph=True)(f3)
+        f3_qjit = qjit(autograph=True, capture=False)(f3)
 
         with pytest.raises(AutoGraphError, match="'c' is potentially uninitialized"):
             f3_qjit()
@@ -1347,6 +1375,7 @@ class TestForLoops:
         with pytest.raises(err_type, match="'x' was initialized with type <class 'str'>"):
             qjitted()
 
+    @pytest.mark.old_frontend
     def test_init_with_mismatched_type(self, monkeypatch):
         """Test loop carried values initialized with a mismatched type compared to the values used
         inside the loop."""
@@ -1361,17 +1390,18 @@ class TestForLoops:
             return x
 
         err_type = qp.exceptions.AutoGraphError if qp.capture.enabled() else AutoGraphError
-        qjitted = qjit(autograph=True)(f)
+        qjitted = qjit(autograph=True, capture=False)(f)
 
         with pytest.raises(err_type, match="'x' was initialized with the wrong type"):
             qjitted()
 
+    @pytest.mark.old_frontend
     @pytest.mark.filterwarnings("error::UserWarning")
     def test_ignore_warnings(self, monkeypatch):
         """Test the AutoGraph config flag properly silences warnings."""
         monkeypatch.setattr("catalyst.autograph_ignore_fallbacks", True)
 
-        @qjit(autograph=True)
+        @qjit(autograph=True, capture=False)
         def f():
             acc = 0
             data = [0, 4, 5]
@@ -1382,11 +1412,12 @@ class TestForLoops:
 
         assert f() == 9
 
+    @pytest.mark.old_frontend
     def test_fallback_itertools(self):
         """Test the AutoGraph fallback when the iteration target has no length, as is for example
         the case with an itertools.product with constant arguments."""
 
-        @qp.qjit(autograph=True)
+        @qp.qjit(autograph=True, capture=False)
         def f(x: float):
 
             for i, j in itertools.product(range(2), repeat=2):
@@ -1556,6 +1587,7 @@ class TestWhileLoops:
         with pytest.raises(err_type, match="'x' was initialized with type <class 'str'>"):
             qjitted(True)
 
+    @pytest.mark.old_frontend
     def test_init_with_mismatched_type(self, monkeypatch):
         """Test loop carried values initialized with a mismatched type compared to the values used
         inside the loop."""
@@ -1573,9 +1605,10 @@ class TestWhileLoops:
         err_type = qp.exceptions.AutoGraphError if qp.capture.enabled() else AutoGraphError
 
         with pytest.raises(err_type, match="'x' was initialized with the wrong type"):
-            qjit(autograph=True)(f)(True)
+            qjit(autograph=True, capture=False)(f)(True)
 
 
+@pytest.mark.old_frontend
 @pytest.mark.parametrize(
     "execution_context", (lambda fn: fn, qp.qnode(qp.device("lightning.qubit", wires=1)))
 )
@@ -1602,7 +1635,7 @@ class TestFallback:
         with pytest.warns(
             UserWarning, match="Tracing of an AutoGraph converted for loop failed with an exception"
         ):
-            f_jit = qjit(autograph=True)(f)
+            f_jit = qjit(autograph=True, capture=False)(f)
 
         arr = jnp.array([1, 2])
         expected = jnp.kron(*([jnp.kron(arr, arr)] * 2))
@@ -1628,7 +1661,7 @@ class TestFallback:
         with pytest.warns(
             UserWarning, match="Tracing of an AutoGraph converted for loop failed with an exception"
         ):
-            f_jit = qjit(autograph=True)(f)
+            f_jit = qjit(autograph=True, capture=False)(f)
 
         results = f_jit()
         assert np.allclose(results[0], [7, 8])
@@ -1642,7 +1675,7 @@ class TestFallback:
         this case, the loop primitive should be removed since the exception happens after binding.
         """
 
-        @qjit(autograph=True)
+        @qjit(autograph=True, capture=False)
         @execution_context
         def f():
             arr = jnp.array([1, 2])
@@ -1664,7 +1697,7 @@ class TestFallback:
         this case no primitive should be removed since the exception happens before binding.
         """
 
-        @qjit(autograph=True)
+        @qjit(autograph=True, capture=False)
         @execution_context
         def f():
             string = "hi"
@@ -1740,34 +1773,36 @@ class TestLogicalOps:
         assert_allclose(qjit(autograph=True)(f_or)(a, b), jnp.logical_or(a, b))
         assert_allclose(qjit(autograph=True)(f_not)(a), jnp.logical_not(a))
 
+    @pytest.mark.old_frontend
     @pytest.mark.parametrize("s,d", [(True, True), (True, False), (False, True), (False, False)])
     def test_logical_mixture_static_dynamic_default(self, s, d):
         """Test the useage of a mixture of static(s) and dynamic(d) variables."""
 
         # Here we either return bool or the dynamic object
-        assert qjit(autograph=True)(lambda d: s and d)(d) == (s and d)
-        assert qjit(autograph=True)(lambda d: s or d)(d) == (s or d)
+        assert qjit(autograph=True, capture=False)(lambda d: s and d)(d) == (s and d)
+        assert qjit(autograph=True, capture=False)(lambda d: s or d)(d) == (s or d)
 
         # Here we perform boolean conversion of a tracer object
-        assert qjit(autograph=True)(lambda d: not d)(d) == (not d)
-        assert qjit(autograph=True)(lambda: not s)() == (not s)
+        assert qjit(autograph=True, capture=False)(lambda d: not d)(d) == (not d)
+        assert qjit(autograph=True, capture=False)(lambda: not s)() == (not s)
 
         # Cases where `d` is 1-st argument are going to fail
         with pytest.raises(TracerBoolConversionError):
-            assert qjit(autograph=True)(lambda d: d and s)(d) == (d and s)
+            assert qjit(autograph=True, capture=False)(lambda d: d and s)(d) == (d and s)
         with pytest.raises(TracerBoolConversionError):
-            assert qjit(autograph=True)(lambda d: d or s)(d) == (d or s)
+            assert qjit(autograph=True, capture=False)(lambda d: d or s)(d) == (d or s)
 
 
 class TestMixed:
     """Test a mix of supported autograph conversions and Catalyst control flow."""
 
+    @pytest.mark.old_frontend
     def test_force_python_fallbacks(self):
         """Test fallback modes of control-flow primitives."""
 
         with pytest.warns(UserWarning):
 
-            @qjit(autograph=True)
+            @qjit(autograph=True, capture=False)
             def f1():
                 acc = 0
                 while acc < 5:
@@ -1799,15 +1834,11 @@ class TestMixed:
 
         # pylint: disable=cell-var-from-loop
 
-        loop_fn = qp.for_loop if qp.capture.enabled() else for_loop
-        cond_fn = qp.cond if qp.capture.enabled() else cond
-
         @qjit(autograph=True)
         def f(x):
             acc = 0
             if x < 3:
 
-                @loop_fn(0, 3, 1)
                 def loop(_, acc):
                     # Oddly enough, AutoGraph treats 'i' as an iter_arg even though it's not
                     # accessed after the for loop. Maybe because it is captured in the nested
@@ -1816,7 +1847,7 @@ class TestMixed:
                     i = 0
                     for i in range(5):
 
-                        @cond_fn(i % 2 == 0)
+                        @qp.cond(i % 2 == 0)
                         def even():
                             return i
 
@@ -1828,7 +1859,7 @@ class TestMixed:
 
                     return acc
 
-                acc = loop(acc)
+                acc = qp.for_loop(0, 3, 1)(loop)(acc)
 
             return acc
 
@@ -1952,16 +1983,17 @@ class TestAutographInclude:
                     x = x + dummy_func(6)
                 return x
 
+    @pytest.mark.old_frontend
     def test_autograph_included_module(self):
         """Test autograph included module."""
 
-        @qjit(autograph=True)
+        @qjit(autograph=True, capture=False)
         def excluded_by_default(x: float, n: int):
             for _ in range(n):
                 x = x + dummy_func(6)
             return x
 
-        @qjit(autograph=True, autograph_include=["catalyst.utils.dummy"])
+        @qjit(autograph=True, autograph_include=["catalyst.utils.dummy"], capture=False)
         def included(x: float, n: int):
             for _ in range(n):
                 x = x + dummy_func(6)
@@ -2184,12 +2216,13 @@ class TestDecorators:
 
         n = 6
 
-        @while_loop(lambda i: i < n)
+        @qp.while_loop(lambda i: i < n)
         def loop(i):
             return i + 1
 
         assert qjit(loop, autograph=True)(0) == n
 
+    @pytest.mark.old_frontend
     def test_prod(self):
         """Test that AutoGraph doesn't fail in the presence of the qp.prod operator within
         functional wrappers."""
@@ -2200,7 +2233,7 @@ class TestDecorators:
                 qp.H(0)
                 qp.X(0)
 
-        @qjit(autograph=True, target="jaxpr")
+        @qjit(autograph=True, target="jaxpr", capture=False)
         @qp.qnode(qp.device("null.qubit", wires=0))
         def circuit():
             qp.adjoint(template)(True)
@@ -2479,13 +2512,14 @@ class TestJaxIndexOperatorUpdate:
         assert jnp.allclose(result, jnp.array([10, 4, 6, 2, 2]))
         assert jnp.allclose(result, expected)
 
+    @pytest.mark.old_frontend
     def test_iterating_lists_inside_a_loop(self):
         """Test support for iterating lists inside a loop."""
 
         def updateList(x):
             return [x[0] + 1, x[1] + 2]
 
-        @qjit(autograph=True)
+        @qjit(autograph=True, capture=False)
         def fn(x):
             # pylint: disable=unused-variable
             for i in range(4):
@@ -2502,13 +2536,14 @@ class TestJaxIndexOperatorUpdate:
             except:
                 assert False, "This warning should not show up again"
 
+    @pytest.mark.old_frontend
     def test_iterating_tuples_inside_a_loop(self):
         """Test support for iterating tuples inside a loop."""
 
         def updateTuple(x):
             return (x[0] + 1, x[1] + 2)
 
-        @qjit(autograph=True)
+        @qjit(autograph=True, capture=False)
         def fn(x):
             # pylint: disable=unused-variable
             for i in range(4):
@@ -2525,13 +2560,14 @@ class TestJaxIndexOperatorUpdate:
             except:
                 assert False, "This warning should not show up again"
 
+    @pytest.mark.old_frontend
     def test_iterating_dictionaries_inside_a_loop(self):
         """Test support for iterating dictionaries inside a loop."""
 
         def updateDict(x):
             return {0: x[0] + 1, 1: x[1] + 2}
 
-        @qjit(autograph=True)
+        @qjit(autograph=True, capture=False)
         def fn(x):
             # pylint: disable=unused-variable
             for i in range(4):

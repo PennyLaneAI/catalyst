@@ -12,9 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// RUN: catalyst --tool=opt --pass-pipeline='builtin.module(graph-decomposition{gate-set=C(TestPhaseShift)=1.0 alt-decomps=C(TestRZ){0:[f64]}{wires:1}{}=ctrl_rz})' %s | FileCheck %s --check-prefixes=ALL,CALL
+// RUN: catalyst --tool=opt --pass-pipeline='builtin.module(graph-decomposition{gate-set=C(TestPhaseShift)=1.0})' %s | FileCheck %s --check-prefixes=ALL,CALL
 
-// RUN: catalyst --tool=opt --pass-pipeline='builtin.module(graph-decomposition{inline-rule-body gate-set=C(TestPhaseShift)=1.0 alt-decomps=C(TestRZ){0:[f64]}{wires:1}{}=ctrl_rz})' %s | FileCheck %s --check-prefixes=ALL,INLINE
+// RUN: catalyst --tool=opt --pass-pipeline='builtin.module(graph-decomposition{inline-rule-body gate-set=C(TestPhaseShift)=1.0})' %s | FileCheck %s --check-prefixes=ALL,INLINE
 
 // ALL-LABEL: func.func @parametric(
 // ALL-SAME:  %[[T:.*]]: f64, %[[Q:.*]]: !quantum.bit, %[[C:.*]]: !quantum.bit
@@ -33,8 +33,8 @@ func.func @parametric(%ctrl: !quantum.bit, %q: !quantum.bit, %theta: f64) -> (!q
 
 // C(RZ)(theta) -> C(PhaseShift)(theta): the parameter passes through, the control is value-agnostic.
 func.func private @ctrl_rz(%theta: f64, %q: !quantum.bit, %ctrl: !quantum.bit) -> (!quantum.bit, !quantum.bit) attributes {
-    target_gate = "C(TestRZ){0:[f64]}{wires:1}{}",
-    resources = {operations = {"C(TestPhaseShift){0:[f64]}{wires:1}{}" = 1 : i64}} } {
+    target_gate = "1C(TestRZ){0:[f64]}{wires:1}{}",
+    resources = {operations = {"1C(TestPhaseShift){0:[f64]}{wires:1}{}" = 1 : i64}} } {
   %true = arith.constant true
   %o, %oc = quantum.custom "TestPhaseShift"(%theta) %q ctrls(%ctrl) ctrlvals(%true) : !quantum.bit ctrls !quantum.bit
   return %o, %oc : !quantum.bit, !quantum.bit

@@ -179,7 +179,6 @@ class TestDynamicWires:
         and this optimization does not yet work for it.
         """
 
-        @qjit
         @qp.qnode(qp.device("lightning.qubit", wires=3))
         def example_circuit(a: int):
             qp.StatePrep(jnp.array([0, 1, 0, 0]), wires=[a, a + 1])
@@ -227,11 +226,12 @@ class TestPossibleErrors:
 
             example_circuit()
 
+    @pytest.mark.old_frontend
     def test_different_shape_state_prep(self):
         """Test that the same error is raised"""
         with pytest.raises(ValueError, match="State must be of length 2; got length 1"):
 
-            @qjit
+            @qjit(capture=False)
             @qp.qnode(qp.device("lightning.qubit", wires=2))
             def example_circuit():
                 qp.StatePrep(jnp.array([0]), wires=[0])
@@ -258,6 +258,7 @@ class TestPossibleErrors:
             example_circuit()
 
 
+@pytest.mark.old_frontend
 class TestGrad:
     """What happens if grad?"""
 
@@ -266,7 +267,7 @@ class TestGrad:
 
         with pytest.raises(DiffErr):
 
-            @qjit
+            @qjit(capture=False)
             @grad
             @qp.qnode(qp.device(backend, wires=2))
             def example_circuit(a: float):
@@ -281,7 +282,7 @@ class TestGrad:
 
         with pytest.raises(DiffErr):
 
-            @qjit
+            @qjit(capture=False)
             @grad
             @qp.qnode(qp.device(backend, wires=2))
             def example_circuit(a: float):
@@ -295,6 +296,7 @@ class TestGrad:
 class TestControlled:
     """What happens if ctrl?"""
 
+    @pytest.mark.old_frontend
     def test_state_prep_ctrl(self):
         """Test state prep with ctrl"""
 
@@ -305,7 +307,7 @@ class TestControlled:
             return qp.state()
 
         expected = example_circuit()
-        observed = qjit(example_circuit)()
+        observed = qjit(example_circuit, capture=False)()
         assert jnp.allclose(expected, observed)
 
     def test_basis_state_ctrl(self):
@@ -325,6 +327,7 @@ class TestControlled:
 class TestAdjoint:
     """What happens if adjoint?"""
 
+    @pytest.mark.old_frontend
     def test_state_prep_ctrl(self, backend):
         """Test state prep with adjoint"""
 
@@ -335,7 +338,7 @@ class TestAdjoint:
             return qp.state()
 
         expected = example_circuit()
-        observed = qjit(example_circuit)()
+        observed = qjit(example_circuit, capture=False)()
         assert jnp.allclose(expected, observed)
 
     def test_basis_state_ctrl(self, backend):

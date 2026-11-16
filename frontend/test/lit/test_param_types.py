@@ -19,7 +19,7 @@ import pennylane as qp
 from jax import numpy as jnp
 from jax.core import ShapedArray
 
-from catalyst import measure, qjit
+from catalyst import qjit
 
 
 def tensor(val, size, dtype):
@@ -38,10 +38,10 @@ def test_tensor_accept(type):
             real = jnp.real(extract)
             multiply = real * np.pi
             qp.RY(multiply, wires=0)
-            return measure(wires=0)
+            return qp.expval(qp.Z(wires=0))
 
-        assert jax_untyped(in_zero) == False
-        assert jax_untyped(in_one) == True
+        assert np.allclose(jax_untyped(in_zero), 1.0)
+        assert np.allclose(jax_untyped(in_one), -1.0)
 
         @qjit
         @qp.qnode(qp.device("lightning.qubit", wires=1))
@@ -50,10 +50,10 @@ def test_tensor_accept(type):
             real = jnp.real(extract)
             multiply = real * np.pi
             qp.RY(multiply, wires=0)
-            return measure(wires=0)
+            return qp.expval(qp.Z(wires=0))
 
-        assert jax_typed(in_zero) == False
-        assert jax_typed(in_one) == True
+        assert np.allclose(jax_typed(in_zero), 1.0)
+        assert np.allclose(jax_typed(in_one), -1.0)
 
         print(jax_untyped.mlir)
         print(jax_typed.mlir)
@@ -68,19 +68,19 @@ def test_tensor_accept(type):
         @qp.qnode(qp.device("lightning.qubit", wires=1))
         def jax_untyped(x):
             qp.RY(x[0] * np.pi, wires=0)
-            return measure(wires=0)
+            return qp.expval(qp.Z(wires=0))
 
-        assert jax_untyped(in_zero) == False
-        assert jax_untyped(in_one) == True
+        assert np.allclose(jax_untyped(in_zero), 1.0)
+        assert np.allclose(jax_untyped(in_one), -1.0)
 
         @qjit
         @qp.qnode(qp.device("lightning.qubit", wires=1))
         def jax_typed(x: ShapedArray([1], type)):
             qp.RY(x[0] * np.pi, wires=0)
-            return measure(wires=0)
+            return qp.expval(qp.Z(wires=0))
 
-        assert jax_typed(in_zero) == False
-        assert jax_typed(in_one) == True
+        assert np.allclose(jax_typed(in_zero), 1.0)
+        assert np.allclose(jax_typed(in_one), -1.0)
 
         print(jax_untyped.mlir)
         print(jax_typed.mlir)
@@ -128,19 +128,19 @@ def test_python_accept(type):
         @qp.qnode(qp.device("lightning.qubit", wires=1))
         def jax_untyped(x):
             qp.RY(x.real * np.pi, wires=0)
-            return measure(wires=0)
+            return qp.expval(qp.Z(wires=0))
 
-        assert jax_untyped(in_zero) == False
-        assert jax_untyped(in_one) == True
+        assert np.allclose(jax_untyped(in_zero), 1.0)
+        assert np.allclose(jax_untyped(in_one), -1.0)
 
         @qjit
         @qp.qnode(qp.device("lightning.qubit", wires=1))
         def jax_typed(x: type):
             qp.RY(x.real * np.pi, wires=0)
-            return measure(wires=0)
+            return qp.expval(qp.Z(wires=0))
 
-        assert jax_typed(in_zero) == False
-        assert jax_typed(in_one) == True
+        assert np.allclose(jax_typed(in_zero), 1.0)
+        assert np.allclose(jax_typed(in_one), -1.0)
         print(jax_untyped.mlir)
         print(jax_typed.mlir)
         del jax_untyped
@@ -153,19 +153,19 @@ def test_python_accept(type):
         @qp.qnode(qp.device("lightning.qubit", wires=1))
         def jax_untyped(x):
             qp.RY(x * np.pi, wires=0)
-            return measure(wires=0)
+            return qp.expval(qp.Z(wires=0))
 
-        assert jax_untyped(in_zero) == False
-        assert jax_untyped(in_one) == True
+        assert np.allclose(jax_untyped(in_zero), 1.0)
+        assert np.allclose(jax_untyped(in_one), -1.0)
 
         @qjit
         @qp.qnode(qp.device("lightning.qubit", wires=1))
         def jax_typed(x: type):
             qp.RY(x * np.pi, wires=0)
-            return measure(wires=0)
+            return qp.expval(qp.Z(wires=0))
 
-        assert jax_typed(in_zero) == False
-        assert jax_typed(in_one) == True
+        assert np.allclose(jax_typed(in_zero), 1.0)
+        assert np.allclose(jax_typed(in_one), -1.0)
         print(jax_untyped.mlir)
         print(jax_typed.mlir)
         del jax_untyped

@@ -80,6 +80,7 @@ def test_qjit_device_invalid_wires(wires):
         QJITDevice(device)
 
 
+@pytest.mark.old_frontend
 @pytest.mark.parametrize("shots", [2048, None])
 def test_qjit_device_measurements(shots, mocker):
     """Test that the list of measurements that are supported is correctly
@@ -105,7 +106,7 @@ def test_qjit_device_measurements(shots, mocker):
 
     spy = mocker.spy(qjit_device, "filter_device_capabilities_with_shots")
 
-    @qjit
+    @qjit(capture=False)
     @qp.set_shots(shots)
     @qp.qnode(dev)
     def circuit():

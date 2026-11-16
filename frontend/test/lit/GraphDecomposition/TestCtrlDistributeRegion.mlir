@@ -12,9 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// RUN: catalyst --tool=opt --pass-pipeline='builtin.module(graph-decomposition{gate-set=C(testT)=1.0 alt-decomps=myCZ{}{wires:2}{}=cz_region})' %s | FileCheck %s --check-prefixes=ALL,CALL
+// RUN: catalyst --tool=opt --pass-pipeline='builtin.module(graph-decomposition{gate-set=C(testT)=1.0})' %s | FileCheck %s --check-prefixes=ALL,CALL
 
-// RUN: catalyst --tool=opt --pass-pipeline='builtin.module(graph-decomposition{inline-rule-body gate-set=C(testT)=1.0 alt-decomps=myCZ{}{wires:2}{}=cz_region})' %s | FileCheck %s --check-prefixes=ALL,INLINE
+// RUN: catalyst --tool=opt --pass-pipeline='builtin.module(graph-decomposition{inline-rule-body gate-set=C(testT)=1.0})' %s | FileCheck %s --check-prefixes=ALL,INLINE
 
 // ALL-LABEL: func.func @distribute_ctrl_region(
 // ALL-SAME:  [[Q0:%.+]]: !quantum.bit, [[Q1:%.+]]: !quantum.bit
@@ -30,7 +30,7 @@ func.func @distribute_ctrl_region(%q0: !quantum.bit, %q1: !quantum.bit) -> (!qua
 // ALL-LABEL: func.func private @cz_region
 func.func private @cz_region(%q0: !quantum.bit, %q1: !quantum.bit) -> (!quantum.bit, !quantum.bit) attributes {
     target_gate = "myCZ{}{wires:2}{}",
-    resources = {operations = {"C(testT){}{wires:1}{}" = 1 : i64}} } {
+    resources = {operations = {"1C(testT){}{wires:1}{}" = 1 : i64}} } {
   %true = arith.constant true
   %oc, %oq = quantum.ctrl(%q0) ctrlvals(%true) (%q1) : !quantum.bit -> !quantum.bit {
   ^bb0(%arg0: !quantum.bit):

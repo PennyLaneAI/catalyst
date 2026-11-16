@@ -16,7 +16,7 @@
 
 import pennylane as qp
 
-from catalyst import measure, qjit
+from catalyst import qjit
 from catalyst.passes import merge_rotations
 
 # pylint: disable=line-too-long
@@ -26,15 +26,16 @@ from catalyst.passes import merge_rotations
 @qp.qnode(qp.device("lightning.qubit", wires=1))
 def circuit(x: float):
     qp.RX(x, wires=0)
-    # CHECK: {{%.+}}, {{%.+}} = quantum.measure {{%.+}}
-    m = measure(wires=0)
-    return m
+    # CHECK: {{%.+}} = qref.measure {{%.+}} : i1
+    qp.measure(wires=0)
+    return qp.expval(qp.Z(0))
 
 
 print(circuit.mlir)
 
 
-@qjit(static_argnums=0)
+# old_frontend: checks the legacy one-shot wrapper and its compilation options.
+@qjit(capture=False, static_argnums=0)
 def test_one_shot_with_static_argnums(N):
     """
     Test static argnums is passed correctly to the one shot qnodes.
@@ -68,7 +69,8 @@ test_one_shot_with_static_argnums(10)
 print(test_one_shot_with_static_argnums.mlir)
 
 
-@qjit(target="mlir")
+# old_frontend: checks the legacy one-shot wrapper and its compilation options.
+@qjit(capture=False, target="mlir")
 def test_one_shot_with_passes():
     """
     Test pass pipeline is passed correctly to the one shot qnodes.

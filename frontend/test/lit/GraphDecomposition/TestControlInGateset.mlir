@@ -12,9 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// RUN: catalyst --tool=opt --pass-pipeline='builtin.module(graph-decomposition{gate-set=C(TestT)=1.0 alt-decomps=C(V){}{wires:1}{}=v_to_ctrl_t})' %s | FileCheck %s --check-prefixes=ALL,CALL
+// RUN: catalyst --tool=opt --pass-pipeline='builtin.module(graph-decomposition{gate-set=C(TestT)=1.0})' %s | FileCheck %s --check-prefixes=ALL,CALL
 
-// RUN: catalyst --tool=opt --pass-pipeline='builtin.module(graph-decomposition{inline-rule-body gate-set=C(TestT)=1.0 alt-decomps=C(V){}{wires:1}{}=v_to_ctrl_t})' %s | FileCheck %s --check-prefixes=ALL,INLINE
+// RUN: catalyst --tool=opt --pass-pipeline='builtin.module(graph-decomposition{inline-rule-body gate-set=C(TestT)=1.0})' %s | FileCheck %s --check-prefixes=ALL,INLINE
+
+// GraphDecomposition only solves GOIDs reachable from an entry function.
+func.func @entry(%ctrl: !quantum.bit, %q: !quantum.bit) attributes {llvm.emit_c_interface} {
+  %0:2 = call @controlled_in_gateset(%ctrl, %q) : (!quantum.bit, !quantum.bit) -> (!quantum.bit, !quantum.bit)
+  %1:2 = call @decompose_to_controlled(%ctrl, %q) : (!quantum.bit, !quantum.bit) -> (!quantum.bit, !quantum.bit)
+  return
+}
 
 // ALL-LABEL: func.func @controlled_in_gateset(
 // ALL-SAME:  %[[Q:.*]]: !quantum.bit, %[[C:.*]]: !quantum.bit
@@ -42,8 +49,8 @@ func.func @decompose_to_controlled(%ctrl: !quantum.bit, %q: !quantum.bit) -> (!q
 }
 
 func.func private @v_to_ctrl_t(%q: !quantum.bit, %ctrl: !quantum.bit) -> (!quantum.bit, !quantum.bit) attributes {
-    target_gate = "C(V){}{wires:1}{}",
-    resources = {operations = {"C(TestT){}{wires:1}{}" = 1 : i64}} } {
+    target_gate = "1C(V){}{wires:1}{}",
+    resources = {operations = {"1C(TestT){}{wires:1}{}" = 1 : i64}} } {
   %true = arith.constant true
   %o, %oc = quantum.custom "TestT"() %q ctrls(%ctrl) ctrlvals(%true) : !quantum.bit ctrls !quantum.bit
   return %o, %oc : !quantum.bit, !quantum.bit

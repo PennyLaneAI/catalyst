@@ -43,6 +43,17 @@ MemoryRegion::MemoryRegion(std::shared_ptr<ProtectionDomain> pd, void *addr, std
 }
 
 /**
+ * @brief Register caller-provided memory at I/O virtual address `iova`, keeping `backing`
+ *        alive for the MR's lifetime.
+ */
+MemoryRegion::MemoryRegion(std::shared_ptr<ProtectionDomain> pd, void *addr, std::size_t length,
+                           std::uint64_t iova, MemAccess access, std::shared_ptr<void> backing)
+    : pd_(std::move(pd)), backing_buffer_(std::move(backing)) {
+    mr_ = ibv_reg_mr_iova(pd_->get(), addr, length, iova, static_cast<int>(access));
+    TP_CHECK_ERRNO(mr_, "ibv_reg_mr_iova");
+}
+
+/**
  * @brief Register a dma-buf region (e.g. exported GPU memory); does not own the
  *        buffer.
  */

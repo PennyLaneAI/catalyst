@@ -30,6 +30,8 @@
 #include "QRef/IR/QRefDialect.h"
 #include "Quantum/IR/QuantumInterfaces.h"
 
+#include "StringConstants.h"
+
 using namespace mlir;
 using namespace catalyst::qref;
 
@@ -317,8 +319,11 @@ LogicalResult CtrlOp::verify() {
         return emitOpError("Ctrl op number of control values must be the same as the number of "
                            "control qubits");
     }
-    if (getWorkWireType() != "borrowed" && getWorkWireType() != "zeroed") {
-        return emitOpError("work_wire_type must be either \"borrowed\" or \"zeroed\"");
+    if (getWorkWireType() != catalyst::CTRL_WORK_WIRE_TYPE_BORROWED &&
+        getWorkWireType() != catalyst::CTRL_WORK_WIRE_TYPE_ZEROED) {
+        return emitOpError("work_wire_type must be either \"")
+               << catalyst::CTRL_WORK_WIRE_TYPE_BORROWED << "\" or \""
+               << catalyst::CTRL_WORK_WIRE_TYPE_ZEROED << "\"";
     }
 
     llvm::SmallDenseSet<Value> regionCtrlQubits(getCtrlQubits().begin(), getCtrlQubits().end());

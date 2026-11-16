@@ -181,4 +181,8 @@ def DecomposableGate : OpInterface<"DecomposableGate", [QuantumGate]> {
     ];
 }
 
+def Observable : OpInterface<"Observable"> {
+    let cppNamespace = "::catalyst::qref";
+}
+
 #endif // QREF_INTERFACES

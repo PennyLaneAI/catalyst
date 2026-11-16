@@ -30,7 +30,7 @@ class TestOperator2Execution:
     def test_custom_op_supported(self):
         """Test that Operator2 versions of core ops are supported and can be executed."""
 
-        @qp.qjit(collect_decomp_rules=False, capture=True)
+        @qp.qjit(capture=True)
         @qp.qnode(qp.device("lightning.qubit", wires=3))
         def c(x):
             qp.PauliX(0)
@@ -47,7 +47,7 @@ class TestOperator2Execution:
     def test_MultiRZ(self):
         """Test that MultiRZ can be executed."""
 
-        @qp.qjit(collect_decomp_rules=False, capture=True)
+        @qp.qjit(capture=True)
         @qp.qnode(qp.device("lightning.qubit", wires=3))
         def c(x):
             qp.Hadamard(0)
@@ -64,7 +64,7 @@ class TestOperator2Execution:
     def test_paulirot(self):
         """Test that PauliRot can be executed."""
 
-        @qp.qjit(collect_decomp_rules=False, capture=True)
+        @qp.qjit(capture=True)
         @qp.qnode(qp.device("lightning.qubit", wires=3))
         def c(x):
             qp.Hadamard(2)
@@ -91,7 +91,7 @@ class TestOperator2Execution:
     def test_QubitUnitary(self):
         """Test that QubitUnitary can be executed."""
 
-        @qp.qjit(collect_decomp_rules=False, capture=True)
+        @qp.qjit(capture=True)
         @qp.qnode(qp.device("lightning.qubit", wires=3))
         def c():
             qp.QubitUnitary(jnp.array([[0, 1], [1, 0]]), 0)
@@ -122,7 +122,7 @@ class TestOperator2Execution:
     def test_PCPhase(self, dim, expected):
         """Test that PCPhase can be executed."""
 
-        @qp.qjit(collect_decomp_rules=False, capture=True)
+        @qp.qjit(capture=True)
         @qp.qnode(qp.device("lightning.qubit", wires=2))
         def c(x):
             qp.Hadamard(0)

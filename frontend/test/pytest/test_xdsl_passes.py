@@ -22,6 +22,7 @@ import pathlib
 import tempfile
 from unittest.mock import Mock
 
+import numpy as np
 import pennylane as qp
 import pytest
 
@@ -164,12 +165,65 @@ class TestCreatePassSaveCallback:
 class TestXDSLPassesIntegration:
     """Test the xDSL passes integration."""
 
+    @pytest.mark.parametrize(
+        "keep_intermediate",
+        [
+            False,
+            pytest.param(
+                "changed",
+                marks=pytest.mark.xfail(
+                    reason="Skipping preprocessing omits the expected device-preprocessing intermediate IR",
+                    strict=True,
+                ),
+            ),
+            pytest.param(
+                "pass",
+                marks=pytest.mark.xfail(
+                    reason="Skipping preprocessing omits the expected device-preprocessing intermediate IR",
+                    strict=True,
+                ),
+            ),
+        ],
+    )
+    def test_xdsl_pass_with_device_preprocessing(self, keep_intermediate, tmp_path, monkeypatch):
+        """Device preprocessing succeeds with xDSL passes and intermediate IR retention."""
+        transforms = pytest.importorskip("catalyst.python_interface.transforms")
+        monkeypatch.chdir(tmp_path)
+
+        @qjit(
+            capture=True,
+            keep_intermediate=keep_intermediate,
+            skip_preprocess=True,
+            collect_decomp_rules=False,
+        )
+        @transforms.merge_rotations_pass
+        @qp.qnode(qp.device("lightning.qubit", wires=1))
+        def circuit(angle):
+            qp.RX(angle, 0)
+            qp.RX(angle, 0)
+            return qp.expval(qp.Z(0))
+
+        np.testing.assert_allclose(circuit(0.2), np.cos(0.4))
+
+        if keep_intermediate:
+            stage = pathlib.Path(str(circuit.workspace)) / "0_QuantumCompilationStage"
+            for pass_name in ("xdsl-merge-rotations", "graph-decomposition"):
+                saved_ir = list(stage.glob(f"*_{pass_name}.mlir"))
+                assert len(saved_ir) == 1
+                assert saved_ir[0].read_text(encoding="utf-8").count('quantum.custom "RX"') == 1
+
     def test_xdsl_passes_integration(self):
         """Test the xDSL passes integration."""
         # pylint: disable-next=import-outside-toplevel
         from catalyst.python_interface.transforms import merge_rotations_pass
 
-        @qjit(keep_intermediate="changed", verbose=True, capture=True, collect_decomp_rules=False)
+        @qjit(
+            keep_intermediate="changed",
+            verbose=True,
+            capture=True,
+            collect_decomp_rules=False,
+            skip_preprocess=True,
+        )
         def workflow(x):
             @merge_rotations_pass
             @qp.transforms.cancel_inverses
