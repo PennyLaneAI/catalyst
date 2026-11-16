@@ -61,7 +61,15 @@ def test_registered_self_adjoint_rule_targets_the_adjoint_op():
 
         print(
             compile_reachable_decomposition_rules_wrapper(
-                "NoParams", "Adjoint(NoParams){}{reg:2}{}", {}, {"reg": 2}, {}
+                [
+                    {
+                        "op_name": "NoParams",
+                        "op_id": "Adjoint(NoParams){}{reg:2}{}",
+                        "dynamic_shape": {},
+                        "wire_lens": {"reg": 2},
+                        "static_data": {},
+                    }
+                ]
             )
         )
 
@@ -85,7 +93,15 @@ def test_registered_symbolic_rule_accepts_mcm():
 
         print(
             compile_reachable_decomposition_rules_wrapper(
-                "NoParams", "Adjoint(NoParams){}{reg:1}{}", {}, {"reg": 1}, {}
+                [
+                    {
+                        "op_name": "NoParams",
+                        "op_id": "Adjoint(NoParams){}{reg:1}{}",
+                        "dynamic_shape": {},
+                        "wire_lens": {"reg": 1},
+                        "static_data": {},
+                    }
+                ]
             )
         )
 
@@ -116,7 +132,15 @@ def test_registered_control_rule_targets_the_controlled_op():
 
         print(
             compile_reachable_decomposition_rules_wrapper(
-                "NoParams", "2C(NoParams){}{reg:2}{}", {}, {"reg": 2}, {}
+                [
+                    {
+                        "op_name": "NoParams",
+                        "op_id": "2C(NoParams){}{reg:2}{}",
+                        "dynamic_shape": {},
+                        "wire_lens": {"reg": 2},
+                        "static_data": {},
+                    }
+                ]
             )
         )
 
