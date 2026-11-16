@@ -1038,7 +1038,7 @@ def _rule_funcops(compiled):
 @pytest.mark.parametrize("adjoint", [False, True])
 @pytest.mark.parametrize("controlled", [False, True])
 def test_skip_rule_bodies_preserves_signatures_and_resources(mocker, adjoint, controlled):
-    """Declarations match definitions, including dynamic parameters and modifier operands."""
+    """Custom rule declarations match definitions, including parameters and modifier operands."""
     import catalyst.from_plxpr.qfunc_interpreter as capture_frontend
 
     class ParameterizedGate(qp.core.Operator2):
@@ -1078,6 +1078,11 @@ def test_skip_rule_bodies_preserves_signatures_and_resources(mocker, adjoint, co
         definitions = qjit(circuit, target="mlir")
         declarations = qjit(circuit, target="mlir", skip_decomp_rule_bodies=True)
 
+    target_names = {
+        ModifierState(adjoint=adjoint, control_count=2 if controlled else 0).wrap_name(name)
+        for name in ("ParameterizedGate", "RepeatedGate")
+    }
+
     def signatures(compiled):
         return sorted(
             tuple(
@@ -1091,9 +1096,11 @@ def test_skip_rule_bodies_preserves_signatures_and_resources(mocker, adjoint, co
                 )
             )
             for op in _rule_funcops(compiled)
+            if ir.StringAttr(op.attributes["frontend_name"]).value in {"root_rule", "leaf_rule"}
+            and ir.StringAttr(op.attributes["target_gate"]).value.partition("{")[0] in target_names
         )
 
-    assert len(_rule_funcops(declarations)) == 2
+    assert len(signatures(declarations)) == 2
     assert signatures(declarations) == signatures(definitions)
     assert all(len(op.regions[0].blocks) == 0 for op in _rule_funcops(declarations))
     assert all(len(op.regions[0].blocks) == 1 for op in _rule_funcops(definitions))
@@ -1189,7 +1196,8 @@ def test_skip_rule_bodies_requires_capture_and_collection(capture, collect_rules
     assert not _rule_funcops(circuit)
 
 
-def test_resource_estimate_uses_declarations(tmp_path):
+@pytest.mark.parametrize("estimate_api", ["qp.estimate", "resource-estimate"])
+def test_resource_estimate_uses_declarations(tmp_path, estimate_api):
     """The resource estimator solves a transitive rule graph without compiling any rule bodies."""
 
     class EstimateRoot(qp.core.Operator2):
@@ -1208,22 +1216,34 @@ def test_resource_estimate_uses_declarations(tmp_path):
     def middle_rule(wires):
         raise AssertionError("The middle rule implementation must not be traced")
 
-    output = tmp_path / "resources.json"
     with qp.decomposition.local_decomps():
         qp.add_decomps(EstimateRoot, root_rule)
         qp.add_decomps(EstimateMiddle, middle_rule)
 
-        @qjit(target="mlir_opt", skip_preprocess=True, skip_decomp_rule_bodies=True)
-        @qp.transform(pass_name="resource-estimate")(
-            gate_set={"RepeatedGate"}, output_json=True, output_fname=str(output)
-        )
         @qp.qnode(qp.device("null.qubit", wires=1))
         def circuit():
             EstimateRoot(0)
             return qp.state()
 
-    resources = json.loads(output.read_text())
-    assert resources["circuit"]["quantum_operations"] == {"-1": {"RepeatedGate": 6}}
+        if estimate_api == "qp.estimate":
+            compiled = qjit(circuit, target="mlir", skip_decomp_rule_bodies=True)
+            assert all(len(op.regions[0].blocks) == 0 for op in _rule_funcops(compiled))
+            counts = qp.estimate(compiled, target={"RepeatedGate"})().resources.quantum_operations
+        else:
+            output = tmp_path / "resources.json"
+            transformed = qp.transform(pass_name="resource-estimate")(
+                gate_set={"RepeatedGate"}, output_json=True, output_fname=str(output)
+            )(circuit)
+            qjit(
+                transformed,
+                target="mlir_opt",
+                skip_preprocess=True,
+                skip_decomp_rule_bodies=True,
+            )
+            resources = json.loads(output.read_text())
+            counts = resources["circuit"]["quantum_operations"]["-1"]
+
+    assert counts == {"RepeatedGate": 6}
 
 
 if __name__ == "__main__":
