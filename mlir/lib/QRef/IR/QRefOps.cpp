@@ -921,6 +921,12 @@ getEntriesInOperandOrder(mlir::DictionaryAttr map) {
 
 // OperatorOp
 
+bool OperatorOp::requiresNonOverlappingNonCtrlQubitOperands() {
+    // Generic composites may repeat targets in their logical wire layout.
+    // Value-semantics conversion compacts these into unique physical operands.
+    return false;
+}
+
 std::string OperatorOp::getOperatorName() { return getOpName().str(); }
 
 DynamicShape OperatorOp::getDynamicShape() {

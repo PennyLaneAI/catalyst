@@ -474,6 +474,8 @@ def OperatorOp : UnitaryGate_Op<"operator", [ParametrizedGate, AttrSizedOperandS
     );
 
     let extraClassDeclaration = extraBaseClassDeclaration # [{
+        bool requiresNonOverlappingNonCtrlQubitOperands();
+
         mlir::ValueRange getAllParams() {
             // the ODS operands must be next to each other
             auto [start, lenParams] = getODSOperandIndexAndLength(/*params=*/0);
