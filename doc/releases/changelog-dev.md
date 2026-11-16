@@ -417,7 +417,7 @@
     Every registered signature is lowered, as well as any operations/rules reachable from these signatures, or their adjoint/control variants.
     [(#3057)](https://github.com/PennyLaneAI/catalyst/pull/3057)
 
-    2. When tracing a gate operation to JAXPR, all rules reachable from that gate are injected. Note that rules already available in the precompiled rule library will not get re-traced. 
+    2. When tracing a gate operation to JAXPR, all rules reachable from that gate are injected. Note that rules already available in the precompiled rule library will not get re-traced.
     [(#3061)](https://github.com/PennyLaneAI/catalyst/pull/3061)
     [(#3160)](https://github.com/PennyLaneAI/catalyst/pull/3160)
     [(#3149)](https://github.com/PennyLaneAI/catalyst/pull/3149)
@@ -993,6 +993,10 @@
 <h3>Deprecations 👋</h3>
 
 <h3>Bug fixes 🐛</h3>
+
+* The `--convert-to-value-semantics` and `--convert-to-reference-semantics` passes no longer read
+  freed memory.
+  [(#3496)](https://github.com/PennyLaneAI/catalyst/pull/3496)
 
 * The `gpu_verbs` coprocessor now supports the NVIDIA GH200 with CUDA 12.4.
   [(#3467)](https://github.com/PennyLaneAI/catalyst/pull/3467)

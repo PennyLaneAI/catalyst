@@ -1756,7 +1756,7 @@ void createElseBranchWithDefaultYields(IRRewriter &builder,
     scf::YieldOp::create(builder, ifOp->getLoc(), elseYieldVals);
 }
 
-void handleIf(IRRewriter &builder, scf::IfOp ifOp, QubitValueTracker &tracker) {
+bool handleIf(IRRewriter &builder, scf::IfOp ifOp, QubitValueTracker &tracker) {
     OpBuilder::InsertionGuard guard(builder);
     builder.setInsertionPoint(ifOp);
     MLIRContext *ctx = ifOp->getContext();
@@ -1770,7 +1770,7 @@ void handleIf(IRRewriter &builder, scf::IfOp ifOp, QubitValueTracker &tracker) {
     }
 
     if (rValuesUsedByRegion.size() == 0) {
-        return;
+        return false;
     }
 
     scf::IfOp newIfOp;
@@ -1840,9 +1840,10 @@ void handleIf(IRRewriter &builder, scf::IfOp ifOp, QubitValueTracker &tracker) {
     }
 
     builder.eraseOp(ifOp);
+    return true;
 }
 
-void handleSwitch(IRRewriter &builder, scf::IndexSwitchOp switchOp, QubitValueTracker &tracker) {
+bool handleSwitch(IRRewriter &builder, scf::IndexSwitchOp switchOp, QubitValueTracker &tracker) {
     OpBuilder::InsertionGuard guard(builder);
     builder.setInsertionPoint(switchOp);
     MLIRContext *ctx = switchOp->getContext();
@@ -1855,7 +1856,7 @@ void handleSwitch(IRRewriter &builder, scf::IndexSwitchOp switchOp, QubitValueTr
     collectNecessaryRegionRValues(switchOp.getDefaultRegion(), rValuesUsedByRegion);
 
     if (rValuesUsedByRegion.size() == 0) {
-        return;
+        return false;
     }
 
     scf::IndexSwitchOp newSwitchOp;
@@ -1915,9 +1916,10 @@ void handleSwitch(IRRewriter &builder, scf::IndexSwitchOp switchOp, QubitValueTr
     }
 
     builder.eraseOp(switchOp);
+    return true;
 }
 
-void handleFor(IRRewriter &builder, scf::ForOp forOp, QubitValueTracker &tracker) {
+bool handleFor(IRRewriter &builder, scf::ForOp forOp, QubitValueTracker &tracker) {
     OpBuilder::InsertionGuard guard(builder);
     builder.setInsertionPoint(forOp);
     Location loc = forOp->getLoc();
@@ -1926,7 +1928,7 @@ void handleFor(IRRewriter &builder, scf::ForOp forOp, QubitValueTracker &tracker
     collectNecessaryRegionRValues(forOp.getRegion(), rValuesUsedByRegion);
 
     if (rValuesUsedByRegion.size() == 0) {
-        return;
+        return false;
     }
 
     scf::ForOp newLoop;
@@ -1991,9 +1993,10 @@ void handleFor(IRRewriter &builder, scf::ForOp forOp, QubitValueTracker &tracker
     }
 
     builder.eraseOp(forOp);
+    return true;
 }
 
-void handleWhile(IRRewriter &builder, scf::WhileOp whileOp, QubitValueTracker &tracker) {
+bool handleWhile(IRRewriter &builder, scf::WhileOp whileOp, QubitValueTracker &tracker) {
     OpBuilder::InsertionGuard guard(builder);
     builder.setInsertionPoint(whileOp);
     Location loc = whileOp->getLoc();
@@ -2004,7 +2007,7 @@ void handleWhile(IRRewriter &builder, scf::WhileOp whileOp, QubitValueTracker &t
     collectNecessaryRegionRValues(whileOp.getAfter(), rValuesUsedByRegion);
 
     if (rValuesUsedByRegion.size() == 0) {
-        return;
+        return false;
     }
 
     unsigned numExistingOperands = whileOp.getBefore().front().getArguments().size();
@@ -2073,6 +2076,7 @@ void handleWhile(IRRewriter &builder, scf::WhileOp whileOp, QubitValueTracker &t
     }
 
     builder.eraseOp(whileOp);
+    return true;
 }
 
 void handleSubroutine(IRRewriter &builder, func::FuncOp f,
@@ -2149,6 +2153,10 @@ void handleSubroutine(IRRewriter &builder, func::FuncOp f,
 
 void handleRegion(IRRewriter &builder, Region &r, QubitValueTracker &tracker) {
     r.walk<WalkOrder::PreOrder>([&](Operation *op) {
+        // All handled operations will not be recursed into (WalkResult::skip), so any nested
+        // regions must be handled together with the handled operation. This is to allow operations
+        // to be erased during the walk.
+        bool handled = true;
         llvm::TypeSwitch<Operation *, void>(op)
             .Case<qref::AllocOp>([&](auto o) { handleAlloc(builder, o, tracker); })
             .Case<qref::DeallocOp>([&](auto o) { handleDealloc(builder, o, tracker); })
@@ -2172,13 +2180,15 @@ void handleRegion(IRRewriter &builder, Region &r, QubitValueTracker &tracker) {
                 [&](auto o) { handlePBCQubitProducer<pbc::PrepareStateOp>(builder, o, tracker); })
             .Case<qref::AdjointOp>([&](auto o) { handleAdjoint(builder, o, tracker); })
             .Case<qref::CtrlOp>([&](auto o) { handleCtrl(builder, o, tracker); })
-            .Case<scf::IfOp>([&](auto o) { handleIf(builder, o, tracker); })
-            .Case<scf::IndexSwitchOp>([&](auto o) { handleSwitch(builder, o, tracker); })
-            .Case<scf::ForOp>([&](auto o) { handleFor(builder, o, tracker); })
-            .Case<scf::WhileOp>([&](auto o) { handleWhile(builder, o, tracker); })
+            .Case<scf::IfOp>([&](auto o) { handled = handleIf(builder, o, tracker); })
+            .Case<scf::IndexSwitchOp>([&](auto o) { handled = handleSwitch(builder, o, tracker); })
+            .Case<scf::ForOp>([&](auto o) { handled = handleFor(builder, o, tracker); })
+            .Case<scf::WhileOp>([&](auto o) { handled = handleWhile(builder, o, tracker); })
             .Case<mbqc::RefGraphStatePrepOp>(
                 [&](auto o) { handleGraphStatePrep(builder, o, tracker); })
-            .Default([](Operation *) {});
+            .Default([&](Operation *) { handled = false; });
+
+        return handled ? WalkResult::skip() : WalkResult::advance();
     });
 }
 
