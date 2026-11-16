@@ -18,7 +18,6 @@
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinAttributes.h"
-#include "mlir/IR/IRMapping.h"
 #include "mlir/IR/SymbolTable.h"
 #include "mlir/IR/Types.h"
 
@@ -119,25 +118,12 @@ ValueRange emitCalibrationCircuit(PatternRewriter &rewriter, Location loc, func:
             loc, TypeRange{tensorTyF64}, compbasis.getResult(), ValueRange{}, Value());
         llvm::dbgs() << "[mitigation.rem] quantum.sample " << tag
                      << " addition OK, op=" << insertedMP << "\n";
-        IRMapping postprocMapping;
-        uint64_t resultIndex = 0;
-        for (auto res : measurementProcess->getResults())
-            postprocMapping.map(res, insertedMP->getResult(resultIndex++));
-        rewriter.setInsertionPointAfter(insertedMP.getOperation());
+        // Return the f64 samples, the type of the rem op's zeros/ones results. The
+        // callee's post-processing of its own samples (the conversion to integers)
+        // is not cloned: its types follow the wires the callee measures, which can
+        // differ from the calibrated ones, and the REM post-processing converts
+        // the calibration samples itself.
         calibratedResult = insertedMP->getResults();
-        for (auto postprocOp = measurementProcess->getNextNode();
-             postprocOp != nullptr &&
-             postprocOp->getName().getIdentifier() != quantum::DeallocOp::getOperationName();
-             postprocOp = postprocOp->getNextNode()) {
-            llvm::dbgs() << "[mitigation.rem] looking for next op: "
-                         << postprocOp->getName().getIdentifier() << "\n";
-            Operation *insertedOp = rewriter.clone(*postprocOp, postprocMapping);
-            if (!insertedOp->getResults().empty())
-                calibratedResult = insertedOp->getResults();
-            rewriter.setInsertionPointAfter(insertedOp);
-            llvm::dbgs() << "[mitigation.rem] insertedOp: " << insertedOp->getName().getIdentifier()
-                         << "\n";
-        }
     }
 
     auto dealloc = rewriter.create<quantum::DeallocOp>(loc, qreg);

@@ -26,8 +26,13 @@ import jax
 import jax.numpy as jnp
 import pennylane as qp
 from jax._src.tree_util import tree_flatten
+from pennylane.measurements import MeasurementProcess
 
-from catalyst.api_extensions.rem_postprocessing import rem_apply, rem_calibrate
+from catalyst.api_extensions.rem_postprocessing import (
+    check_calibration_matrices,
+    rem_apply,
+    rem_calibrate,
+)
 from catalyst.jax_primitives import Folding, func_p, quantum_kernel_p, rem_p, zne_p
 from catalyst.jax_tracer import Function
 from catalyst.utils.callables import CatalystCallable
@@ -162,7 +167,10 @@ def mitigate_with_zne(
 
 
 def mitigate_with_rem(
-    fn=None, *, calibration_matrices=None, return_calibration_matrices: bool = False
+    fn=None,
+    *,
+    calibration_matrices=None,
+    return_calibration_matrices: bool = False,
 ):
     r"""A :func:`~.qjit` compatible readout error mitigation of an input circuit.
 
@@ -171,9 +179,9 @@ def mitigate_with_rem(
     Alongside the input circuit, two calibration circuits that prepare the all-zeros and the
     all-ones state are executed on the same device. Their results give a :math:`2 \times 2`
     confusion matrix per qubit, holding the probability of each measured bit value given the
-    prepared one. Assuming uncorrelated readout errors, the confusion matrix of all :math:`n`
-    device wires is the tensor product of the per-qubit matrices, and the mitigated result is
-    obtained by solving the linear system it defines.
+    prepared one. Assuming uncorrelated readout errors, the confusion matrix of the :math:`n`
+    measured wires is the tensor product of their per-qubit matrices, and the mitigated result
+    is obtained by solving the linear system it defines.
 
     For :func:`~pennylane.sample` measurements, when :math:`2^n` exceeds the number of shots, this
     system is restricted to the sampled bitstrings, as proposed by
@@ -185,12 +193,12 @@ def mitigate_with_rem(
     Args:
         fn (qp.QNode): the circuit to be mitigated. It must return a single
             :func:`~pennylane.probs`, :func:`~pennylane.counts` or :func:`~pennylane.sample`
-            measurement on all device wires. Expectation values and other observables are not
-            supported.
-        calibration_matrices (Array): confusion matrices of shape ``(n, 2, 2)``, returned by a
-            previous call with ``return_calibration_matrices=True`` on the same device.
-            ``calibration_matrices[k][i, j]`` is the probability of measuring ``i`` on wire
-            ``k`` when ``j`` was prepared, so each column sums to one. If provided, the
+            measurement, on all device wires or on a subset of them. Expectation values and
+            other observables are not supported.
+        calibration_matrices (Array): confusion matrices of shape ``(d, 2, 2)``, one per device
+            wire, returned by a previous call with ``return_calibration_matrices=True`` on the
+            same device. ``calibration_matrices[k][i, j]`` is the probability of measuring ``i``
+            on wire ``k`` when ``j`` was prepared, so each column sums to one. If provided, the
             calibration circuits are omitted and these matrices are used instead.
             Defaults to ``None``, in which case the calibration circuits are run on every call.
         return_calibration_matrices (bool): if ``True``, the confusion matrices are returned
@@ -200,6 +208,8 @@ def mitigate_with_rem(
     Returns:
         Callable: A callable object that computes the mitigated result of the wrapped
         :class:`~.QNode`, depending on the measurement process:
+
+        Here :math:`n` is the number of measured wires.
 
         * :func:`~pennylane.probs`: the :math:`2^n` mitigated probabilities.
         * :func:`~pennylane.counts`: a tuple ``(basis_states, counts)`` over all :math:`2^n`
@@ -385,7 +395,8 @@ class RemCallable(CatalystCallable):
     Args:
         fn (Callable): the circuit to be mitigated with REM.
         calibration_matrices: optional precomputed per-qubit confusion stack
-            of shape ``(n_qubits, 2, 2)``, indexed as ``[wire, measured, prepared]``
+            of shape ``(n_wires, 2, 2)``, one per device wire, indexed as
+            ``[wire, measured, prepared]``
             (see :func:`~catalyst.api_extensions.rem_postprocessing.rem_calibrate`).
             When ``None`` the lowering pass
             emits the all-zeros and all-ones calibration circuits and this
@@ -413,9 +424,13 @@ class RemCallable(CatalystCallable):
         self.calibration_matrices = calibration_matrices
         self.return_calibration_matrices = bool(return_calibration_matrices)
         super().__init__("fn")
+        self._mp_kind = None
 
     def __call__(self, *args, **kwargs):
-        callable_fn = _wrap_callable(self.fn)
+        # The measurement process, and with it the measured wires, only exists while Catalyst
+        # traces the quantum function; it is not stored in the jaxpr. Record it instead.
+        recorded_results = []
+        callable_fn = _record_results(_wrap_callable(self.fn), recorded_results)
         jaxpr = jax.make_jaxpr(callable_fn)(*args)
 
         args_data, _ = tree_flatten(args)
@@ -429,14 +444,30 @@ class RemCallable(CatalystCallable):
         assert callable(
             callable_fn
         ), "expected callable set as param on the first operation in rem target"
-
         mp_kind = _detect_measurement_process(jaxpr)
         assert mp_kind is not None, (
             "measurement process must be one of CountsMP, ProbsMP or SampleMP. "
             "Other measurement processes such as observables are not supported yet."
         )
+        self._mp_kind = mp_kind
+
+        qnode_obj = jaxpr.eqns[0].params.get("qnode", None)
+        assert qnode_obj is not None, "REM post-processing requires a QNode target"
+        # Catalyst requires device wires 0..n-1, so confusion_matrices[k] belongs to wire k.
+        device_wires = qnode_obj.device.wires
+        n_wires = len(device_wires)
+        # Register positions of the measured wires, in the order of the result. A measurement
+        # without wires, e.g. qp.probs(), measures all device wires in order.
+        mp = recorded_results[-1]
+        if not isinstance(mp, MeasurementProcess):
+            raise NotImplementedError(
+                "REM requires the QNode to return a single measurement process."
+            )
+        wires = tuple(device_wires.indices(mp.wires)) if mp.wires else tuple(range(n_wires))
 
         run_calibration = self.calibration_matrices is None
+        if not run_calibration:
+            check_calibration_matrices(self.calibration_matrices, n_wires)
         rem_results = rem_p.bind(
             *args_data,
             run_calibration=run_calibration,
@@ -444,58 +475,53 @@ class RemCallable(CatalystCallable):
             fn=callable_fn,
         )
 
-        qnode_obj = jaxpr.eqns[0].params.get("qnode", None)
-        assert qnode_obj is not None, "REM post-processing requires a QNode target"
-        # Catalyst requires device wires 0..n-1, so confusion_matrices[k] belongs to wire k.
-        n_qubits = len(qnode_obj.device.wires)
-
         handler = {
             "sample": self._apply_sample,
             "counts": self._apply_counts,
             "probs": self._apply_probs,
         }[mp_kind]
-        mitigated_result, confusion_matrices = handler(rem_results, run_calibration, n_qubits)
+        mitigated_result, confusion_matrices = handler(rem_results, run_calibration, wires)
 
         if self.return_calibration_matrices:
             return mitigated_result, confusion_matrices
         return mitigated_result
 
-    def _apply_sample(self, rem_results, run_calibration, n_qubits):
+    def _apply_sample(self, rem_results, run_calibration, wires):
         # quantum.sample returns f64 in catalyst; the REM helpers index
         # confusion matrices by bit value and need an integer dtype.
         mitigatee_samples = rem_results[0].astype(jnp.int32)
         if run_calibration:
             zeros_samples = rem_results[1].astype(jnp.int32)
             ones_samples = rem_results[2].astype(jnp.int32)
-            confusion_matrices = rem_calibrate("sample", zeros_samples, ones_samples)
+            confusion_matrices = rem_calibrate(self._mp_kind, zeros_samples, ones_samples)
         else:
             confusion_matrices = jnp.asarray(self.calibration_matrices)
         unique_bitstrings, mitigated_counts = rem_apply(
-            "sample", mitigatee_samples, confusion_matrices, n_qubits
+            self._mp_kind, mitigatee_samples, confusion_matrices, wires
         )
         return (unique_bitstrings, mitigated_counts), confusion_matrices
 
-    def _apply_counts(self, rem_results, run_calibration, n_qubits):
+    def _apply_counts(self, rem_results, run_calibration, wires):
         mitigatee_eigvals = rem_results[0]
         mitigatee_counts = rem_results[1]
         if run_calibration:
             zeros_counts = rem_results[2]
             ones_counts = rem_results[3]
-            confusion_matrices = rem_calibrate("counts", zeros_counts, ones_counts)
+            confusion_matrices = rem_calibrate(self._mp_kind, zeros_counts, ones_counts)
         else:
             confusion_matrices = jnp.asarray(self.calibration_matrices)
-        mitigated_counts = rem_apply("counts", mitigatee_counts, confusion_matrices, n_qubits)
+        mitigated_counts = rem_apply(self._mp_kind, mitigatee_counts, confusion_matrices, wires)
         return (mitigatee_eigvals, mitigated_counts), confusion_matrices
 
-    def _apply_probs(self, rem_results, run_calibration, n_qubits):
+    def _apply_probs(self, rem_results, run_calibration, wires):
         mitigatee_probs = rem_results[0]
         if run_calibration:
             zeros_probs = rem_results[1]
             ones_probs = rem_results[2]
-            confusion_matrices = rem_calibrate("probs", zeros_probs, ones_probs)
+            confusion_matrices = rem_calibrate(self._mp_kind, zeros_probs, ones_probs)
         else:
             confusion_matrices = jnp.asarray(self.calibration_matrices)
-        mitigated_probs = rem_apply("probs", mitigatee_probs, confusion_matrices, n_qubits)
+        mitigated_probs = rem_apply(self._mp_kind, mitigatee_probs, confusion_matrices, wires)
         return mitigated_probs, confusion_matrices
 
 
@@ -527,3 +553,21 @@ def _detect_measurement_process(jaxpr):
             if pname in ("probs", "sample", "counts"):
                 return pname
     return None
+
+
+def _record_results(fn, results):
+    """Return a copy of the QNode ``fn`` whose quantum function appends its return value to
+    ``results`` every time Catalyst traces it. Other callables are returned unchanged."""
+    if not isinstance(fn, qp.QNode):
+        return fn
+    func = fn.func
+
+    @functools.wraps(func)
+    def recording_func(*args, **kwargs):
+        result = func(*args, **kwargs)
+        results.append(result)
+        return result
+
+    recording_qnode = copy.copy(fn)
+    recording_qnode.func = recording_func
+    return recording_qnode

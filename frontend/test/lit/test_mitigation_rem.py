@@ -134,6 +134,28 @@ print(rem_with_sample_sort_rle.mlir)
 
 
 @qjit(target="mlir")
+def rem_subset_all_wires_calibrated():
+    """Measuring wires (2, 0) of a 3-wire device: by default the calibration still covers the
+    whole register (2**3 probs, a 3x2x2 stack), and apply gets the matrices of wires 2 and 0."""
+    dev = qp.device("lightning.qubit", wires=3)
+
+    def circuit():
+        qp.Hadamard(wires=0)
+        return qp.probs(wires=[2, 0])
+
+    qnode = qp.set_shots(qp.QNode(circuit, dev), shots=200)
+    return mitigate_with_rem(qnode)()
+
+
+# CHECK-LABEL: func.func public @jit_rem_subset_all_wires_calibrated
+# CHECK: mitigation.rem @{{[^(]+}}() runCalibration(true)
+# CHECK-SAME: -> (tensor<4xf64>, tensor<8xf64>, tensor<8xf64>)
+# CHECK: call @_rem_calibrate_probs({{.*}}) : (tensor<8xf64>, tensor<8xf64>) -> tensor<3x2x2xf64>
+# CHECK: call @_rem_apply_to_probs({{.*}}) : (tensor<4xf64>, tensor<2x2x2xf64>) -> tensor<4xf64>
+print(rem_subset_all_wires_calibrated.mlir)
+
+
+@qjit(target="mlir")
 def rem_cached():
     """Passing precomputed calibration matrices runs the op with runCalibration(false)
     and emits _rem_apply_to_probs but not _rem_calibrate_probs."""

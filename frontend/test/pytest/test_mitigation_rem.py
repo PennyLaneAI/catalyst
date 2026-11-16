@@ -30,6 +30,7 @@ from catalyst.api_extensions.rem_postprocessing import (
     _rem_calibrate_probs,
     _rem_calibrate_samples,
     _stretch_confusion_matrix,
+    check_calibration_matrices,
     rem_apply,
     rem_calibrate,
 )
@@ -502,6 +503,118 @@ def test_cached_matrices_wire_order(kind):
     assert np.allclose(result, expected)
 
 
+@pytest.mark.parametrize("kind", ["probs", "counts", "sample"])
+def test_subset_of_wires(kind):
+    """Measuring wires (2, 0) of a 3-wire device without noise mitigates to the measured |10>.
+    All device wires are calibrated."""
+    n_wires, shots = 3, 100
+    dev = qp.device("lightning.qubit", wires=n_wires)
+
+    @qp.qnode(dev, shots=shots)
+    def circuit():
+        qp.PauliX(wires=2)  # |001>, which reads |10> on the wires (2, 0)
+        return getattr(qp, kind)(wires=[2, 0])
+
+    @catalyst.qjit
+    def mitigated():
+        return mitigate_with_rem(circuit, return_calibration_matrices=True)()
+
+    result, cm = mitigated()
+    # counts: (basis states, counts); sample: (bitstrings, counts) over all 2**2 bitstrings.
+    histogram = np.asarray(result) if kind == "probs" else np.asarray(result[1]) / shots
+    expected = np.zeros(4)
+    expected[0b10] = 1.0
+    assert np.allclose(histogram, expected)
+
+    cm = np.asarray(cm)
+    assert cm.shape == (n_wires, 2, 2)
+    assert np.allclose(cm, np.eye(2))
+
+
+@pytest.mark.parametrize("kind", ["probs", "counts"])
+def test_cached_matrices_subset_of_wires(kind):
+    """For the measured wires (2, 0), calibration_matrices[2] and [0] are applied in that order."""
+    n_wires, shots = 3, 100
+    cm = _per_qubit_asymmetric_confusion(n_wires)
+    dev = qp.device("lightning.qubit", wires=n_wires)
+
+    @qp.qnode(dev, shots=shots)
+    def circuit():
+        qp.PauliX(wires=2)  # noiseless |10> on the wires (2, 0)
+        return qp.probs(wires=[2, 0]) if kind == "probs" else qp.counts(wires=[2, 0])
+
+    @catalyst.qjit
+    def mitigated(cm_in):
+        return mitigate_with_rem(circuit, calibration_matrices=cm_in)()
+
+    out = mitigated(jnp.asarray(cm))
+    result = np.asarray(out if kind == "probs" else out[1])
+    measured = np.zeros(4)
+    measured[0b10] = 1.0 if kind == "probs" else shots
+    expected = np.linalg.solve(_transition_matrix(cm[[2, 0]]), measured)
+    assert np.allclose(result, expected)
+
+
+def test_cached_matrices_wrong_shape():
+    """calibration_matrices must hold one matrix per device wire, also when fewer are measured."""
+    dev = qp.device("lightning.qubit", wires=3)
+
+    @qp.qnode(dev, shots=100)
+    def circuit():
+        return qp.probs(wires=[0])
+
+    cm = np.broadcast_to(np.eye(2), (1, 2, 2))
+
+    def mitigated():
+        return mitigate_with_rem(circuit, calibration_matrices=cm)()
+
+    with pytest.raises(ValueError, match=r"must have shape \(3, 2, 2\)"):
+        catalyst.qjit(mitigated)
+
+
+@pytest.mark.parametrize(
+    "bad, message",
+    [
+        (np.nan, r"NaN or infinite entries for the wires \[1\]"),
+        (np.inf, r"NaN or infinite entries for the wires \[1\]"),
+        (0.5, r"singular \(non-invertible\) matrices for the wires \[1\]"),
+    ],
+)
+def test_check_calibration_matrices_malformed(bad, message):
+    """Malformed confusion matrices are rejected with the offending wires."""
+    cm = _per_qubit_asymmetric_confusion(3)
+    cm[1] = bad  # 0.5 everywhere: equal columns, so the matrix is singular
+    with pytest.raises(ValueError, match=message):
+        check_calibration_matrices(cm, 3)
+    check_calibration_matrices(_per_qubit_asymmetric_confusion(3), 3)
+
+
+def test_cached_matrices_malformed_rejected_at_trace_time():
+    """mitigate_with_rem runs the sanity checks on concrete cached matrices."""
+    dev = qp.device("lightning.qubit", wires=2)
+
+    @qp.qnode(dev, shots=100)
+    def circuit():
+        return qp.probs()
+
+    cm = np.broadcast_to(np.eye(2), (2, 2, 2)).copy()
+    cm[0] = np.nan
+
+    def mitigated():
+        return mitigate_with_rem(circuit, calibration_matrices=cm)()
+
+    with pytest.raises(ValueError, match=r"NaN or infinite entries for the wires \[0\]"):
+        catalyst.qjit(mitigated)
+
+
+def test_rem_apply_selects_wires():
+    """rem_apply applies confusion_matrices[wires], in the order of the result."""
+    cm = _per_qubit_asymmetric_confusion(3)
+    probs = np.array([0.1, 0.2, 0.3, 0.4])
+    expected = np.linalg.solve(_transition_matrix(cm[[2, 0]]), probs)
+    assert np.allclose(rem_apply("probs", probs, cm, (2, 0)), expected)
+
+
 def test_unsupported_measurement():
     """REM rejects non-sample/counts/probs measurements with a clear trace-time error."""
     dev = qp.device("lightning.qubit", wires=2)
@@ -525,4 +638,4 @@ def test_rem_calibrate_apply_reject_unknown_mp_kind():
     with pytest.raises(ValueError, match="Unsupported measurement process 'expval'"):
         rem_calibrate("expval", cm, cm)
     with pytest.raises(ValueError, match="Unsupported measurement process 'expval'"):
-        rem_apply("expval", cm, cm, 1)
+        rem_apply("expval", cm, cm, (0,))

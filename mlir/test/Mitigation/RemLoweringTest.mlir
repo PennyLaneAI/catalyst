@@ -137,6 +137,45 @@ func.func @remSampleCalibrate() -> (tensor<200x2xf64>, tensor<200x2xf64>, tensor
 // -----
 
 // ===================================================================
+// SampleMP callee that measures only wire 1 of its 2 qubits and converts
+// its samples to integers. The calibration circuits still measure the
+// whole register (tensor<200x2xf64>), and nothing after the callee's
+// sample is cloned into them: neither the conversion, whose type follows
+// the callee's measured wires, nor the quantum.insert of its measured
+// qubit (at an index given by a constant, as in traced programs).
+// ===================================================================
+
+func.func @subsetSampleCircuit() -> tensor<200x1xi64> attributes {qnode} {
+    %shots = arith.constant 200 : i64
+    quantum.device shots(%shots) ["rtd_lightning.so", "LightningQubit", "{}"]
+    %r = quantum.alloc(2) : !quantum.reg
+    %q_1 = quantum.extract %r[ 1] : !quantum.reg -> !quantum.bit
+    %obs = quantum.compbasis qubits %q_1 : !quantum.obs
+    %samples = quantum.sample %obs : tensor<200x1xf64>
+    %converted = arith.fptosi %samples : tensor<200x1xf64> to tensor<200x1xi64>
+    %idx1 = arith.constant 1 : i64
+    %r_0 = quantum.insert %r[%idx1], %q_1 : !quantum.reg, !quantum.bit
+    quantum.dealloc %r_0 : !quantum.reg
+    quantum.device_release
+    func.return %converted : tensor<200x1xi64>
+}
+
+func.func @remSubsetSampleCalibrate() -> (tensor<200x1xi64>, tensor<200x2xf64>, tensor<200x2xf64>) {
+    %out:3 = mitigation.rem @subsetSampleCircuit() runCalibration(true) {resultSegmentSizes = array<i32: 1, 1, 1>} : () -> (tensor<200x1xi64>, tensor<200x2xf64>, tensor<200x2xf64>)
+    func.return %out#0, %out#1, %out#2 : tensor<200x1xi64>, tensor<200x2xf64>, tensor<200x2xf64>
+}
+
+// CHECK-LABEL: func.func @remSubsetSampleCalibrate
+// CHECK:       call @subsetSampleCircuit() : () -> tensor<200x1xi64>
+// CHECK:       [[REG:%.+]] = quantum.alloc(%{{.*}}) : !quantum.reg
+// CHECK-NEXT:  [[OBS:%.+]] = quantum.compbasis qreg [[REG]]
+// CHECK-NEXT:  [[SAMPLES:%.+]] = quantum.sample [[OBS]] : tensor<200x2xf64>
+// CHECK-NEXT:  quantum.dealloc [[REG]]
+// CHECK:       return {{.*}}[[SAMPLES]],
+
+// -----
+
+// ===================================================================
 // runCalibration(false): the pass forwards the callee unchanged. With the
 // zeros/ones result groups empty, the op replacement is just the callee's
 // SSA values -- no placeholder constants and no calibration circuits.

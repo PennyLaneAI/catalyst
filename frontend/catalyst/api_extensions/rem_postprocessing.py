@@ -21,11 +21,12 @@ calibration, reduced-confusion-matrix construction, and a linear solve -
 to the three sample arrays emitted by the ``mitigation.rem`` op after
 lowering.
 
-The public entry points are :func:`rem_calibrate` and :func:`rem_apply`.
+The public entry points are :func:`rem_calibrate`, :func:`rem_apply` and
+:func:`check_calibration_matrices`.
 """
 
 from functools import partial, reduce
-from typing import Tuple, Union
+from typing import Sequence, Tuple, Union
 
 import jax
 import jax.numpy as jnp
@@ -324,8 +325,8 @@ def _rem_apply_to_probs(
     return mitigated_probs
 
 
-# Public entrypoints. Not `@jax.jit`'d, because they do not add anything to the IR, and instead 
-# just decide which jited functions should be used.
+# Public entrypoints. Not `@jax.jit`'d, because they do not add anything to the IR, and instead
+# just decide at trace time which jited functions should be used.
 def rem_calibrate(mp_kind: str, zeros_result: jax.Array, ones_result: jax.Array) -> jax.Array:
     """Build per-qubit confusion matrices from the results of the calibration circuits.
 
@@ -341,9 +342,9 @@ def rem_calibrate(mp_kind: str, zeros_result: jax.Array, ones_result: jax.Array)
       wire ``k``, and ``confusion_matrices[k][i, j]`` is the probability of measuring ``i`` on
       that wire when ``j`` was prepared: rows are measured values, columns are prepared values,
       and each column sums to one.
-    - The transition matrix of all wires is
-      ``kron(confusion_matrices[0], ..., confusion_matrices[n_qubits - 1])``, so that
-      ``noisy = transition_matrix @ ideal``.
+    - The transition matrix of the measured wires, given as ``meas_wires`` to :func:`rem_apply`,
+      is ``kron(confusion_matrices[meas_wires[0]], ..., confusion_matrices[meas_wires[-1]])``,
+      so that ``noisy = transition_matrix @ ideal``.
 
     Args:
         mp_kind (str): measurement process of the results: ``"sample"``, ``"counts"`` or
@@ -367,33 +368,86 @@ def rem_calibrate(mp_kind: str, zeros_result: jax.Array, ones_result: jax.Array)
 
 
 def rem_apply(
-    mp_kind: str, mitigatee_result: jax.Array, confusion_matrices: jax.Array, n_qubits: int
+    mp_kind: str,
+    mitigatee_result: jax.Array,
+    confusion_matrices: jax.Array,
+    meas_wires: Sequence[int],
 ) -> Union[jax.Array, Tuple[jax.Array, jax.Array]]:
     """Apply per-qubit confusion matrices to the result of the user circuit.
 
     Step 2 of the REM pipeline. The wire order and the layout of ``confusion_matrices`` are
-    described in :func:`rem_calibrate`.
+    described in :func:`rem_calibrate`. ``n_qubits`` is the total number of device qubits (wires).
+    There are always as many or more device wires as there are measured wires:
+    ``n_qubits >= len(meas_wires)``.
 
     Args:
         mp_kind (str): measurement process of ``mitigatee_result``: ``"sample"``, ``"counts"``
             or ``"probs"``.
         mitigatee_result (jax.Array): result of the user circuit: integer samples of shape
-            ``(n_shots, n_qubits)``, or counts or probs of shape ``(2**n_qubits,)``.
-        confusion_matrices (jax.Array): confusion matrices of shape ``(n_qubits, 2, 2)``, as
-            returned by :func:`rem_calibrate`.
-        n_qubits (int): number of wires; must be static.
+            ``(n_shots, len(meas_wires))``, or counts or probs of shape ``(2**len(meas_wires),)``.
+        confusion_matrices (jax.Array): confusion matrices of shape ``(n_qubits, 2, 2)``, one per
+            device wire, as returned by :func:`rem_calibrate`.
+        meas_wires (Sequence[int]): list of wires that were measured, in the same order as in the
+            MeasurementProcess operation used in the quantum kernel. Must be static.
 
     Returns:
         For ``"sample"``, the tuple ``(unique_bitstrings, mitigated_counts)`` described in
         :func:`_rem_apply_to_samples`. For ``"counts"`` and ``"probs"``, the mitigated counts
-        or probs, of shape ``(2**n_qubits,)``.
+        or probs, of shape ``(2**len(meas_wires),)``.
     """
+    n_measured_qubits = len(meas_wires)
+    # Skip gather when all device wires are measured in order, the most common case.
+    if tuple(meas_wires) != tuple(range(jnp.shape(confusion_matrices)[0])):
+        confusion_matrices = jnp.asarray(confusion_matrices)[jnp.asarray(meas_wires)]
     if mp_kind == "sample":
-        return _rem_apply_to_samples(mitigatee_result, confusion_matrices, n_qubits)
+        return _rem_apply_to_samples(mitigatee_result, confusion_matrices, n_measured_qubits)
     if mp_kind == "counts":
-        return _rem_apply_to_counts(mitigatee_result, confusion_matrices, n_qubits)
+        return _rem_apply_to_counts(mitigatee_result, confusion_matrices, n_measured_qubits)
     if mp_kind == "probs":
-        return _rem_apply_to_probs(mitigatee_result, confusion_matrices, n_qubits)
+        return _rem_apply_to_probs(mitigatee_result, confusion_matrices, n_measured_qubits)
     raise ValueError(
         f"Unsupported measurement process {mp_kind!r}: expected 'sample', 'counts' or 'probs'."
     )
+
+
+def check_calibration_matrices(calibration_matrices: jax.Array, n_wires: int) -> None:
+    """Sanity checks for confusion matrices supplied by the user, e.g. cached from a previous run.
+
+    - The shape must be ``(n_wires, 2, 2)``, one matrix per device wire. :func:`rem_apply`
+      indexes them by register position, and JAX clamps out-of-range indices without an error,
+      so a stack of the wrong size would silently pair wires with the wrong matrices.
+    - All entries must be finite, and every matrix must be invertible, since :func:`rem_apply`
+      inverts them. A singular matrix gives infinite or NaN results, and under ``qjit``,
+      inverting a matrix with NaN entries can crash the process.
+
+    The values are only checked when they are known at trace time, i.e. not when the matrices
+    are passed to the ``qjit``-compiled function as an argument.
+
+    Args:
+        calibration_matrices (jax.Array): confusion matrices laid out as described in
+            :func:`rem_calibrate`.
+        n_wires (int): number of device wires.
+
+    Raises:
+        ValueError: if the shape is not ``(n_wires, 2, 2)``, or if a matrix has a non-finite
+            entry or is singular.
+    """
+    shape = tuple(jnp.shape(calibration_matrices))
+    if shape != (n_wires, 2, 2):
+        raise ValueError(
+            f"calibration_matrices must have shape ({n_wires}, 2, 2), one confusion matrix per "
+            f"device wire, got {shape}."
+        )
+    if isinstance(calibration_matrices, jax.core.Tracer):
+        return
+    matrices = np.asarray(calibration_matrices, dtype=float)
+    not_finite = [k for k in range(n_wires) if not np.isfinite(matrices[k]).all()]
+    if not_finite:
+        raise ValueError(
+            f"calibration_matrices has NaN or infinite entries for the wires {not_finite}."
+        )
+    singular = [k for k in range(n_wires) if np.isclose(np.linalg.det(matrices[k]), 0.0)]
+    if singular:
+        raise ValueError(
+            f"calibration_matrices has singular (non-invertible) matrices for the wires {singular}."
+        )
