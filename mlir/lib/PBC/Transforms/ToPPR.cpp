@@ -567,6 +567,52 @@ struct PBCMeasureLowering : public OpConversionPattern<MeasureOp> {
     }
 };
 
+struct PBCPauliMeasureLowering : public OpConversionPattern<MeasurementOp> {
+    using OpConversionPattern::OpConversionPattern;
+
+    LogicalResult matchAndRewrite(MeasurementOp op, OpAdaptor adaptor,
+                                  ConversionPatternRewriter &rewriter) const final {
+        if (op.getOpName() != "PauliMeasure") {
+            return failure();
+        }
+        if (!op.getParams().empty() || op.getInQreg() || !op.getArrQubitIndices().empty()) {
+            return rewriter.notifyMatchFailure(op, "expected explicit qubits and no parameters");
+        }
+        auto results = op.getMres();
+        if (results.size() > 1 || (!results.empty() && !results.front().getType().isInteger(1))) {
+            return rewriter.notifyMatchFailure(op, "expected at most one i1 measurement result");
+        }
+
+        auto staticData = op.getStaticData();
+        auto pauliWord = staticData.getAs<StringAttr>("pauli_word");
+        if (!pauliWord || pauliWord.getValue().size() != op.getInQubits().size()) {
+            return rewriter.notifyMatchFailure(op,
+                                               "expected a Pauli word matching the qubit count");
+        }
+        if (auto postselect = staticData.get("postselect");
+            postselect && !isa<TypeAttr>(postselect)) {
+            return op.emitOpError("postselection is not supported by PBC conversion");
+        }
+
+        SmallVector<Attribute> paulis;
+        for (char pauli : pauliWord.getValue()) {
+            if (pauli != 'I' && pauli != 'X' && pauli != 'Y' && pauli != 'Z') {
+                return rewriter.notifyMatchFailure(op, "invalid Pauli word");
+            }
+            paulis.push_back(rewriter.getStringAttr(StringRef(&pauli, 1)));
+        }
+        auto ppm = PPMeasurementOp::create(rewriter, op.getLoc(), rewriter.getArrayAttr(paulis),
+                                           op.getInQubits());
+        SmallVector<Value> replacements;
+        if (!results.empty()) {
+            replacements.push_back(ppm.getMres());
+        }
+        llvm::append_range(replacements, ppm.getOutQubits());
+        rewriter.replaceOp(op, replacements);
+        return success();
+    }
+};
+
 } // namespace
 
 namespace catalyst {
@@ -575,6 +621,7 @@ namespace pbc {
 void populateToPPRPatterns(RewritePatternSet &patterns) {
     patterns.add<PBCGateLowering>(patterns.getContext());
     patterns.add<PBCMeasureLowering>(patterns.getContext());
+    patterns.add<PBCPauliMeasureLowering>(patterns.getContext());
 }
 
 } // namespace pbc
