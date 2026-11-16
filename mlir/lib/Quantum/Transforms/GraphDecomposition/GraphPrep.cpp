@@ -373,7 +373,7 @@ LogicalResult loadDecompositionRules(ModuleOp module,
     return success();
 }
 
-// Capture missing root closures through Python and add candidates to the rule library.
+// Capture the combined closure of missing roots through Python and add it to the rule library.
 LogicalResult loadPythonDecomps(ModuleOp module, ModuleOp ruleLibrary, ArrayRef<std::string> opIDs,
                                 const WeightedGateset &targetGateSet, llvm::StringRef libQPDPath,
                                 llvm::StringRef libpythonPath) {
@@ -394,85 +394,64 @@ LogicalResult loadPythonDecomps(ModuleOp module, ModuleOp ruleLibrary, ArrayRef<
         });
     }
 
-    llvm::StringSet<> requestedOpIds;
+    llvm::SmallVector<std::string> requestedIds;
     for (const auto &opId : opIDs) {
         if (!handledOpIds.contains(opId) && !targetGateSet.contains(parseOperator(opId))) {
-            requestedOpIds.insert(opId);
+            requestedIds.push_back(opId);
         }
     }
+    if (requestedIds.empty()) {
+        return success();
+    }
 
+    // These operations supply argument metadata. Resource analysis supplies the identities,
+    // including modifiers inherited from regions and calls.
     llvm::SmallVector<catalyst::quantum::DecomposableOp> decomposableOps;
     module.walk([&](catalyst::quantum::DecomposableOp op) {
-        if (!DecompUtils::isInDecompRule(op) && requestedOpIds.contains(op.getGraphOpId())) {
+        if (!DecompUtils::isInDecompRule(op)) {
             decomposableOps.push_back(op);
         }
     });
 
-    for (catalyst::quantum::DecomposableOp op : decomposableOps) {
-        std::string opId = op.getGraphOpId();
+    // Resolve Python only when gates need rules. Capture all missing roots together so shared
+    // dependencies are discovered and traced once.
+    if (!loadQPD(libQPDPath.str(), libpythonPath.str())) {
+        return module.emitError("failed to load the Python decomposition callback");
+    }
 
-        if (handledOpIds.contains(opId)) {
-            continue;
-        }
+    std::string mlirText;
+    std::string errorMessage;
+    if (!pythonRuleLowering(decomposableOps, requestedIds, mlirText, errorMessage)) {
+        return module.emitError() << "failed to load decomposition rules: " << errorMessage;
+    }
 
-        // Resolve Python only when a gate actually needs rules. Modules whose rules are already
-        // embedded, or whose gates are native to the target, do not need a Python runtime.
-        if (!loadQPD(libQPDPath.str(), libpythonPath.str())) {
-            return op.emitError("failed to load the Python decomposition callback");
-        }
+    mlir::ParserConfig config(context);
+    auto moduleOp = mlir::parseSourceString<ModuleOp>(llvm::StringRef(mlirText), config);
+    if (!moduleOp) {
+        return module.emitError("failed to parse MLIR from python-decomposition");
+    }
 
-        std::string mlirText;
-        std::string errorMessage;
-        if (!pythonRuleLowering(op, mlirText, errorMessage)) {
-            return op.emitError() << "failed to load decomposition rules for " << opId << ": "
-                                  << errorMessage;
-        }
+    // Shared tracing emits reference semantics. Convert before inserting the rules so
+    // decompose-lowering's modifier preprocessing can see their adjoint/control regions.
+    PassManager rulesPm(context);
+    rulesPm.addPass(catalyst::qref::createValueSemanticsConversionPass());
+    if (failed(rulesPm.run(*moduleOp))) {
+        return module.emitError("failed to prepare decomposition rules");
+    }
 
-        mlir::ParserConfig config(context);
-        auto moduleOp = mlir::parseSourceString<ModuleOp>(llvm::StringRef(mlirText), config);
-        if (!moduleOp) {
-            // If we fail to parse the lowered module this op will be left without a
-            // decomposition, so we must fail here.
-            llvm::errs() << "failed to parse MLIR from python-decomposition\n";
-            return failure();
+    // Keep candidates alongside precompiled rules; import only selected rules and their helpers.
+    for (auto func : llvm::make_early_inc_range(moduleOp->getOps<func::FuncOp>())) {
+        auto targetGate = func->getAttrOfType<StringAttr>("target_gate");
+        if (targetGate && handledOpIds.contains(targetGate.getValue())) {
+            func.erase();
         }
-
-        // Shared tracing emits reference semantics. Convert before inserting the rules so
-        // decompose-lowering's modifier preprocessing can see their adjoint/control regions.
-        PassManager rulesPm(context);
-        rulesPm.addPass(catalyst::qref::createValueSemanticsConversionPass());
-        if (failed(rulesPm.run(*moduleOp))) {
-            return op.emitError() << "failed to prepare decomposition rules for " << opId;
-        }
-
-        // The captured closure supplies every candidate needed by the solver. Keep it in the
-        // same library as precompiled rules; only selected rules and their helpers are imported.
-        llvm::StringSet<> newlyHandled;
-        for (auto func : llvm::make_early_inc_range(moduleOp->getOps<func::FuncOp>())) {
-            auto targetGate = func->getAttrOfType<StringAttr>("target_gate");
-            if (!targetGate) {
-                continue;
-            }
-            if (handledOpIds.contains(targetGate.getValue())) {
-                func.erase();
-                continue;
-            }
-            newlyHandled.insert(targetGate.getValue());
-        }
-        if (failed(prepareRuleLibrary(ruleLibrary, *moduleOp, &circuitSymbols))) {
-            return failure();
-        }
-        for (auto func : llvm::make_early_inc_range(moduleOp->getOps<func::FuncOp>())) {
-            func->remove();
-            librarySymbols.insert(func);
-        }
-        for (const auto &target : newlyHandled) {
-            handledOpIds.insert(target.getKey());
-        }
-        // Mark this op handled even if its closure produced no rule (e.g. no decomposition
-        // exists), so repeated instances of the same gate do not re-invoke the Python
-        // loader.
-        handledOpIds.insert(opId);
+    }
+    if (failed(prepareRuleLibrary(ruleLibrary, *moduleOp, &circuitSymbols))) {
+        return failure();
+    }
+    for (auto func : llvm::make_early_inc_range(moduleOp->getOps<func::FuncOp>())) {
+        func->remove();
+        librarySymbols.insert(func);
     }
     return success();
 }
