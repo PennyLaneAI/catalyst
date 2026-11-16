@@ -133,15 +133,18 @@ struct ResourceEstimatePass : public impl::ResourceEstimatePassBase<ResourceEsti
 
             auto graphOp = solution.find(operatorNode);
             if (graphOp == solution.end()) {
-                // this case should not happen, because the graph should be complete
-                // Not a graph operator (e.g. a mid-circuit measurement): count the op itself.
-                estimate.operations[goid][{-1, -1}] += scale;
+                // Not a graph operator (e.g. a Pauli product rotation): count the op itself by
+                // its name.
+                estimate.operations[GraphPrep::getGraphOpName(goid)][{-1, -1}] += scale;
                 continue;
             }
             for (const auto &[basisOp, count] : graphOp->second.basisCounts) {
                 // Getting wires and params from GOID is unreliable. The JSON is flattened anyways,
                 // so for qp.estimate this will be enough.
-                estimate.operations[basisOp.name][{-1, -1}] += count * scale;
+                // Unlike `basisOp.name`, the name in the GOID keeps the number of control qubits,
+                // e.g. `2C(RX)`, as in `ResourceAnalysis`.
+                estimate.operations[GraphPrep::getGraphOpName(basisOp.id)][{-1, -1}] +=
+                    count * scale;
             }
         }
         return estimate;

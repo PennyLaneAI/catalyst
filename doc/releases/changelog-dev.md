@@ -993,6 +993,12 @@
 
 <h3>Bug fixes 🐛</h3>
 
+* The `resource-estimate` pass now keeps the number of control qubits in the names of the gates,
+  e.g. `2C(RX)`, as `resource-analysis` does. Gates with different numbers of control qubits were
+  counted together as `C(RX)`. The ops outside the decomposition graph, such as Pauli product
+  rotations, are also counted by their names, e.g. `PPR-pi/4` instead of `PPR-pi/4[Z]`.
+  [(#3484)](https://github.com/PennyLaneAI/catalyst/pull/3484)
+
 * The `gpu_verbs` coprocessor now supports the NVIDIA GH200 with CUDA 12.4.
   [(#3467)](https://github.com/PennyLaneAI/catalyst/pull/3467)
 
