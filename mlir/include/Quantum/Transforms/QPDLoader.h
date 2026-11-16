@@ -15,15 +15,17 @@
 #pragma once
 
 #include <string>
-#include <vector>
+
+#include "llvm/ADT/ArrayRef.h"
 
 #include "Quantum/IR/QuantumInterfaces.h"
 
 namespace catalyst::quantum {
 
 // Keep Python exceptions inside the plugin: compiler passes are built without exception support.
-using PythonRuleLoweringFn = bool (*)(DecomposableGate op, std::string &mlirText,
-                                      std::string &errorMessage);
+using PythonRuleLoweringFn = bool (*)(llvm::ArrayRef<DecomposableGate> ops,
+                                      llvm::ArrayRef<std::string> requestedIds,
+                                      std::string &mlirText, std::string &errorMessage);
 
 extern PythonRuleLoweringFn pythonRuleLowering;
 

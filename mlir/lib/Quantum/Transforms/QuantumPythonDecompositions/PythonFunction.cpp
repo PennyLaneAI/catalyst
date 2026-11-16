@@ -19,11 +19,15 @@
 #include <exception>
 #include <iostream>
 #include <string>
+#include <utility>
 
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/SmallVector.h"
+#include "llvm/ADT/StringExtras.h"
+#include "llvm/ADT/StringMap.h"
 #include "llvm/ADT/StringRef.h"
+#include "llvm/ADT/StringSet.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/Casting.h"
 #include "llvm/Support/DebugLog.h"
@@ -214,40 +218,92 @@ static nb::object getPyvalFromMlirAttribute(mlir::Attribute attr) {
 
 } // namespace
 
-bool pythonRuleLowering(catalyst::quantum::DecomposableGate op, std::string &mlirText,
+bool pythonRuleLowering(llvm::ArrayRef<catalyst::quantum::DecomposableGate> ops,
+                        llvm::ArrayRef<std::string> requestedIds, std::string &mlirText,
                         std::string &errorMessage) {
     try {
         QuantumPythonDecompositions::PyInterpreterGuard guard;
         mlirText = guard.withGil([&] -> std::string {
             const char *moduleName = "catalyst.decomposition.decomposition_rules";
             const char *functionName = "compile_reachable_decomposition_rules_wrapper";
+            std::string tracingContext;
 
             try {
                 nb::module_ wrapperModule = nb::module_::import_(moduleName);
                 nb::object wrapperFunction = wrapperModule.attr(functionName);
 
-                // The wrapper resolves OperatorRegistry and traces the reachable closure in one
-                // module. Pass the full identity, including operation-level modifiers and work
-                // wires.
-                auto dynamicShape = op.getDynamicShape();
-                // Control lowering promotes custom gates with work wires to OperatorOp, while
-                // retaining their positional parameter names and operand layout.
-                bool positionalParameters =
-                    !dynamicShape.empty() && llvm::all_of(dynamicShape, [](const auto &parameter) {
-                        return !parameter.first.empty() &&
-                               llvm::StringRef(parameter.first).find_first_not_of("0123456789") ==
-                                   llvm::StringRef::npos;
-                    });
-                nb::object pythonResult = wrapperFunction(
-                    op.getOperatorName(), op.getGraphOpId(), getPyvalFromDynamicShape(dynamicShape),
-                    getPyvalFromWireLens(op.getWireLens()),
-                    getPyvalFromMlirAttribute(op.getStaticData()),
-                    nb::arg("is_custom_op") =
-                        isa<catalyst::quantum::CustomOp>(op) || positionalParameters);
+                // Index base identities once. The original operations supply operand order,
+                // which cannot be recovered from their sorted graph IDs.
+                llvm::StringMap<catalyst::quantum::DecomposableGate> baseOps;
+                llvm::StringSet<> seenNames;
+                llvm::SmallVector<std::string> opNames;
+                for (auto op : ops) {
+                    baseOps.try_emplace(op.getGraphOpIdExplicitModifiers(false, 0, 0, false), op);
+                    auto name = op.getOperatorName();
+                    if (seenNames.insert(name).second) {
+                        opNames.push_back(std::move(name));
+                    }
+                }
+
+                nb::object parseId = wrapperModule.attr("ModifierState").attr("from_graph_op_id");
+                llvm::StringMap<nb::dict> metadata;
+                nb::list requests;
+                for (const auto &opId : requestedIds) {
+                    tracingContext = opId;
+                    auto match = baseOps.end();
+                    for (const auto &name : opNames) {
+                        try {
+                            nb::tuple parsed(parseId(name, opId));
+                            match = baseOps.find(nb::cast<std::string>(parsed[0]));
+                            if (match != baseOps.end()) {
+                                break;
+                            }
+                        } catch (const nb::python_error &error) {
+                            // A modified ID for another base name cannot be unwrapped.
+                            if (!error.matches(PyExc_ValueError)) {
+                                throw;
+                            }
+                        }
+                    }
+                    if (match == baseOps.end()) {
+                        throw QuantumPythonDecompositions::QPDError(
+                            "No operation matches resource graph ID " + opId);
+                    }
+
+                    auto [entry, inserted] = metadata.try_emplace(match->getKey());
+                    nb::dict data = entry->second;
+                    if (inserted) {
+                        auto op = match->second;
+                        auto dynamicShape = op.getDynamicShape();
+                        // Control lowering can promote custom gates to OperatorOp while
+                        // retaining their positional parameter names.
+                        bool positionalParameters =
+                            !dynamicShape.empty() &&
+                            llvm::all_of(dynamicShape, [](const auto &parameter) {
+                                return !parameter.first.empty() &&
+                                       llvm::StringRef(parameter.first)
+                                               .find_first_not_of("0123456789") ==
+                                           llvm::StringRef::npos;
+                            });
+                        data["op_name"] = nb::cast(op.getOperatorName());
+                        data["dynamic_shape"] = getPyvalFromDynamicShape(dynamicShape);
+                        data["wire_lens"] = getPyvalFromWireLens(op.getWireLens());
+                        data["static_data"] = getPyvalFromMlirAttribute(op.getStaticData());
+                        data["is_custom_op"] =
+                            nb::bool_(isa<catalyst::quantum::CustomOp>(op) || positionalParameters);
+                    }
+                    // Modifier variants share metadata, but each request retains its full ID.
+                    nb::dict request = nb::borrow<nb::dict>(data.attr("copy")());
+                    request["op_id"] = nb::cast(opId);
+                    requests.append(request);
+                }
+
+                tracingContext = llvm::join(requestedIds, ", ");
+                nb::object pythonResult = wrapperFunction(requests);
                 return nb::borrow<nb::str>(pythonResult).c_str();
-            } catch (const nb::python_error &error) {
+            } catch (const std::exception &error) {
                 throw QuantumPythonDecompositions::TracingError(moduleName, functionName,
-                                                                op.getGraphOpId(), error.what());
+                                                                tracingContext, error.what());
             }
         });
         return true;
