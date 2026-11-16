@@ -1130,11 +1130,11 @@ def build_registered_decomp_target_spec(
     body rebuilds the operator from its own traced arguments.
 
     An adjointed target is decomposed by the ``Adjoint(op)`` rules, and any controls are wrapped
-    around each rule body to synthesize the composed modifier ``C(Adjoint(op))``. This reduces the
-    adjoint under control (``C(Adjoint(RZ)) -> C(RZ)``), which the registered ``C(op)`` rules then
-    terminate (``C(RZ) -> CRZ``) -- something plain distribution cannot reach, since a registered
-    ``C(op)`` rule reads op-specific attributes and cannot take an adjoint base. A target that is
-    only controlled is decomposed by the ``C(op)`` rules, which take the controls as arguments.
+    around each rule body to synthesize the composed modifier ``<n>C(Adjoint(op))``. This reduces
+    the adjoint under control (``<n>C(Adjoint(RZ)) -> <n>C(RZ)``), which the registered ``C(op)``
+    rules then terminate (``1C(RZ) -> CRZ``) -- something plain distribution cannot reach, since a
+    registered ``C(op)`` rule reads op-specific attributes and cannot take an adjoint base. A target
+    that is only controlled is decomposed by the ``C(op)`` rules, which take the controls as arguments.
 
     Args:
         op_name (str): the base operator's name
@@ -1240,7 +1240,7 @@ def build_registered_decomp_target_spec(
             # TODO: Call the rule itself instead of its _impl after merging
             # https://github.com/PennyLaneAI/pennylane/pull/10144
             if wrap_control:
-                # Reduce the adjoint under control: C(Adjoint(op)) -> C(<adjoint decomposition>).
+                # Reduce the adjoint under control: <n>C(Adjoint(op)) -> <n>C(<adjoint decomposition>).
                 controls.wrap_callable(
                     lambda: rule._impl(**symbolic_arguments(base, kind, None)),
                     _ctrl_wires,

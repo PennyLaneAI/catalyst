@@ -707,7 +707,7 @@ def test_ctrl_rule_is_traversed():
 # CHECK: func.func private @__builtin_ctrl_rule{{(_[0-9]+)?}}
 # CHECK-SAME:   resources = {operations = {
 # CHECK-SAME:   "CompilableData{}{wires:1}{a = \22a\22, b = \22b\22, thing = \22thing\22}" = 1 : i64
-# CHECK-SAME:   target_gate = "C(NoParams){}{reg:1}{}"
+# CHECK-SAME:   target_gate = "1C(NoParams){}{reg:1}{}"
 # CHECK: qref.operator "CompilableData"
 #
 # CHECK: func.func private @__builtin_rule{{(_[0-9]+)?}}

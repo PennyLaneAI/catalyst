@@ -154,7 +154,7 @@ def test_region_control_and_adjoint_orders():
         control_adjoint_mlir = str(control_adjoint.mlir_module)
         adjoint_control_mlir = str(adjoint_control.mlir_module)
 
-    target = 'target_gate = "C(Adjoint(RepeatedGate)){}{wires:1}{}"'
+    target = 'target_gate = "1C(Adjoint(RepeatedGate)){}{wires:1}{}"'
     assert control_adjoint_mlir.count(target) == 1
     assert adjoint_control_mlir.count(target) == 1
 
@@ -482,7 +482,7 @@ def test_modifier_changing_identity_cycle_is_closed():
     targets = {target_spec.target_id for target_spec in target_specs}
     assert targets == {
         "CyclicGate{}{wires:1}{}",
-        "C(CyclicGate){}{wires:1}{}",
+        "1C(CyclicGate){}{wires:1}{}",
     }
 
 
@@ -516,7 +516,7 @@ def test_indirect_control_cycle_uses_same_ancestor_count():
         target_specs = walk_reachable_decomp_rule_sets([(request, {request.modifier_state})])
 
     targets = {target_spec.target_id for target_spec in target_specs}
-    assert "C(IndirectCycleGate){}{wires:1}{}" in targets
+    assert "1C(IndirectCycleGate){}{wires:1}{}" in targets
     assert "CycleBridge{}{wires:1}{}" in targets
     assert "2C(IndirectCycleGate){}{wires:1}{}" not in targets
 
@@ -531,7 +531,7 @@ class TestControlWorkWireCycles:
     @staticmethod
     def _borrowed_ctrl_id(name, num_controls, num_work_wires):
         """The target id of ``name`` under controls with borrowed control work wires."""
-        prefix = "C" if num_controls == 1 else f"{num_controls}C"
+        prefix = f"{num_controls}C"
         return (
             f"{prefix}({name}){{}}{{ctrl_work_wires:{num_work_wires},wires:1}}"
             '{ctrl_work_wire_type = "borrowed"}'

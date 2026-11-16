@@ -159,7 +159,7 @@ LogicalResult parseGateset(ArrayRef<std::string> targetGateSetOption,
  *
  * The graphOpId format is "<name>{params}{wires}{static}[uid]", where <name> already
  * carries any name-wrapped op-level modifiers produced by `defaultGetGraphOpId`, e.g.
- * "C(Adjoint(RX)){0:[f64]}{wires:1}{}".
+ * "1C(Adjoint(RX)){0:[f64]}{wires:1}{}".
  */
 OperatorNode parseOperator(llvm::StringRef id) {
     OperatorNode node;
