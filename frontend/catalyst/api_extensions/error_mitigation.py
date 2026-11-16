@@ -29,9 +29,9 @@ from jax._src.tree_util import tree_flatten
 from pennylane.measurements import MeasurementProcess
 
 from catalyst.api_extensions.rem_postprocessing import (
-    check_calibration_matrices,
     rem_apply,
     rem_calibrate,
+    rem_check_calibration_matrices,
 )
 from catalyst.jax_primitives import Folding, func_p, quantum_kernel_p, rem_p, zne_p
 from catalyst.jax_tracer import Function
@@ -467,7 +467,7 @@ class RemCallable(CatalystCallable):
 
         run_calibration = self.calibration_matrices is None
         if not run_calibration:
-            check_calibration_matrices(self.calibration_matrices, n_wires)
+            rem_check_calibration_matrices(self.calibration_matrices, n_wires)
         rem_results = rem_p.bind(
             *args_data,
             run_calibration=run_calibration,

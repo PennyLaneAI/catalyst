@@ -22,7 +22,7 @@ to the three sample arrays emitted by the ``mitigation.rem`` op after
 lowering.
 
 The public entry points are :func:`rem_calibrate`, :func:`rem_apply` and
-:func:`check_calibration_matrices`.
+:func:`rem_check_calibration_matrices`.
 """
 
 from functools import partial, reduce
@@ -342,7 +342,7 @@ def rem_calibrate(mp_kind: str, zeros_result: jax.Array, ones_result: jax.Array)
       wire ``k``, and ``confusion_matrices[k][i, j]`` is the probability of measuring ``i`` on
       that wire when ``j`` was prepared: rows are measured values, columns are prepared values,
       and each column sums to one.
-    - The transition matrix of the measured wires, given as ``meas_wires`` to :func:`rem_apply`,
+    - The transition matrix of the measured wires, computed in :func:`rem_apply`,
       is ``kron(confusion_matrices[meas_wires[0]], ..., confusion_matrices[meas_wires[-1]])``,
       so that ``noisy = transition_matrix @ ideal``.
 
@@ -410,7 +410,7 @@ def rem_apply(
     )
 
 
-def check_calibration_matrices(calibration_matrices: jax.Array, n_wires: int) -> None:
+def rem_check_calibration_matrices(calibration_matrices: jax.Array, n_wires: int) -> None:
     """Sanity checks for confusion matrices supplied by the user, e.g. cached from a previous run.
 
     - The shape must be ``(n_wires, 2, 2)``, one matrix per device wire. :func:`rem_apply`

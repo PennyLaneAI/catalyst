@@ -30,9 +30,9 @@ from catalyst.api_extensions.rem_postprocessing import (
     _rem_calibrate_probs,
     _rem_calibrate_samples,
     _stretch_confusion_matrix,
-    check_calibration_matrices,
     rem_apply,
     rem_calibrate,
+    rem_check_calibration_matrices,
 )
 
 
@@ -580,13 +580,13 @@ def test_cached_matrices_wrong_shape():
         (0.5, r"singular \(non-invertible\) matrices for the wires \[1\]"),
     ],
 )
-def test_check_calibration_matrices_malformed(bad, message):
+def test_rem_check_calibration_matrices_malformed(bad, message):
     """Malformed confusion matrices are rejected with the offending wires."""
     cm = _per_qubit_asymmetric_confusion(3)
     cm[1] = bad  # 0.5 everywhere: equal columns, so the matrix is singular
     with pytest.raises(ValueError, match=message):
-        check_calibration_matrices(cm, 3)
-    check_calibration_matrices(_per_qubit_asymmetric_confusion(3), 3)
+        rem_check_calibration_matrices(cm, 3)
+    rem_check_calibration_matrices(_per_qubit_asymmetric_confusion(3), 3)
 
 
 def test_cached_matrices_malformed_rejected_at_trace_time():
