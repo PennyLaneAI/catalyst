@@ -1394,7 +1394,7 @@ ParseResult OperatorOp::parse(OpAsmParser &parser, OperationState &result) {
 }
 
 //===----------------------------------------------------------------------===//
-// DecomposableGate interface methods.
+// DecomposableOp interface methods.
 //===----------------------------------------------------------------------===//
 
 // CustomOp

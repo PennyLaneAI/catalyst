@@ -47,7 +47,7 @@ namespace test {
 void registerTestDialect(mlir::DialectRegistry &);
 } // namespace test
 
-TEST(DecomposableGateInterfaceTests, CustomOp) {
+TEST(DecomposableOpInterfaceTests, CustomOp) {
     std::string moduleStr = R"mlir(
 module {
   %angle = arith.constant 3.1 : f64
@@ -64,7 +64,7 @@ module {
     ParserConfig config(&context, /*verifyAfterParse=*/false);
     OwningOpRef<ModuleOp> module = parseSourceString<ModuleOp>(moduleStr, config);
 
-    DecomposableGate customOp = *module->getOps<CustomOp>().begin();
+    DecomposableOp customOp = *module->getOps<CustomOp>().begin();
 
     ASSERT_EQ(customOp.getOperatorName(), "RX");
 
@@ -80,7 +80,7 @@ module {
     ASSERT_EQ(customOp.getGraphOpIdExplicitModifiers(false, 0, 0, false), "RX{0:[f64]}{wires:2}{}");
 }
 
-TEST(DecomposableGateInterfaceTests, MultiControlledCustomOp) {
+TEST(DecomposableOpInterfaceTests, MultiControlledCustomOp) {
     std::string moduleStr = R"mlir(
 module {
   %true = arith.constant true
@@ -97,14 +97,14 @@ module {
     ParserConfig config(&context, /*verifyAfterParse=*/false);
     OwningOpRef<ModuleOp> module = parseSourceString<ModuleOp>(moduleStr, config);
 
-    DecomposableGate op = *module->getOps<CustomOp>().begin();
+    DecomposableOp op = *module->getOps<CustomOp>().begin();
 
     // Two control wires fold as `2C(...)`
     ASSERT_EQ(op.getGraphOpId(), "2C(PauliX){}{wires:1}{}");
     ASSERT_EQ(op.getGraphOpIdExplicitModifiers(false, 2, 0, false), "2C(PauliX){}{wires:1}{}");
 }
 
-TEST(DecomposableGateInterfaceTests, ControlledAdjointCustomOp) {
+TEST(DecomposableOpInterfaceTests, ControlledAdjointCustomOp) {
     std::string moduleStr = R"mlir(
 module {
   %true = arith.constant true
@@ -121,7 +121,7 @@ module {
     ParserConfig config(&context, /*verifyAfterParse=*/false);
     OwningOpRef<ModuleOp> module = parseSourceString<ModuleOp>(moduleStr, config);
 
-    DecomposableGate op = *module->getOps<CustomOp>().begin();
+    DecomposableOp op = *module->getOps<CustomOp>().begin();
 
     // Modifiers fold control-outermost
     ASSERT_EQ(op.getGraphOpId(), "1C(Adjoint(RX)){0:[f64]}{wires:1}{}");
@@ -129,7 +129,7 @@ module {
               "1C(Adjoint(RX)){0:[f64]}{wires:1}{}");
 }
 
-TEST(DecomposableGateInterfaceTests, MultiControlledAdjointCustomOp) {
+TEST(DecomposableOpInterfaceTests, MultiControlledAdjointCustomOp) {
     std::string moduleStr = R"mlir(
 module {
   %true = arith.constant true
@@ -147,7 +147,7 @@ module {
     ParserConfig config(&context, /*verifyAfterParse=*/false);
     OwningOpRef<ModuleOp> module = parseSourceString<ModuleOp>(moduleStr, config);
 
-    DecomposableGate op = *module->getOps<CustomOp>().begin();
+    DecomposableOp op = *module->getOps<CustomOp>().begin();
 
     // Controls + Adjoint folding
     ASSERT_EQ(op.getGraphOpId(), "2C(Adjoint(RX)){0:[f64]}{wires:1}{}");
@@ -155,7 +155,7 @@ module {
               "2C(Adjoint(RX)){0:[f64]}{wires:1}{}");
 }
 
-TEST(DecomposableGateInterfaceTests, MultiRZOp) {
+TEST(DecomposableOpInterfaceTests, MultiRZOp) {
     std::string moduleStr = R"mlir(
 module {
   %angle = arith.constant 3.1 : f64
@@ -173,7 +173,7 @@ module {
     ParserConfig config(&context, /*verifyAfterParse=*/false);
     OwningOpRef<ModuleOp> module = parseSourceString<ModuleOp>(moduleStr, config);
 
-    DecomposableGate multiRZ = *module->getOps<MultiRZOp>().begin();
+    DecomposableOp multiRZ = *module->getOps<MultiRZOp>().begin();
 
     ASSERT_EQ(multiRZ.getOperatorName(), "MultiRZ");
 
@@ -191,7 +191,7 @@ module {
               "MultiRZ{theta:[f64]}{wires:3}{}");
 }
 
-TEST(DecomposableGateInterfaceTests, PauliRotOp) {
+TEST(DecomposableOpInterfaceTests, PauliRotOp) {
     std::string moduleStr = R"mlir(
 module {
   %angle = arith.constant 3.1 : f64
@@ -209,7 +209,7 @@ module {
     ParserConfig config(&context, /*verifyAfterParse=*/false);
     OwningOpRef<ModuleOp> module = parseSourceString<ModuleOp>(moduleStr, config);
 
-    DecomposableGate paulirot = *module->getOps<PauliRotOp>().begin();
+    DecomposableOp paulirot = *module->getOps<PauliRotOp>().begin();
 
     ASSERT_EQ(paulirot.getOperatorName(), "PauliRot");
 
@@ -230,7 +230,7 @@ module {
               "PauliRot{theta:[f64]}{wires:3}{pauli_word = \"XYZ\"}");
 }
 
-TEST(DecomposableGateInterfaceTests, PCPhaseOP) {
+TEST(DecomposableOpInterfaceTests, PCPhaseOP) {
     std::string moduleStr = R"mlir(
 module {
   %theta = arith.constant 3.7 : f64
@@ -248,7 +248,7 @@ module {
     ParserConfig config(&context, /*verifyAfterParse=*/false);
     OwningOpRef<ModuleOp> module = parseSourceString<ModuleOp>(moduleStr, config);
 
-    DecomposableGate pcphase = *module->getOps<PCPhaseOp>().begin();
+    DecomposableOp pcphase = *module->getOps<PCPhaseOp>().begin();
 
     ASSERT_EQ(pcphase.getOperatorName(), "PCPhase");
 
@@ -270,7 +270,7 @@ module {
               "1C(PCPhase){phi:[f64]}{wires:2}{dim = 0 : i64}");
 }
 
-TEST(DecomposableGateInterfaceTests, GlobalPhaseOp) {
+TEST(DecomposableOpInterfaceTests, GlobalPhaseOp) {
     std::string moduleStr = R"mlir(
 module {
   %angle = arith.constant 3.1 : f64
@@ -285,7 +285,7 @@ module {
     ParserConfig config(&context, /*verifyAfterParse=*/false);
     OwningOpRef<ModuleOp> module = parseSourceString<ModuleOp>(moduleStr, config);
 
-    DecomposableGate gphase = *module->getOps<GlobalPhaseOp>().begin();
+    DecomposableOp gphase = *module->getOps<GlobalPhaseOp>().begin();
 
     ASSERT_EQ(gphase.getOperatorName(), "GlobalPhase");
 
@@ -303,7 +303,7 @@ module {
               "GlobalPhase{phi:[f64]}{}{}");
 }
 
-TEST(DecomposableGateInterfaceTests, ControlledGlobalPhaseOp) {
+TEST(DecomposableOpInterfaceTests, ControlledGlobalPhaseOp) {
     std::string moduleStr = R"mlir(
 module {
   %angle = arith.constant 3.1 : f64
@@ -320,7 +320,7 @@ module {
     ParserConfig config(&context, /*verifyAfterParse=*/false);
     OwningOpRef<ModuleOp> module = parseSourceString<ModuleOp>(moduleStr, config);
 
-    DecomposableGate gphase = *module->getOps<GlobalPhaseOp>().begin();
+    DecomposableOp gphase = *module->getOps<GlobalPhaseOp>().begin();
 
     ASSERT_EQ(gphase.getOperatorName(), "GlobalPhase");
 
@@ -340,7 +340,7 @@ module {
               "1C(GlobalPhase){phi:[f64]}{}{}");
 }
 
-TEST(DecomposableGateInterfaceTests, QubitUnitaryOp) {
+TEST(DecomposableOpInterfaceTests, QubitUnitaryOp) {
     std::string moduleStr = R"mlir(
 module {
   %matrix = "test.op"() : () -> tensor<4x4xcomplex<f64>>
@@ -359,7 +359,7 @@ module {
     ParserConfig config(&context, /*verifyAfterParse=*/false);
     OwningOpRef<ModuleOp> module = parseSourceString<ModuleOp>(moduleStr, config);
 
-    DecomposableGate unitary = *module->getOps<QubitUnitaryOp>().begin();
+    DecomposableOp unitary = *module->getOps<QubitUnitaryOp>().begin();
 
     ASSERT_EQ(unitary.getOperatorName(), "QubitUnitary");
 
@@ -379,7 +379,7 @@ module {
               "1C(QubitUnitary){U:[tensor<4x4xcomplex<f64>>]}{wires:2}{}");
 }
 
-TEST(DecomposableGateInterfaceTests, OperatorOpQubits) {
+TEST(DecomposableOpInterfaceTests, OperatorOpQubits) {
     std::string moduleStr = R"mlir(
 module {
   %angle = arith.constant 3.1 : f64
@@ -399,7 +399,7 @@ module {
     OwningOpRef<ModuleOp> module = parseSourceString<ModuleOp>(moduleStr, config);
 
     auto operators = module->getOps<OperatorOp>();
-    DecomposableGate op = *operators.begin();
+    DecomposableOp op = *operators.begin();
 
     ASSERT_EQ(op.getOperatorName(), "testInterfaceOp");
 
@@ -438,7 +438,7 @@ module {
               "myStaticArray = [1, 2, 3], myStaticInt = 4 : i64, myStaticString = \"Test\"}");
 }
 
-TEST(DecomposableGateInterfaceTests, OperatorOpDistinguishesGenericAndControlWorkWires) {
+TEST(DecomposableOpInterfaceTests, OperatorOpDistinguishesGenericAndControlWorkWires) {
     std::string moduleStr = R"mlir(
 module {
   %true = arith.constant true
@@ -461,12 +461,13 @@ module {
     OwningOpRef<ModuleOp> module = parseSourceString<ModuleOp>(moduleStr, config);
 
     auto operatorOp = *module->getOps<OperatorOp>().begin();
-    DecomposableGate op = operatorOp;
+    DecomposableOp op = operatorOp;
     catalyst::quantum::WireLens expectedWires = {
         {"wires", 1}, {"work_wires", 1}, {"ctrl_work_wires", 1}};
 
     ASSERT_EQ(op.getWireLens(), expectedWires);
-    ASSERT_EQ(op.getNonCtrlQubitOperands().size(), 3u);
+    ASSERT_EQ(cast<QuantumGate>(op.getOperation()).getNonCtrlQubitOperands().size(), 3u);
+    ASSERT_TRUE(op.isModifiable());
     ASSERT_EQ(op.getGraphOpId(),
               "1C(MultiControlledX){}{ctrl_work_wires:1,wires:1,work_wires:1}{"
               "ctrl_work_wire_type = \"zeroed\", work_wire_type = \"borrowed\"}");
@@ -476,7 +477,7 @@ module {
               "ctrl_work_wire_type = \"zeroed\", work_wire_type = \"borrowed\"}");
 }
 
-TEST(DecomposableGateInterfaceTests, OperatorOpQureg) {
+TEST(DecomposableOpInterfaceTests, OperatorOpQureg) {
     std::string moduleStr = R"mlir(
 func.func @testfunc(%first : tensor<1xi64>, %secondthird : tensor<2xi64>) {
   %angle = arith.constant 3.1 : f64
@@ -497,7 +498,7 @@ func.func @testfunc(%first : tensor<1xi64>, %secondthird : tensor<2xi64>) {
     ParserConfig config(&context, /*verifyAfterParse=*/false);
     OwningOpRef<ModuleOp> module = parseSourceString<ModuleOp>(moduleStr, config);
 
-    DecomposableGate op;
+    DecomposableOp op;
     module->walk([&](OperatorOp walkOp) { op = walkOp; });
 
     ASSERT_EQ(op.getOperatorName(), "testOperatorQureg");
@@ -539,7 +540,7 @@ func.func @testfunc(%first : tensor<1xi64>, %secondthird : tensor<2xi64>) {
               "myStaticString = \"string\"}");
 }
 
-TEST(DecomposableGateInterfaceTests, OperatorOpUID) {
+TEST(DecomposableOpInterfaceTests, OperatorOpUID) {
     std::string moduleStr = R"mlir(
 func.func @testfunc(%first : tensor<1xi64>, %secondthird : tensor<2xi64>, %arg1 : tensor<i1>, %arg2: tensor<f64>, %arg3: tensor<i64>) {
 
@@ -560,7 +561,7 @@ func.func @testfunc(%first : tensor<1xi64>, %secondthird : tensor<2xi64>, %arg1 
     ParserConfig config(&context, /*verifyAfterParse=*/false);
     OwningOpRef<ModuleOp> module = parseSourceString<ModuleOp>(moduleStr, config);
 
-    DecomposableGate op;
+    DecomposableOp op;
     module->walk([&](OperatorOp walkOp) { op = walkOp; });
 
     ASSERT_EQ(op.getOperatorName(), "testOperatorUID");

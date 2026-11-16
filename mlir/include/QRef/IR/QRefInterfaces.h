@@ -18,7 +18,7 @@
 #include <utility>
 #include <vector>
 
-#include "llvm/ADT/SmallVector.h" // for DecomposableGate interface
+#include "llvm/ADT/SmallVector.h" // for DecomposableOp interface
 #include "mlir/IR/OpDefinition.h"
 #include "mlir/IR/Types.h"
 
@@ -31,7 +31,7 @@
 namespace catalyst {
 namespace qref {
 
-/// The arguments of a DecomposableGate, in operand order.
+/// The arguments of a DecomposableOp, in operand order.
 ///
 /// Operand order is the only positional order of an operator's arguments: the frontend lowering
 /// keeps the binding order set by PennyLane, and the decomposition rules lay out their operands in

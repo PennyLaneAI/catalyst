@@ -180,7 +180,7 @@ def DifferentiableGate : OpInterface<"DifferentiableGate", [ParametrizedGate]> {
     ];
 }
 
-def DecomposableGate : OpInterface<"DecomposableGate", [QuantumGate]> {
+def DecomposableOp : OpInterface<"DecomposableOp"> {
     let description = [{
         This interface provides a generic way to query decomposition data from a quantum operation.
         An operation must implement this interface in order to compatible with the `graph-decomposition` pass.
@@ -190,6 +190,13 @@ def DecomposableGate : OpInterface<"DecomposableGate", [QuantumGate]> {
     let cppNamespace = "::catalyst::quantum";
 
     let methods = [
+        InterfaceMethod<
+            "Return true if this op can carry modifiers for graph IDs and lowering.",
+            "bool", "isModifiable", (ins), [{}],
+            /*defaultImplementation=*/[{
+                return mlir::isa<::catalyst::quantum::QuantumGate>($_op.getOperation());
+            }]
+        >,
         InterfaceMethod<
             "Return the name of the corresponding frontend operator (i.e. the rule supplier).", "std::string", "getOperatorName"
         >,
