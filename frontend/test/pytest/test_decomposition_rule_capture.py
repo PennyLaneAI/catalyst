@@ -14,8 +14,11 @@
 
 """Tests for trace-embedded decomposition-rule definitions."""
 
+import json
+
 import pennylane as qp
 import pytest
+from jax._src.lib.mlir import ir
 from pennylane.testing import find_eqns
 from pennylane.typing import Float, Wire
 
@@ -980,7 +983,8 @@ def test_rule_uses_size_agnostic_qreg():
     assert 'target_gate = "RepeatedGate{}{wires:1}{}"' in mlir
 
 
-def test_multiple_qnodes_capture_and_materialize_locally(mocker):
+@pytest.mark.parametrize("skip_rule_bodies", [False, True])
+def test_multiple_qnodes_capture_and_materialize_locally(mocker, skip_rule_bodies):
     """Each QNode captures and materializes its definitions in its own nested module."""
 
     import catalyst.from_plxpr.qfunc_interpreter as capture_frontend
@@ -1006,7 +1010,7 @@ def test_multiple_qnodes_capture_and_materialize_locally(mocker):
     with qp.decomposition.local_decomps():
         qp.add_decomps(RepeatedGate, empty_rule)
 
-        @qjit(capture=True, target="mlir")
+        @qjit(capture=True, target="mlir", skip_decomp_rule_bodies=skip_rule_bodies)
         def workflow():
             return first(), second()
 
@@ -1016,6 +1020,210 @@ def test_multiple_qnodes_capture_and_materialize_locally(mocker):
     assert mlir.count("target_gate =") == 2
     assert mlir.count("!qref.reg<?>") >= 2
     assert "!qref.reg<4>" in mlir  # circuit allocation remains statically sized
+
+
+def _rule_funcops(compiled):
+    """Collect rule functions from a compiled workflow's nested modules."""
+    rules = []
+
+    def collect(op):
+        if op.name == "func.func" and "target_gate" in op.attributes:
+            rules.append(op)
+        return ir.WalkResult.ADVANCE
+
+    compiled.mlir_module.operation.walk(collect)
+    return rules
+
+
+@pytest.mark.parametrize("adjoint", [False, True])
+@pytest.mark.parametrize("controlled", [False, True])
+def test_skip_rule_bodies_preserves_signatures_and_resources(mocker, adjoint, controlled):
+    """Declarations match definitions, including dynamic parameters and modifier operands."""
+    import catalyst.from_plxpr.qfunc_interpreter as capture_frontend
+
+    class ParameterizedGate(qp.core.Operator2):
+        dynamic_argnames = ("theta",)
+
+        def __init__(self, theta, wires):
+            super().__init__(theta=theta, wires=wires)
+
+    @qp.register_resources({RepeatedGate(Wire[1]): 2})
+    def root_rule(theta, wires):
+        del theta
+        RepeatedGate(wires)
+        RepeatedGate(wires)
+
+    @qp.register_resources({})
+    def leaf_rule(wires):
+        del wires
+
+    mocker.patch.object(
+        capture_frontend, "load_precompiled_rule_identities", return_value=frozenset()
+    )
+
+    @qp.qnode(qp.device("null.qubit", wires=4))
+    def circuit(theta: float):
+        def gate():
+            ParameterizedGate(theta, wires=0)
+
+        modified = qp.adjoint(gate) if adjoint else gate
+        if controlled:
+            modified = qp.ctrl(modified, control=[1, 2], work_wires=[3], work_wire_type="zeroed")
+        modified()
+        return qp.state()
+
+    with qp.decomposition.local_decomps():
+        qp.add_decomps(ParameterizedGate, root_rule)
+        qp.add_decomps(RepeatedGate, leaf_rule)
+        definitions = qjit(circuit, target="mlir")
+        declarations = qjit(circuit, target="mlir", skip_decomp_rule_bodies=True)
+
+    def signatures(compiled):
+        return sorted(
+            tuple(
+                str(op.attributes[attr])
+                for attr in (
+                    "function_type",
+                    "target_gate",
+                    "resources",
+                    "frontend_name",
+                    "sym_visibility",
+                )
+            )
+            for op in _rule_funcops(compiled)
+        )
+
+    assert len(_rule_funcops(declarations)) == 2
+    assert signatures(declarations) == signatures(definitions)
+    assert all(len(op.regions[0].blocks) == 0 for op in _rule_funcops(declarations))
+    assert all(len(op.regions[0].blocks) == 1 for op in _rule_funcops(definitions))
+    assert declarations.mlir_module.operation.verify()
+
+
+def test_skip_rule_bodies_does_not_trace_implementations(mocker):
+    """Resource-only rules remain available even if their implementations cannot be captured."""
+    import catalyst.from_plxpr.qfunc_interpreter as capture_frontend
+
+    @qp.register_resources({RepeatedGate(Wire[1]): 3})
+    def unavailable_rule(wires):
+        raise AssertionError("The rule implementation must not be traced")
+
+    @qp.register_resources({})
+    def empty_rule(wires):
+        del wires
+
+    load_cache = mocker.patch.object(
+        capture_frontend,
+        "load_precompiled_rule_identities",
+        side_effect=AssertionError("Declarations do not require the implementation cache"),
+    )
+
+    with qp.decomposition.local_decomps():
+        qp.add_decomps(RepeatedGate, unavailable_rule, empty_rule)
+
+        @qjit(target="mlir", skip_decomp_rule_bodies=True)
+        @qp.qnode(qp.device("null.qubit", wires=1))
+        def circuit():
+            RepeatedGate(0)
+            RepeatedGate(0)
+            return qp.state()
+
+    load_cache.assert_not_called()
+    rules = _rule_funcops(circuit)
+    assert len(rules) == 2
+    unavailable = next(
+        op
+        for op in rules
+        if ir.StringAttr(op.attributes["frontend_name"]).value == "unavailable_rule"
+    )
+    assert '"RepeatedGate{}{wires:1}{}" = 3' in str(unavailable.attributes["resources"])
+    assert all(len(op.regions[0].blocks) == 0 for op in rules)
+
+
+def test_skip_rule_bodies_includes_precompiled_rules(mocker):
+    """Matching cached implementations still have declarations with their current resources."""
+    import catalyst.from_plxpr.qfunc_interpreter as capture_frontend
+
+    @qp.register_resources({})
+    def empty_rule(wires):
+        del wires
+
+    mocker.patch.object(
+        capture_frontend,
+        "load_precompiled_rule_identities",
+        return_value=frozenset(
+            {RuleIdentity(SerializedGraphOpID("RepeatedGate{}{wires:1}{}"), "empty_rule", ())}
+        ),
+    )
+
+    with qp.decomposition.local_decomps():
+        qp.add_decomps(RepeatedGate, empty_rule)
+
+        @qp.qnode(qp.device("null.qubit", wires=1))
+        def circuit():
+            RepeatedGate(0)
+            return qp.state()
+
+        definitions = qjit(circuit, target="mlir")
+        declarations = qjit(circuit, target="mlir", skip_decomp_rule_bodies=True)
+
+    assert not _rule_funcops(definitions)
+    assert len(_rule_funcops(declarations)) == 1
+
+
+@pytest.mark.parametrize("capture, collect_rules", [(True, False), (False, True)])
+def test_skip_rule_bodies_requires_capture_and_collection(capture, collect_rules):
+    """Disabling capture or rule collection takes precedence over requesting declarations."""
+
+    @qjit(
+        target="mlir",
+        capture=capture,
+        collect_decomp_rules=collect_rules,
+        skip_decomp_rule_bodies=True,
+    )
+    @qp.qnode(qp.device("null.qubit", wires=1))
+    def circuit():
+        qp.RX(0.5, wires=0)
+        return qp.state()
+
+    assert not _rule_funcops(circuit)
+
+
+def test_resource_estimate_uses_declarations(tmp_path):
+    """The resource estimator solves a transitive rule graph without compiling any rule bodies."""
+
+    class EstimateRoot(qp.core.Operator2):
+        def __init__(self, wires):
+            super().__init__(wires=wires)
+
+    class EstimateMiddle(qp.core.Operator2):
+        def __init__(self, wires):
+            super().__init__(wires=wires)
+
+    @qp.register_resources({EstimateMiddle(Wire[1]): 2})
+    def root_rule(wires):
+        raise AssertionError("The root rule implementation must not be traced")
+
+    @qp.register_resources({RepeatedGate(Wire[1]): 3})
+    def middle_rule(wires):
+        raise AssertionError("The middle rule implementation must not be traced")
+
+    output = tmp_path / "resources.json"
+    with qp.decomposition.local_decomps():
+        qp.add_decomps(EstimateRoot, root_rule)
+        qp.add_decomps(EstimateMiddle, middle_rule)
+
+        @qjit(target="mlir_opt", skip_preprocess=True, skip_decomp_rule_bodies=True)
+        @qp.transform(pass_name="resource-estimate")(
+            gate_set={"RepeatedGate"}, output_json=True, output_fname=str(output)
+        )
+        @qp.qnode(qp.device("null.qubit", wires=1))
+        def circuit():
+            EstimateRoot(0)
+            return qp.state()
+
+    resources = json.loads(output.read_text())
+    assert resources["circuit"]["quantum_operations"] == {"-1": {"RepeatedGate": 6}}
 
 
 if __name__ == "__main__":
