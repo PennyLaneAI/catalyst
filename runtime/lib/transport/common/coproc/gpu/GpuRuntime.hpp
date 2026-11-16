@@ -28,7 +28,7 @@ class GpuRuntime {
     struct HbmRing {
         void *ptr = nullptr;  // device pointer; also acts as MR addr and I/O
                               // virtual address for NIC
-        std::size_t size = 0; // allocation size
+        std::size_t size = 0; // ring size, in whole host pages
         int dmabuf_fd = -1;   // export fd; caller closes after ibv_reg_dmabuf_mr
     };
     HbmRing alloc_hbm_ring(std::size_t bytes);

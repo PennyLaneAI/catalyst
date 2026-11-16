@@ -1,3 +1,5 @@
+set(PRECOMPILED_BYTECODE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/../../frontend/test/lit/GraphDecomposition/test_rules.mlirbc")
+
 configure_lit_site_cfg(
     ${CMAKE_CURRENT_SOURCE_DIR}/lit.site.cfg.py.in
     ${CMAKE_CURRENT_BINARY_DIR}/lit.site.cfg.py

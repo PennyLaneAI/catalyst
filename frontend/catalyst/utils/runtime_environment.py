@@ -19,6 +19,7 @@ import os
 import os.path
 import sys
 import sysconfig
+from pathlib import Path
 
 package_root = os.path.join(os.path.dirname(__file__), "..")
 
@@ -57,11 +58,16 @@ DEFAULT_BIN_PATHS = {
     "cli": os.path.join(package_root, "..", "..", "mlir", "build", "bin"),
 }
 
-BYTECODE_FILE_PATH = os.path.join(
+PRECOMPILED_BYTECODE_PATH = os.path.join(
     package_root,
     "resources",
     "decomposition_rules_" + (__revision__ if __revision__ else __version__) + ".mlirbc",
 )
+
+
+def get_precompiled_manifest_path(bytecode_path: str | Path) -> Path:
+    """Return the manifest path associated with a given bytecode file."""
+    return Path(bytecode_path).with_suffix(".json")
 
 
 def get_libpython_path() -> str:  # pragma: no cover
@@ -111,7 +117,21 @@ def get_lib_path(project, env_var):
     if INSTALLED:  # pragma: no cover
         return os.path.join(package_root, "lib")
 
-    return os.getenv(env_var, DEFAULT_LIB_PATHS.get(project, ""))
+    if env_var in os.environ:
+        return os.environ[env_var]
+
+    if project in ("llvm", "enzyme"):
+        config_path = Path(package_root).resolve().parents[1] / ".catalyst-worktree"
+        try:
+            main_checkout = config_path.read_text(encoding="utf-8").strip()
+        except FileNotFoundError:
+            main_checkout = ""
+        if main_checkout:
+            if project == "llvm":
+                return str(Path(main_checkout) / "mlir" / "llvm-project" / "build" / "lib")
+            return str(Path(main_checkout) / "mlir" / "Enzyme" / "build" / "Enzyme")
+
+    return DEFAULT_LIB_PATHS.get(project, "")
 
 
 def get_include_path():

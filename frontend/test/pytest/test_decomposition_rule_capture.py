@@ -20,9 +20,10 @@ from pennylane.testing import find_eqns
 from pennylane.typing import Float, Wire
 
 from catalyst import qjit
-from catalyst.decomposition.capture_session import OpDecompRequest
+from catalyst.decomposition.capture_session import OpDecompRequest, RuleIdentity
 from catalyst.decomposition.decomposition_rules import walk_reachable_decomp_rule_sets
 from catalyst.decomposition.modifier_state import ModifierState
+from catalyst.decomposition.type_utils import SerializedGraphOpID
 from catalyst.jax_primitives import decomp_definition_p, decomprule_p
 
 # MLIR prints the quotes inside a string attribute as `\22`.
@@ -153,7 +154,7 @@ def test_region_control_and_adjoint_orders():
         control_adjoint_mlir = str(control_adjoint.mlir_module)
         adjoint_control_mlir = str(adjoint_control.mlir_module)
 
-    target = 'target_gate = "C(Adjoint(RepeatedGate)){}{wires:1}{}"'
+    target = 'target_gate = "1C(Adjoint(RepeatedGate)){}{wires:1}{}"'
     assert control_adjoint_mlir.count(target) == 1
     assert adjoint_control_mlir.count(target) == 1
 
@@ -251,6 +252,143 @@ def test_adjoint_context_propagates_to_descendants():
     assert 'target_gate = "ContextLeaf{}{wires:1}{}"' not in mlir
 
 
+def test_precompilation_preserves_traversal(mocker):
+    """The trace-time rule traversal should continue past precompiled rules."""
+
+    import catalyst.from_plxpr.qfunc_interpreter as capture_frontend
+
+    class CacheRoot(qp.core.Operator2):
+        def __init__(self, wires):
+            super().__init__(wires=wires)
+
+    class CacheLeaf(qp.core.Operator2):
+        def __init__(self, wires):
+            super().__init__(wires=wires)
+
+    @qp.register_resources({CacheLeaf(wires=Wire[1]): 1})
+    def cacheroot_to_cacheleaf(wires):
+        CacheLeaf(wires)
+
+    @qp.register_resources({})
+    def cacheroot_to_leaf(wires):
+        del wires
+
+    @qp.register_resources({})
+    def cacheleaf_to_leaf(wires):
+        del wires
+
+    cached_rule_identity = RuleIdentity(
+        SerializedGraphOpID("CacheRoot{}{wires:1}{}"),
+        "cacheroot_to_cacheleaf",
+        ((SerializedGraphOpID("CacheLeaf{}{wires:1}{}"), 1),),
+    )
+
+    # mock the cache to only include the test CacheRoot
+    load_cache = mocker.patch.object(
+        capture_frontend,
+        "load_precompiled_rule_identities",
+        return_value=frozenset({cached_rule_identity}),
+    )
+
+    with qp.decomposition.local_decomps():
+        qp.add_decomps(CacheRoot, cacheroot_to_cacheleaf, cacheroot_to_leaf)
+        qp.add_decomps(CacheLeaf, cacheleaf_to_leaf)
+
+        @qjit(capture=True, target="mlir")
+        @qp.qnode(qp.device("null.qubit", wires=1))
+        def circuit():
+            CacheRoot(0)
+            return qp.state()
+
+        mlir = str(circuit.mlir_module)
+
+    # ensure cache was only loaded once
+    load_cache.assert_called_once_with()
+
+    # cached rule should be skipped
+    assert 'frontend_name = "cacheroot_to_cacheleaf"' not in mlir
+
+    # uncached rule targetting an op with some cached rules should be compiled
+    assert 'frontend_name = "cacheroot_to_leaf"' in mlir
+
+    # uncached rule targetting op that is a product of a cached rule should be compiled
+    # (i.e. traversal should not stop at cached ops)
+    assert 'frontend_name = "cacheleaf_to_leaf"' in mlir
+
+
+def test_changed_resources_get_recaptured(mocker):
+    """A rule is recaptured when its resources differ from a precompiled rule."""
+
+    import catalyst.from_plxpr.qfunc_interpreter as capture_frontend
+
+    @qp.register_resources({})
+    def current_rule(wires):
+        del wires
+
+    stale_identity = RuleIdentity(
+        SerializedGraphOpID("RepeatedGate{}{wires:1}{}"),
+        "current_rule",
+        ((SerializedGraphOpID("PauliX{}{wires:1}{}"), 1),),
+    )
+    load_cache = mocker.patch.object(
+        capture_frontend,
+        "load_precompiled_rule_identities",
+        return_value=frozenset({stale_identity}),
+    )
+
+    with qp.decomposition.local_decomps():
+        qp.add_decomps(RepeatedGate, current_rule)
+
+        @qjit(capture=True, target="mlir")
+        @qp.qnode(qp.device("null.qubit", wires=1))
+        def circuit():
+            RepeatedGate(0)
+            return qp.state()
+
+        mlir = str(circuit.mlir_module)
+
+    load_cache.assert_called_once_with()
+    assert 'frontend_name = "current_rule"' in mlir
+
+
+def test_tracing_recovers_missed_cache(mocker):
+    """Test that the trace-time traversal captures all rules if loading the cache fails."""
+
+    import catalyst.from_plxpr.qfunc_interpreter as capture_frontend
+
+    @qp.register_resources({})
+    def first_rule(wires):
+        del wires
+
+    @qp.register_resources({})
+    def second_rule(wires):
+        del wires
+
+    load_cache = mocker.patch.object(
+        capture_frontend,
+        "load_precompiled_rule_identities",
+        side_effect=OSError("cache unavailable"),
+    )
+
+    with qp.decomposition.local_decomps(), pytest.warns(match="Failed to load precompiled rules"):
+        qp.add_decomps(RepeatedGate, first_rule, second_rule)
+
+        @qjit(capture=True, target="mlir")
+        @qp.qnode(qp.device("null.qubit", wires=1))
+        def circuit():
+            RepeatedGate(0)
+            return qp.state()
+
+        mlir = str(circuit.mlir_module)
+
+    # ensure cache was only loaded once
+    load_cache.assert_called_once_with()
+
+    # ensure rules were compiled
+    assert 'frontend_name = "first_rule"' in mlir
+    assert 'frontend_name = "second_rule"' in mlir
+
+
 def test_distributed_control_context_reopens_descendants():
     """A newly demanded control count propagates through distributed-rule resources."""
 
@@ -344,7 +482,7 @@ def test_modifier_changing_identity_cycle_is_closed():
     targets = {target_spec.target_id for target_spec in target_specs}
     assert targets == {
         "CyclicGate{}{wires:1}{}",
-        "C(CyclicGate){}{wires:1}{}",
+        "1C(CyclicGate){}{wires:1}{}",
     }
 
 
@@ -378,7 +516,7 @@ def test_indirect_control_cycle_uses_same_ancestor_count():
         target_specs = walk_reachable_decomp_rule_sets([(request, {request.modifier_state})])
 
     targets = {target_spec.target_id for target_spec in target_specs}
-    assert "C(IndirectCycleGate){}{wires:1}{}" in targets
+    assert "1C(IndirectCycleGate){}{wires:1}{}" in targets
     assert "CycleBridge{}{wires:1}{}" in targets
     assert "2C(IndirectCycleGate){}{wires:1}{}" not in targets
 
@@ -393,7 +531,7 @@ class TestControlWorkWireCycles:
     @staticmethod
     def _borrowed_ctrl_id(name, num_controls, num_work_wires):
         """The target id of ``name`` under controls with borrowed control work wires."""
-        prefix = "C" if num_controls == 1 else f"{num_controls}C"
+        prefix = f"{num_controls}C"
         return (
             f"{prefix}({name}){{}}{{ctrl_work_wires:{num_work_wires},wires:1}}"
             '{ctrl_work_wire_type = "borrowed"}'
@@ -620,10 +758,14 @@ def test_work_wire_variants_are_captured_independently():
 
         mlir = str(circuit.mlir_module)
 
+    # Count the distributed rule independently of generic alternatives for the same target.
+    empty_rule_definitions = "\n".join(
+        line for line in mlir.splitlines() if 'frontend_name = "empty_rule"' in line
+    )
     work_wire_id = "2C(RepeatedGate){}{ctrl_work_wires:1,wires:1}"
-    assert mlir.count('target_gate = "2C(RepeatedGate){}{wires:1}{}"') == 1
-    assert mlir.count(f'target_gate = "{work_wire_id}{BORROWED}"') == 1
-    assert mlir.count(f'target_gate = "{work_wire_id}{ZEROED}"') == 1
+    assert empty_rule_definitions.count('target_gate = "2C(RepeatedGate){}{wires:1}{}"') == 1
+    assert empty_rule_definitions.count(f'target_gate = "{work_wire_id}{BORROWED}"') == 1
+    assert empty_rule_definitions.count(f'target_gate = "{work_wire_id}{ZEROED}"') == 1
 
 
 def test_region_work_wires_are_ambient():
@@ -690,7 +832,11 @@ def test_distributed_control_carries_work_wires():
 
     root_id = f"2C(ContextRoot){{}}{{ctrl_work_wires:1,wires:1}}{ZEROED}"
     leaf_id = f"2C(ContextLeaf){{}}{{ctrl_work_wires:1,wires:1}}{ZEROED}"
-    (root_rule_line,) = [line for line in mlir.splitlines() if f'target_gate = "{root_id}"' in line]
+    (root_rule_line,) = [
+        line
+        for line in mlir.splitlines()
+        if f'target_gate = "{root_id}"' in line and 'frontend_name = "root_rule"' in line
+    ]
 
     assert (
         "(%arg0: !qref.reg<?>, %arg1: tensor<2xi64>, %arg2: tensor<2xi64>, "
@@ -734,10 +880,16 @@ def test_registered_callable_captures_work_wire_operands(work_wire_type):
             return qp.state()
 
     kernel_jaxpr = circuit.jaxpr.eqns[0].params["call_jaxpr"]
+    target_id = (
+        "2C(RepeatedGate){}{ctrl_work_wires:1,wires:1}"
+        f'{{ctrl_work_wire_type = "{work_wire_type}"}}'
+    )
+    # The zeroed-work-wire fallback also reaches a one-control variant of this rule.
     (rule,) = [
         eqn
         for eqn in find_eqns(kernel_jaxpr, decomp_definition_p)
         if eqn.params["frontend_name"] == "callable_ctrl_rule"
+        and eqn.params["target_gate"] == target_id
     ]
     (control,) = find_eqns(rule.params["func_jaxpr"], ctrl_transform_prim)
     assert "work_wires" not in control.params
@@ -864,3 +1016,7 @@ def test_multiple_qnodes_capture_and_materialize_locally(mocker):
     assert mlir.count("target_gate =") == 2
     assert mlir.count("!qref.reg<?>") >= 2
     assert "!qref.reg<4>" in mlir  # circuit allocation remains statically sized
+
+
+if __name__ == "__main__":
+    pytest.main(["-x", __file__])

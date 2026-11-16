@@ -1036,7 +1036,7 @@ func.func @shared_groups() attributes {quantum.node} {
 }
 
 func.func private @shared_rule(%r: !quantum.reg, %wires: tensor<5xi64>, %ctrls: tensor<1xi64>, %values: tensor<1xi1>) -> !quantum.reg
-    attributes {target_gate = "C(Composite){}{a_reg:2,ctrl_work_wires:1,empty:0,z_reg:2}{ctrl_work_wire_type = \22borrowed\22}"} {
+    attributes {target_gate = "1C(Composite){}{a_reg:2,ctrl_work_wires:1,empty:0,z_reg:2}{ctrl_work_wire_type = \22borrowed\22}"} {
   %i0 = arith.constant 0 : index
   %i1 = arith.constant 1 : index
   %i2 = arith.constant 2 : index
