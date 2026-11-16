@@ -340,6 +340,7 @@ def BarrierOp : Gate_Op<"barrier"> {
         The `qref.barrier` operation creates a barrier over which optimizations such as gate fusion,
         commutation, etc. will not be applied.
         Each operand may be an individual qubit or an entire register.
+        With no operands, the barrier applies to all available registers in its scope.
     }];
 
     let arguments = (ins
