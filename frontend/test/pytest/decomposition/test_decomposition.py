@@ -802,7 +802,15 @@ class TestGenericUtilities:
 
         with pytest.warns(RuleLoweringWarning, match="Failed to get resources"):
             res = compile_reachable_decomposition_rules_wrapper(
-                "NoParams", "NoParams{}{reg:1}{}", {}, {"reg": 1}, {}
+                [
+                    {
+                        "op_name": "NoParams",
+                        "op_id": "NoParams{}{reg:1}{}",
+                        "dynamic_shape": {},
+                        "wire_lens": {"reg": 1},
+                        "static_data": {},
+                    }
+                ]
             )
         assert isinstance(res, str)
 
@@ -819,11 +827,15 @@ class TestGenericUtilities:
         mocker.patch("pennylane.decomposition.list_decomps", return_value=[mock_decomp])
 
         res = compile_reachable_decomposition_rules_wrapper(
-            "CompilableData",
-            'CompilableData{}{wires:2}{a = true, b = 3.140000e+00 : f64, thing = "string"}',
-            {},
-            {"wires": 2},
-            {"a": True, "b": 3.14, "thing": "string"},
+            [
+                {
+                    "op_name": "CompilableData",
+                    "op_id": 'CompilableData{}{wires:2}{a = true, b = 3.140000e+00 : f64, thing = "string"}',
+                    "dynamic_shape": {},
+                    "wire_lens": {"wires": 2},
+                    "static_data": {"a": True, "b": 3.14, "thing": "string"},
+                }
+            ],
         )
 
         assert "FakeRuleName" in res
@@ -1723,7 +1735,16 @@ class TestOnDemand:
 
         op_id = "S{}{wires:1}{}"
         module_str = compile_reachable_decomposition_rules_wrapper(
-            "S", op_id, {}, {"wires": 1}, {}, is_custom_op=True
+            [
+                {
+                    "op_name": "S",
+                    "op_id": op_id,
+                    "dynamic_shape": {},
+                    "wire_lens": {"wires": 1},
+                    "static_data": {},
+                    "is_custom_op": True,
+                }
+            ]
         )
         assert module_str.lstrip().startswith("module")
 
@@ -1742,7 +1763,15 @@ class TestOnDemand:
         with local_decomps():
             add_decomps(symbolic_op_name("NoParams", kind), symbolic_rule)
             module_str = compile_reachable_decomposition_rules_wrapper(
-                "NoParams", op_id, {}, {"reg": 1}, {}
+                [
+                    {
+                        "op_name": "NoParams",
+                        "op_id": op_id,
+                        "dynamic_shape": {},
+                        "wire_lens": {"reg": 1},
+                        "static_data": {},
+                    }
+                ]
             )
 
         assert 'frontend_name = "symbolic_rule"' in module_str
@@ -1751,7 +1780,7 @@ class TestOnDemand:
         assert "!qref.reg<?>" in module_str
 
     def test_reachable_wrapper_shares_tracer_and_symbol_table(self, mocker):
-        """The captured module preserves helpers and rules sharing a name across signatures."""
+        """Multiple roots share one capture, including dependencies that are also roots."""
         from catalyst.from_plxpr import qfunc_interpreter
 
         @qp.capture.subroutine
@@ -1772,7 +1801,22 @@ class TestOnDemand:
             add_decomps(NoParams, root_rule)
             add_decomps(SingleParam, leaf_rule)
             module_str = compile_reachable_decomposition_rules_wrapper(
-                "NoParams", "NoParams{}{reg:1}{}", {}, {"reg": 1}, {}
+                [
+                    {
+                        "op_name": "NoParams",
+                        "op_id": "NoParams{}{reg:1}{}",
+                        "dynamic_shape": {},
+                        "wire_lens": {"reg": 1},
+                        "static_data": {},
+                    },
+                    {
+                        "op_name": "SingleParam",
+                        "op_id": "SingleParam{x:[tensor<f64>]}{reg:1}{}",
+                        "dynamic_shape": {"x": ["tensor<f64>"]},
+                        "wire_lens": {"reg": 1},
+                        "static_data": {},
+                    },
+                ]
             )
 
         assert tracer.call_count == 2
@@ -1785,6 +1829,92 @@ class TestOnDemand:
         assert "call @helper" in module_str
         assert "catalyst.launch_kernel" not in module_str
         assert "qref.alloc" not in module_str
+
+    def test_reachable_wrapper_merges_modifier_states(self, mocker):
+        """Plain, adjoint and controlled roots share a base request without losing variants."""
+        from catalyst.decomposition import precompile_decomposition_rules
+
+        @register_resources({})
+        def empty_rule(reg):
+            del reg
+
+        base_id = "NoParams{}{reg:1}{}"
+        states = [ModifierState(), ModifierState(True), ModifierState(False, 2, 1, "zeroed")]
+        requests = [
+            {
+                "op_name": "NoParams",
+                "op_id": state.wrap_id(base_id),
+                "dynamic_shape": {},
+                "wire_lens": {"reg": 1},
+                "static_data": {},
+            }
+            for state in states
+        ]
+        capture = mocker.spy(precompile_decomposition_rules, "_capture_rule_module")
+        with local_decomps():
+            add_decomps(NoParams, empty_rule)
+            module_str = compile_reachable_decomposition_rules_wrapper([*requests, requests[0]])
+
+        capture.assert_called_once()
+        scope = capture.call_args.args[0]
+        assert list(scope.roots) == [base_id]
+        assert scope.roots[base_id][1] == set(states)
+        # Generic controlled fallbacks can share a target with the rule registered here.
+        empty_rule_headers = [
+            line for line in module_str.splitlines() if 'frontend_name = "empty_rule"' in line
+        ]
+        for request in requests:
+            escaped_id = request["op_id"].replace('"', "\\22")
+            assert sum(f'target_gate = "{escaped_id}"' in line for line in empty_rule_headers) == 1
+        assert requests[0]["wire_lens"] == {"reg": 1}
+
+    def test_reachable_wrapper_keeps_valid_roots_with_unregistered_class(self):
+        """An unavailable class warns without dropping other roots from the batch."""
+        requests = [
+            {
+                "op_name": name,
+                "op_id": f"{name}{{}}{{wires:1}}{{}}",
+                "dynamic_shape": {},
+                "wire_lens": {"wires": 1},
+                "static_data": {},
+                "is_custom_op": True,
+            }
+            for name in ["OnDemandUnregisteredClass", "S"]
+        ]
+        with pytest.warns(RuleLoweringWarning, match="OnDemandUnregisteredClass"):
+            module_str = compile_reachable_decomposition_rules_wrapper(requests)
+        assert 'target_gate = "S{}{wires:1}{}"' in module_str
+
+    def test_reachable_wrapper_empty_batch(self, mocker):
+        """An empty batch does not start rule capture."""
+        from catalyst.decomposition import precompile_decomposition_rules
+
+        capture = mocker.spy(precompile_decomposition_rules, "_capture_rule_module")
+        assert compile_reachable_decomposition_rules_wrapper([]) == "module {}"
+        capture.assert_not_called()
+
+    def test_compiler_loads_multiple_missing_roots(self):
+        """The compiler loads all missing static and modifier variants together."""
+
+        @qnode(qp.device("null.qubit", wires=2))
+        def circuit(theta):
+            qp.PCPhase(theta, dim=1, wires=[0, 1])
+            qp.PCPhase(theta, dim=2, wires=[0, 1])
+            qp.adjoint(qp.PCPhase(theta, dim=2, wires=[0, 1]))
+            return qp.state()
+
+        gate_set = {"PhaseShift", "GlobalPhase", "CNOT", "PauliX"}
+        compiled = qjit(
+            graph_decomposition(circuit, gate_set=gate_set, bytecode_rules=""),
+            capture=True,
+            target="mlir",
+            collect_decomp_rules=False,
+        )
+        resources = qp.analyze(compiled, level="all-user")(0.37).resources
+
+        assert resources["Before MLIR Passes"].counts["PCPhase"] == 2
+        assert resources["Before MLIR Passes"].counts["Adjoint(PCPhase)"] == 1
+        assert set(resources["graph-decomposition"].counts) <= gate_set
 
     def test_reachable_wrapper_keeps_rules_after_capture_failure(self):
         """A failing body uses the eager tracer's warning and leaves valid alternatives intact."""
@@ -1801,7 +1931,15 @@ class TestOnDemand:
             add_decomps(NoParams, failing_rule, valid_rule)
             with pytest.warns(RuleLoweringWarning, match="Failed to capture.*body failure"):
                 module_str = compile_reachable_decomposition_rules_wrapper(
-                    "NoParams", "NoParams{}{reg:1}{}", {}, {"reg": 1}, {}
+                    [
+                        {
+                            "op_name": "NoParams",
+                            "op_id": "NoParams{}{reg:1}{}",
+                            "dynamic_shape": {},
+                            "wire_lens": {"reg": 1},
+                            "static_data": {},
+                        }
+                    ]
                 )
 
         assert 'frontend_name = "valid_rule"' in module_str
@@ -1812,7 +1950,16 @@ class TestOnDemand:
         """The on-demand wrapper preserves the requested control count."""
 
         module_str = compile_reachable_decomposition_rules_wrapper(
-            "S", op_id, {}, {"wires": 1}, {}, is_custom_op=True
+            [
+                {
+                    "op_name": "S",
+                    "op_id": op_id,
+                    "dynamic_shape": {},
+                    "wire_lens": {"wires": 1},
+                    "static_data": {},
+                    "is_custom_op": True,
+                }
+            ]
         )
 
         assert f'target_gate = "{op_id}"' in module_str
@@ -1832,7 +1979,15 @@ class TestOnDemand:
         static_data = {"ctrl_work_wire_type": work_wire_type, "pauli_word": "XY"}
 
         module_str = compile_reachable_decomposition_rules_wrapper(
-            "PauliRot", op_id, {"theta": ["tensor<f64>"]}, wire_lens, static_data
+            [
+                {
+                    "op_name": "PauliRot",
+                    "op_id": op_id,
+                    "dynamic_shape": {"theta": ["tensor<f64>"]},
+                    "wire_lens": wire_lens,
+                    "static_data": static_data,
+                }
+            ]
         )
 
         escaped_id = op_id.replace('"', "\\22")
@@ -1931,7 +2086,15 @@ class TestOnDemand:
             add_decomps(NoParams, two_controlled_s)
 
             module_str = compile_reachable_decomposition_rules_wrapper(
-                "NoParams", "NoParams{}{reg:3}{}", {}, {"reg": 3}, {}
+                [
+                    {
+                        "op_name": "NoParams",
+                        "op_id": "NoParams{}{reg:3}{}",
+                        "dynamic_shape": {},
+                        "wire_lens": {"reg": 3},
+                        "static_data": {},
+                    }
+                ]
             )
 
         # the resource the rule declares ...
@@ -1952,7 +2115,15 @@ class TestOnDemand:
             match="Failed to generate the precompiled decomposition-rule module",
         ):
             dr.compile_reachable_decomposition_rules_wrapper(
-                "S", "S{}{wires:1}{}", {}, {"wires": 1}, {}
+                [
+                    {
+                        "op_name": "S",
+                        "op_id": "S{}{wires:1}{}",
+                        "dynamic_shape": {},
+                        "wire_lens": {"wires": 1},
+                        "static_data": {},
+                    }
+                ]
             )
 
 
@@ -2621,7 +2792,15 @@ class TestSymbolicRules:
             add_decomps(NoParams, h_rule)
 
             module_str = compile_reachable_decomposition_rules_wrapper(
-                "NoParams", "3C(NoParams){}{reg:1}{}", {}, {"reg": 1}, {}
+                [
+                    {
+                        "op_name": "NoParams",
+                        "op_id": "3C(NoParams){}{reg:1}{}",
+                        "dynamic_shape": {},
+                        "wire_lens": {"reg": 1},
+                        "static_data": {},
+                    }
+                ]
             )
 
         assert 'target_gate = "3C(NoParams){}{reg:1}{}"' in module_str
@@ -2698,7 +2877,7 @@ class TestSymbolicRules:
             == "CH{}{wires:2}{}"
         )
 
-    def test_controlled_adjoint_rule_composes_resource_controls(self):
+    def test_controlled_adjoint_rule_composes_resource_controls(self, capture_target):
         """Controls on an adjoint rule combine with controls already on its resources."""
 
         @register_resources({ControlledOp2(qp.S(Wire[1]), Wire[1]): 1})
@@ -2707,20 +2886,21 @@ class TestSymbolicRules:
 
         with local_decomps():
             add_decomps("Adjoint(NoParams)", adjoint_rule)
-            module = compile_registered_symbolic_rules(
-                "NoParams",
-                "NoParams{}{reg:2}{}",
-                {},
-                {"reg": 2},
-                {},
-                op_cls=NoParams,
-                modifiers=ModifierState(adjoint=True, control_count=1),
+            module = capture_target(
+                build_registered_decomp_target_spec(
+                    "NoParams",
+                    "NoParams{}{reg:2}{}",
+                    {},
+                    {"reg": 2},
+                    {},
+                    op_cls=NoParams,
+                    modifiers=ModifierState(adjoint=True, control_count=1),
+                )
             )
 
-        rules = get_rule_strings_from_module(module)
-        assert len(rules) == 1
-        rule = rules[0]
-        assert '"2C(S){}{wires:1}{}" = 1 : i64' in rule
+        mlir = str(module)
+        assert mlir.count("target_gate =") == 1
+        assert '"2C(S){}{wires:1}{}" = 1 : i64' in mlir
 
     def test_no_registered_symbolic_rules(self, capture_target):
         """Test an op with no symbolic rules registered against its adjoint yields no module."""
@@ -2826,7 +3006,6 @@ class TestApplicabilityFilterOrdering:
     """
 
     OP_ID = "SingleParam{x:[tensor<f64>]}{reg:1}{}"
-    OP_ARGS = ({"x": ["tensor<f64>"]}, {"reg": 1}, {})
 
     # kind, lookup name, ctrl_wires
     SYMBOLIC_KINDS = [
@@ -2862,7 +3041,15 @@ class TestApplicabilityFilterOrdering:
         with local_decomps():
             add_decomps(SingleParam, *rules)
             return compile_reachable_decomposition_rules_wrapper(
-                "SingleParam", self.OP_ID, *self.OP_ARGS
+                [
+                    {
+                        "op_name": "SingleParam",
+                        "op_id": self.OP_ID,
+                        "dynamic_shape": {"x": ["tensor<f64>"]},
+                        "wire_lens": {"reg": 1},
+                        "static_data": {},
+                    }
+                ]
             )
 
     @staticmethod

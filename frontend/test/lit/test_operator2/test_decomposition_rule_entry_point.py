@@ -64,7 +64,15 @@ def test_to_dynamic_argnames():
     with qp.decomposition.local_decomps():
         qp.add_decomps(NoParams, rule)
         result = compile_reachable_decomposition_rules_wrapper(
-            "NoParams", "NoParams{}{reg:2}{}", {}, {"reg": 2}, {}
+            [
+                {
+                    "op_name": "NoParams",
+                    "op_id": "NoParams{}{reg:2}{}",
+                    "dynamic_shape": {},
+                    "wire_lens": {"reg": 2},
+                    "static_data": {},
+                }
+            ]
         )
         print(result)
 
@@ -92,11 +100,15 @@ def test_from_dynamic_argnames():
     with qp.decomposition.local_decomps():
         qp.add_decomps(SingleParam, rule)
         result = compile_reachable_decomposition_rules_wrapper(
-            "SingleParam",
-            "SingleParam{x:[tensor<2xf64>]}{reg:2}{}",
-            {"x": ["f64", "f64"]},
-            {"reg": 2},
-            {},
+            [
+                {
+                    "op_name": "SingleParam",
+                    "op_id": "SingleParam{x:[tensor<2xf64>]}{reg:2}{}",
+                    "dynamic_shape": {"x": ["f64", "f64"]},
+                    "wire_lens": {"reg": 2},
+                    "static_data": {},
+                }
+            ],
         )
         print(result)
 
@@ -124,7 +136,15 @@ def test_to_multiple_dynamic_argnames():
     with qp.decomposition.local_decomps():
         qp.add_decomps(NoParams, rule)
         result = compile_reachable_decomposition_rules_wrapper(
-            "NoParams", "NoParams{}{reg:1}{}", {}, {"reg": 1}, {}
+            [
+                {
+                    "op_name": "NoParams",
+                    "op_id": "NoParams{}{reg:1}{}",
+                    "dynamic_shape": {},
+                    "wire_lens": {"reg": 1},
+                    "static_data": {},
+                }
+            ]
         )
         print(result)
 
@@ -151,11 +171,15 @@ def test_from_multiple_dynamic_argnames():
     with qp.decomposition.local_decomps():
         qp.add_decomps(MultiParams, rule)
         result = compile_reachable_decomposition_rules_wrapper(
-            "MultiParams",
-            "MultiParams{a:[tensor<f64>],b:[tensor<i32>,tensor<i32>],c:[tensor<f64>,tensor<f64>]}{reg:2}{}",
-            {"b": ["i32", "i32"], "c": ["f64", "f64"], "a": ["f64"]},
-            {"reg": 2},
-            {},
+            [
+                {
+                    "op_name": "MultiParams",
+                    "op_id": "MultiParams{a:[tensor<f64>],b:[tensor<i32>,tensor<i32>],c:[tensor<f64>,tensor<f64>]}{reg:2}{}",
+                    "dynamic_shape": {"b": ["i32", "i32"], "c": ["f64", "f64"], "a": ["f64"]},
+                    "wire_lens": {"reg": 2},
+                    "static_data": {},
+                }
+            ],
         )
         print(result)
 
@@ -183,7 +207,15 @@ def test_to_multiple_wire_argnames():
     with qp.decomposition.local_decomps():
         qp.add_decomps(NoParams, rule)
         result = compile_reachable_decomposition_rules_wrapper(
-            "NoParams", "NoParams{}{reg:1}{}", {}, {"reg": 1}, {}
+            [
+                {
+                    "op_name": "NoParams",
+                    "op_id": "NoParams{}{reg:1}{}",
+                    "dynamic_shape": {},
+                    "wire_lens": {"reg": 1},
+                    "static_data": {},
+                }
+            ]
         )
         print(result)
 
@@ -211,11 +243,15 @@ def test_from_multiple_wire_argnames():
     with qp.decomposition.local_decomps():
         qp.add_decomps(MultipleRegisters, rule)
         result = compile_reachable_decomposition_rules_wrapper(
-            "MultipleRegisters",
-            "MultipleRegisters{}{reg1:2,reg2:3}{}",
-            {},
-            {"reg1": 2, "reg2": 3},
-            {},
+            [
+                {
+                    "op_name": "MultipleRegisters",
+                    "op_id": "MultipleRegisters{}{reg1:2,reg2:3}{}",
+                    "dynamic_shape": {},
+                    "wire_lens": {"reg1": 2, "reg2": 3},
+                    "static_data": {},
+                }
+            ],
         )
         print(result)
 
@@ -251,7 +287,15 @@ def test_to_compilable_data():
     with qp.decomposition.local_decomps():
         qp.add_decomps(NoParams, rule)
         result = compile_reachable_decomposition_rules_wrapper(
-            "NoParams", "NoParams{}{reg:2}{}", {}, {"reg": 2}, {}
+            [
+                {
+                    "op_name": "NoParams",
+                    "op_id": "NoParams{}{reg:2}{}",
+                    "dynamic_shape": {},
+                    "wire_lens": {"reg": 2},
+                    "static_data": {},
+                }
+            ]
         )
         print(result)
 
@@ -282,20 +326,28 @@ def test_from_compilable_data():
     with qp.decomposition.local_decomps():
         qp.add_decomps(CompilableData, rule)
         result_a1 = compile_reachable_decomposition_rules_wrapper(
-            "CompilableData",
-            "CompilableData{}{wires:1}{a = 1 : i64, b = 2 : i64, thing = 3 : i64}",
-            {},
-            {"wires": 1},
-            {"a": 1, "b": 2, "thing": 3},
+            [
+                {
+                    "op_name": "CompilableData",
+                    "op_id": "CompilableData{}{wires:1}{a = 1 : i64, b = 2 : i64, thing = 3 : i64}",
+                    "dynamic_shape": {},
+                    "wire_lens": {"wires": 1},
+                    "static_data": {"a": 1, "b": 2, "thing": 3},
+                }
+            ],
         )
         print(result_a1)
 
         result_a10 = compile_reachable_decomposition_rules_wrapper(
-            "CompilableData",
-            "CompilableData{}{wires:1}{a = 10 : i64, b = 2 : i64, thing = 3 : i64}",
-            {},
-            {"wires": 1},
-            {"a": 10, "b": 2, "thing": 3},
+            [
+                {
+                    "op_name": "CompilableData",
+                    "op_id": "CompilableData{}{wires:1}{a = 10 : i64, b = 2 : i64, thing = 3 : i64}",
+                    "dynamic_shape": {},
+                    "wire_lens": {"wires": 1},
+                    "static_data": {"a": 10, "b": 2, "thing": 3},
+                }
+            ],
         )
         print(result_a10)
 
@@ -334,7 +386,15 @@ def test_to_static_data():
     with qp.decomposition.local_decomps():
         qp.add_decomps(NoParams, rule)
         result = compile_reachable_decomposition_rules_wrapper(
-            "NoParams", "NoParams{}{reg:2}{}", {}, {"reg": 2}, {}
+            [
+                {
+                    "op_name": "NoParams",
+                    "op_id": "NoParams{}{reg:2}{}",
+                    "dynamic_shape": {},
+                    "wire_lens": {"reg": 2},
+                    "static_data": {},
+                }
+            ]
         )
         print(result)
 
@@ -374,12 +434,30 @@ def test_from_static_data():
     with qp.decomposition.local_decomps():
         qp.add_decomps(StaticData, rule)
         result_1234 = compile_reachable_decomposition_rules_wrapper(
-            "StaticData", "StaticData{}{reg:1}{}[1234]", {}, {"reg": 1}, {}, {"label": 1234}
+            [
+                {
+                    "op_name": "StaticData",
+                    "op_id": "StaticData{}{reg:1}{}[1234]",
+                    "dynamic_shape": {},
+                    "wire_lens": {"reg": 1},
+                    "static_data": {},
+                    "extra_data": {"label": 1234},
+                }
+            ]
         )
         print(result_1234)
 
         result_4321 = compile_reachable_decomposition_rules_wrapper(
-            "StaticData", "StaticData{}{reg:1}{}[4321]", {}, {"reg": 1}, {}, {"label": 4321}
+            [
+                {
+                    "op_name": "StaticData",
+                    "op_id": "StaticData{}{reg:1}{}[4321]",
+                    "dynamic_shape": {},
+                    "wire_lens": {"reg": 1},
+                    "static_data": {},
+                    "extra_data": {"label": 4321},
+                }
+            ]
         )
         print(result_4321)
 
@@ -419,7 +497,15 @@ def test_to_hybrid_wires():
     with qp.decomposition.local_decomps():
         qp.add_decomps(NoParams, rule)
         result = compile_reachable_decomposition_rules_wrapper(
-            "NoParams", "NoParams{}{reg:3}{}", {}, {"reg": 3}, {}
+            [
+                {
+                    "op_name": "NoParams",
+                    "op_id": "NoParams{}{reg:3}{}",
+                    "dynamic_shape": {},
+                    "wire_lens": {"reg": 3},
+                    "static_data": {},
+                }
+            ]
         )
         print(result)
 
@@ -457,12 +543,16 @@ def test_from_hybrid_wires():
     with qp.decomposition.local_decomps():
         qp.add_decomps(HybridWires, rule)
         result = compile_reachable_decomposition_rules_wrapper(
-            "HybridWires",
-            "HybridWires{}{cwires:3}{}[3742]",
-            {},
-            {"cwires": 3},
-            {},
-            extra_data={"cwires": [Wire[1], [Wire[1], Wire[1]]]},
+            [
+                {
+                    "op_name": "HybridWires",
+                    "op_id": "HybridWires{}{cwires:3}{}[3742]",
+                    "dynamic_shape": {},
+                    "wire_lens": {"cwires": 3},
+                    "static_data": {},
+                    "extra_data": {"cwires": [Wire[1], [Wire[1], Wire[1]]]},
+                }
+            ],
         )
         print(result)
 
@@ -521,7 +611,15 @@ def test_to_hybrid_op():
     with qp.decomposition.local_decomps():
         qp.add_decomps(NoParams, rule)
         result = compile_reachable_decomposition_rules_wrapper(
-            "NoParams", "NoParams{}{reg:3}{}", {}, {"reg": 3}, {}
+            [
+                {
+                    "op_name": "NoParams",
+                    "op_id": "NoParams{}{reg:3}{}",
+                    "dynamic_shape": {},
+                    "wire_lens": {"reg": 3},
+                    "static_data": {},
+                }
+            ]
         )
         print(result)
 
@@ -558,15 +656,19 @@ def test_from_hybrid_op():
     with qp.decomposition.local_decomps():
         qp.add_decomps(HybridOpArg, rule)
         result = compile_reachable_decomposition_rules_wrapper(
-            "HybridOpArg",
-            "HybridOpArg{angle:[tensor<f64>]}{cwires:1,op:3}{}[5678]",
-            {"angle": ["f64"]},
-            {"cwires": 1, "op": 3},
-            {},
-            extra_data={
-                "op": StaticDataMultiReg("hello", reg=Wire[1], reg2=Wire[2], theta=Float),
-                "n_iters": 100,
-            },
+            [
+                {
+                    "op_name": "HybridOpArg",
+                    "op_id": "HybridOpArg{angle:[tensor<f64>]}{cwires:1,op:3}{}[5678]",
+                    "dynamic_shape": {"angle": ["f64"]},
+                    "wire_lens": {"cwires": 1, "op": 3},
+                    "static_data": {},
+                    "extra_data": {
+                        "op": StaticDataMultiReg("hello", reg=Wire[1], reg2=Wire[2], theta=Float),
+                        "n_iters": 100,
+                    },
+                }
+            ],
         )
         print(result)
 
@@ -618,7 +720,15 @@ def test_to_hybrid_op_nested():
     with qp.decomposition.local_decomps():
         qp.add_decomps(NoParams, rule)
         result = compile_reachable_decomposition_rules_wrapper(
-            "NoParams", "NoParams{}{reg:3}{}", {}, {"reg": 3}, {}
+            [
+                {
+                    "op_name": "NoParams",
+                    "op_id": "NoParams{}{reg:3}{}",
+                    "dynamic_shape": {},
+                    "wire_lens": {"reg": 3},
+                    "static_data": {},
+                }
+            ]
         )
         print(result)
 
@@ -649,20 +759,24 @@ def test_from_hybrid_op_nested():
     with qp.decomposition.local_decomps():
         qp.add_decomps(HybridOpArg, rule)
         result = compile_reachable_decomposition_rules_wrapper(
-            "HybridOpArg",
-            "HybridOpArg{angle:[tensor<f64>]}{cwires:1,op:4}{}[7654]",
-            {"angle": ["f64"]},
-            {"cwires": 1, "op": 4},
-            {},
-            extra_data={
-                "op": HybridOpArg(
-                    angle=Float,
-                    op=StaticDataMultiReg("hello", reg=Wire[1], reg2=Wire[2], theta=Float),
-                    cwires=Wire[1],
-                    n_iters=200,
-                ),
-                "n_iters": 100,
-            },
+            [
+                {
+                    "op_name": "HybridOpArg",
+                    "op_id": "HybridOpArg{angle:[tensor<f64>]}{cwires:1,op:4}{}[7654]",
+                    "dynamic_shape": {"angle": ["f64"]},
+                    "wire_lens": {"cwires": 1, "op": 4},
+                    "static_data": {},
+                    "extra_data": {
+                        "op": HybridOpArg(
+                            angle=Float,
+                            op=StaticDataMultiReg("hello", reg=Wire[1], reg2=Wire[2], theta=Float),
+                            cwires=Wire[1],
+                            n_iters=200,
+                        ),
+                        "n_iters": 100,
+                    },
+                }
+            ],
         )
         print(result)
 
@@ -732,7 +846,15 @@ def test_to_multiple_full_args_op():
     with qp.decomposition.local_decomps():
         qp.add_decomps(NoParams, rule)
         result = compile_reachable_decomposition_rules_wrapper(
-            "NoParams", "NoParams{}{reg:3}{}", {}, {"reg": 3}, {}
+            [
+                {
+                    "op_name": "NoParams",
+                    "op_id": "NoParams{}{reg:3}{}",
+                    "dynamic_shape": {},
+                    "wire_lens": {"reg": 3},
+                    "static_data": {},
+                }
+            ]
         )
         print(result)
 
@@ -768,19 +890,30 @@ def test_from_multiple_full_args_op():
     with qp.decomposition.local_decomps():
         qp.add_decomps(MultipleFullArgs, rule)
         result = compile_reachable_decomposition_rules_wrapper(
-            "MultipleFullArgs",
-            "MultipleFullArgs{angles1:[tensor<f64>],angles2:[tensor<2xf64>]}{hwires1:2,hwires2:1,op1:1,op2:1,reg1:1,reg2:2}{}[4444]",
-            {"angles1": ["f64"], "angles2": ["f64", "f64"]},
-            {"reg1": 1, "reg2": 2, "op1": 1, "op2": 1, "hwires1": 2, "hwires2": 1},
-            {},
-            extra_data={
-                "pytree1": [1],
-                "pytree2": [2],
-                "op1": SingleParam(x=Float, reg=Wire[1]),
-                "op2": SingleParam(x=Int, reg=Wire[1]),
-                "hwires1": [Wire[1], Wire[1]],
-                "hwires2": [Wire[1]],
-            },
+            [
+                {
+                    "op_name": "MultipleFullArgs",
+                    "op_id": "MultipleFullArgs{angles1:[tensor<f64>],angles2:[tensor<2xf64>]}{hwires1:2,hwires2:1,op1:1,op2:1,reg1:1,reg2:2}{}[4444]",
+                    "dynamic_shape": {"angles1": ["f64"], "angles2": ["f64", "f64"]},
+                    "wire_lens": {
+                        "reg1": 1,
+                        "reg2": 2,
+                        "op1": 1,
+                        "op2": 1,
+                        "hwires1": 2,
+                        "hwires2": 1,
+                    },
+                    "static_data": {},
+                    "extra_data": {
+                        "pytree1": [1],
+                        "pytree2": [2],
+                        "op1": SingleParam(x=Float, reg=Wire[1]),
+                        "op2": SingleParam(x=Int, reg=Wire[1]),
+                        "hwires1": [Wire[1], Wire[1]],
+                        "hwires2": [Wire[1]],
+                    },
+                }
+            ],
         )
         print(result)
 
@@ -827,7 +960,15 @@ def test_multiple_rules():
         qp.add_decomps(NoParams, rule1)
         qp.add_decomps(NoParams, rule2)
         result = compile_reachable_decomposition_rules_wrapper(
-            "NoParams", "NoParams{}{reg:1}{}", {}, {"reg": 1}, {}
+            [
+                {
+                    "op_name": "NoParams",
+                    "op_id": "NoParams{}{reg:1}{}",
+                    "dynamic_shape": {},
+                    "wire_lens": {"reg": 1},
+                    "static_data": {},
+                }
+            ]
         )
         print(result)
 
@@ -870,7 +1011,15 @@ def test_for_loop():
         qp.add_decomps(LayerRX, test_rule)
 
         result = compile_reachable_decomposition_rules_wrapper(
-            "LayerRX", "TestID", {"angles": ["f64", "f64", "f64"]}, {"wires": 3}, {}
+            [
+                {
+                    "op_name": "LayerRX",
+                    "op_id": "TestID",
+                    "dynamic_shape": {"angles": ["f64", "f64", "f64"]},
+                    "wire_lens": {"wires": 3},
+                    "static_data": {},
+                }
+            ]
         )
         print(result)
 
@@ -903,7 +1052,15 @@ def test_if():
 
     print(
         compile_reachable_decomposition_rules_wrapper(
-            "TestOp", "IfID", {"flag": ["i1"]}, {"wires": 1}, {}
+            [
+                {
+                    "op_name": "TestOp",
+                    "op_id": "IfID",
+                    "dynamic_shape": {"flag": ["i1"]},
+                    "wire_lens": {"wires": 1},
+                    "static_data": {},
+                }
+            ]
         )
     )
 
@@ -937,7 +1094,15 @@ def test_while_loop():
 
     print(
         compile_reachable_decomposition_rules_wrapper(
-            "WhileOp", "whileID", {"angle": ["f64"]}, {"wires": 1}, {}
+            [
+                {
+                    "op_name": "WhileOp",
+                    "op_id": "whileID",
+                    "dynamic_shape": {"angle": ["f64"]},
+                    "wire_lens": {"wires": 1},
+                    "static_data": {},
+                }
+            ]
         )
     )
 
@@ -957,12 +1122,16 @@ def test_custom_op_numbered_args():
     """
     print(
         compile_reachable_decomposition_rules_wrapper(
-            "RZ",
-            "RZ{0:[f64]}{wires:2}{}",
-            {"0": ["f64"]},
-            {"wires": 1},
-            {},
-            is_custom_op=True,
+            [
+                {
+                    "op_name": "RZ",
+                    "op_id": "RZ{0:[f64]}{wires:2}{}",
+                    "dynamic_shape": {"0": ["f64"]},
+                    "wire_lens": {"wires": 1},
+                    "static_data": {},
+                    "is_custom_op": True,
+                }
+            ],
         )
     )
 
@@ -986,7 +1155,15 @@ def test_rule_with_helper_functions():
     with qp.decomposition.local_decomps():
         qp.add_decomps(NoParams, rule)
         result = compile_reachable_decomposition_rules_wrapper(
-            "NoParams", "NoParams{}{reg:1}{}", {}, {"reg": 1}, {}
+            [
+                {
+                    "op_name": "NoParams",
+                    "op_id": "NoParams{}{reg:1}{}",
+                    "dynamic_shape": {},
+                    "wire_lens": {"reg": 1},
+                    "static_data": {},
+                }
+            ]
         )
         print(result)
 
@@ -1013,11 +1190,15 @@ def test_frontend_name_attr():
         qp.add_decomps(NoParams, frontend_rule)
         print(
             compile_reachable_decomposition_rules_wrapper(
-                "NoParams",
-                "NoParams{}{reg:2}{}",
-                {},
-                {"reg": 2},
-                {},
+                [
+                    {
+                        "op_name": "NoParams",
+                        "op_id": "NoParams{}{reg:2}{}",
+                        "dynamic_shape": {},
+                        "wire_lens": {"reg": 2},
+                        "static_data": {},
+                    }
+                ],
             )
         )
 
