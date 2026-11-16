@@ -1233,66 +1233,63 @@ def walk_reachable_decomp_rule_sets(
     return target_specs
 
 
-def compile_reachable_decomposition_rules_wrapper(
-    op_name: str,
-    op_id: str,
-    dynamic_shape,
-    wire_lens,
-    static_data,
-    extra_data=None,
-    is_custom_op=False,
-) -> str:
-    """Return an MLIR module with the full reachable decomposition-rule closure for an operator.
+def compile_reachable_decomposition_rules_wrapper(requests: list[dict]) -> str:
+    """Return one MLIR module with the combined reachable closure of the requested operators.
 
-    The compiler supplies a base class name and a full GraphOpID. Resolve the class through
-    PennyLane's OperatorRegistry and separate modifier metadata from the base arguments. Rule
-    discovery, tracing and definition lowering then use the same infrastructure as eager capture.
-    The loader receives the entire reachable closure because it does not recurse into resources.
+    Resolve each class through PennyLane's OperatorRegistry and seed one DecompositionScope.
+    Shared discovery and tracing deduplicate dependencies and combine modifier states for the
+    same base identity.
 
     Args:
-        op_name (str): the operator's *base* name
-        op_id (str): the operator's full graphOpId, modifiers included
-        dynamic_shape (dict): dynamic argument names to their MLIR types
-        wire_lens (dict): wire argument names to their lengths
-        static_data (dict): compiler-static argument names to their values
-        extra_data (dict): argument values the graphOpId identifies by UID instead of spelling
-        is_custom_op (bool): whether the operator lowers to ``qref.custom``
+        requests (list[dict]): Each request supplies ``op_name``, the full ``op_id``,
+            ``dynamic_shape``, ``wire_lens`` and ``static_data`` in operand order.
+            Optional ``extra_data`` defaults to an empty dict, and ``is_custom_op`` to False.
 
     Returns:
-        str: a module holding the whole reachable rule closure
+        str: a module holding the combined reachable rule closure
     """
-    try:
-        op_cls = get_op_class_by_name(op_name)
-    except KeyError:
-        # A standalone compiler cannot resolve a class defined only in the calling process.
-        # Leave this gate to the solver, which can still use rules supplied in the module.
-        warnings.warn(
-            f"Cannot load decomposition rules for {op_name}: no Operator2 class with this name is "
-            "registered in the compiler's Python process.",
-            category=RuleLoweringWarning,
+    scope = DecompositionScope()
+    for data in requests:
+        op_name = data["op_name"]
+        try:
+            op_cls = get_op_class_by_name(op_name)
+        except KeyError:
+            # A standalone compiler may not have classes defined in the calling process.
+            warnings.warn(
+                f"Cannot load decomposition rules for {op_name}: no Operator2 class with this name "
+                "is registered in the compiler's Python process.",
+                category=RuleLoweringWarning,
+            )
+            continue
+
+        base_id, modifiers = ModifierState.from_graph_op_id(
+            op_name, SerializedGraphOpID(data["op_id"])
         )
+        wire_lens = data["wire_lens"]
+        static_data = data["static_data"]
+        if modifiers.is_controlled:
+            wire_lens = {name: size for name, size in wire_lens.items() if name != CTRL_WORK_WIRES}
+            static_data = {
+                name: value for name, value in static_data.items() if name != CTRL_WORK_WIRE_TYPE
+            }
+
+        scope.record_root(
+            OpDecompRequest(
+                base_id=base_id,
+                op_name=op_name,
+                op_cls=op_cls,
+                dynamic_shape=data["dynamic_shape"],
+                wire_lens=wire_lens,
+                static_data=static_data,
+                extra_data=data.get("extra_data") or {},
+                is_custom_op=data.get("is_custom_op", False),
+                modifier_state=modifiers,
+            )
+        )
+
+    if not scope.roots:
         return "module {}"
 
-    base_id, modifiers = ModifierState.from_graph_op_id(op_name, SerializedGraphOpID(op_id))
-    if modifiers.is_controlled:
-        wire_lens = {name: size for name, size in wire_lens.items() if name != CTRL_WORK_WIRES}
-        static_data = {
-            name: value for name, value in static_data.items() if name != CTRL_WORK_WIRE_TYPE
-        }
-
-    request = OpDecompRequest(
-        base_id=base_id,
-        op_name=op_name,
-        op_cls=op_cls,
-        dynamic_shape=dynamic_shape,
-        wire_lens=wire_lens,
-        static_data=static_data,
-        extra_data=extra_data or {},
-        is_custom_op=is_custom_op,
-        modifier_state=modifiers,
-    )
-    scope = DecompositionScope()
-    scope.record_root(request)
     # The interpreter also imports the rule builders in this module.
     from catalyst.decomposition.precompile_decomposition_rules import (  # pylint: disable=import-outside-toplevel
         _capture_rule_module,
