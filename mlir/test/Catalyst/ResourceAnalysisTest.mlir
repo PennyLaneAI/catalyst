@@ -2560,7 +2560,7 @@ module @nested_resource_module {
 // CHECK:   "Adjoint(T)": 1
 // CHECK:   "PauliX": 1
 // CHECK: "2"
-// CHECK:   "C(Adjoint(S))": 1
+// CHECK:   "1C(Adjoint(S))": 1
 // CHECK:   "CY": 1
 // CHECK: "3"
 // CHECK:   "2C(S)": 1
@@ -2597,8 +2597,8 @@ func.func public @test_ops_with_ctrl() -> tensor<8xf64> {
 // CHECK:   "Adjoint(T)": 1
 // CHECK:   "PauliX": 1
 // CHECK: "2"
-// CHECK:   "C(Adjoint(S))": 1
-// CHECK:   "C(PauliY)": 1
+// CHECK:   "1C(Adjoint(S))": 1
+// CHECK:   "1C(PauliY)": 1
 // CHECK: "3"
 // CHECK:   "2C(S)": 1
 
@@ -2646,7 +2646,7 @@ func.func public @test_ops_with_ctrl_region() -> tensor<8xf64> {
 // CHECK:   "Adjoint(T)": 1
 // CHECK:   "PauliX": 1
 // CHECK: "2"
-// CHECK:   "C(S)": 1
+// CHECK:   "1C(S)": 1
 // CHECK:   "CY": 1
 // CHECK: "3"
 // CHECK:   "2C(S)": 1
@@ -2737,7 +2737,7 @@ func.func @pbc_prepare_fabricate() {
 // CHECK: "1"
 // CHECK:   "Adjoint(MyOpD)": 1
 // CHECK: "2"
-// CHECK:   "C(MyOpB)": 1
+// CHECK:   "1C(MyOpB)": 1
 // CHECK:   "MyOpA": 1
 // CHECK: "3"
 // CHECK:   "2C(MyOpC)": 1
@@ -2793,7 +2793,7 @@ func.func @same_name_different_params(%q: !quantum.bit, %theta: f64) -> !quantum
 // CHECK: "1"
 // CHECK:   "Adjoint(MyOpD)": 1
 // CHECK: "2"
-// CHECK:   "C(MyOpB)": 1
+// CHECK:   "1C(MyOpB)": 1
 // CHECK:   "MyOpA": 1
 // CHECK: "3"
 // CHECK:   "2C(MyOpC)": 1

@@ -283,6 +283,35 @@ def test_pass_decomposition():
 test_pass_decomposition()
 
 
+def test_pass_resource_estimate():
+    """Application of the resource-estimate pass decorator with its output options."""
+
+    resource_estimate = qp.transform(pass_name="resource-estimate")
+
+    # CHECK-LABEL: module @resource_estimate_circuit
+    @qp.qjit(capture=True, skip_preprocess=True, target="mlir")
+    @resource_estimate(gate_set={"RX", "RY", "RZ"}, output_json=True, output_fname="resources.json")
+    @qp.qnode(qp.device("null.qubit", wires=1))
+    def resource_estimate_circuit():
+        qp.Rot(0.1, 0.2, 0.3, wires=0)
+        return qp.probs()
+
+    # CHECK: transform.named_sequence @__transform_main
+    # CHECK-NEXT: transform.apply_registered_pass "resource-estimate"
+    # CHECK-SAME: "bytecode-rules" =
+    # CHECK-SAME: "gate-set" = {RX = 1.000000e+00 : f64, RY = 1.000000e+00 : f64, RZ = 1.000000e+00 : f64}
+    # CHECK-SAME: "libQPD-path" =
+    # CHECK-SAME: "libpython-path" =
+    # CHECK-SAME: "output-fname" = "resources.json"
+    # CHECK-SAME: "output-json" = true
+    # CHECK-NEXT: transform.yield
+
+    print(resource_estimate_circuit.mlir)
+
+
+test_pass_resource_estimate()
+
+
 def test_two_qnodes_with_different_passes_in_one_workflow():
     """Two qnodes with different passes in one workflow."""
 
