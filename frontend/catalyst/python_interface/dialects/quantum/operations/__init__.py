@@ -28,6 +28,7 @@ from .gate_ops import (
 from .measurement_ops import (
     CountsOp,
     ExpvalOp,
+    MeasurementOp,
     MeasureOp,
     ProbsOp,
     SampleOp,
@@ -79,6 +80,7 @@ __all__ = [
     "TensorOp",
     "MCMObsOp",
     # Mid-circuit measurements
+    "MeasurementOp",
     "MeasureOp",
     # Terminal measurements
     "CountsOp",
