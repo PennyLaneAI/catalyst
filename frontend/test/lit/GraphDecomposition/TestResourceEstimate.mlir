@@ -14,7 +14,7 @@
 
 // Test that resource-estimate counts each op by the basis gates of its chosen decomposition
 
-// RUN: catalyst --tool=opt --pass-pipeline='builtin.module(resource-estimate{output-json gate-set=testRX=1.0,testRZ=1.0 bytecode-rules="%BYTECODE_PATH"})' %s -o /dev/null | FileCheck %s
+// RUN: catalyst --tool=opt --pass-pipeline='builtin.module(resource-estimate{output-json gate-set=testRX=1.0,testRZ=1.0 bytecode-rules="%PRECOMPILED_BYTECODE_PATH"})' %s -o /dev/null | FileCheck %s
 
 // CHECK-LABEL: "circuit"
 // CHECK: "num_qubits"

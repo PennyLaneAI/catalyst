@@ -14,7 +14,7 @@
 
 // An adjoint applied to a subroutine also applies to the subroutines it calls.
 
-// RUN: catalyst --tool=opt --pass-pipeline='builtin.module(resource-estimate{output-json gate-set=S=1.0,T=1.0,Adjoint(S)=1.0,Adjoint(T)=1.0 bytecode-rules="%BYTECODE_PATH"})' %s -o /dev/null | FileCheck %s
+// RUN: catalyst --tool=opt --pass-pipeline='builtin.module(resource-estimate{output-json gate-set=S=1.0,T=1.0,Adjoint(S)=1.0,Adjoint(T)=1.0 bytecode-rules="%PRECOMPILED_BYTECODE_PATH"})' %s -o /dev/null | FileCheck %s
 
 // CHECK-LABEL: "A_inner": {
 // CHECK:         "Adjoint(S)": 1

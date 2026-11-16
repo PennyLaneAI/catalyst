@@ -34,8 +34,8 @@ func.func @composite_region(%ctrl: !quantum.bit, %q: !quantum.bit) -> (!quantum.
 
 // C(Adjoint(U)) rule: base decomposition (H; H) as adjoint gates inside a quantum.ctrl region.
 func.func private @ctrl_adj_u(%q: !quantum.bit, %ctrl: !quantum.bit) -> (!quantum.bit, !quantum.bit) attributes {
-    target_gate = "C(Adjoint(U)){}{wires:1}{}",
-    resources = {operations = {"C(Adjoint(H)){}{wires:1}{}" = 2 : i64}} } {
+    target_gate = "1C(Adjoint(U)){}{wires:1}{}",
+    resources = {operations = {"1C(Adjoint(H)){}{wires:1}{}" = 2 : i64}} } {
   %true = arith.constant true
   %oc, %oq = quantum.ctrl(%ctrl) ctrlvals(%true) (%q) : !quantum.bit -> !quantum.bit {
   ^bb0(%arg0: !quantum.bit):

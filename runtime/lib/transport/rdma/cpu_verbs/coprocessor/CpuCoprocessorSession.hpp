@@ -19,9 +19,14 @@
 #include <exception>
 #include <memory>
 #include <stop_token>
+#include <string>
 #include <thread>
+#include <vector>
 
-#include "VerbsSessionBase.hpp"
+#include "Frame.hpp"
+#include "MemoryRegion.hpp"
+#include "PeerLink.hpp"
+#include "Transport.hpp"
 
 namespace catalyst::transport::cpu_verbs {
 
@@ -29,15 +34,24 @@ namespace catalyst::transport::cpu_verbs {
 // the result. The function is bound via set_coprocessor_fn; nullptr selects the
 // built-in echo. Each message's decoder_id is handed to the function, which may
 // serve several codes and dispatch on it, or ignore it if it serves only one.
-class CpuCoprocessorSession : public common::VerbsSessionBase<CoprocessorSession> {
-    using Base = common::VerbsSessionBase<CoprocessorSession>;
-
+// The link connects the session to its controller (PeerLink.hpp).
+class CpuCoprocessorSession final : public CoprocessorSession {
   public:
+    /// Facing a catalyst controller over RC, with `ring` the frames both ends agree on.
     explicit CpuCoprocessorSession(std::string dev, int gid_idx,
-                                   common::frame::RingGeometry ring = common::frame::BL16_RING)
-        : Base(std::move(dev), gid_idx, "cpu_verbs", common::DEFAULT_QP_SHAPE, ring) {}
+                                   common::frame::RingGeometry ring = common::frame::BL16_RING);
+    /// Facing the peer `link` connects to (common::make_coprocessor_link).
+    explicit CpuCoprocessorSession(std::unique_ptr<common::PeerLink> link);
     ~CpuCoprocessorSession() override { stop(); }
 
+    CpuCoprocessorSession(const CpuCoprocessorSession &) = delete;
+    CpuCoprocessorSession &operator=(const CpuCoprocessorSession &) = delete;
+
+    int connect(const ConnectInfo &info) override;
+    MemRegion alloc_memory(std::size_t size, MemKind kind) override;
+    PeerRef exchange_keys(const MemRegion &local) override;
+    void establish_channel(const ChannelDesc &desc, const MemRegion &local,
+                           const PeerRef &peer) override;
     void start() override;
     int collect(void *const *replies, const std::uint64_t *replies_bytes, std::size_t n) override;
     void stop() override;
@@ -49,13 +63,15 @@ class CpuCoprocessorSession : public common::VerbsSessionBase<CoprocessorSession
         pin_realtime_ = realtime;
     }
 
-  protected:
-    bool oob_listens() const override { return true; }
-
   private:
     // The engine loop; runs on engine_.
     void run(std::stop_token st);
-    template <common::frame::Mode M> void serve(std::stop_token st);
+    template <common::frame::Mode M, class Link> void serve(Link &link, std::stop_token st);
+
+    std::unique_ptr<common::PeerLink> link_;
+    common::frame::RingGeometry ring_;
+    std::vector<common::MemoryRegion> regions_; // handed out by alloc_memory()
+    std::uint8_t *ring_buf_ = nullptr; // the ring requests land in, from establish_channel()
 
     int pin_cpu_ = -1; // -1 -> leave affinity alone
     bool pin_realtime_ = false;

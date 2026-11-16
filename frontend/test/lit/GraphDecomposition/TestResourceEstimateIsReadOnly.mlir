@@ -14,7 +14,7 @@
 
 // Tests that the IR is unchanged after resource-estimate pass.
 
-// RUN: catalyst --tool=opt --pass-pipeline='builtin.module(resource-estimate{output-json gate-set=S=1.0,T=1.0,Adjoint(S)=1.0,Adjoint(T)=1.0 bytecode-rules="%BYTECODE_PATH"})' %s | FileCheck %s
+// RUN: catalyst --tool=opt --pass-pipeline='builtin.module(resource-estimate{output-json gate-set=S=1.0,T=1.0,Adjoint(S)=1.0,Adjoint(T)=1.0 bytecode-rules="%PRECOMPILED_BYTECODE_PATH"})' %s | FileCheck %s
 
 // CHECK-LABEL: func.func public @adjoint_circuit() attributes {quantum.node} {
 // CHECK-NEXT:    [[REG:%.+]] = quantum.alloc( 1) : !quantum.reg
