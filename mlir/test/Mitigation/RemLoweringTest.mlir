@@ -206,19 +206,3 @@ func.func @remProbsPassthrough() -> tensor<4xf64> {
 // CHECK-NOT:   arith.constant dense<0.000000e+00>
 // CHECK-NOT:   quantum.compbasis
 // CHECK-NOT:   quantum.custom "PauliX"
-
-// -----
-
-// ===================================================================
-// A missing callee leaves the mitigation.rem op untouched: the lowering
-// pattern bails out via notifyMatchFailure, which keeps the IR in a state
-// that downstream passes can either re-try or surface as a hard error.
-// ===================================================================
-
-func.func @remMissingCallee() -> (tensor<4xf64>, tensor<4xf64>, tensor<4xf64>) {
-    %out:3 = mitigation.rem @doesNotExist() runCalibration(true) {resultSegmentSizes = array<i32: 1, 1, 1>} : () -> (tensor<4xf64>, tensor<4xf64>, tensor<4xf64>)
-    func.return %out#0, %out#1, %out#2 : tensor<4xf64>, tensor<4xf64>, tensor<4xf64>
-}
-
-// CHECK-LABEL: func.func @remMissingCallee
-// CHECK:       mitigation.rem @doesNotExist() runCalibration(true)

@@ -86,6 +86,9 @@ def RemOp : Mitigation_Op<"rem", [DeclareOpInterfaceMethods<CallOpInterface>,
         Variadic<RankedTensorOf<[AnyFloat, AnyInteger]>>:$zeros,
         Variadic<RankedTensorOf<[AnyFloat, AnyInteger]>>:$ones
     );
+
+    let hasVerifier = 1;
+
     let assemblyFormat = [{
         $callee `(` $args `)` `runCalibration` `(` $runCalibration `)` attr-dict `:` functional-type($args, results)
     }];
