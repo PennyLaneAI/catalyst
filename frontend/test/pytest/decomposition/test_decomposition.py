@@ -856,7 +856,7 @@ class TestGenericUtilities:
             collected_rules = collect_resources_for_op("RZ", kwargs, is_custom_op=True)
 
         collected = next(
-            rule for rule in collected_rules if rule.source_rule.name == "_rz_to_rx_cliff"
+            rule for rule in collected_rules if rule.source_rule.name == "to_rx_cliff"
         )
         assert collected.resource_counts_by_id == {
             "Hadamard{}{wires:1}{}": 2,
@@ -969,16 +969,16 @@ class TestPrecompiled:
 
         bytecode = _quantum_opt("--empty", str(bytecode_path))
         expected_rules = [
-            ("_rz_to_ppr", "RZ{0:[f64]}{wires:1}{}"),
-            ("_rz_to_rot", "RZ{0:[f64]}{wires:1}{}"),
-            ("_multi_rz_decomposition", "MultiRZ{theta:[f64]}{wires:1}{}"),
-            ("_multi_rz_decomposition", "MultiRZ{theta:[f64]}{wires:2}{}"),
+            ("to_paulirot", "RZ{0:[f64]}{wires:1}{}"),
+            ("to_rot", "RZ{0:[f64]}{wires:1}{}"),
+            ("cnot_ladder", "MultiRZ{theta:[f64]}{wires:1}{}"),
+            ("cnot_ladder", "MultiRZ{theta:[f64]}{wires:2}{}"),
             (
-                "_pauli_rot_decomposition",
+                "basis_change_multirz",
                 "PauliRot{theta:[f64]}{wires:1}{pauli_word = \\22Z\\22}",
             ),
             (
-                "_pauli_rot_decomposition",
+                "basis_change_multirz",
                 "PauliRot{theta:[f64]}{wires:2}{pauli_word = \\22XX\\22}",
             ),
         ]
@@ -2046,7 +2046,7 @@ class TestSymbolicRules:
         (rule,) = [
             rule
             for rule in get_rule_strings_from_module(module)
-            if 'frontend_name = "flip_zero_ctrl_values(_controlled_hadamard)"' in rule
+            if 'frontend_name = "to_mcx"' in rule
         ]
 
         assert f'target_gate = "{target_id}"' in rule
