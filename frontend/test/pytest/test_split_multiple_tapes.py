@@ -25,6 +25,8 @@ import pytest
 
 from catalyst import qjit
 
+pytestmark = pytest.mark.old_frontend
+
 
 def test_split_multiple_tapes():
     """
@@ -56,7 +58,7 @@ def test_split_multiple_tapes():
 
     expected = circuit([0.1, 0.2])
 
-    circuit = qjit(circuit)
+    circuit = qjit(circuit, capture=False)
     qjit_results = circuit([0.1, 0.2])
 
     assert np.allclose(expected, qjit_results)

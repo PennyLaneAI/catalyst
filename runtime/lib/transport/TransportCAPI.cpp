@@ -734,6 +734,13 @@ int __catalyst__transport__start_benchmark(CatalystTransportSession *s, std::uin
     const bool progress = (flags & CATALYST_BENCH_PROGRESS) != 0;
 
     return guard([&] {
+        // The backend issues the rounds and keeps their record itself. A backend before version 4
+        // has no self_paced() to ask.
+        const std::uint32_t version = s->caps != nullptr ? s->caps->abi_version : 1;
+        if (version >= 4 && c->self_paced()) {
+            return c->run_paced();
+        }
+
         std::vector<std::uint8_t> outgoing_message(
             std::max<std::size_t>(outgoing_message_bytes, sizeof(std::uint64_t)), 0);
         std::uint64_t written = 0;

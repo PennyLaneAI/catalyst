@@ -56,21 +56,22 @@ original_function = f_of_dynamic_argument.original_function
 assert get_arg_names(jaxpr_in_avals, original_function) == ["a", ""]
 
 
-@qjit(abstracted_axes={0: "n"})
-def f_of_qnode_with_dynamic_argument(a):
-    """Check QNode argument with dynamic argument"""
+def test_qnode_with_dynamic_argument():
+    """Check QNode argument with dynamic argument."""
 
-    @qp.qnode(qp.device("lightning.qubit", wires=1))
-    def _circuit(b):
-        return b
+    @qjit(abstracted_axes={0: "n"})
+    def f_of_qnode_with_dynamic_argument(a):
+        @qp.qnode(qp.device("lightning.qubit", wires=1))
+        def _circuit(b):
+            qp.RX(b[0], wires=0)
+            return qp.expval(qp.Z(0))
 
-    return _circuit(a)
+        return _circuit(a)
 
-
-f_of_qnode_with_dynamic_argument.jit_compile([jnp.array([1, 2, 3])])
-jaxpr_in_avals = f_of_qnode_with_dynamic_argument.jaxpr.in_avals
-original_function = f_of_qnode_with_dynamic_argument.original_function
-assert get_arg_names(jaxpr_in_avals, original_function) == ["a", ""]
+    f_of_qnode_with_dynamic_argument.jit_compile([jnp.array([1, 2, 3])])
+    jaxpr_in_avals = f_of_qnode_with_dynamic_argument.jaxpr.in_avals
+    original_function = f_of_qnode_with_dynamic_argument.original_function
+    assert get_arg_names(jaxpr_in_avals, original_function) == ["a", ""]
 
 
 @qjit
