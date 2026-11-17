@@ -116,6 +116,7 @@ const PipelineList pipelineList{
       "one-shot-bufferize",
       // Remove dead memrefToTensorOp's
       "canonicalize",
+      "buffer-results-to-out-params(hoist-static-allocs)",
       "gradient-postprocess",
       // Introduced during gradient-bufferize of callbacks
       "func.func(buffer-hoisting)",
