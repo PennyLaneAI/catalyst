@@ -88,6 +88,8 @@
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 #include "Catalyst/IR/CatalystDialect.h"
+#include "QRef/IR/QRefDialect.h"
+#include "Quantum/IR/QuantumDialect.h"
 
 using namespace mlir;
 using namespace catalyst;
@@ -394,7 +396,8 @@ class BufferDeallocation : public BufferPlacementTransformationBase {
         SetVector<Value> nonAliases;
         op->walk([&](Operation *operation) {
             for (Value result : operation->getResults()) {
-                if (isa<catalyst::quantum::QuantumDialect>(result.getType().getDialect())) {
+                if (isa<catalyst::quantum::QuantumDialect, catalyst::qref::QRefDialect>(
+                        result.getType().getDialect())) {
                     nonAliases.insert(result);
                 }
             }
