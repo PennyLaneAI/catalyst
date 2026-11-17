@@ -22,6 +22,7 @@
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/IR/IRMapping.h"
+#include "mlir/Interfaces/ViewLikeInterface.h"
 #include "mlir/Transforms/DialectConversion.h"
 
 using namespace mlir;
@@ -59,6 +60,73 @@ struct CallOpToAsyncOPRewritePattern : public mlir::OpRewritePattern<func::CallO
         for (auto refCountedValue : executeOp.getResults()) {
             async::RuntimeDropRefOp::create(rewriter, op.getLoc(), refCountedValue,
                                             rewriter.getI64IntegerAttr(1));
+        }
+    }
+
+    /// Buffers passed to the QNode are captured by the async.execute, so they must stay alive
+    /// until it completes. buffer-deallocation ran before this pass and assumed a synchronous
+    /// call, so a dealloc of a call operand can sit between the call and the end-of-block await
+    /// placed by insertDropRefOps. Move such deallocs after that await, i.e. to the end of the
+    /// block. Deallocs outside the call's block need no change: control cannot leave the block
+    /// before its final await. A dealloc nested in a later op of the block (e.g. inside scf.if)
+    /// cannot be hoisted out, so it gets its own await on the execute token instead.
+    void delayOperandDeallocs(func::CallOp op, async::ExecuteOp executeOp,
+                              PatternRewriter &rewriter) const {
+        Block *block = executeOp->getBlock();
+
+        // Every buffer the call reads: each memref operand, its view sources and their views.
+        SetVector<Value> buffers;
+        SmallVector<Value> worklist;
+        for (Value operand : op.getOperands()) {
+            if (!isa<BaseMemRefType>(operand.getType())) {
+                continue;
+            }
+            Value root = operand;
+            while (auto view = root.getDefiningOp<ViewLikeOpInterface>()) {
+                root = view.getViewSource();
+            }
+            worklist.push_back(root);
+        }
+        while (!worklist.empty()) {
+            Value value = worklist.pop_back_val();
+            if (!buffers.insert(value)) {
+                continue;
+            }
+            for (Operation *user : value.getUsers()) {
+                if (auto view = dyn_cast<ViewLikeOpInterface>(user);
+                    view && view.getViewSource() == value) {
+                    worklist.push_back(view->getResult(0));
+                }
+            }
+        }
+
+        SmallVector<memref::DeallocOp> deallocs;
+        for (Value buffer : buffers) {
+            for (Operation *user : buffer.getUsers()) {
+                if (auto dealloc = dyn_cast<memref::DeallocOp>(user)) {
+                    deallocs.push_back(dealloc);
+                }
+            }
+        }
+
+        for (memref::DeallocOp dealloc : deallocs) {
+            Operation *ancestor = block->findAncestorOpInBlock(*dealloc);
+            if (!ancestor || !executeOp->isBeforeInBlock(ancestor)) {
+                continue; // Not after the call in this block: already ordered after the await.
+            }
+            if (ancestor == dealloc.getOperation()) {
+                bool hasTerminator =
+                    !block->empty() && block->back().mightHaveTrait<OpTrait::IsTerminator>();
+                if (hasTerminator) {
+                    rewriter.moveOpBefore(dealloc, block->getTerminator());
+                } else {
+                    rewriter.moveOpAfter(dealloc, &block->back());
+                }
+            } else {
+                PatternRewriter::InsertionGuard insertGuard(rewriter);
+                rewriter.setInsertionPoint(dealloc);
+                async::AwaitOp::create(rewriter, op.getLoc(), executeOp.getToken());
+            }
         }
     }
 
@@ -200,6 +268,7 @@ struct CallOpToAsyncOPRewritePattern : public mlir::OpRewritePattern<func::CallO
 
         insertDropRefOps(op, executeOp, rewriter);
         insertAwaitOps(op, executeOp, rewriter);
+        delayOperandDeallocs(op, executeOp, rewriter);
 
         rewriter.eraseOp(op);
 
