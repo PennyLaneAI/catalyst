@@ -394,7 +394,7 @@ class BufferDeallocation : public BufferPlacementTransformationBase {
         SetVector<Value> nonAliases;
         op->walk([&](Operation *operation) {
             for (Value result : operation->getResults()) {
-                if (!isa<BaseMemRefType>(result.getType())) {
+                if (isa<catalyst::quantum::QuantumDialect>(result.getType().getDialect())) {
                     nonAliases.insert(result);
                 }
             }
