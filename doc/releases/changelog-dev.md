@@ -2,6 +2,19 @@
 
 <h3>New features since last release</h3>
 
+* Device libraries now have a versioned ABI. `GENERATE_DEVICE_FACTORY` emits
+  `<Name>DeviceAbiVersion`, and a device can provide optional, append-only C function tables
+  through the new `QuantumDevice::QueryInterface` (`DeviceExtensions.h`). Existing devices keep
+  working unchanged.
+  [(#XXXX)](https://github.com/PennyLaneAI/catalyst/pull/XXXX)
+
+  - The "Delegated" table lets a device take mid-circuit feed-forward as data: result handles,
+    predicates and result ops, and a Pauli measurement that applies its own sign.
+  - The "Gadget" table brackets a span of ops that implements one Pauli rotation.
+  - `__catalyst__rt__device_require` fails at load, naming the table, the version and the device,
+    when the device does not provide a table the program needs.
+  - `null.qubit` provides both tables.
+
 * Backline can drive a VPK120 whose FPGA carries NVIDIA's Holoscan Sensor Bridge (HSB), through
   the new `hsb_hwhs` controller backend. Its coprocessors stay `cpu_verbs` and `gpu_verbs`,
   set to face HSB with `peer=hsb`.

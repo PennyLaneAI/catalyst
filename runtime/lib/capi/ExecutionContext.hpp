@@ -18,6 +18,7 @@
 #include <cstdio>
 #include <dlfcn.h>
 #include <filesystem>
+#include <map>
 #include <memory>
 #include <mutex>
 #include <random>
@@ -27,6 +28,7 @@
 #include <unordered_set>
 
 #include "DataView.hpp"
+#include "DeviceExtensions.h"
 #include "Exception.hpp"
 #include "QuantumDevice.hpp"
 
@@ -161,6 +163,12 @@ class SharedLibraryManager final {
         RT_FAIL_IF(!sym, dlerror());
         return sym;
     }
+
+    /// The symbol, or null when the library does not define it.
+    void *findSymbol(const std::string &symbol) {
+        dlerror();
+        return dlsym(_handler, symbol.c_str());
+    }
 };
 
 /**
@@ -196,6 +204,11 @@ class RTDevice {
 
     std::unique_ptr<SharedLibraryManager> rtd_dylib{nullptr};
     std::unique_ptr<QuantumDevice> rtd_qdevice{nullptr};
+
+    /// The device ABI the library was built against: 0 without `<Name>DeviceAbiVersion`.
+    uint32_t rtd_abi_version{0};
+    /// Extension tables already looked up, by name and minimum version. Null entries are kept.
+    std::map<std::pair<std::string, uint32_t>, const void *> rtd_tables{};
 
     RTDeviceStatus status{RTDeviceStatus::Inactive};
 
@@ -268,7 +281,54 @@ class RTDevice {
             (f_ptr != nullptr)
                 ? reinterpret_cast<decltype(GenericDeviceFactory) *>(f_ptr)(rtd_kwargs.c_str())
                 : nullptr);
+        void *version_ptr = rtd_dylib->findSymbol(rtd_name + "DeviceAbiVersion");
+        rtd_abi_version =
+            version_ptr ? reinterpret_cast<uint32_t (*)()>(version_ptr)() : uint32_t{0};
         return rtd_qdevice;
+    }
+
+    [[nodiscard]] auto getDeviceAbiVersion() const -> uint32_t { return rtd_abi_version; }
+
+    /**
+     * @brief The device's extension table `name` at version `min_version` or later, or null.
+     *
+     * A version-0 device has no tables, and is never asked.
+     */
+    [[nodiscard]] auto queryInterface(const std::string &name, uint32_t min_version) -> const
+        void * {
+        const auto &device = getQuantumDevicePtr();
+        if (!device || rtd_abi_version < 1) {
+            return nullptr;
+        }
+        const auto key = std::make_pair(name, min_version);
+        if (auto it = rtd_tables.find(key); it != rtd_tables.end()) {
+            return it->second;
+        }
+        const void *table = device->QueryInterface(name.c_str(), min_version);
+        if (table) {
+            const auto *header = static_cast<const CatalystDeviceTableHeader *>(table);
+            RT_FAIL_IF(header->abi_version < min_version,
+                       "The device returned an extension table older than requested");
+        }
+        rtd_tables.emplace(key, table);
+        return table;
+    }
+
+    /**
+     * @brief The device's extension table `name` at version `min_version` or later.
+     *
+     * Fails, naming the table, the version and the device, when the device does not provide it.
+     */
+    auto requireInterface(const std::string &name, uint32_t min_version) -> const void * {
+        const void *table = queryInterface(name, min_version);
+        if (!table) {
+            const std::string message = "The program needs the device extension " + name +
+                                        " >= " + std::to_string(min_version) + ", and device " +
+                                        rtd_name + " (device ABI " +
+                                        std::to_string(rtd_abi_version) + ") does not provide it.";
+            RT_FAIL(message.c_str());
+        }
+        return table;
     }
 
     [[nodiscard]] auto getDeviceInfo() const
