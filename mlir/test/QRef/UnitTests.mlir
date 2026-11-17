@@ -347,7 +347,8 @@ func.func @test_circuit_with_loop(%nqubits: i64) -> tensor<?xf64> {
 func.func @qubits(%angle: f64, %data: tensor<?xf64>, %q0: !qref.bit, %q1: !qref.bit)
     -> (i1, tensor<2xf64>) {
   %m, %data_out = qref.measurement "MeasurePair"(%angle: f64, %data: tensor<?xf64>)
-      qubits(%q0, %q1) static_data = {plane = "XY", reset = true} {tag = "preserved"}
+      qubits(%q0, %q1) static_data = {plane = "XY", reset = true}
+      param_map = {angle = [0], data = [1]} qubit_map = {wires = [0, 1]} {tag = "preserved"}
       : i1, tensor<2xf64>
   return %m, %data_out : i1, tensor<2xf64>
 }
@@ -356,6 +357,7 @@ func.func @register(%reg: !qref.reg<4>, %wires: tensor<?xi64>, %other: tensor<1x
     -> tensor<?xi1> {
   %m = qref.measurement "MeasureMany"()
       quregs(%reg: !qref.reg<4>) indices(%wires: tensor<?xi64>, %other: tensor<1xi64>)
+      qubit_map = {wires = [0], other = [1]}
       : tensor<?xi1>
   return %m : tensor<?xi1>
 }
