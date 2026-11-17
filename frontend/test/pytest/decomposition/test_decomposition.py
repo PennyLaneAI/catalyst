@@ -855,9 +855,7 @@ class TestGenericUtilities:
         with qp.capture.toggle_ctx(False):
             collected_rules = collect_resources_for_op("RZ", kwargs, is_custom_op=True)
 
-        collected = next(
-            rule for rule in collected_rules if rule.source_rule.name == "to_rx_cliff"
-        )
+        collected = next(rule for rule in collected_rules if rule.source_rule.name == "to_rx_cliff")
         assert collected.resource_counts_by_id == {
             "Hadamard{}{wires:1}{}": 2,
             "RX{0:[f64]}{wires:1}{}": 1,
