@@ -193,6 +193,10 @@
 
 <h3>Improvements 🛠</h3>
 
+* Operators whose operator-valued arguments share wires are now supported
+  with `qjit`.
+  [(#3470)](https://github.com/PennyLaneAI/catalyst/pull/3470)
+
 * Ahead-of-time compilation with `qjit` can now stop at any of the main internal compiler stages,
   in addition to the frontend-controlled stages (`target="jaxpr"|"mlir"|"binary"`).
   The `"llvmir"` target now correctly stops after LLVM IR is first generated from the MLIR, and
@@ -417,7 +421,7 @@
     Every registered signature is lowered, as well as any operations/rules reachable from these signatures, or their adjoint/control variants.
     [(#3057)](https://github.com/PennyLaneAI/catalyst/pull/3057)
 
-    2. When tracing a gate operation to JAXPR, all rules reachable from that gate are injected. Note that rules already available in the precompiled rule library will not get re-traced. 
+    2. When tracing a gate operation to JAXPR, all rules reachable from that gate are injected. Note that rules already available in the precompiled rule library will not get re-traced.
     [(#3061)](https://github.com/PennyLaneAI/catalyst/pull/3061)
     [(#3160)](https://github.com/PennyLaneAI/catalyst/pull/3160)
     [(#3149)](https://github.com/PennyLaneAI/catalyst/pull/3149)
