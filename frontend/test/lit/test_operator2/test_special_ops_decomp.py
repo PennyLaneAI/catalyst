@@ -74,7 +74,7 @@ def test_paulirot():
 # CHECK: qref.paulirot ["X", "X"]({{%.+}}) {{%.+}}, {{%.+}} : !qref.bit, !qref.bit
 # CHECK: qref.paulirot ["Z"]({{%.+}}) {{%.+}} : !qref.bit
 # CHECK: qref.paulirot ["Y", "Z", "X"]({{%.+}}) {{%.+}}, {{%.+}}, {{%.+}} : !qref.bit, !qref.bit, !qref.bit
-# CHECK: func.func private @__builtin__pauli_rot_decomposition{{(_[0-9]+)?}}
+# CHECK: func.func private @__builtin_basis_change_multirz{{(_[0-9]+)?}}
 # CHECK-SAME:   target_gate = "PauliRot{theta:[f64]}{wires:3}{pauli_word = \22YZX\22}"
 test_paulirot()
 
@@ -97,9 +97,9 @@ def test_pcphase():
 # CHECK: func.func public @pcphase()
 # CHECK: qref.pcphase({{%.+}}, dim : 3) {{%.+}}, {{%.+}}, {{%.+}} : !qref.bit, !qref.bit, !qref.bit
 # CHECK: qref.pcphase({{%.+}}, dim : 0) {{%.+}} : !qref.bit
-# CHECK: func.func private @__builtin__decompose_pcphase{{(_[0-9]+)?}}
+# CHECK: func.func private @__builtin_controlled_phase_shifts{{(_[0-9]+)?}}
 # CHECK-SAME:   target_gate = "PCPhase{phi:[f64]}{wires:3}{dim = 3 : i64}"
-# CHECK: func.func private @__builtin__decompose_pcphase{{(_[0-9]+)?}}
+# CHECK: func.func private @__builtin_controlled_phase_shifts{{(_[0-9]+)?}}
 # CHECK-SAME:   target_gate = "PCPhase{phi:[f64]}{wires:1}{dim = 0 : i64}"
 test_pcphase()
 
@@ -188,8 +188,8 @@ def test_basis_state():
 # CHECK:   static_data = {}
 # CHECK:   param_map = {state = [0]} qubit_map = {wires = [0, 1]}
 #
-# CHECK: func.func private @__builtin__basis_state_decomp{{(_[0-9]+)?}}
+# CHECK: func.func private @__builtin_to_x{{(_[0-9]+)?}}
 # CHECK-SAME:   target_gate = "BasisState{state:[tensor<1xi1>]}{wires:1}{}"
-# CHECK: func.func private @__builtin__basis_state_decomp{{(_[0-9]+)?}}
+# CHECK: func.func private @__builtin_to_x{{(_[0-9]+)?}}
 # CHECK-SAME:   target_gate = "BasisState{state:[tensor<2xi1>]}{wires:2}{}"
 test_basis_state()
