@@ -199,8 +199,7 @@ LogicalResult RemLowering::matchAndRewrite(mitigation::RemOp op, PatternRewriter
     // check for MP type: Sample, Probs or Counts
     auto measurementProcesses = calleeOp.getOps<quantum::MeasurementProcess>();
     if (measurementProcesses.empty()) {
-        llvm::errs() << "[mitigation.rem] No valid MP found.\n";
-        return failure();
+       return op.emitOpError("[mitigation.rem] No valid MP found.\n");
     }
     const std::string MPName =
         (*measurementProcesses.begin()).getOperation()->getName().getIdentifier().str();
