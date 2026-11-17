@@ -1103,6 +1103,7 @@ class CustomDevice(qp.devices.Device):
         return circuits, execution_config
 
 
+@pytest.mark.old_frontend
 class TestDensityMatrixMP:
     """Tests for density_matrix"""
 
@@ -1110,12 +1111,11 @@ class TestDensityMatrixMP:
         """Test that tracing density matrix produces an error"""
 
         err_msg = "DensityMatrixMP is not a supported measurement process"
-        with pytest.warns(UserWarning, match="AOT.*failed"):
 
-            @qjit
-            @qp.qnode(CustomDevice(wires=1))
-            def circuit():
-                return qp.density_matrix([0])
+        @qjit(capture=False)
+        @qp.qnode(CustomDevice(wires=1))
+        def circuit():
+            return qp.density_matrix([0])
 
         with pytest.raises(CompileError, match=err_msg):
             circuit()

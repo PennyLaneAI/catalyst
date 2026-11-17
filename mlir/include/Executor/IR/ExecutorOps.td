@@ -152,16 +152,28 @@ def Executor_CallOp : Executor_Op<"call"> {
 
     let arguments = (ins
         Executor_SessionType:$session,
-        Variadic<AnyMemRef>:$inputs,
+        Variadic<AnyTypeOf<[AnyRankedTensor, AnyMemRef]>>:$inputs,
         StrAttr:$symbol,
         OptionalAttr<I32Attr>:$num_input_args
     );
 
-    let results = (outs Variadic<AnyMemRef>:$results);
+    let results = (outs Variadic<AnyRankedTensor>:$results);
 
     let assemblyFormat = [{
         $session `(` $symbol `)` `(` $inputs `)` attr-dict
             `:` type($session) `,` functional-type($inputs, $results)
+    }];
+
+    let extraClassDeclaration = [{
+        /// Whether there are no tensors left to bufferize
+        bool isBufferized() {
+            if (!getResults().empty()) {
+                return false;
+            }
+            return llvm::none_of(getInputs().getTypes(), [](mlir::Type type) {
+                return mlir::isa<mlir::RankedTensorType>(type);
+            });
+        }
     }];
 }
 

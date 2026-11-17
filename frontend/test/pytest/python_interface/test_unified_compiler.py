@@ -24,11 +24,10 @@ from jaxlib.mlir.ir import Module as jModule
 from pennylane.capture import enabled as capture_enabled
 from xdsl import passes
 from xdsl.context import Context
-from xdsl.dialects import builtin, transform
+from xdsl.dialects import builtin, func, transform
 from xdsl.passes import PassPipeline
 
 from catalyst import CompileError, qjit
-from catalyst.passes import apply_pass
 from catalyst.passes import cancel_inverses as catalyst_cancel_inverses
 from catalyst.passes.xdsl_plugin import getXDSLPluginAbsolutePath
 from catalyst.python_interface import Compiler
@@ -37,6 +36,7 @@ from catalyst.python_interface.conversion import (
     parse_generic_to_mlir_module,
     parse_generic_to_xdsl_module,
 )
+from catalyst.python_interface.dialects.quantum import CustomOp
 from catalyst.python_interface.pass_api import (
     ApplyTransformSequencePass,
     available_passes,
@@ -155,6 +155,36 @@ def test_empty_res_attrs_on_void_func_is_omitted():
     assert isinstance(out, str)
     assert "res_attrs = []" not in out
     assert "arg_attrs = []" not in out
+
+
+@pytest.mark.parametrize("as_mod", [True, False])
+@pytest.mark.usefixtures("use_capture")
+def test_captured_rules_are_used_before_symbol_cleanup(as_mod, mocker):
+    """Use captured decomposition rules before removing unused rule functions."""
+
+    # keep precompiled rules out of the way
+    mocker.patch(
+        "catalyst.from_plxpr.qfunc_interpreter.load_precompiled_rule_identities",
+        return_value=frozenset(),
+    )
+
+    @qjit(capture=True, target="mlir")
+    @qp.decompose(gate_set=[qp.RY, qp.RZ])
+    @qp.qnode(qp.device("lightning.qubit", wires=1))
+    def circuit(angle: float):
+        qp.Rot(angle, angle, angle, 0)
+        return qp.state()
+
+    module = circuit.mlir_module
+    assert "target_gate" in str(module)
+    transformed = Compiler.run(module if as_mod else str(module))
+    assert "target_gate" not in str(transformed)
+
+    xmod = parse_generic_to_xdsl_module(
+        transformed.operation.get_asm(print_generic_op_form=True) if as_mod else transformed
+    )
+    gates = [op.gate_name.data for op in xmod.walk() if isinstance(op, CustomOp)]
+    assert gates == ["RZ", "RY", "RZ"]
 
 
 def test_raises_error_when_pass_does_not_exists():
@@ -283,7 +313,7 @@ class TestCatalystIntegration:
         assert not capture_enabled()
 
         @qjit
-        @apply_pass("hello-world")
+        @qp.transform(pass_name="hello-world")
         @qp.qnode(qp.device("lightning.qubit", wires=2))
         def f(x):
             qp.RX(x, 0)
@@ -323,7 +353,7 @@ class TestCatalystIntegration:
         assert not capture_enabled()
 
         @qjit
-        @apply_pass("hello-world")
+        @qp.transform(pass_name="hello-world")
         @catalyst_cancel_inverses
         @qp.qnode(qp.device("lightning.qubit", wires=2))
         def f(x):
@@ -450,7 +480,7 @@ class TestCallbackIntegration:
 
         assert printed_modules[0] != printed_modules[1], "IR should differ between passes"
 
-    @pytest.mark.parametrize("skip_preprocess", [True, False])
+    @pytest.mark.parametrize("skip_preprocess", (True, False))
     @pytest.mark.usefixtures("use_capture")
     def test_callback_run_integration(self, capsys, skip_preprocess):
         """Test that the callback is integrated into the pass pipeline with the Compiler.run() method"""
@@ -460,7 +490,12 @@ class TestCallbackIntegration:
             if pass_level == 0:
                 return
             print("=== Between Pass ===")
-            print(module)
+            circuit_func = next(
+                op
+                for op in module.ops
+                if isinstance(op, func.FuncOp) and op.sym_name.data == "circuit"
+            )
+            print(circuit_func)
 
         @qp.qjit(skip_preprocess=skip_preprocess, capture=True)
         @iterative_cancel_inverses_pass
@@ -482,7 +517,7 @@ class TestCallbackIntegration:
                 len(printed_modules) == 2
             ), "Callback should have been called twice (after each pass)."
         else:
-            assert len(printed_modules) == 5, (
+            assert len(printed_modules) == 6, (
                 "Callback should have been called five times (after each pass, "
                 "including device preprocessing)."
             )

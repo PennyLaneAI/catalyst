@@ -16,9 +16,12 @@
 
 The attribute records shared-library paths that a compiled program needs at link time. The write
 side is used by JAX primitive lowering, when emitting a ``catalyst.custom_call`` that targets a
-local (in-process) external symbol exported by library. The read side is used by the compiler driver
-to add those libraries to the link command.
+local (in-process) external symbol exported by library. Devices can also declare libraries through
+``get_runtime_artifacts()``. The read side is used by the compiler driver to add those libraries to
+the link command.
 """
+
+import os
 
 from jax._src.lib.mlir import ir
 
@@ -39,25 +42,42 @@ def record_runtime_artifact(module_op, artifact_path):
     attrs[RUNTIME_ARTIFACTS_ATTR] = ir.ArrayAttr.get([ir.StringAttr.get(p) for p in existing])
 
 
+def record_device_runtime_artifacts(module_op, device):
+    """Record the runtime libraries optionally declared by ``device``."""
+    get_artifacts = getattr(device, "get_runtime_artifacts", None)
+
+    if get_artifacts is None:
+        return
+
+    device_runtime_artifacts = get_artifacts()
+    if isinstance(device_runtime_artifacts, (str, bytes, os.PathLike)):
+        raise TypeError(
+            "calling device.get_runtime_artifacts should return an iterable of paths, "
+            f"but got {type(device_runtime_artifacts)}"
+        )
+    for artifact_path in device_runtime_artifacts:
+        record_runtime_artifact(module_op, str(artifact_path))
+
+
 def collect_runtime_artifacts(mlir_module, compile_options):
     """Aggregate every ``catalyst.runtime_artifacts`` path into ``compile_options``.
 
-    Walks the module and all nested modules, collecting the artifact paths recorded on each, so the
-    linker receives the full set. The result is stored on ``compile_options.runtime_artifacts``.
+    Collects the paths recorded on ``mlir_module`` and on every module nested within it, in the
+    order first seen, so the linker receives the full set. The result is stored on
+    ``compile_options.runtime_artifacts``.
     """
-    seen = []
+    seen = {}
 
-    def _walk(op):
-        attrs = op.attributes
+    def _walk(module_op):
+        attrs = module_op.attributes
         if RUNTIME_ARTIFACTS_ATTR in attrs:
             for string_attr in attrs[RUNTIME_ARTIFACTS_ATTR]:
-                path = ir.StringAttr(string_attr).value
-                if path not in seen:
-                    seen.append(path)
-        for region in op.regions:
+                seen[ir.StringAttr(string_attr).value] = None
+        for region in module_op.regions:
             for block in region:
                 for child_op in block:
-                    _walk(child_op)
+                    if child_op.operation.name == "builtin.module":
+                        _walk(child_op.operation)
 
     _walk(mlir_module.operation)
     compile_options.runtime_artifacts = tuple(seen)

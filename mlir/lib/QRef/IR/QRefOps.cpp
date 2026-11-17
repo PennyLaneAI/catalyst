@@ -15,7 +15,9 @@
 #include "QRef/IR/QRefOps.h"
 
 #include <cstdint>
+#include <limits>
 
+#include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/StringSet.h"
 #include "llvm/Support/LogicalResult.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
@@ -27,6 +29,8 @@
 #include "PBC/IR/PBCOps.h"
 #include "QRef/IR/QRefDialect.h"
 #include "Quantum/IR/QuantumInterfaces.h"
+
+#include "StringConstants.h"
 
 using namespace mlir;
 using namespace catalyst::qref;
@@ -54,60 +58,6 @@ static LogicalResult verifyTensorResult(Type ty, int64_t length0, int64_t length
 //===----------------------------------------------------------------------===//
 // QRef op canonicalizers.
 //===----------------------------------------------------------------------===//
-
-static const mlir::StringSet<> hermitianOps = {"Hadamard", "PauliX", "PauliY", "PauliZ", "CNOT",
-                                               "CY",       "CZ",     "SWAP",   "Toffoli"};
-static const mlir::StringSet<> rotationsOps = {"RX",  "RY",  "RZ",  "PhaseShift",
-                                               "CRX", "CRY", "CRZ", "ControlledPhaseShift"};
-
-LogicalResult CustomOp::canonicalize(CustomOp op, mlir::PatternRewriter &rewriter) {
-    if (op.getAdjoint()) {
-        auto name = op.getGateName();
-        if (hermitianOps.contains(name)) {
-            op.setAdjoint(false);
-            return success();
-        } else if (rotationsOps.contains(name)) {
-            auto params = op.getParams();
-            SmallVector<Value> paramsNeg;
-            for (auto param : params) {
-                auto paramNeg = mlir::arith::NegFOp::create(rewriter, op.getLoc(), param);
-                paramsNeg.push_back(paramNeg);
-            }
-
-            rewriter.replaceOpWithNewOp<CustomOp>(op, paramsNeg, op.getQubits(), name, false,
-                                                  op.getCtrlQubits(), op.getCtrlValues());
-
-            return success();
-        }
-        return failure();
-    }
-    return failure();
-}
-
-LogicalResult MultiRZOp::canonicalize(MultiRZOp op, mlir::PatternRewriter &rewriter) {
-    if (op.getAdjoint()) {
-        auto paramNeg = mlir::arith::NegFOp::create(rewriter, op.getLoc(), op.getTheta());
-
-        rewriter.replaceOpWithNewOp<MultiRZOp>(op, paramNeg, op.getQubits(), nullptr,
-                                               op.getCtrlQubits(), op.getCtrlValues());
-
-        return success();
-    };
-    return failure();
-}
-
-LogicalResult PCPhaseOp::canonicalize(PCPhaseOp op, mlir::PatternRewriter &rewriter) {
-    if (op.getAdjoint()) {
-        auto paramNeg = mlir::arith::NegFOp::create(rewriter, op.getLoc(), op.getTheta());
-
-        rewriter.replaceOpWithNewOp<PCPhaseOp>(op, paramNeg, op.getDimAttr(), op.getQubits(),
-                                               nullptr, op.getCtrlQubits(), op.getCtrlValues());
-
-        return success();
-    };
-    return failure();
-}
-
 LogicalResult AllocOp::canonicalize(AllocOp alloc, mlir::PatternRewriter &rewriter) {
     if (alloc->use_empty()) {
         rewriter.eraseOp(alloc);
@@ -349,14 +299,14 @@ LogicalResult AdjointOp::verify() {
 }
 
 LogicalResult CtrlOp::verify() {
-    auto res = this->getRegion().walk([](Operation *op) {
+    auto noMeasureWalkRes = this->getRegion().walk([](Operation *op) {
         return isa<quantum::MeasurementProcess, MeasureOp, pbc::RefPPMeasurementOp,
                    mbqc::RefMeasureInBasisOp>(op)
                    ? WalkResult::interrupt()
                    : WalkResult::advance();
     });
 
-    if (res.wasInterrupted()) {
+    if (noMeasureWalkRes.wasInterrupted()) {
         return emitOpError("quantum measurements are not allowed in the ctrl regions");
     }
 
@@ -368,6 +318,27 @@ LogicalResult CtrlOp::verify() {
     if (this->getCtrlValues().size() != this->getCtrlQubits().size()) {
         return emitOpError("Ctrl op number of control values must be the same as the number of "
                            "control qubits");
+    }
+    if (getWorkWireType() != catalyst::CTRL_WORK_WIRE_TYPE_BORROWED &&
+        getWorkWireType() != catalyst::CTRL_WORK_WIRE_TYPE_ZEROED) {
+        return emitOpError("work_wire_type must be either \"")
+               << catalyst::CTRL_WORK_WIRE_TYPE_BORROWED << "\" or \""
+               << catalyst::CTRL_WORK_WIRE_TYPE_ZEROED << "\"";
+    }
+
+    llvm::SmallDenseSet<Value> regionCtrlQubits(getCtrlQubits().begin(), getCtrlQubits().end());
+    auto noOverlappingCtrlQubitWalkRes = this->getRegion().walk([regionCtrlQubits](QuantumGate op) {
+        for (Value opCtrlQubit : op.getCtrlQubitOperands()) {
+            if (regionCtrlQubits.contains(opCtrlQubit)) {
+                return WalkResult::interrupt();
+            }
+        }
+        return WalkResult::advance();
+    });
+
+    if (noOverlappingCtrlQubitWalkRes.wasInterrupted()) {
+        return emitOpError("Ctrl op ctrl qubits must not reappear as the individual gates' ctrl "
+                           "qubits inside the ctrl region");
     }
 
     return success();
@@ -828,6 +799,169 @@ ParseResult OperatorOp::parse(OpAsmParser &parser, OperationState &result) {
              arrCtrlValues ? 1 : 0}));
 
     return success();
+}
+
+//===----------------------------------------------------------------------===//
+// DecomposableGate op interface methods.
+//===----------------------------------------------------------------------===//
+
+// CustomOp
+
+std::string CustomOp::getOperatorName() { return getGateName().str(); }
+
+DynamicShape CustomOp::getDynamicShape() {
+    DynamicShape ret;
+    for (auto [i, param] : llvm::enumerate(getParams())) {
+        ret.emplace_back(std::to_string(i), llvm::SmallVector<mlir::Type>({param.getType()}));
+    }
+    return ret;
+}
+
+WireLens CustomOp::getWireLens() { return {{"wires", getNonCtrlQubitOperands().size()}}; }
+
+mlir::DictionaryAttr CustomOp::getStaticData() {
+    return mlir::DictionaryAttr::get(getContext(), {});
+}
+
+// MultiRZOp
+
+std::string MultiRZOp::getOperatorName() { return "MultiRZ"; }
+
+DynamicShape MultiRZOp::getDynamicShape() {
+    return {{"theta", {mlir::Float64Type::get(getContext())}}};
+}
+
+WireLens MultiRZOp::getWireLens() { return {{"wires", getNonCtrlQubitOperands().size()}}; }
+
+mlir::DictionaryAttr MultiRZOp::getStaticData() {
+    return mlir::DictionaryAttr::get(getContext(), {});
+}
+
+// PauliRotOp
+
+std::string PauliRotOp::getOperatorName() { return "PauliRot"; }
+
+DynamicShape PauliRotOp::getDynamicShape() {
+    return {{"theta", {mlir::Float64Type::get(getContext())}}};
+}
+
+WireLens PauliRotOp::getWireLens() { return {{"wires", getNonCtrlQubitOperands().size()}}; }
+
+mlir::DictionaryAttr PauliRotOp::getStaticData() {
+    mlir::MLIRContext *ctx = getContext();
+    mlir::NamedAttribute pauliWordEntry = mlir::NamedAttribute(
+        mlir::StringAttr::get(ctx, "pauli_word"), mlir::StringAttr::get(ctx, getPauliWord()));
+    return mlir::DictionaryAttr::get(ctx, {pauliWordEntry});
+}
+
+// PCPhaseOp
+
+std::string PCPhaseOp::getOperatorName() { return "PCPhase"; }
+
+DynamicShape PCPhaseOp::getDynamicShape() {
+    return {{"phi", {mlir::Float64Type::get(getContext())}}};
+}
+
+WireLens PCPhaseOp::getWireLens() { return {{"wires", getNonCtrlQubitOperands().size()}}; }
+
+mlir::DictionaryAttr PCPhaseOp::getStaticData() {
+    mlir::MLIRContext *ctx = getContext();
+    mlir::NamedAttribute dimEntry =
+        mlir::NamedAttribute(mlir::StringAttr::get(ctx, "dim"), getDimAttr());
+    return mlir::DictionaryAttr::get(ctx, {dimEntry});
+}
+
+// GlobalPhaseOp
+
+std::string GlobalPhaseOp::getOperatorName() { return "GlobalPhase"; }
+
+DynamicShape GlobalPhaseOp::getDynamicShape() {
+    return {{"phi", {mlir::Float64Type::get(getContext())}}};
+}
+
+WireLens GlobalPhaseOp::getWireLens() { return {}; }
+
+mlir::DictionaryAttr GlobalPhaseOp::getStaticData() {
+    return mlir::DictionaryAttr::get(getContext(), {});
+}
+
+// QubitUnitaryOp
+
+std::string QubitUnitaryOp::getOperatorName() { return "QubitUnitary"; }
+
+DynamicShape QubitUnitaryOp::getDynamicShape() { return {{"U", {getMatrix().getType()}}}; }
+
+WireLens QubitUnitaryOp::getWireLens() { return {{"wires", getNonCtrlQubitOperands().size()}}; }
+
+mlir::DictionaryAttr QubitUnitaryOp::getStaticData() {
+    return mlir::DictionaryAttr::get(getContext(), {});
+}
+
+// Return the entries of a name -> operand-indices map (`param_map`/`qubit_map`) in operand order.
+// The dictionary attribute itself is sorted by name, which is not an operand order. Entries
+// without operands (e.g. an empty wire argument) have no position and go last, in name order.
+static llvm::SmallVector<std::pair<llvm::StringRef, llvm::ArrayRef<int64_t>>>
+getEntriesInOperandOrder(mlir::DictionaryAttr map) {
+    llvm::SmallVector<std::pair<llvm::StringRef, llvm::ArrayRef<int64_t>>> entries;
+    if (!map) {
+        return entries;
+    }
+    for (mlir::NamedAttribute entry : map) {
+        entries.emplace_back(entry.getName().getValue(),
+                             cast<mlir::DenseI64ArrayAttr>(entry.getValue()).asArrayRef());
+    }
+    auto position = [](llvm::ArrayRef<int64_t> indices) {
+        return indices.empty() ? std::numeric_limits<int64_t>::max() : indices.front();
+    };
+    llvm::stable_sort(entries, [&](const auto &lhs, const auto &rhs) {
+        return position(lhs.second) < position(rhs.second);
+    });
+    return entries;
+}
+
+// OperatorOp
+
+std::string OperatorOp::getOperatorName() { return getOpName().str(); }
+
+DynamicShape OperatorOp::getDynamicShape() {
+    DynamicShape dynamicShape;
+    auto params = getParams();
+
+    for (auto [name, indices] : getEntriesInOperandOrder(getParamMap())) {
+        llvm::SmallVector<mlir::Type> types;
+        for (int64_t index : indices) {
+            types.push_back(params[index].getType());
+        }
+        dynamicShape.emplace_back(name.str(), std::move(types));
+    }
+
+    return dynamicShape;
+}
+
+WireLens OperatorOp::getWireLens() {
+    WireLens wireLens;
+
+    for (auto [name, indices] : getEntriesInOperandOrder(getQubitMap())) {
+        size_t numQubits;
+        if (getQreg()) {
+            numQubits = 0;
+            for (int64_t index : indices) {
+                auto indexTensorType =
+                    cast<mlir::RankedTensorType>(getArrQubitIndices()[index].getType());
+                numQubits += indexTensorType.getDimSize(0);
+            }
+        } else {
+            numQubits = indices.size();
+        }
+
+        wireLens.emplace_back(name.str(), numQubits);
+    }
+
+    return wireLens;
+}
+
+std::string OperatorOp::getExtraData() {
+    return getUID().has_value() ? std::to_string(getUID().value()) : "";
 }
 
 //===----------------------------------------------------------------------===//

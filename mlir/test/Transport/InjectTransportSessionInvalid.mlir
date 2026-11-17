@@ -37,8 +37,8 @@ module attributes {catalyst.backline = #transport.backline<transport = "rdma", c
 
 // -----
 
-// expected-error @below {{backline transport must be 'rdma' or 'memcpy'}}
-module attributes {catalyst.backline = #transport.backline<transport = "bogus", controller = #transport.node<backend_lib = "x">>} {
+// expected-error @below {{backline requires a transport}}
+module attributes {catalyst.backline = #transport.backline<transport = "", controller = #transport.node<backend_lib = "x">>} {
   func.func @setup() { quantum.init  return }
   func.func @teardown() { quantum.finalize  return }
 }
@@ -74,4 +74,15 @@ module attributes {catalyst.backline = #transport.backline<transport = "memcpy",
 module attributes {catalyst.backline = #transport.backline<transport = "rdma", controller = #transport.node<backend_lib = "x">>} {
   func.func @setup() { quantum.init  return }
   func.func @teardown() { quantum.finalize  return }
+}
+
+// -----
+
+// The 'none' transport carries nothing, so there is nobody for a coprocessor to be reached
+// through.
+
+// expected-error @below {{the 'none' transport carries nothing, so it cannot have coprocessors}}
+module attributes {catalyst.backline = #transport.backline<transport = "none", controller = #transport.node<backend_lib = "x", config = "c", in_bytes = 8 : i64, out_bytes = 8 : i64>, coprocessors = [#transport.node<backend_lib = "x", config = "c", symbol = "coproc_fn">]>} {
+  func.func @setup() { return }
+  func.func @teardown() { return }
 }

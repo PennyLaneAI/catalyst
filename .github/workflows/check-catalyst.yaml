@@ -24,7 +24,7 @@ jobs:
     name: Determine runner type to use
     uses: ./.github/workflows/determine-workflow-runner.yml
     with:
-      default_runner: ubuntu-24.04
+      default_runner: blacksmith-8vcpu-ubuntu-2404
 
   constants:
     name: "Set build matrix"
@@ -79,7 +79,7 @@ jobs:
           C_COMPILER=$(which ${{ needs.constants.outputs[format('c_compiler.{0}', matrix.compiler)] }}) \
           CXX_COMPILER=$(which ${{ needs.constants.outputs[format('cxx_compiler.{0}', matrix.compiler)] }}) \
           RT_BUILD_DIR="$(pwd)/runtime-build" \
-          LLVM_DIR="$(pwd)/mlir/llvm-project" \
+          LLVM_SRC_DIR="$(pwd)/mlir/llvm-project" \
           ENABLE_ASAN=OFF \
           ENABLE_OQD=ON \
           make runtime
@@ -89,7 +89,7 @@ jobs:
           CXX_COMPILER=$(which ${{ needs.constants.outputs[format('cxx_compiler.{0}', matrix.compiler)] }}) \
           RT_BUILD_DIR="$(pwd)/runtime-build" \
           OQC_BUILD_DIR="$(pwd)/oqc-build" \
-          LLVM_DIR="$(pwd)/mlir/llvm-project" \
+          LLVM_SRC_DIR="$(pwd)/mlir/llvm-project" \
           make oqc
 
       - name: Upload Catalyst-Runtime Artifact
@@ -610,8 +610,9 @@ jobs:
 
     - name: Run Python Pytest Tests (backend=lightning.kokkos)
       run: |
-        # Don't run xDSL tests
-        make pytest TEST_BACKEND="lightning.kokkos" XDSL_TESTS=OFF
+        # Select tests parametrized by the backend fixture.
+        python3 -m pytest frontend/test/pytest --tb=native --backend="lightning.kokkos" -n auto -m "not xdsl" -k "lightning.kokkos"
+        python3 -m pytest frontend/test/async_tests --tb=native --backend="lightning.kokkos" -k "lightning.kokkos"
 
   frontend-tests-openqasm-device:
     name: Frontend Tests (backend="openqasm3")
@@ -762,7 +763,7 @@ jobs:
           CXX_COMPILER=$(which g++) \
           COMPILER_LAUNCHER="" \
           ENABLE_OQD=ON \
-          LLVM_DIR="$(pwd)/mlir/llvm-project" \
+          LLVM_SRC_DIR="$(pwd)/mlir/llvm-project" \
           make coverage-runtime
           mv runtime/build_cov/coverage.info coverage-${{ github.job }}.info
 

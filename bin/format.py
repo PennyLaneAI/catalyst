@@ -23,7 +23,23 @@ from utils import get_cpp_files
 
 CLANG_FMT_BIN = "clang-format"
 
-IGNORE_PATTERNS = ["external", "build", "llvm-project", "Enzyme", "stablehlo"]
+# Headers Backline's transport copies from other projects, which keep their own formatting.
+BACKLINE_VENDOR = [
+    "rdma/vendor/infiniband",
+    "coproc/onnx/vendor",
+    "rdma/fpga_hsb/hsb_regs.h",
+    "rdma/fpga_hsb/hwhs_regs.h",
+    "rdma/fpga_balboa/hwhs_regs.h",
+]
+
+IGNORE_PATTERNS = [
+    "external",
+    "build",
+    "llvm-project",
+    "Enzyme",
+    "stablehlo",
+    *BACKLINE_VENDOR,
+]
 
 DEFAULT_CLANG_FORMAT_VERSION = 20
 

@@ -13,7 +13,9 @@ permissions:
 
 jobs:
   trigger_benchmark_webhook:
-    runs-on: ubuntu-24.04
+    runs-on:  
+      group: 'PennyLaneAI-Static-IP-Runners'
+      labels: ['pl-2-core-gh-runner']   
 
     # Only run for pull request comments (newly created)
     if: github.event.issue.pull_request

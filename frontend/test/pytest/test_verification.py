@@ -38,7 +38,7 @@ from catalyst.api_extensions import HybridAdjoint, HybridCtrl
 from catalyst.compiler import get_lib_path
 from catalyst.device import get_device_capabilities
 from catalyst.device.qjit_device import RUNTIME_OPERATIONS, get_qjit_device_capabilities
-from catalyst.device.verification import validate_measurements
+from catalyst.device.verification import validate_measurements, verify_operations
 
 # pylint: disable = unused-argument, unnecessary-lambda-assignment, unnecessary-lambda
 
@@ -131,6 +131,7 @@ class PauliX2(qp.PauliX):
         return "PauliX2"
 
 
+@pytest.mark.old_frontend
 @patch("catalyst.device.qjit_device.catalyst_decompose", null_transform)
 def test_unsupported_ops_raise_an_error():
     """Test that an unsupported op raises an error"""
@@ -153,7 +154,7 @@ def test_unsupported_ops_raise_an_error():
         return qp.expval(qp.PauliX(0))
 
     with pytest.raises(CompileError, match="UnsupportedOp is not supported"):
-        qjit(f)(1.2)
+        qjit(f, capture=False)(1.2)
 
 
 def queue_ops(x, wires):
@@ -174,6 +175,7 @@ ctrl_op_callable = lambda x, wires: ctrl(qp.Z, control=[1, 2, 3])(wires)  # (Con
 ctrl_op_multiple = lambda x, wires: ctrl(queue_ops, control=[1, 2, 3])(x, wires)  # (HybridCtrl)
 
 
+@pytest.mark.old_frontend
 @patch("catalyst.device.qjit_device.catalyst_decompose", null_transform)
 class TestHybridOpVerification:
     """Test that the verification catches situations where a HybridOp subtape contains
@@ -195,13 +197,11 @@ class TestHybridOpVerification:
             return qp.expval(qp.PauliX(0))
 
         with pytest.raises(CompileError, match="RX.*not invertible"):
-            qjit(f)(1.2)
+            qjit(f, capture=False)(1.2)
 
-        with pytest.warns(UserWarning, match="AOT.*failed"):
-
-            @qjit
-            def cir(x: float):
-                return grad(f)(x)
+        @qjit(capture=False)
+        def cir(x: float):
+            return grad(f)(x)
 
         with pytest.raises(CompileError, match="RX.*not invertible"):
             cir(1.2)
@@ -231,13 +231,11 @@ class TestHybridOpVerification:
             return qp.expval(qp.PauliX(0))
 
         with pytest.raises(CompileError, match="RX.*not invertible"):
-            qjit(f)(1.2)
+            qjit(f, capture=False)(1.2)
 
-        with pytest.warns(UserWarning, match="AOT.*failed"):
-
-            @qjit
-            def cir(x: float):
-                return grad(f)(x)
+        @qjit(capture=False)
+        def cir(x: float):
+            return grad(f)(x)
 
         with pytest.raises(CompileError, match="RX.*not invertible"):
             cir(1.2)
@@ -261,13 +259,11 @@ class TestHybridOpVerification:
             return qp.expval(qp.PauliX(0))
 
         with pytest.raises(CompileError, match="RX.*not invertible"):
-            qjit(f)(1.2)
+            qjit(f, capture=False)(1.2)
 
-        with pytest.warns(UserWarning, match="AOT.*failed"):
-
-            @qjit
-            def cir(x: float):
-                return grad(f)(x)
+        @qjit(capture=False)
+        def cir(x: float):
+            return grad(f)(x)
 
         with pytest.raises(CompileError, match="RX.*not invertible"):
             cir(1.2)
@@ -285,13 +281,11 @@ class TestHybridOpVerification:
             return qp.expval(qp.PauliX(0))
 
         with pytest.raises(CompileError, match="PauliZ is not controllable"):
-            qjit(f)(1.2)
+            qjit(f, capture=False)(1.2)
 
-        with pytest.warns(UserWarning, match="AOT.*failed"):
-
-            @qjit
-            def cir(x: float):
-                return grad(f)(x)
+        @qjit(capture=False)
+        def cir(x: float):
+            return grad(f)(x)
 
         with pytest.raises(CompileError, match="PauliZ is not controllable"):
             cir(1.2)
@@ -321,13 +315,11 @@ class TestHybridOpVerification:
 
         with patch("catalyst.device.qjit_device.RUNTIME_OPERATIONS", runtime_ops_with_qctrl):
             with pytest.raises(CompileError, match="PauliZ is not controllable"):
-                qjit(f)(1.2)
+                qjit(f, capture=False)(1.2)
 
-            with pytest.warns(UserWarning, match="AOT.*failed"):
-
-                @qjit
-                def cir(x: float):
-                    return grad(f)(x)
+            @qjit(capture=False)
+            def cir(x: float):
+                return grad(f)(x)
 
             with pytest.raises(CompileError, match="PauliZ is not controllable"):
                 cir(1.2)
@@ -345,13 +337,11 @@ class TestHybridOpVerification:
             return qp.expval(qp.PauliX(0))
 
         with pytest.raises(CompileError, match="HybridCtrl is not supported"):
-            qjit(f)(1.2)
+            qjit(f, capture=False)(1.2)
 
-        with pytest.warns(UserWarning, match="AOT.*failed"):
-
-            @qjit
-            def cir(x: float):
-                return grad(f)(x)
+        @qjit(capture=False)
+        def cir(x: float):
+            return grad(f)(x)
 
         with pytest.raises(CompileError, match="HybridCtrl is not supported"):
             cir(1.2)
@@ -370,13 +360,11 @@ class TestHybridOpVerification:
             return qp.expval(qp.PauliX(0))
 
         with pytest.raises(CompileError, match="Cannot compile PennyLane control of the hybrid op"):
-            qjit(f)(1.2)
+            qjit(f, capture=False)(1.2)
 
-        with pytest.warns(UserWarning, match="AOT.*failed"):
-
-            @qjit
-            def cir(x: float):
-                return grad(f)(x)
+        @qjit(capture=False)
+        def cir(x: float):
+            return grad(f)(x)
 
         with pytest.raises(CompileError, match="Cannot compile PennyLane control of the hybrid op"):
             cir(1.2)
@@ -395,13 +383,11 @@ class TestHybridOpVerification:
             return qp.expval(qp.PauliX(0))
 
         with pytest.raises(CompileError, match="Cannot compile PennyLane inverse of the hybrid op"):
-            qjit(f)(1.2)
+            qjit(f, capture=False)(1.2)
 
-        with pytest.warns(UserWarning, match="AOT.*failed"):
-
-            @qjit
-            def cir(x: float):
-                return grad(f)(x)
+        @qjit(capture=False)
+        def cir(x: float):
+            return grad(f)(x)
 
         with pytest.raises(CompileError, match="Cannot compile PennyLane inverse of the hybrid op"):
             cir(1.2)
@@ -441,13 +427,11 @@ class TestHybridOpVerification:
 
         with patch("catalyst.device.qjit_device.RUNTIME_OPERATIONS", runtime_ops_with_qctrl):
             with pytest.raises(CompileError, match=f"PauliZ is not {unsupported_gate_attribute}"):
-                qjit(f)(1.2)
+                qjit(f, capture=False)(1.2)
 
-            with pytest.warns(UserWarning, match="AOT.*failed"):
-
-                @qjit
-                def cir(x: float):
-                    return grad(f)(x)
+            @qjit(capture=False)
+            def cir(x: float):
+                return grad(f)(x)
 
             with pytest.raises(CompileError, match=f"PauliZ is not {unsupported_gate_attribute}"):
                 cir(1.2)
@@ -487,13 +471,11 @@ class TestHybridOpVerification:
 
         with patch("catalyst.device.qjit_device.RUNTIME_OPERATIONS", runtime_ops_with_qctrl):
             with pytest.raises(CompileError, match=f"PauliZ is not {unsupported_gate_attribute}"):
-                qjit(f)(1.2)
+                qjit(f, capture=False)(1.2)
 
-            with pytest.warns(UserWarning, match="AOT.*failed"):
-
-                @qjit
-                def cir(x: float):
-                    return grad(f)(x)
+            @qjit(capture=False)
+            def cir(x: float):
+                return grad(f)(x)
 
             with pytest.raises(CompileError, match=f"PauliZ is not {unsupported_gate_attribute}"):
                 cir(1.2)
@@ -510,13 +492,11 @@ class TestHybridOpVerification:
             return qp.expval(qp.PauliX(0))
 
         with pytest.raises(CompileError, match=f"PauliZ is not {unsupported_gate_attribute}"):
-            qjit(f)(1.2)
+            qjit(f, capture=False)(1.2)
 
-        with pytest.warns(UserWarning, match="AOT.*failed"):
-
-            @qjit
-            def cir(x: float):
-                return grad(f)(x)
+        @qjit(capture=False)
+        def cir(x: float):
+            return grad(f)(x)
 
         with pytest.raises(CompileError, match=f"PauliZ is not {unsupported_gate_attribute}"):
             cir(1.2)
@@ -533,13 +513,11 @@ class TestHybridOpVerification:
             return qp.expval(qp.PauliX(0))
 
         with pytest.raises(CompileError, match=f"PauliZ is not {unsupported_gate_attribute}"):
-            qjit(f)(1.2)
+            qjit(f, capture=False)(1.2)
 
-        with pytest.warns(UserWarning, match="AOT.*failed"):
-
-            @qjit
-            def cir(x: float):
-                return grad(f)(x)
+        @qjit(capture=False)
+        def cir(x: float):
+            return grad(f)(x)
 
         with pytest.raises(CompileError, match=f"PauliZ is not {unsupported_gate_attribute}"):
             cir(1.2)
@@ -548,6 +526,7 @@ class TestHybridOpVerification:
 class TestObservableValidation:
     """Tests the general validation of observables (independent of gradient method)"""
 
+    @pytest.mark.old_frontend
     def test_unsupported_observable_raises_error(self):
         """Test that including an unsupported observable in a measurement raises an
         error when jitting the circuit"""
@@ -560,7 +539,7 @@ class TestObservableValidation:
             return qp.expval(qp.RX(1.2, 0))
 
         with pytest.raises(CompileError, match="RX.*not supported as an observable"):
-            qjit(f)()
+            qjit(f, capture=False)()
 
     @pytest.mark.parametrize(
         "measurements, invalid_op",
@@ -705,6 +684,7 @@ class TestMeasurementTypeValidation:
         with pytest.raises(CompileError, match=msg):
             validate_measurements(tape, qjit_capabilities, dev.name, shots)
 
+    @pytest.mark.old_frontend
     def test_state_measurements_rejected_with_shots(self):
         """Test that trying to measure a state on a device with finite shots
         raises a CompileError informing the user that shots must be None for
@@ -719,8 +699,9 @@ class TestMeasurementTypeValidation:
             return qp.state()
 
         with pytest.raises(CompileError, match="Please specify shots=None."):
-            qjit(f)()
+            qjit(f, capture=False)()
 
+    @pytest.mark.old_frontend
     @pytest.mark.parametrize("measurement", [qp.sample, qp.counts])
     def test_sample_measurements_rejected_without_shots(self, measurement):
         """Test that trying to take a sample-based measurement on a device
@@ -736,8 +717,9 @@ class TestMeasurementTypeValidation:
             return measurement()
 
         with pytest.raises(CompileError, match="Please specify a finite number of shots."):
-            qjit(f)()
+            qjit(f, capture=False)()
 
+    @pytest.mark.old_frontend
     def test_unsupported_measurement_types_rejected(self):
         """Test that trying to use a measurement type that is generally unsupported by
         the device raises a CompileError"""
@@ -765,7 +747,7 @@ class TestMeasurementTypeValidation:
             return MyMeasurement()
 
         with pytest.raises(CompileError, match="is not a supported measurement process"):
-            qjit(f)()
+            qjit(f, capture=False)()
 
 
 @patch("catalyst.device.qjit_device.catalyst_decompose", null_transform)
@@ -773,6 +755,7 @@ class TestAdjointMethodVerification:
     """Test the verification of operators and observables when the adjoint diff method
     is used for differentiation"""
 
+    @pytest.mark.old_frontend
     def test_non_differentiable_gate_simple(self):
         """Emulate a device with a non-differentiable gate."""
 
@@ -783,15 +766,14 @@ class TestAdjointMethodVerification:
             qp.RX(x, wires=0)
             return qp.expval(qp.PauliX(0))
 
-        with pytest.warns(UserWarning, match="AOT.*failed"):
-
-            @qjit
-            def cir(x: float):
-                return grad(f)(x)
+        @qjit(capture=False)
+        def cir(x: float):
+            return grad(f)(x)
 
         with pytest.raises(DifferentiableCompileError, match="RX.*non-differentiable"):
             cir(1.2)
 
+    @pytest.mark.old_frontend
     @pytest.mark.parametrize(
         "observable",
         [
@@ -815,11 +797,9 @@ class TestAdjointMethodVerification:
             qp.RX(x, wires=0)
             return qp.expval(observable)
 
-        with pytest.warns(UserWarning, match="AOT.*failed"):
-
-            @qjit
-            def cir(x: float):
-                return grad(f)(x)
+        @qjit(capture=False)
+        def cir(x: float):
+            return grad(f)(x)
 
         with pytest.raises(DifferentiableCompileError, match="PauliX.*non-differentiable"):
             cir(1.2)
@@ -837,6 +817,7 @@ class TestAdjointMethodVerification:
 
         qjit(f)(1.2)
 
+    @pytest.mark.old_frontend
     def test_non_differentiable_gate_nested_cond(self):
         """Test that taking the adjoint diff of a tape containing a parameterized operation
         that doesn't support adjoint differentiation raises an error."""
@@ -857,15 +838,14 @@ class TestAdjointMethodVerification:
 
             return qp.expval(qp.PauliX(0))
 
-        with pytest.warns(UserWarning, match="AOT.*failed"):
-
-            @qjit
-            def cir(x: float):
-                return grad(f)(x)
+        @qjit(capture=False)
+        def cir(x: float):
+            return grad(f)(x)
 
         with pytest.raises(DifferentiableCompileError, match="RX.*non-differentiable"):
             cir(1.2)
 
+    @pytest.mark.old_frontend
     def test_non_differentiable_gate_nested_adjoint(self):
         """Test that taking the adjoint diff of a tape containing a HybridOp with a
         parameterized operation that doesn't support adjoint differentiation raises
@@ -878,16 +858,15 @@ class TestAdjointMethodVerification:
             adjoint(qp.RX(x, wires=[0]))
             return qp.expval(qp.PauliX(0))
 
-        with pytest.warns(UserWarning, match="AOT.*failed"):
-
-            @qjit
-            def cir(x: float):
-                return grad(f)(x)
+        @qjit(capture=False)
+        def cir(x: float):
+            return grad(f)(x)
 
         with pytest.raises(DifferentiableCompileError, match="RX.*non-differentiable"):
             cir(1.2)
 
 
+@pytest.mark.old_frontend
 @patch("catalyst.device.qjit_device.catalyst_decompose", null_transform)
 class TestParameterShiftMethodVerification:
     """Test the verification of operators and observables when the parameter shift method
@@ -914,11 +893,9 @@ class TestParameterShiftMethodVerification:
             qp.RX(x, wires=0)
             return qp.expval(observable)
 
-        with pytest.warns(UserWarning, match="AOT.*failed"):
-
-            @qjit
-            def cir(x: float):
-                return grad(f)(x)
+        @qjit(capture=False)
+        def cir(x: float):
+            return grad(f)(x)
 
         with pytest.raises(
             DifferentiableCompileError, match="PauliX does not support analytic differentiation"
@@ -926,6 +903,7 @@ class TestParameterShiftMethodVerification:
             cir(1.2)
 
 
+@pytest.mark.old_frontend
 def test_no_state_returns():
     """Test state returns are rejected in gradients."""
 
@@ -934,16 +912,15 @@ def test_no_state_returns():
         qp.PauliX(wires=0)
         return qp.state()
 
-    with pytest.warns(UserWarning, match="AOT.*failed"):
-
-        @qjit
-        def cir(x: float):
-            return grad(f)(x)
+    @qjit(capture=False)
+    def cir(x: float):
+        return grad(f)(x)
 
     with pytest.raises(DifferentiableCompileError, match="State returns.*forbidden"):
         cir(1.2)
 
 
+@pytest.mark.old_frontend
 def test_no_variance_returns():
     """Test variance returns are rejected in gradients."""
 
@@ -952,14 +929,70 @@ def test_no_variance_returns():
         qp.PauliX(wires=0)
         return qp.var(qp.PauliX(0))
 
-    with pytest.warns(UserWarning, match="AOT.*failed"):
-
-        @qjit
-        def cir(x: float):
-            return grad(f)(x)
+    @qjit(capture=False)
+    def cir(x: float):
+        return grad(f)(x)
 
     with pytest.raises(DifferentiableCompileError, match="Variance returns.*forbidden"):
         cir(1.2)
+
+
+class TestDynamicQubitAllocationVerification:
+    """Test verify_operations handling of Allocate/Deallocate and qjit capability override."""
+
+    def test_qjit_compatible_devices_enable_dynamic_qubit_management(self, backend):
+        """qjit-compatible backends expose Catalyst dynamic allocation even if TOML is false."""
+        dev = qp.device(backend, wires=1)
+        dev_capabilities = get_device_capabilities(dev)
+        qjit_capabilities = get_qjit_device_capabilities(dev_capabilities)
+
+        assert dev_capabilities.qjit_compatible
+        assert qjit_capabilities.dynamic_qubit_management
+
+    def test_non_qjit_compatible_devices_keep_toml_dynamic_qubit_flag(self, backend):
+        """Do not override dynamic_qubit_management when the backend is not qjit-compatible."""
+        dev = qp.device(backend, wires=1)
+        dev_capabilities = deepcopy(get_device_capabilities(dev))
+        dev_capabilities.qjit_compatible = False
+        dev_capabilities.dynamic_qubit_management = False
+        qjit_capabilities = get_qjit_device_capabilities(dev_capabilities)
+
+        assert not qjit_capabilities.dynamic_qubit_management
+
+    def test_allocate_and_deallocate_accepted_when_dynamic_qubits_supported(self, backend):
+        """Allocate/Deallocate tape ops are allowed when dynamic qubit management is on."""
+        qjit_dev = type("QJITDevice", (), {})()
+        qjit_dev.original_device = qp.device(backend, wires=1)
+        qjit_dev.capabilities = get_qjit_device_capabilities(
+            get_device_capabilities(qjit_dev.original_device)
+        )
+        qjit_dev.capabilities.dynamic_qubit_management = True
+
+        tape = qp.tape.QuantumScript(
+            [
+                qp.allocation.Allocate(wires=[10], state=qp.allocation.AllocateState.MAGIC_T),
+                qp.X(0),
+                qp.allocation.Deallocate(wires=[10]),
+            ],
+            [qp.expval(qp.Z(0))],
+        )
+        verify_operations(tape, None, qjit_dev)
+
+    def test_allocate_rejected_when_dynamic_qubits_unsupported(self, backend):
+        """Allocate is rejected when the qjit device does not support dynamic qubits."""
+        qjit_dev = type("QJITDevice", (), {})()
+        qjit_dev.original_device = qp.device(backend, wires=1)
+        qjit_dev.capabilities = deepcopy(
+            get_qjit_device_capabilities(get_device_capabilities(qjit_dev.original_device))
+        )
+        qjit_dev.capabilities.dynamic_qubit_management = False
+
+        tape = qp.tape.QuantumScript(
+            [qp.allocation.Allocate(wires=[10])],
+            [qp.expval(qp.Z(0))],
+        )
+        with pytest.raises(CompileError, match="Dynamic qubit allocation is not supported"):
+            verify_operations(tape, None, qjit_dev)
 
 
 if __name__ == "__main__":

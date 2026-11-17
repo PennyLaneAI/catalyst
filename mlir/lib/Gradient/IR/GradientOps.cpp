@@ -23,6 +23,7 @@
 #include "Gradient/Utils/GradientShape.h"
 #include "Quantum/IR/QuantumOps.h"
 
+#include "Gradient/IR/GradientEnums.cpp.inc"
 #define GET_OP_CLASSES
 #include "Gradient/IR/GradientOps.cpp.inc"
 
@@ -59,9 +60,8 @@ LogicalResult verifyGradInputs(OpState *op_state, func::FuncOp callee, ValueRang
         // Check that the method is not finite difference, as finite difference should always be
         // available
         auto gradOpInterface = cast<GradientOpInterface>(op_state->getOperation());
-        llvm::StringRef MethodName = gradOpInterface.getMethod();
 
-        if (MethodName != "fd") {
+        if (gradOpInterface.getMethod() != DiffMethod::FiniteDifference) {
             return op_state->emitOpError(
                 "An operation without a valid gradient was found in code "
                 "reachable from the gradient operation.\n"
@@ -173,9 +173,9 @@ LogicalResult CustomGradOp::verifySymbolUses(SymbolTableCollection &symbolTable)
 //===----------------------------------------------------------------------===//
 
 LogicalResult GradOp::verify() {
-    StringRef method = this->getMethod();
-    if (method != "fd" && method != "auto") {
-        return emitOpError("got invalid differentiation method: ") << method;
+    DiffMethod method = this->getMethod();
+    if (method != DiffMethod::FiniteDifference && method != DiffMethod::Auto) {
+        return emitOpError("got invalid differentiation method: ") << stringifyDiffMethod(method);
     }
     return success();
 }
@@ -242,9 +242,9 @@ LogicalResult ValueAndGradOp::verifySymbolUses(SymbolTableCollection &symbolTabl
 //===----------------------------------------------------------------------===//
 
 LogicalResult ValueAndGradOp::verify() {
-    StringRef method = this->getMethod();
-    if (method != "fd" && method != "auto") {
-        return emitOpError("got invalid differentiation method: ") << method;
+    DiffMethod method = this->getMethod();
+    if (method != DiffMethod::FiniteDifference && method != DiffMethod::Auto) {
+        return emitOpError("got invalid differentiation method: ") << stringifyDiffMethod(method);
     }
     return success();
 }
@@ -348,9 +348,9 @@ LogicalResult JVPOp::verifySymbolUses(SymbolTableCollection &symbolTable) {
 //===----------------------------------------------------------------------===//
 
 LogicalResult JVPOp::verify() {
-    StringRef method = this->getMethod();
-    if (method != "fd" && method != "ps" && method != "adj" && method != "auto") {
-        return emitOpError("got invalid differentiation method: ") << method;
+    DiffMethod method = this->getMethod();
+    if (method != DiffMethod::FiniteDifference && method != DiffMethod::Auto) {
+        return emitOpError("got invalid differentiation method: ") << stringifyDiffMethod(method);
     }
     return success();
 }
@@ -431,9 +431,9 @@ LogicalResult VJPOp::verifySymbolUses(SymbolTableCollection &symbolTable) {
 //===----------------------------------------------------------------------===//
 
 LogicalResult VJPOp::verify() {
-    StringRef method = this->getMethod();
-    if (method != "fd" && method != "ps" && method != "adj" && method != "auto") {
-        return emitOpError("got invalid differentiation method: ") << method;
+    DiffMethod method = this->getMethod();
+    if (method != DiffMethod::FiniteDifference && method != DiffMethod::Auto) {
+        return emitOpError("got invalid differentiation method: ") << stringifyDiffMethod(method);
     }
     return success();
 }

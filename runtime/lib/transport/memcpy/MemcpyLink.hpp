@@ -38,16 +38,11 @@ class CpuControllerSession;
 // The coprocessor binds `process_message` on connect(); the controller's kick() invokes it
 // inline. `mu` guards both fields across connect / kick / teardown.
 struct MemcpyLink {
-    // TODOs: Update this once ControllerSession::kick() is renamed to post() to match the dialect
-    // and CAPI Invoked once per controller kick(). Reads `in_len` bytes from `in` (a wire-shaped
-    // `common::Payload` frame synthesized by the controller: value bytes at offset 0,
-    // decoder_id at offset PAYLOAD_DATA_BYTES, seq_num right after), writes at most
-    // `out_cap` bytes into `out`, and returns the number of bytes actually written. A
-    // return value greater than `out_cap` means the fn overran the caller's buffer.
-    // Signature mirrors `CoprocessorFn` (Transport.hpp) minus the `ctx` slot; decoder_id
-    // travels inside `in` as it does over cpu_verbs.
-    using ProcessMessage = std::function<std::size_t(const void *in, std::size_t in_len, void *out,
-                                                     std::size_t out_cap)>;
+    // Invoked once per controller kick() with the round's payload, its length and fn_id. The
+    // coprocessor frames the message in its own ring, as an RDMA backend's peer would receive it,
+    // writes at most `out_cap` reply bytes into `out`, and returns the number written.
+    using ProcessMessage = std::function<std::size_t(
+        const void *payload, std::size_t len, std::uint32_t fn_id, void *out, std::size_t out_cap)>;
 
     std::mutex mu;
     // Duplicate-binding sentinels: connect() throws if the field for its role is already set,

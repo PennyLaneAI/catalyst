@@ -18,7 +18,7 @@ import numpy as np
 import pennylane as qp
 import pytest
 
-from catalyst import grad, qjit
+from catalyst import qjit
 
 # pylint: disable=missing-function-docstring
 
@@ -92,13 +92,13 @@ class TestReturnValues:
 
         @qjit
         def order1(params):
-            diff = grad(circuit, argnums=0)
+            diff = qp.grad(circuit, argnums=0)
             h = diff(params)
             return h[0], params
 
         @qjit
         def order2(params):
-            diff = grad(circuit, argnums=0)
+            diff = qp.grad(circuit, argnums=0)
             h = diff(params)
             return params, h[0]
 
@@ -143,8 +143,7 @@ class TestReturnValues:
         def return_scalar():
             return jnp.array(0, dtype=dtype)
 
-        with pytest.warns(UserWarning, match="AOT.*failed"):
-            compiled = qjit(return_scalar)
+        compiled = qjit(return_scalar)
 
         with pytest.raises(TypeError, match="Requested return type is unavailable."):
             compiled()

@@ -57,6 +57,14 @@ class CompilableData(qp.core.Operator2):
         super().__init__(a=a, b=b, thing=thing, wires=wires)
 
 
+class ArrayData(qp.core.Operator2):
+
+    compilable_argnames = ("angles",)
+
+    def __init__(self, angles, wires):
+        super().__init__(angles=angles, wires=wires)
+
+
 class MultipleRegisters(qp.core.Operator2):
 
     wire_argnames = ("reg1", "reg2")
@@ -82,47 +90,12 @@ class MultiParamsCustom(qp.core.Operator2):
         super().__init__(wires, a, b, c)
 
 
-class MultiRZ(qp.core.Operator2):
-
-    dynamic_argnames = ("phi",)
-
-    def __init__(self, phi, wires):
-        super().__init__(phi, wires)
-
-
-class PauliRot(qp.core.Operator2):
-
-    dynamic_argnames = ("phi",)
-    compilable_argnames = ("pauli_word",)
-
-    def __init__(self, phi, pauli_word, wires):
-        super().__init__(phi, pauli_word, wires)
-
-
-class GlobalPhase(qp.core.Operator2):
-
-    dynamic_argnames = ("phi",)
-    wire_argnames = ()
-
-    def __init__(self, phi):
-        super().__init__(phi=phi)
-
-
-class QubitUnitary(qp.core.Operator2):
+class TestQubitUnitary(qp.core.Operator2):
 
     dynamic_argnames = ("matrix",)
 
     def __init__(self, matrix, wires):
         super().__init__(matrix, wires)
-
-
-class PCPhase(qp.core.Operator2):
-
-    dynamic_argnames = ("phi",)
-    compilable_argnames = ("dim",)
-
-    def __init__(self, phi, dim, wires):
-        super().__init__(phi, dim, wires)
 
 
 class StaticData(qp.core.Operator2):

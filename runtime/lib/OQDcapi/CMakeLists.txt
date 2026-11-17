@@ -45,3 +45,6 @@ if(NOT APPLE)
 else()
     set_property(TARGET rt_OQD_capi APPEND PROPERTY BUILD_RPATH @loader_path)
 endif()
+
+# catalyst_oqd_obj is an OBJECT lib, already folded into rt_OQD_capi.
+catalyst_runtime_install(rt_OQD_capi)

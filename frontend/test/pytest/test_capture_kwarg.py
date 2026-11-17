@@ -26,19 +26,19 @@ from catalyst.jit import _ensure_capture_mode as ensure_capture_mode
 class TestCaptureKwarg:
     """Test suite for the capture kwarg functionality."""
 
-    def test_capture_kwarg_default_is_global(self):
-        """Test that the default value of capture is 'global'."""
+    def test_capture_kwarg_default_is_true(self):
+        """Test that the default value of capture is True."""
 
         @qjit
         def f(x):
             return x * 2
 
-        assert f.compile_options.capture == "global"
+        assert f.compile_options.capture is True
 
     def test_capture_kwarg_true(self):
         """Test that capture=True is accepted."""
 
-        @qjit(capture=True)
+        @qjit(capture=True, collect_decomp_rules=False)
         def f(x):
             return x * 2
 
@@ -176,7 +176,7 @@ class TestCaptureKwargIntegration:
         try:
             dev = qp.device(backend, wires=2)
 
-            @qjit(capture=False)
+            @qjit(capture=False, collect_decomp_rules=False)
             @qp.qnode(dev)
             def circuit(theta):
                 assert not qp.capture.enabled()
@@ -210,7 +210,7 @@ class TestCaptureKwargIntegration:
         """Test that capture=True works for classical-only functions."""
         qp.capture.disable()
 
-        @qjit(capture=True)
+        @qjit(capture=True, collect_decomp_rules=False)
         def classical_fn(x, y):
             assert qp.capture.enabled()
             return x**2 + y**2
@@ -258,7 +258,7 @@ class TestCaptureCompileOptionsIdentity:
         """Test that qjit(capture=True) and qjit(capture=False) have distinct CompileOptions."""
         qp.capture.disable()  # Ensure global state doesn't affect the test
 
-        @qjit(capture=True)
+        @qjit(capture=True, collect_decomp_rules=False)
         def fn_capture(x):
             return x * 2
 
@@ -286,7 +286,7 @@ class TestCaptureCompileOptionsIdentity:
         """
         qp.capture.disable()  # Global state is disabled
 
-        @qjit(capture=True)
+        @qjit(capture=True, collect_decomp_rules=False)
         def circuit(x: float):  # Type hint enables AOT compilation
             return x * 2
 
@@ -306,7 +306,7 @@ class TestCaptureCompileOptionsIdentity:
         qp.capture.enable()
         try:
 
-            @qjit(capture=False)
+            @qjit(capture=False, collect_decomp_rules=False)
             def circuit(x: float):  # Type hint enables AOT compilation
                 return x * 2
 
@@ -328,7 +328,7 @@ class TestCaptureCompileOptionsIdentity:
         assert opts_true.capture is True
         assert opts_false.capture is False
         assert opts_global.capture == "global"
-        assert opts_default.capture == "global"  # Default should be "global"
+        assert opts_default.capture is True
 
     def test_different_capture_produces_different_qjit_objects(self, backend):
         """Test that different capture settings produce independent QJIT objects.

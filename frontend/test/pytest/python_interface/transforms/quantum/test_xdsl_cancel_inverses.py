@@ -204,7 +204,7 @@ class TestIterativeCancelInversesIntegration:
         """Test that the IterativeCancelInversesPass works correctly with qjit."""
         dev = qp.device("lightning.qubit", wires=2)
 
-        @qp.qjit(capture=True, target="mlir")
+        @qp.qjit(capture=True, collect_decomp_rules=False, target="mlir")
         @iterative_cancel_inverses_pass
         @qp.qnode(dev)
         def circuit():

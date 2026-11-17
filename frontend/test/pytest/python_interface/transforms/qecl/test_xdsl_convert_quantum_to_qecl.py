@@ -1498,7 +1498,7 @@ class TestMeasurementProcesses:
         """
         dev = qp.device("null.qubit", wires=1)
 
-        @qp.qjit(capture=True, target="mlir")
+        @qp.qjit(capture=True, collect_decomp_rules=False, target="mlir")
         @convert_quantum_to_qecl_pass(k=1)
         @qp.qnode(dev, shots=100, mcm_method="one-shot")
         def circuit():
@@ -1523,7 +1523,7 @@ class TestMeasurementProcesses:
         """
         dev = qp.device("null.qubit", wires=1)
 
-        @qp.qjit(capture=True, target="mlir")
+        @qp.qjit(capture=True, collect_decomp_rules=False, target="mlir")
         @convert_quantum_to_qecl_pass(k=1)
         @qp.qnode(dev, shots=100, mcm_method="one-shot")
         def circuit():
@@ -1548,7 +1548,7 @@ class TestMeasurementProcesses:
         """
         dev = qp.device("null.qubit", wires=2)
 
-        @qp.qjit(capture=True, target="mlir")
+        @qp.qjit(capture=True, collect_decomp_rules=False, target="mlir")
         @convert_quantum_to_qecl_pass(k=1)
         @qp.qnode(dev, shots=100, mcm_method="one-shot")
         def circuit():
@@ -1579,7 +1579,7 @@ class TestMeasurementProcesses:
         """
         dev = qp.device("null.qubit", wires=2)
 
-        @qp.qjit(capture=True, target="mlir")
+        @qp.qjit(capture=True, collect_decomp_rules=False, target="mlir")
         @convert_quantum_to_qecl_pass(k=1)
         @qp.qnode(dev, shots=100, mcm_method="one-shot")
         def circuit():
@@ -1599,7 +1599,7 @@ class TestMeasurementProcesses:
         """
         dev = qp.device("null.qubit", wires=1)
 
-        @qp.qjit(capture=True, target="mlir")
+        @qp.qjit(capture=True, collect_decomp_rules=False, target="mlir")
         @convert_quantum_to_qecl_pass(k=1)
         @measurements_from_samples_pass
         @qp.qnode(dev, shots=100, mcm_method="one-shot")
@@ -1637,7 +1637,7 @@ class TestMeasurementProcesses:
         """
         dev = qp.device("null.qubit", wires=1)
 
-        @qp.qjit(capture=True, target="mlir")
+        @qp.qjit(capture=True, collect_decomp_rules=False, target="mlir")
         @convert_quantum_to_qecl_pass(k=1)
         @measurements_from_samples_pass
         @qp.qnode(dev, shots=100, mcm_method="one-shot")
@@ -1671,7 +1671,7 @@ class TestMeasurementProcesses:
         """
         dev = qp.device("null.qubit", wires=1)
 
-        @qp.qjit(capture=True, target="mlir")
+        @qp.qjit(capture=True, collect_decomp_rules=False, target="mlir")
         @convert_quantum_to_qecl_pass(k=1)
         @measurements_from_samples_pass
         @qp.qnode(dev, shots=100, mcm_method="one-shot")
@@ -1705,7 +1705,7 @@ class TestMeasurementProcesses:
         """
         dev = qp.device("null.qubit", wires=1)
 
-        @qp.qjit(capture=True, target="mlir")
+        @qp.qjit(capture=True, collect_decomp_rules=False, target="mlir")
         @convert_quantum_to_qecl_pass(k=1)
         @measurements_from_samples_pass
         @qp.qnode(dev, shots=100, mcm_method="one-shot")
@@ -1740,7 +1740,7 @@ class TestMeasurementProcesses:
         """
         dev = qp.device("null.qubit", wires=2)
 
-        @qp.qjit(capture=True, target="mlir")
+        @qp.qjit(capture=True, collect_decomp_rules=False, target="mlir")
         @convert_quantum_to_qecl_pass(k=1)
         @measurements_from_samples_pass
         @qp.qnode(dev, shots=100, mcm_method="one-shot")
@@ -1761,7 +1761,7 @@ class TestQuantumToQecLogicalPassIntegration:
         """Test the convert-quantum-to-qecl pass on the simplest possible, non-trivial circuit."""
         dev = qp.device("null.qubit", wires=1)
 
-        @qp.qjit(capture=True, target="mlir")
+        @qp.qjit(capture=True, collect_decomp_rules=False, target="mlir")
         @convert_quantum_to_qecl_pass(k=1)
         @qp.qnode(dev, shots=1)
         def circuit():
@@ -1792,7 +1792,7 @@ class TestQuantumToQecLogicalPassIntegration:
         """Test the convert-quantum-to-qecl pass on a GHZ circuit."""
         dev = qp.device("null.qubit", wires=3)
 
-        @qp.qjit(capture=True, target="mlir")
+        @qp.qjit(capture=True, collect_decomp_rules=False, target="mlir")
         @convert_quantum_to_qecl_pass(k=1)
         @qp.qnode(dev, shots=1)
         def circuit():

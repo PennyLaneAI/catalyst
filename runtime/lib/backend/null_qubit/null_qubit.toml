@@ -97,9 +97,8 @@ qjit_compatible = true
 runtime_code_generation = false
 # If the device supports mid-circuit measurements natively
 supported_mcm_methods = [ "device", "one-shot" ]
-# This field is currently unchecked, but it is reserved for the purpose of
-# determining if the device supports dynamic qubit allocation/deallocation.
-dynamic_qubit_management = false
+# Whether the device supports dynamic qubit allocation/deallocation.
+dynamic_qubit_management = true
 # whether the device can support non-commuting measurements together
 # in a single execution
 non_commuting_observables = true

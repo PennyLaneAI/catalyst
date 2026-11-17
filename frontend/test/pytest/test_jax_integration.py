@@ -20,11 +20,12 @@ from functools import partial
 
 import jax
 import jax.numpy as jnp
+import numpy as np
 import pennylane as qp
 import pytest
 from jax.interpreters.mlir import ir
 
-from catalyst import for_loop, measure, qjit
+from catalyst import for_loop, qjit
 from catalyst.jax_extras.lowering import get_mlir_attribute_from_pyval
 from catalyst.jit import JAX_QJIT
 from catalyst.utils.exceptions import CompileError
@@ -170,13 +171,13 @@ class TestJAXJIT:
         @qp.qnode(qp.device(backend, wires=1))
         def circuit(x):
             qp.RY(x, wires=0)
-            return measure(0)
+            return qp.probs(wires=0)
 
         @jax.jit
         def cost_fn(x, y):
             m1 = circuit(x)
             m2 = circuit(y)
-            return m1 == m2
+            return jnp.allclose(m1, m2)
 
         result1 = cost_fn(0.0, 0.0)
         result2 = cost_fn(0.0, jnp.pi)
@@ -184,13 +185,14 @@ class TestJAXJIT:
         assert result2 == False
 
 
+@pytest.mark.old_frontend
 class TestJAXAD:
     """Test QJIT compatibility with JAX differentiation."""
 
     def test_simple_circuit(self, backend):
         """Test a basic use case of jax.grad on top of qjit."""
 
-        @qjit
+        @qjit(capture=False)
         @qp.qnode(qp.device(backend, wires=2))
         def circuit(x: jax.core.ShapedArray((3,), dtype=float)):
             qp.RX(jnp.pi * x[0], wires=0)
@@ -213,7 +215,7 @@ class TestJAXAD:
     def test_multiple_arguments(self, backend, argnums):
         """Test a circuit with multiple arguments using jax.grad on top of qjit."""
 
-        @qjit
+        @qjit(capture=False)
         @qp.qnode(qp.device(backend, wires=2))
         def circuit(
             x: jax.core.ShapedArray((3,), dtype=float), y: jax.core.ShapedArray((2,), dtype=float)
@@ -239,7 +241,7 @@ class TestJAXAD:
     def test_multiple_results(self, backend):
         """Test a circuit with multiple results using jax.grad on top of qjit."""
 
-        @qjit
+        @qjit(capture=False)
         @qp.qnode(qp.device(backend, wires=2))
         def circuit(
             x: jax.core.ShapedArray((3,), dtype=float), y: jax.core.ShapedArray((2,), dtype=float)
@@ -265,7 +267,7 @@ class TestJAXAD:
     def test_jacobian(self, backend):
         """Test a circuit with vector return type using jax.jacobian on top of qjit."""
 
-        @qjit
+        @qjit(capture=False)
         @qp.qnode(qp.device(backend, wires=2))
         def circuit(
             x: jax.core.ShapedArray((3,), dtype=float), y: jax.core.ShapedArray((2,), dtype=float)
@@ -291,7 +293,7 @@ class TestJAXAD:
     def test_without_precompilation(self, backend):
         """Test a function without type hints (pre-compilation) using jax.grad on top of qjit."""
 
-        @qjit
+        @qjit(capture=False)
         @qp.qnode(qp.device(backend, wires=2))
         def circuit(x, y):
             qp.RX(jnp.pi * x[0], wires=0)
@@ -315,7 +317,7 @@ class TestJAXAD:
     def test_non_differentiable_arguments(self, backend):
         """Test a circuit with non-differentiable arguments using jax.grad on top of qjit."""
 
-        @qjit
+        @qjit(capture=False)
         @qp.qnode(qp.device(backend, wires=2))
         def circuit(x: jax.core.ShapedArray((3,), dtype=float), y: int):
             qp.RX(jnp.pi * x[0], wires=0)
@@ -337,7 +339,7 @@ class TestJAXAD:
     def test_multiple_calls(self, backend):
         """Test a jax.grad function which repeatedly calls a qjit function."""
 
-        @qjit
+        @qjit(capture=False)
         @qp.qnode(qp.device(backend, wires=1))
         def circuit(x):
             qp.RY(x, wires=0)
@@ -361,7 +363,7 @@ class TestJAXAD:
         def func(p1, p2):
             return jnp.reshape(p1, shape) + 2 * jnp.reshape(p2, shape)
 
-        C_func = qjit(func)
+        C_func = qjit(func, capture=False)
         PL_func = func
 
         def cost_fn(p1, p2, f):
@@ -381,7 +383,7 @@ class TestJAXAD:
     def test_efficient_Jacobian(self, backend):
         """Test a jax.grad function does not compute Jacobians for arguments not in argnums."""
 
-        @qjit
+        @qjit(capture=False)
         @qp.qnode(qp.device(backend, wires=2))
         def circuit(x: float, y: float):
             qp.RX(x, wires=0)
@@ -402,7 +404,7 @@ class TestJAXAD:
         """Test that argnums determination works correctly when combining jax.jit with jax.grad.
         This was fixed by the introduction of symbolic zero detection for tangent vectors."""
 
-        @qjit
+        @qjit(capture=False)
         @qp.qnode(qp.device(backend, wires=2))
         def circuit(params: jax.core.ShapedArray((2,), dtype=float), n: int):
             qp.RX(n * params[0], wires=0)
@@ -423,7 +425,7 @@ class TestJAXAD:
         """Test that when combining jax.jit and jax.grad, the internal argnums are correctly
         passed to the custom quantum JVP"""
 
-        @qjit
+        @qjit(capture=False)
         @qp.qnode(qp.device(backend, wires=2))
         def circuit(p1, n, p2):
             def ansatz(_):
@@ -447,6 +449,7 @@ class TestJAXAD:
         jax.grad(jax.jit(circuit), argnums=(0, 2))(-4.5, 3, 4.3)
 
 
+@pytest.mark.old_frontend
 class TestJAXRecompilation:
     """
     Test obtained from ticket: https://github.com/PennyLaneAI/catalyst/issues/149
@@ -457,7 +460,7 @@ class TestJAXRecompilation:
     def test_jax_function_has_not_been_jit_compiled(self, backend):
         """Test if function can be used by jax.grad even if it has not been JIT compiled"""
 
-        @qjit
+        @qjit(capture=False)
         @qp.qnode(qp.device(backend, wires=2))
         def circuit(params, n):
             def ansatz(i, x):
@@ -476,7 +479,7 @@ class TestJAXRecompilation:
     def test_jax_function_needs_recompilation(self, backend):
         """Test if function can be used by jax.grad but it needs recompilation"""
 
-        @qjit
+        @qjit(capture=False)
         @qp.qnode(qp.device(backend, wires=2))
         def circuit(params, n):
             def ansatz(i, x):
@@ -522,7 +525,16 @@ class TestJAXMLIRAttributeGetter:
             assert isinstance(attr, ir.StringAttr)
             assert attr.value == "hello catalyst!"
 
-    @pytest.mark.parametrize("number", (37, -37))
+    def test_none_attr(self):
+        """
+        Test None is lowered to the MLIR null attribute value.
+        """
+        with ctx, loc:
+            attr = get_mlir_attribute_from_pyval(None)
+            assert isinstance(attr, ir.TypeAttr)
+            assert attr.value == ir.NoneType.get()
+
+    @pytest.mark.parametrize("number", (37, -37, 2**63 - 1, -(2**63)))
     def test_int_attr(self, number):
         """
         Test integer attribute.
@@ -555,6 +567,67 @@ class TestJAXMLIRAttributeGetter:
             for attr_val, py_val in zip(attr, array):
                 assert isinstance(attr_val, ir.IntegerAttr)
                 assert attr_val.value == py_val
+
+    @pytest.mark.parametrize(
+        "array, spelling",
+        (
+            (np.array([1, 2, 3]), "dense<[1, 2, 3]> : tensor<3xi64>"),
+            # An array whose elements all agree prints in MLIR's splat shorthand.
+            (np.array([5, 5, 5]), "dense<5> : tensor<3xi64>"),
+            (
+                np.array([[1, 2], [3, 4]], dtype=np.int32),
+                "dense<[[1, 2], [3, 4]]> : tensor<2x2xi32>",
+            ),
+            # A rank-0 array stays rank 0 rather than being promoted to a one-element tensor.
+            (np.array(3), "dense<3> : tensor<i64>"),
+            # Unsigned data carries its signedness in the type; read as signless, 250 would be -6.
+            (np.array([1, 250], dtype=np.uint8), "dense<[1, 250]> : tensor<2xui8>"),
+            (np.array([True, False]), "dense<[true, false]> : tensor<2xi1>"),
+            (
+                np.array([1.5, -2.5], dtype=np.float32),
+                "dense<[1.500000e+00, -2.500000e+00]> : tensor<2xf32>",
+            ),
+            # A non-contiguous array, which a dense attribute cannot read as it stands.
+            (np.arange(6)[::2], "dense<[0, 2, 4]> : tensor<3xi64>"),
+            (np.array([], dtype=np.int64), "dense<> : tensor<0xi64>"),
+        ),
+    )
+    def test_numpy_array_attr(self, array, spelling):
+        """
+        Test that a NumPy array becomes a dense attribute, spelled as MLIR prints it.
+
+        The spelling matters as much as the value: it is what a graphOpId carries for array static
+        data, so it has to agree with the compiler's own printer character for character.
+        """
+        with ctx, loc:
+            attr = get_mlir_attribute_from_pyval(array)
+            assert isinstance(attr, ir.DenseElementsAttr)
+            assert str(attr) == spelling
+
+    @pytest.mark.parametrize(
+        "value, attr_type, spelling",
+        (
+            (np.int64(37), ir.IntegerAttr, "37 : i64"),
+            (np.float64(3.7), ir.FloatAttr, "3.700000e+00 : f64"),
+            (np.bool_(True), ir.BoolAttr, "true"),
+        ),
+    )
+    def test_numpy_scalar_attr(self, value, attr_type, spelling):
+        """
+        Test that a NumPy scalar becomes the same attribute as the Python number it holds.
+        """
+        with ctx, loc:
+            attr = get_mlir_attribute_from_pyval(value)
+            assert isinstance(attr, attr_type)
+            assert str(attr) == spelling
+
+    def test_numpy_array_attr_unsupported_dtype(self):
+        """
+        Test that an array MLIR has no dense representation for is reported clearly.
+        """
+        with pytest.raises(CompileError, match="NumPy array of dtype complex128"):
+            with ctx, loc:
+                _ = get_mlir_attribute_from_pyval(np.array([1 + 2j]))
 
     def test_dict_attr(self):
         """
@@ -595,7 +668,8 @@ class TestJAXMLIRAttributeGetter:
             with ctx, loc:
                 _ = get_mlir_attribute_from_pyval(Foo())
 
-    def test_int_attr_overflow(self):
+    @pytest.mark.parametrize("value", (2**63, -(2**63) - 1, 2**100))
+    def test_int_attr_overflow(self, value):
         """
         Test int attribute with overflow correctly raises error.
         """
@@ -607,7 +681,7 @@ class TestJAXMLIRAttributeGetter:
             """),
         ):
             with ctx, loc:
-                _ = get_mlir_attribute_from_pyval(2**100)
+                _ = get_mlir_attribute_from_pyval(value)
 
     def test_dataclass_attr(self):
         """

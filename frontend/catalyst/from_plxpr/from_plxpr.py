@@ -17,9 +17,9 @@ This submodule defines a utility for converting plxpr into Catalyst jaxpr.
 
 # pylint: disable=protected-access
 
-import warnings
 from copy import copy
 from functools import partial
+from importlib.metadata import entry_points
 from typing import Callable
 
 import jax
@@ -27,13 +27,12 @@ import pennylane as qp
 from jax.extend.core import ClosedJaxpr, Jaxpr
 from pennylane.capture import PlxprInterpreter, qnode_prim
 from pennylane.capture.primitives import transform_prim
-from pennylane.decomposition.utils import to_name
 from pennylane.transforms import decompose as pl_decompose
 
-from catalyst.backline import device_pass_pipeline
+from catalyst.backline import device_pass_pipeline, remote_device_lib
+from catalyst.decomposition.capture_session import DecompositionScope
 from catalyst.device import extract_backend_info
 from catalyst.device.qjit_device import is_dynamic_wires
-from catalyst.from_plxpr.decompose import DecompRuleInterpreter
 from catalyst.from_plxpr.qref_jax_primitives import (
     qref_alloc_p,
     qref_dealloc_p,
@@ -48,7 +47,10 @@ from catalyst.jax_primitives import (
 from catalyst.utils.patching import Patcher
 
 from .device_utils import create_device_preprocessing_pipeline
-from .qfunc_interpreter import PLxPRToQuantumJaxprInterpreter
+from .qfunc_interpreter import (
+    PLxPRToQuantumJaxprInterpreter,
+    capture_and_bind_kernel_rules,
+)
 
 # dummy hop (higher order primitive) is used to just return a jaxpr
 # produced inside of a another jaxpr
@@ -129,9 +131,11 @@ def _get_device_kwargs(device) -> dict:
     # Note that the value of rtd_kwargs is a string version of
     # the info kwargs, not the info kwargs itself
     # this is due to ease of serialization to MLIR
+    # A dispatched controller loads its runtime from its workspace, so the program names it by
+    # filename. info.lpath describes this machine and is right for a controller running here.
     return {
         "rtd_kwargs": str(info.kwargs),
-        "rtd_lib": info.lpath,
+        "rtd_lib": remote_device_lib(device, info.lpath) or info.lpath,
         "rtd_name": info.c_interface_name,
     }
 
@@ -143,6 +147,7 @@ def from_plxpr(
     skip_preprocess: bool = False,
     _preprocess_warn: bool = True,
     collect_decomp_rules: bool = True,
+    plugin_paths: list[str] | None = None,
 ) -> Callable[..., Jaxpr]:
     """Convert PennyLane variant jaxpr to Catalyst variant jaxpr.
 
@@ -157,6 +162,8 @@ def from_plxpr(
             generally not be used. ``True`` by default.
         collect_decomp_rules (bool): Controls whether or not to compile the reachable
             decomposition rules from the gates in the circuit. ``True`` by default.
+        plugin_paths (None | list[str]): a list that will be **mutated in place** with
+            the paths of any transforms from plugins encountered
 
     Returns:
         Callable: A function that accepts the same arguments as the plxpr and returns catalyst
@@ -218,6 +225,7 @@ def from_plxpr(
         skip_preprocess=skip_preprocess,
         _preprocess_warn=_preprocess_warn,
         collect_decomp_rules=collect_decomp_rules,
+        plugin_paths=plugin_paths,
     )
     original_fn = partial(interpreter.eval, plxpr.jaxpr, plxpr.consts)
 
@@ -238,23 +246,25 @@ class WorkflowInterpreter(PlxprInterpreter):
             skip_preprocess=self._skip_preprocess,
             _preprocess_warn=self._preprocess_warn,
             collect_decomp_rules=self._collect_decomp_rules,
+            plugin_paths=self.plugin_paths,
         )
         new_version._pass_pipeline = copy(self._pass_pipeline)
         new_version.init_qreg = self.init_qreg
-        new_version.requires_decompose_lowering = self.requires_decompose_lowering
-        new_version.decompose_tkwargs = copy(self.decompose_tkwargs)
         return new_version
 
-    def __init__(self, skip_preprocess=False, _preprocess_warn=True, collect_decomp_rules=True):
+    def __init__(
+        self,
+        skip_preprocess=False,
+        _preprocess_warn=True,
+        collect_decomp_rules=True,
+        plugin_paths: None | list[str] = None,
+    ):
         self._pass_pipeline = []
         self.init_qreg = None
         self._skip_preprocess = skip_preprocess
         self._preprocess_warn = _preprocess_warn
         self._collect_decomp_rules = collect_decomp_rules
-
-        # Compiler options for the new decomposition system
-        self.requires_decompose_lowering = False
-        self.decompose_tkwargs = {}  # target gateset
+        self.plugin_paths = plugin_paths if plugin_paths is not None else []
 
         super().__init__()
 
@@ -274,19 +284,7 @@ def handle_qnode(
 
     closed_jaxpr = ClosedJaxpr(qfunc_jaxpr, consts)
 
-    if self.decompose_tkwargs.get("stopping_condition"):
-        raise NotImplementedError(
-            "A stopping condition is not currently supported with catalyst decomposition."
-        )
-    if self.requires_decompose_lowering:
-        with warnings.catch_warnings():
-            warnings.simplefilter("error", qp.exceptions.DecompositionWarning)
-            closed_jaxpr, _ = _collect_and_compile_graph_solutions(
-                inner_jaxpr=closed_jaxpr.jaxpr,
-                consts=closed_jaxpr.consts,
-                tkwargs=self.decompose_tkwargs,
-                ncargs=non_const_args,
-            )
+    decomposition_scope = DecompositionScope() if self._collect_decomp_rules else None
 
     def calling_convention(*args):
         device_init_p.bind(
@@ -303,23 +301,19 @@ def handle_qnode(
         self.init_qreg = qreg
 
         converter = PLxPRToQuantumJaxprInterpreter(
-            device, shots, self.init_qreg, {}, collect_decomp_rules=self._collect_decomp_rules
+            device,
+            shots,
+            self.init_qreg,
+            {},
+            decomposition_scope=decomposition_scope,
         )
         retvals = converter(closed_jaxpr, *args)
+        # Discover and inject all relevant decomposition rules for this QNode as module functions.
+        capture_and_bind_kernel_rules(converter)
         qref_dealloc_p.bind(self.init_qreg)
         device_release_p.bind()
         return retvals
 
-    if self.requires_decompose_lowering:
-        # Add gate_set attribute to the quantum kernel primitive
-        # decompose_gatesets is treated as a queue of gatesets to be used
-        # but we only support a single gateset for now in from_plxpr
-        # as supporting multiple gatesets requires an MLIR/C++ graph-decomposition
-        # implementation. The current Python implementation cannot be mixed
-        # with other transforms in between.
-        gateset = [to_name(op) for op in self.decompose_tkwargs.get("gate_set", [])]
-        gateset = list(sorted(gateset))  # consistent ordering for testing
-        setattr(qnode, "decompose_gatesets", [gateset])
     # The device may require passes of its own, e.g. a backline placement naming a QEC code implies
     # implicit encoding applied to it. Therefore we append the pass pipeline with the qec lowering
     # passes.
@@ -329,6 +323,9 @@ def handle_qnode(
             qnode.device, execution_config, shots, warn=self._preprocess_warn
         )
         pipelines += (("device", device_preprocessing_pipeline),)
+
+    # Add the post-device pipeline, which contains optional Resource Analysis passes used through `qp.analyze`
+    pipelines += (("post-device", tuple(qnode.post_device_pipeline)),)
 
     # no idea what deduce_avals is doing, but this seems to make dynamic shapes work
     flattened_fn = deduce_avals(
@@ -343,50 +340,63 @@ def handle_qnode(
     )
 
 
-def _set_decompose_lowering_state(self):
-    """Set requires_decompose_lowering and decompose_tkwargs; raise if already set."""
-    if not self.requires_decompose_lowering:
-        self.requires_decompose_lowering = True
-    else:
-        raise NotImplementedError("Multiple decomposition transforms are not yet supported.")
+def _require_decompose_gate_set(tkwargs, is_resource_estimate=False):
+    """Reject a qp.decompose or qp.estimate without a gate set, which the pass needs."""
+    transform_name = "qp.estimate" if is_resource_estimate else "qp.decompose"
+    if tkwargs.get("gate_set") is None:
+        raise ValueError(
+            f"{transform_name} requires an explicit 'gate_set' under qjit; the graph-based decomposition "
+            "has no default target gate set."
+        )
+
+
+def _require_resource_estimate_args(output_json, output_fname):
+    """Reject a qp.estimate without output_json and output_fname, which the resource-estimate pass needs."""
+    if output_json is None:
+        raise ValueError("resource-estimate pass requires an explicit 'output_json'.")
+    if output_fname is None:
+        raise ValueError(
+            "resource-estimate pass requires an explicit 'output_fname'. "
+            "The pass does not have a default output file."
+        )
 
 
 # pylint: disable=too-many-positional-arguments
-def _handle_decompose_transform(self, inner_jaxpr, consts, non_const_args, tkwargs):
-    _set_decompose_lowering_state(self)
+def _handle_decompose_transform(
+    self, inner_jaxpr, consts, non_const_args, tkwargs, is_resource_estimate=False
+):
+    """Route a captured ``qp.decompose`` or ``qp.estimate`` onto the ``graph-decomposition``
+    or ``resource-estimate`` pass.
+
+    ``qp.decompose`` is an alias for :func:`catalyst.passes.graph_decomposition`.
+    ``qp.estimate`` is an alias for ``catalyst.passes.builtin_passes.resource_estimate``.
+    """
+    # Local imports avoid an import cycle (catalyst.passes imports from_plxpr indirectly).
+    from catalyst.passes.builtin_passes import graph_decomposition, resource_estimate
+
+    _require_decompose_gate_set(tkwargs, is_resource_estimate)
+
+    if is_resource_estimate:
+        _require_resource_estimate_args(tkwargs.get("output_json"), tkwargs.get("output_fname"))
 
     next_eval = copy(self)
-    # Update the decompose_gateset to be used by the quantum kernel primitive
-    # TODO: we originally wanted to treat decompose_gateset as a queue of
-    # gatesets to be used by the decompose-lowering pass at MLIR
-    # but this requires a C++ implementation of the graph-based decomposition
-    # which doesn't exist yet.
-    next_eval.decompose_tkwargs = tkwargs
+    # Reusing the graph_decomposition transform (not a fork) guarantees identical pass options
+    # to the explicit catalyst.passes.graph_decomposition entry point.
+    bound_transform = resource_estimate if is_resource_estimate else graph_decomposition
+    bound_transform_params = {
+        "gate_set": tkwargs["gate_set"],
+        "fixed_decomps": tkwargs.get("fixed_decomps") or None,
+        "exclude_decomps": tkwargs.get("exclude_decomps") or None,
+    }
+    bound_pass = bound_transform(**bound_transform_params)
 
-    # Note. We don't perform the compiler-specific decomposition here
-    # to be able to support multiple decomposition transforms
-    # and collect all the required gatesets
-    # as well as being able to support other transforms in between.
+    # Set resource-estimate options after graph_decomposition_setup_inputs.
+    if is_resource_estimate:
+        bound_pass.kwargs["output_json"] = tkwargs["output_json"]
+        bound_pass.kwargs["output_fname"] = tkwargs["output_fname"]
 
-    # The compiler specific transformation will be performed
-    # in the qnode handler.
+    next_eval._pass_pipeline.insert(0, bound_pass)
 
-    # Add the decompose-lowering pass to the start of the pipeline
-    t = qp.transform(pass_name="decompose-lowering")
-    pass_container = qp.transforms.core.BoundTransform(t)
-    next_eval._pass_pipeline.insert(0, pass_container)
-
-    # We still need to construct and solve the graph based on
-    # the current jaxpr based on the current gateset
-    # but we don't rewrite the jaxpr at this stage.
-
-    # gds_interpreter = DecompRuleInterpreter(*targs, **tkwargs)
-
-    # def gds_wrapper(*args):
-    #     return gds_interpreter.eval(inner_jaxpr, consts, *args)
-
-    # final_jaxpr = jax.make_jaxpr(gds_wrapper)(*args)
-    # return self.eval(final_jaxpr.jaxpr, consts, *non_const_args)
     return next_eval.eval(inner_jaxpr, consts, *non_const_args)
 
 
@@ -408,22 +418,41 @@ def handle_transform(
     non_const_args = args[_tuple_to_slice(args_slice)]
     targs = args[_tuple_to_slice(targs_slice)]
     pl_tkwargs = _tuple_to_dict(tkwargs)
+    is_resource_estimate = transform.pass_name == "resource-estimate"
 
-    # If the transform is a decomposition transform
-    # and the graph-based decomposition is enabled
-    if transform == pl_decompose:
-        return _handle_decompose_transform(self, inner_jaxpr, consts, non_const_args, pl_tkwargs)
+    # qp.decompose is routed to the graph-decomposition pass (see _handle_decompose_transform).
+    if transform == pl_decompose or is_resource_estimate:
+        return _handle_decompose_transform(
+            self, inner_jaxpr, consts, non_const_args, pl_tkwargs, is_resource_estimate
+        )
 
     if transform.pass_name is None:
         raise ValueError(
             f"{transform} does not have a pass_name and is not supported with the "
             "capture frontend. Set capture=False to apply tape-only transforms with qjit."
         )
+    if "." in transform.pass_name:
+        resolution_functions = entry_points(group="catalyst.passes_resolution")
+        key, passname = transform.pass_name.split(".", 1)
+        try:
+            resolution_function = resolution_functions[key + ".passes"]
+        except KeyError as e:
+            raise ValueError(
+                f"No pass plugin registered under '{key}'. Available: "
+                f"{[ep.name for ep in resolution_functions]}. "
+                "Is the plugin package installed?"
+            ) from e
+        module = resolution_function.load()
+        path, name = module.name2pass(passname)
+        self.plugin_paths.append(path)
+    else:
+        name = transform.pass_name
 
     # Apply the corresponding Catalyst pass counterpart
     next_eval = copy(self)
-    t = qp.transform(pass_name=transform.pass_name)
-    bound_pass = qp.transforms.core.BoundTransform(t, args=targs, kwargs=pl_tkwargs)
+    t = qp.transform(pass_name=name)
+    # Transform.__call__() rejects empty args/kwargs; construct BoundTransform directly.
+    bound_pass = qp.core.transforms.BoundTransform(t, args=targs, kwargs=pl_tkwargs)
     next_eval._pass_pipeline.insert(0, bound_pass)
     return next_eval.eval(inner_jaxpr, consts, *non_const_args)
 
@@ -476,6 +505,7 @@ def trace_from_pennylane(
         Tuple[Tuple[ShapedArray, bool]]: the return type of the captured JAXPR.
             The boolean indicates whether each result is a value returned by the user function.
         PyTreeDef: PyTree metadata of the function output
+        list[str]: the plugin paths encountered in the transforms
     """
     if abstracted_axes and any(isinstance(arg, jax.core.ShapedArray) for arg in args):
         # ShapedArrays incompatible with abstracted_axes, so need to create dummy arrays
@@ -498,6 +528,12 @@ def trace_from_pennylane(
             "abstracted_axes": abstracted_axes,
         }
 
+        # passing plugin_paths to from_plxpr as an argument for in-place mutation for now
+        # as otherwise would require a signature change
+        # we should redesign either from_plxpr or handling plugin_paths to
+        # no longer need inplace mutation of an argument
+        plugin_paths = []
+
         # we want to have the same tracers as inputs to plxpr capture and from_plxpr
         # translation, as this tells jax which inputs match which dynamic shapes
         # if we have concrete inputs to both, jax will get confused.
@@ -510,10 +546,13 @@ def trace_from_pennylane(
             )(*inner_args, **inner_kwargs)
 
             flat_inputs = jax.tree.flatten((inner_args, inner_kwargs))[0]
-            flat_inputs = [a for a in flat_inputs if qp.math.is_abstract(a)]
+            flat_inputs = [a for a in flat_inputs if qp.math.is_tracer(a)]
             abstract_shapes = _extract_abstract_shapes(flat_inputs)
             jaxpr = from_plxpr(
-                plxpr, skip_preprocess=skip_preprocess, collect_decomp_rules=collect_decomp_rules
+                plxpr,
+                skip_preprocess=skip_preprocess,
+                collect_decomp_rules=collect_decomp_rules,
+                plugin_paths=plugin_paths,
             )(*abstract_shapes, *flat_inputs)
 
             return _dummy_hop.bind(jaxpr=jaxpr, out_type=out_type, out_treedef=out_treedef)
@@ -523,49 +562,4 @@ def trace_from_pennylane(
         out_type = nested_jaxpr.eqns[0].params["out_type"]
         out_treedef = nested_jaxpr.eqns[0].params["out_treedef"]
 
-    return jaxpr, out_type, out_treedef
-
-
-def _collect_and_compile_graph_solutions(inner_jaxpr, consts, tkwargs, ncargs):
-    """Collect and compile graph solutions for a given JAXPR.
-
-    This function uses the DecompRuleInterpreter to evaluate
-    the input JAXPR and obtain a new JAXPR that incorporates
-    the graph-based decomposition solutions.
-
-    This function doesn't modify the underlying quantum function
-    but rather constructs a new JAXPR with decomposition rules.
-
-    Args:
-        inner_jaxpr (Jaxpr): The input JAXPR to be decomposed.
-        consts (list): The constants used in the JAXPR.
-        tkwargs (list): The keyword arguments of the decompose transform.
-        ncargs (list): Non-constant arguments for the JAXPR.
-
-    Returns:
-        ClosedJaxpr: The decomposed JAXPR.
-        bool: A flag indicating whether the graph-based decomposition was successful.
-    """
-    gds_interpreter = DecompRuleInterpreter(**tkwargs)
-
-    def gds_wrapper(*args):
-        return gds_interpreter.eval(inner_jaxpr, consts, *args)
-
-    graph_succeeded = True
-
-    with warnings.catch_warnings(record=True) as captured_warnings:
-        warnings.simplefilter("always", UserWarning)
-        final_jaxpr = jax.make_jaxpr(gds_wrapper)(*ncargs)
-
-    for w in captured_warnings:
-        warnings.showwarning(w.message, w.category, w.filename, w.lineno)
-        # TODO: use a custom warning class for this in PennyLane to remove this
-        # string matching and make it more robust.
-        if "The graph-based decomposition system is unable" in str(w.message):  # pragma: no cover
-            graph_succeeded = False
-            warnings.warn(
-                "Falling back to the legacy decomposition system.",
-                UserWarning,
-            )
-
-    return final_jaxpr, graph_succeeded
+    return jaxpr, out_type, out_treedef, plugin_paths

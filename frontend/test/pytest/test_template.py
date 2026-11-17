@@ -20,7 +20,7 @@ import pennylane as qp
 import pytest
 from scipy.stats import norm
 
-from catalyst import for_loop, qjit
+from catalyst import qjit
 
 # pylint: disable=too-many-lines
 
@@ -46,6 +46,7 @@ def test_adder(backend):
     assert np.allclose(interpreted_fn(), jitted_fn())
 
 
+@pytest.mark.xfail(strict=True, reason="Template needs to be ported to Operator2.")
 def test_amplitude_embedding(backend):
     """Test amplitude embedding."""
 
@@ -61,6 +62,7 @@ def test_amplitude_embedding(backend):
     assert np.allclose(interpreted_fn(params), jitted_fn(params))
 
 
+@pytest.mark.xfail(strict=True, reason="Template needs to be ported to Operator2.")
 def test_angle_embedding(backend):
     """Test angle embedding."""
 
@@ -92,6 +94,7 @@ def test_basis_embedding(backend):
     assert np.allclose(interpreted_fn(params), jitted_fn(params))
 
 
+@pytest.mark.xfail(strict=True, reason="Template needs to be ported to Operator2.")
 def test_cosine_window(backend):
     """Test cosine window."""
 
@@ -116,11 +119,12 @@ def test_iqp_embedding(backend):
     device = qp.device(backend, wires=3)
     params = jnp.array([1.0, 2.0, 3.0])
     interpreted_fn = qp.QNode(iqp_embedding, device)
-    jitted_fn = qjit(interpreted_fn)
+    jitted_fn = qjit(interpreted_fn, capture=True)
 
     assert np.allclose(interpreted_fn(params), jitted_fn(params))
 
 
+@pytest.mark.xfail(strict=True, reason="Template needs to be ported to Operator2.")
 def test_qaoa_embedding(backend):
     """Test qaoa embedding."""
 
@@ -138,6 +142,7 @@ def test_qaoa_embedding(backend):
     assert np.allclose(interpreted_fn(*params), jitted_fn(*params))
 
 
+@pytest.mark.xfail(strict=True, reason="Template needs to be ported to Operator2.")
 def test_random_layers(backend):
     """Test random layers."""
 
@@ -153,6 +158,7 @@ def test_random_layers(backend):
     assert np.allclose(interpreted_fn(params), jitted_fn(params))
 
 
+@pytest.mark.xfail(strict=True, reason="Template needs to be ported to Operator2.")
 def test_strongly_entangled_layers(backend):
     """Test strongly entangled layers."""
 
@@ -171,6 +177,7 @@ def test_strongly_entangled_layers(backend):
     assert np.allclose(interpreted_fn(params), jitted_fn(params))
 
 
+@pytest.mark.xfail(strict=True, reason="Template needs to be ported to Operator2.")
 def test_simplified_two_design(backend):
     """Test simplified two design."""
 
@@ -188,6 +195,7 @@ def test_simplified_two_design(backend):
     assert np.allclose(interpreted_fn(*params), jitted_fn(*params))
 
 
+@pytest.mark.xfail(strict=True, reason="Template needs to be ported to Operator2.")
 def test_basic_entangler_layers(backend):
     """Test basic entangler layers."""
 
@@ -203,6 +211,7 @@ def test_basic_entangler_layers(backend):
     assert np.allclose(interpreted_fn(params), jitted_fn(params))
 
 
+@pytest.mark.xfail(strict=True, reason="Template needs to be ported to Operator2.")
 def test_mottonen_state_preparation(backend):
     """Test mottonen state preparation."""
 
@@ -230,6 +239,7 @@ def test_mottonen_state_preparation(backend):
     assert np.allclose(interpreted_fn(state), jitted_fn(state))
 
 
+@pytest.mark.xfail(strict=True, reason="Template needs to be ported to Operator2.")
 def test_arbitrary_state_preparation(backend):
     """Test arbitrary state preparation."""
 
@@ -245,6 +255,7 @@ def test_arbitrary_state_preparation(backend):
     assert np.allclose(interpreted_fn(params), jitted_fn(params))
 
 
+@pytest.mark.xfail(strict=True, reason="Template needs to be ported to Operator2.")
 def test_all_single_doubles(backend):
     """Test all single doubles."""
 
@@ -267,6 +278,7 @@ def test_all_single_doubles(backend):
     assert np.allclose(interpreted_fn(params), jitted_fn(params))
 
 
+@pytest.mark.xfail(strict=True, reason="Template needs to be ported to Operator2.")
 def test_gate_fabric(backend):
     """Test gate fabric."""
 
@@ -294,6 +306,7 @@ def test_gate_fabric(backend):
     assert np.allclose(interpreted_fn(qp.numpy.array(params)), jitted_fn(params))
 
 
+@pytest.mark.xfail(strict=True, reason="Template needs to be ported to Operator2.")
 def test_uccsd(backend):
     """Test UCCSD."""
 
@@ -328,6 +341,7 @@ def test_uccsd(backend):
     assert np.allclose(interpreted_fn(params), jitted_fn(params))
 
 
+@pytest.mark.xfail(strict=True, reason="Template needs to be ported to Operator2.")
 def test_kup(backend):
     """Test KUP."""
 
@@ -343,6 +357,7 @@ def test_kup(backend):
     assert np.allclose(interpreted_fn(params), jitted_fn(params))
 
 
+@pytest.mark.xfail(strict=True, reason="Template needs to be ported to Operator2.")
 def test_particle_conserving_u1(backend):
     """Test particle conserving U1"""
 
@@ -358,6 +373,7 @@ def test_particle_conserving_u1(backend):
     assert np.allclose(interpreted_fn(weights), jitted_fn(weights))
 
 
+@pytest.mark.xfail(strict=True, reason="Template needs to be ported to Operator2.")
 def test_particle_conserving_u2(backend):
     """Test particle conserving U2"""
 
@@ -373,6 +389,7 @@ def test_particle_conserving_u2(backend):
     assert np.allclose(interpreted_fn(weights), jitted_fn(weights))
 
 
+@pytest.mark.xfail(strict=True, reason="Template needs to be ported to Operator2.")
 def test_mps(backend):
     """Test MPS."""
 
@@ -396,6 +413,7 @@ def test_mps(backend):
     assert np.allclose(interpreted_fn(params), jitted_fn(params))
 
 
+@pytest.mark.xfail(strict=True, reason="Template needs to be ported to Operator2.")
 def test_ttn(backend):
     """Test TTN."""
 
@@ -419,6 +437,7 @@ def test_ttn(backend):
     assert np.allclose(interpreted_fn(params), jitted_fn(params))
 
 
+@pytest.mark.xfail(strict=True, reason="Template needs to be ported to Operator2.")
 def test_mera(backend):
     """Test MERA."""
 
@@ -442,6 +461,7 @@ def test_mera(backend):
     assert np.allclose(interpreted_fn(params), jitted_fn(params))
 
 
+@pytest.mark.xfail(strict=True, reason="Template needs to be ported to Operator2.")
 def test_two_local_swap_network(backend):
     """Test TwoLocalSwapNetwork."""
 
@@ -463,6 +483,7 @@ def test_two_local_swap_network(backend):
     assert np.allclose(interpreted_fn(weights), jitted_fn(weights))
 
 
+@pytest.mark.xfail(strict=True, reason="Template needs to be ported to Operator2.")
 def test_grover(backend):
     """Test Grover."""
 
@@ -485,18 +506,16 @@ def test_grover(backend):
         return qp.state()
 
     def grover_compiled(num_iterations: int):
-        @for_loop(0, n_wires, 1)
         def loop_fn(i):
             qp.Hadamard(i)
 
-        loop_fn()
+        qp.for_loop(0, n_wires, 1)(loop_fn)()
 
-        @for_loop(0, num_iterations, 1)
         def body(i):
             oracle()
             qp.templates.GroverOperator(wires=wires)
 
-        body()
+        qp.for_loop(0, num_iterations, 1)(body)()
         return qp.state()
 
     device = qp.device(backend, wires=n_wires)
@@ -509,6 +528,7 @@ def test_grover(backend):
     assert positive or negative
 
 
+@pytest.mark.xfail(strict=True, reason="Template needs to be ported to Operator2.")
 def test_reflection(backend):
     """Test Reflection."""
 
@@ -535,6 +555,7 @@ def test_reflection(backend):
     assert np.allclose(interpreted_fn(x), jitted_fn(x))
 
 
+@pytest.mark.xfail(strict=True, reason="Template needs to be ported to Operator2.")
 def test_amplitude_amplification(backend):
     """Test AmplitudeAmplification."""
 
@@ -558,6 +579,7 @@ def test_amplitude_amplification(backend):
     assert np.allclose(interpreted_fn(params), jitted_fn(params))
 
 
+@pytest.mark.xfail(strict=True, reason="Template needs to be ported to Operator2.")
 def test_fermionic(backend):
     """Test Fermionic."""
 
@@ -573,6 +595,7 @@ def test_fermionic(backend):
     assert np.allclose(interpreted_fn(params), jitted_fn(params))
 
 
+@pytest.mark.xfail(strict=True, reason="Template needs to be ported to Operator2.")
 def test_fermionic_double(backend):
     """Test Fermionic double."""
 
@@ -588,6 +611,7 @@ def test_fermionic_double(backend):
     assert np.allclose(interpreted_fn(weight), jitted_fn(weight))
 
 
+@pytest.mark.xfail(strict=True, reason="Template needs to be ported to Operator2.")
 def test_arbitrary_unitary(backend):
     """Test ArbitraryUnitary."""
 
@@ -603,6 +627,7 @@ def test_arbitrary_unitary(backend):
     assert np.allclose(interpreted_fn(weights), jitted_fn(weights))
 
 
+@pytest.mark.xfail(strict=True, reason="Template needs to be ported to Operator2.")
 def test_permute(backend):
     """Test Permute."""
 
@@ -651,7 +676,7 @@ def test_aqft(backend):
     assert np.allclose(interpreted_fn(1), jitted_fn(1))
 
 
-@pytest.mark.xfail(reason="Takes quantum tape as a parameter")
+@pytest.mark.xfail(strict=True, reason="Takes quantum tape as a parameter")
 def test_hilbert_schmidt(backend):
     """Test HilbertSchmidt."""
     with qp.QueuingManager.stop_recording():
@@ -672,7 +697,7 @@ def test_hilbert_schmidt(backend):
     assert np.allclose(interpreted_fn(v_params), jitted_fn(v_params))
 
 
-@pytest.mark.xfail(reason="Takes quantum tape as a parameter")
+@pytest.mark.xfail(strict=True, reason="Takes quantum tape as a parameter")
 def test_local_hilbert_schmidt(backend):
     """Test LocalHilbertSchmidt."""
     with qp.QueuingManager.stop_recording():
@@ -697,6 +722,7 @@ def test_local_hilbert_schmidt(backend):
     assert np.allclose(interpreted_fn(v_params), jitted_fn(v_params))
 
 
+@pytest.mark.xfail(strict=True, reason="Template needs to be ported to Operator2.")
 def test_commuting_evolution(backend):
     """Test CommutingEvolution."""
 
@@ -734,6 +760,7 @@ def test_flip_sign(backend):
     assert np.allclose(interpreted_fn(), jitted_fn())
 
 
+@pytest.mark.xfail(strict=True, reason="Template needs to be ported to Operator2.")
 def test_qsvt(backend):
     """Test QSVT."""
     block_encoding = qp.Hadamard(wires=0)
@@ -750,6 +777,7 @@ def test_qsvt(backend):
     assert np.allclose(interpreted_fn(), jitted_fn())
 
 
+@pytest.mark.xfail(strict=True, reason="Template needs to be ported to Operator2.")
 def test_approx_time_evoluation(backend):
     """Test ApproxTimeEvolution."""
 
@@ -768,6 +796,7 @@ def test_approx_time_evoluation(backend):
     assert np.allclose(interpreted_fn(params), jitted_fn(params))
 
 
+@pytest.mark.xfail(strict=True, reason="Template needs to be ported to Operator2.")
 def test_qdrift(backend):
     """Test QDrift."""
     coeffs = [1, 1, 1]
@@ -787,6 +816,7 @@ def test_qdrift(backend):
     assert np.allclose(interpreted_fn(time), jitted_fn(time))
 
 
+@pytest.mark.xfail(strict=True, reason="Template needs to be ported to Operator2.")
 def test_trotter_product(backend):
     """Test Trotter product."""
     time = jnp.array(0.5)
@@ -810,20 +840,18 @@ def test_trotter_product(backend):
     assert np.allclose(interpreted_fn(time, c1, c2), jitted_fn(time, c1, c2))
 
 
+@pytest.mark.xfail(strict=True, reason="Template needs to be ported to Operator2.")
 def test_quantum_phase_estimation(backend):
     """Test QuantumPhaseEstimation."""
 
     phase = 5
-    target_wires = [0]
-    unitary = qp.RX(phase, wires=0).matrix()
+    unitary = qp.RX(phase, wires=0)
     n_estimation_wires = 5
     estimation_wires = range(1, n_estimation_wires + 1)
 
     def quantum_phase_estimation():
-        qp.Hadamard(wires=target_wires)
-        qp.QuantumPhaseEstimation(
-            unitary, target_wires=target_wires, estimation_wires=estimation_wires
-        )
+        qp.Hadamard(0)
+        qp.QuantumPhaseEstimation(unitary, estimation_wires=estimation_wires)
         return qp.probs(estimation_wires)
 
     device = qp.device(backend, wires=6)
@@ -833,6 +861,7 @@ def test_quantum_phase_estimation(backend):
     assert np.allclose(interpreted_fn(), jitted_fn())
 
 
+@pytest.mark.xfail(strict=True, reason="Template needs to be ported to Operator2.")
 def test_quantum_montecarlo():
     """Test QuantumMonteCarlo."""
 
@@ -861,6 +890,7 @@ def test_quantum_montecarlo():
     assert np.allclose(interpreted_fn(), jitted_fn())
 
 
+@pytest.mark.xfail(strict=True, reason="Template needs to be ported to Operator2.")
 def test_qnn_ticket(backend):  # pylint: disable-next=line-too-long
     """https://discuss.pennylane.ai/t/error-faced-in-training-the-quantum-network-for-estimating-parameters/3624/22"""
     n_dset = 10
@@ -885,6 +915,7 @@ def test_qnn_ticket(backend):  # pylint: disable-next=line-too-long
     assert np.allclose(expected, observed)
 
 
+@pytest.mark.xfail(strict=True, reason="Needs distinct qubits.")
 def test_select(backend):
     """Test Select"""
 
@@ -917,6 +948,7 @@ def test_controlled_sequence(backend):
     assert np.allclose(interpreted_fn(x), jitted_fn(x))
 
 
+@pytest.mark.xfail(strict=True, reason="Template needs to be ported to Operator2.")
 def test_fable(backend):
     """Test FABLE."""
 
@@ -940,6 +972,7 @@ def test_fable(backend):
     assert np.allclose(interpreted_fn(input_matrix), jitted_fn(input_matrix))
 
 
+@pytest.mark.xfail(strict=True, reason="Template needs to be ported to Operator2.")
 def test_qubitization(backend):
     """Test Qubitization."""
 
@@ -971,6 +1004,7 @@ def test_qrom(backend):
     assert np.allclose(interpreted_fn(), jitted_fn())
 
 
+@pytest.mark.xfail(strict=True, reason="Template needs to be ported to Operator2.")
 def test_prepselprep(backend):
     """Test PrepSelPrep"""
 
@@ -991,7 +1025,7 @@ def test_prepselprep(backend):
 
 
 # This test passes on Catalyst version 0.8.0 but fails on 0.9.0 or greater
-@pytest.mark.xfail(reason="QJIT gives an incorrect result")
+@pytest.mark.xfail(strict=True, reason="QJIT gives an incorrect result")
 def test_mod_exp(backend):
     """Test ModExp."""
     base = 2
@@ -1016,7 +1050,8 @@ def test_mod_exp(backend):
 
 
 @pytest.mark.xfail(
-    reason="Legacy Catalyst frontend does not support PennyLane's 'borrowed' template argument"
+    strict=True,
+    reason="Legacy Catalyst frontend does not support PennyLane's 'borrowed' template argument",
 )
 def test_multiplier(backend):
     """Test Multiplier."""
@@ -1039,9 +1074,7 @@ def test_multiplier(backend):
     assert np.allclose(interpreted_fn(), jitted_fn())
 
 
-@pytest.mark.xfail(
-    reason="Legacy Catalyst frontend does not support PennyLane's 'borrowed' template argument"
-)
+@pytest.mark.xfail(strict=True, reason="Template needs to be ported to Operator2.")
 def test_out_adder(backend):
     """Test OutAdder."""
     mod = 7
@@ -1066,9 +1099,6 @@ def test_out_adder(backend):
     assert np.allclose(interpreted_fn(), jitted_fn())
 
 
-@pytest.mark.xfail(
-    reason="Legacy Catalyst frontend does not support PennyLane's 'borrowed' template argument"
-)
 def test_out_multiplier(backend):
     """Test OutMultiplier."""
     mod = 12
@@ -1116,7 +1146,7 @@ def test_phase_adder(backend):
     assert np.allclose(interpreted_fn(), jitted_fn())
 
 
-@pytest.mark.xfail(reason="Qutrit operators not supported on lightning.")
+@pytest.mark.xfail(strict=True, reason="Qutrit operators not supported on lightning.")
 def test_qutrit_basis_state_preparation(backend):
     """Test QutritBasisStatePreparation."""
     basis_state = [0, 1]

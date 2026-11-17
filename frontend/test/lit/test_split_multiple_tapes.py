@@ -17,6 +17,7 @@ This file performs the frontend lit tests that multi-tape transforms are traced 
 correctly.
 """
 
+# old_frontend: tests tape-only transforms and tape splitting.
 # RUN: %PYTHON %s | FileCheck %s
 
 # pylint: disable=line-too-long
@@ -50,7 +51,7 @@ def test_multiple_tape_transforms():
 
     dispatched_transform = qp.transform(my_quantum_transform)
 
-    @qjit
+    @qjit(capture=False)
     @dispatched_transform
     @qp.qnode(qp.device("lightning.qubit", wires=2))
     def circuit_twotapes(x):

@@ -23,6 +23,7 @@
 #include "mlir/Transforms/DialectConversion.h"
 
 #include "Catalyst/IR/CatalystOps.h"
+#include "Catalyst/Utils/BufferizationUtils.h"
 
 using namespace mlir;
 using namespace catalyst;
@@ -183,6 +184,89 @@ struct CustomCallOpInterface
         bufferization::replaceOpWithBufferizedValues(rewriter, op, bufferResults);
 
         return success();
+    }
+};
+
+/// Bufferization of catalyst.runtime_call for `buf` inputs and `out` results.
+struct RuntimeCallOpInterface
+    : public bufferization::BufferizableOpInterface::ExternalModel<RuntimeCallOpInterface,
+                                                                   RuntimeCallOp> {
+    bool bufferizesToAllocation(Operation *op, Value value) const {
+        return llvm::is_contained(cast<RuntimeCallOp>(op).getOutTensors(), value);
+    }
+
+    bool bufferizesToMemoryRead(Operation *op, OpOperand &opOperand,
+                                const bufferization::AnalysisState &state) const {
+        return !isDestBuffer(op, opOperand) &&
+               isa<RankedTensorType, MemRefType>(opOperand.get().getType());
+    }
+
+    bool bufferizesToMemoryWrite(Operation *op, OpOperand &opOperand,
+                                 const bufferization::AnalysisState &state) const {
+        return isDestBuffer(op, opOperand);
+    }
+
+    bufferization::AliasingValueList
+    getAliasingValues(Operation *op, OpOperand &opOperand,
+                      const bufferization::AnalysisState &state) const {
+        return {};
+    }
+
+    LogicalResult bufferize(Operation *op, RewriterBase &rewriter,
+                            const bufferization::BufferizationOptions &options,
+                            bufferization::BufferizationState &state) const {
+        auto runtimeCall = cast<RuntimeCallOp>(op);
+        Location loc = op->getLoc();
+
+        SmallVector<Value> bufferizedInputs;
+        for (Value operand : runtimeCall.getInputs()) {
+            if (!isa<RankedTensorType>(operand.getType())) {
+                bufferizedInputs.push_back(operand);
+                continue;
+            }
+            FailureOr<Value> buffer = getBuffer(rewriter, operand, options, state);
+            if (failed(buffer)) {
+                return failure();
+            }
+            FailureOr<Value> contiguous = makeContiguous(rewriter, *buffer, options);
+            if (failed(contiguous)) {
+                return failure();
+            }
+            bufferizedInputs.push_back(*contiguous);
+        }
+
+        SmallVector<Value> destBuffers;
+        for (Value outTensor : runtimeCall.getOutTensors()) {
+            auto tensorType = cast<RankedTensorType>(outTensor.getType());
+            FailureOr<Value> tensorAlloc = bufferization::allocateTensorForShapedValue(
+                rewriter, loc, outTensor, options, state, /*copy=*/false);
+            if (failed(tensorAlloc)) {
+                return failure();
+            }
+            MemRefType memrefType =
+                MemRefType::get(tensorType.getShape(), tensorType.getElementType());
+            auto toBuffer =
+                bufferization::ToBufferOp::create(rewriter, loc, memrefType, *tensorAlloc);
+            destBuffers.push_back(toBuffer.getResult());
+        }
+
+        auto newOp = RuntimeCallOp::create(
+            rewriter, loc, runtimeCall.getScalarResult().getTypes(), /*outTensors=*/TypeRange{},
+            bufferizedInputs, destBuffers, runtimeCall.getCalleeAttr(),
+            runtimeCall.getCParamsAttr(), runtimeCall.getCResultAttr(),
+            runtimeCall.getCStringsAttr(), runtimeCall.getDispatchAttr());
+        newOp->setDiscardableAttrs(runtimeCall->getDiscardableAttrDictionary());
+
+        SmallVector<Value> replacements(newOp.getScalarResult().begin(),
+                                        newOp.getScalarResult().end());
+        llvm::append_range(replacements, destBuffers);
+        bufferization::replaceOpWithBufferizedValues(rewriter, op, replacements);
+        return success();
+    }
+
+  private:
+    static bool isDestBuffer(Operation *op, OpOperand &opOperand) {
+        return llvm::is_contained(cast<RuntimeCallOp>(op).getDestBuffers(), opOperand.get());
     }
 };
 
@@ -431,6 +515,7 @@ struct LaunchKernelOpInterface
 void catalyst::registerBufferizableOpInterfaceExternalModels(DialectRegistry &registry) {
     registry.addExtension(+[](MLIRContext *ctx, CatalystDialect *dialect) {
         CustomCallOp::attachInterface<CustomCallOpInterface>(*ctx);
+        RuntimeCallOp::attachInterface<RuntimeCallOpInterface>(*ctx);
         PrintOp::attachInterface<PrintOpInterface>(*ctx);
         CallbackOp::attachInterface<CallbackOpInterface>(*ctx);
         CallbackCallOp::attachInterface<CallbackCallOpInterface>(*ctx);

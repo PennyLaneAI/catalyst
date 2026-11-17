@@ -90,6 +90,14 @@ class MultiParamsCustom(qp.core.Operator2):
         super().__init__(a, b, c, wires)
 
 
+class TestQubitUnitary(qp.core.Operator2):
+
+    dynamic_argnames = ("matrix",)
+
+    def __init__(self, matrix, wires):
+        super().__init__(matrix, wires)
+
+
 class StaticData(qp.core.Operator2):
 
     static_argnames = ("label",)

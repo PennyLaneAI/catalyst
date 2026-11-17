@@ -20,6 +20,7 @@
 # pylint: disable=expression-not-assigned
 # pylint: disable=too-many-arguments
 # pylint: disable=too-many-lines
+# pylint: disable=no-member # for pnp.pi, sqrt, eye, sort
 
 import copy
 from typing import Callable
@@ -376,6 +377,7 @@ class TestCatalystOnlyControlled:
         with pytest.raises(ValueError, match="Length of the control_values"):
             qjit(circuit)(0.1)
 
+    @pytest.mark.old_frontend
     def test_qctrl_no_mid_circuit_measurements(self, backend):
         """Test the no-measurements exception"""
 
@@ -389,8 +391,9 @@ class TestCatalystOnlyControlled:
             return qp.state()
 
         with pytest.raises(ValueError, match="Mid-circuit measurements cannot be used"):
-            qjit(circuit)(0.1)
+            qjit(circuit, capture=False)(0.1)
 
+    @pytest.mark.old_frontend
     def test_qctrl_no_end_circuit_measurements(self, backend):
         """Test the no-measurements exception"""
 
@@ -404,12 +407,13 @@ class TestCatalystOnlyControlled:
             return qp.state()
 
         with pytest.raises(ValueError, match="Measurement process cannot be used"):
-            qjit(circuit)(0.1)
+            qjit(circuit, capture=False)(0.1)
 
+    @pytest.mark.old_frontend
     def test_qctrl_wires(self, backend):
         """Test the wires property of HybridCtrl"""
 
-        @qjit
+        @qjit(capture=False)
         @qp.qnode(qp.device(backend, wires=3))
         def circuit(theta):
             def func(theta):
@@ -423,10 +427,11 @@ class TestCatalystOnlyControlled:
         # Without the `wires` property, returns `[-1]`
         assert circuit(0.3) == qp.wires.Wires([1, 0, 2])
 
+    @pytest.mark.old_frontend
     def test_qctrl_wires_arg_fun(self, backend):
         """Test the wires property of HybridCtrl with argument wires"""
 
-        @qjit
+        @qjit(capture=False)
         @qp.qnode(qp.device(backend, wires=4))
         def circuit():
             def func(anc, wires):
@@ -440,10 +445,11 @@ class TestCatalystOnlyControlled:
 
         assert circuit() == qp.wires.Wires([1, 0, 2, 3])
 
+    @pytest.mark.old_frontend
     def test_qctrl_var_wires(self, backend):
         """Test the wires property of HybridCtrl with variable wires"""
 
-        @qjit
+        @qjit(capture=False)
         @qp.qnode(qp.device(backend, wires=4))
         def circuit(anc, wires):
             def func(anc, wires):
@@ -457,10 +463,11 @@ class TestCatalystOnlyControlled:
 
         assert circuit(0, [2, 3]) == qp.wires.Wires([1, 0, 2, 3])
 
+    @pytest.mark.old_frontend
     def test_qctrl_wires_nested(self, backend):
         """Test the wires property of HybridCtrl with nested branches"""
 
-        @qjit
+        @qjit(capture=False)
         @qp.qnode(qp.device(backend, wires=4))
         def circuit(theta, w1, w2, cw1, cw2):
             def _func1():
@@ -478,10 +485,11 @@ class TestCatalystOnlyControlled:
 
         assert circuit(0.1, 0, 1, 2, 3) == qp.wires.Wires([2, 0, 3, 1])
 
+    @pytest.mark.old_frontend
     def test_qctrl_work_wires(self, backend):
         """Test the wires property of HybridCtrl with work-wires"""
 
-        @qjit
+        @qjit(capture=False)
         @qp.qnode(qp.device(backend, wires=5))
         def circuit(theta):
             def _func1():
@@ -538,6 +546,7 @@ class TestCatalystOnlyControlled:
         assert new_qctrl._control_wires == [1]  # pylint: disable=protected-access
         assert new_qctrl.regions[0].quantum_tape.operations[0].wires == Wires([0])
 
+    @pytest.mark.old_frontend
     @pytest.mark.parametrize("work_wire_type", ["zeroed", "borrowed"])
     def test_qctrl_work_wire_type_operator(self, work_wire_type):
         """Test that work_wire_type is preserved on a Controlled op inside qjit"""
@@ -547,7 +556,7 @@ class TestCatalystOnlyControlled:
         work_wires_add = [7, 8]
         work_wires_ctrl = [9]
 
-        @qjit
+        @qjit(capture=False)
         def func():
             return PL_ctrl(
                 qp.SemiAdder(
@@ -566,7 +575,7 @@ class TestCatalystOnlyControlled:
         assert op.control_wires == Wires([0])
         assert op.work_wires == Wires([9])
 
-        @qjit
+        @qjit(capture=False)
         def func_native():
             return C_ctrl(
                 qp.SemiAdder(
@@ -621,6 +630,7 @@ class TestCatalystOnlyControlled:
         assert result.control_values.tolist() == expected.control_values.tolist()
         assert result.work_wires == expected.work_wires
 
+    @pytest.mark.old_frontend
     def test_control_decomp_trotter(self):
         """Test that the Catalyst control can safelt decompose TrotterProduct."""
 
@@ -636,7 +646,7 @@ class TestCatalystOnlyControlled:
             qp.ControlledSequence(qp.TrotterProduct(H, time=2.4, order=2), control=[1])
             return qp.expval(qp.PauliZ(0))
 
-        assert qp.math.allclose(qjit(circuit)(), circuit())
+        assert qp.math.allclose(qjit(circuit, capture=False)(), circuit())
 
     def test_distribute_controlled_with_adj(self):
         """Test that the distribute_controlled function with a PennyLane Adjoint,
@@ -831,7 +841,7 @@ class TestControlledProperties:
         """Test that `catalyst.ctrl` defers to base ndim_params"""
 
         op = C_ctrl(base, 1)
-        assert op.ndim_params == base.ndim_params
+        assert op.ndim_params == qp.ctrl(base, 1).ndim_params
 
     @pytest.mark.parametrize("cwires, cvalues", [(0, [0]), ([3, 0, 2], [1, 1, 0])])
     def test_has_decomposition_true_via_control_values(self, cwires, cvalues):
@@ -1012,10 +1022,8 @@ class TestControlledMiscMethods:
         base = qp.U1(1.23, wires=0)
         op = C_ctrl(base, "a")
 
-        # NOTE: As of https://github.com/PennyLaneAI/pennylane/pull/9981,
-        # ctrl(U1) eagerly dispatches to controlled phase shift.
-        assert op.label() == "Rϕ"
-        assert op.label(decimals=2) == "Rϕ\n(1.23)"
+        assert op.label() == "U1"
+        assert op.label(decimals=2) == "U1\n(1.23)"
         assert op.label(base_label="hi") == "hi"
 
     def test_label_matrix_param(self):
@@ -1410,31 +1418,31 @@ pauli_x_based_op_decomps = [
         qp.PauliX,
         [2],
         [0, 1],
-        [qp.Toffoli(wires=[0, 1, 2])],
+        [qp.MultiControlledX(wires=[0, 1, 2], work_wires=Wires("aux"))],
     ),
     (
         qp.CNOT,
         [1, 2],
         [0],
-        [qp.Toffoli(wires=[0, 1, 2])],
+        [qp.MultiControlledX(wires=[0, 1, 2], work_wires=Wires("aux"))],
     ),
     (
         qp.PauliX,
         [3],
         [0, 1, 2],
-        qp.MultiControlledX.compute_decomposition(wires=[0, 1, 2, 3], work_wires=Wires("aux")),
+        [qp.MultiControlledX(wires=[0, 1, 2, 3], work_wires=Wires("aux"))],
     ),
     (
         qp.CNOT,
         [2, 3],
         [0, 1],
-        qp.MultiControlledX.compute_decomposition(wires=[0, 1, 2, 3], work_wires=Wires("aux")),
+        [qp.MultiControlledX(wires=[0, 1, 2, 3], work_wires=Wires("aux"))],
     ),
     (
         qp.Toffoli,
         [1, 2, 3],
         [0],
-        qp.MultiControlledX.compute_decomposition(wires=[0, 1, 2, 3], work_wires=Wires("aux")),
+        [qp.MultiControlledX(wires=[0, 1, 2, 3], work_wires=Wires("aux"))],
     ),
 ]
 
@@ -1448,17 +1456,24 @@ class TestDecomposition:
             (
                 OpWithDecomposition(0.123, wires=[0, 1]),
                 [
-                    qp.CH(wires=[2, 0]),
+                    qp.ctrl(qp.H(0), 2),
                     qp.ctrl(qp.S(1), 2),
-                    qp.CRX(0.123, wires=[2, 0]),
+                    qp.ctrl(qp.RX(0.123, wires=0), 2),
                 ],
             ),
             (
                 qp.IsingXX(0.123, wires=[0, 1]),
+                # IsingXX decomposes via change_op_basis, so the control applies only to the
+                # inner RX once this op is decomposed further: CNOT, CRX, CNOT.
                 [
-                    qp.Toffoli(wires=[2, 0, 1]),
-                    qp.CRX(0.123, wires=[2, 0]),
-                    qp.Toffoli(wires=[2, 0, 1]),
+                    qp.ctrl(
+                        qp.change_op_basis(
+                            qp.CNOT(wires=[0, 1]),
+                            qp.RX(0.123, wires=[0]),
+                            qp.CNOT(wires=[0, 1]),
+                        ),
+                        2,
+                    ),
                 ],
             ),
         ],

@@ -232,7 +232,8 @@ void __catalyst__rt__finalize() {
     CTX.reset(nullptr);
 }
 
-// Uniform random number in [0, 1) from the PRNG (used by ZNE random local folding).
+// Uniform random number in [0, 1) for compiler-inserted randomness (e.g. ZNE random local folding,
+// mixed gridsynth).
 double __catalyst__rt__random_double() {
     RT_FAIL_IF(!CTX, "Invalid use of the global driver before initialization");
     return CTX->getRandomNumber();

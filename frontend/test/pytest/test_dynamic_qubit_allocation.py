@@ -18,6 +18,7 @@ Note that this feature is only available under the plxpr pipeline.
 """
 
 import textwrap
+from types import SimpleNamespace
 
 import numpy as np
 import pennylane as qp
@@ -26,6 +27,10 @@ from jax import numpy as jnp
 from pennylane.capture import subroutine
 
 from catalyst import qjit
+from catalyst.from_plxpr.qref_jax_primitives import (
+    _deallocate_prim_lowering,
+    _normalize_allocate_state,
+)
 from catalyst.utils.exceptions import CompileError
 
 
@@ -167,7 +172,7 @@ def test_StatePrep(backend):
     Test qp.allocate with qp.StatePrep ops.
     """
 
-    @qjit(capture=True)
+    @qjit(capture=True, collect_decomp_rules=False)
     @qp.qnode(qp.device(backend, wires=1))
     def circuit():
         with qp.allocate(1) as q:
@@ -185,7 +190,7 @@ def test_BasisState(backend):
     Test qp.allocate with qp.BasisState ops.
     """
 
-    @qjit(capture=True)
+    @qjit(capture=True, collect_decomp_rules=False, skip_preprocess=True)
     @qp.qnode(qp.device(backend, wires=1))
     def circuit():
         with qp.allocate(1) as q:
@@ -532,18 +537,43 @@ def test_adjoint(backend):
     assert np.allclose(observed, expected)
 
 
-def test_no_capture(backend):
-    """
-    Test error message when used without capture.
-    """
-    with pytest.warns(UserWarning, match="AOT.*failed"):
+@pytest.mark.parametrize(
+    ("state", "prep"),
+    (
+        ("magic-T", lambda w: (qp.H(w), qp.T(w))),
+        ("magic-T-adj", lambda w: (qp.H(w), qp.adjoint(qp.T(w)))),
+    ),
+)
+def test_magic_state_allocation(backend, state, prep):
+    """Test magic state allocation lowers correctly and produces expected states."""
 
-        @qjit
-        @qp.qnode(qp.device(backend, wires=1))
-        def circuit():
-            with qp.allocate(1) as _:
-                pass
-            return qp.probs(wires=[0])
+    @qjit(capture=True)
+    @qp.qnode(qp.device(backend, wires=2))
+    def baseline():
+        prep(1)
+        qp.CNOT(wires=[1, 0])
+        return qp.probs(wires=[0])
+
+    @qjit(capture=True)
+    @qp.qnode(qp.device(backend, wires=2))
+    def circuit():
+        q = qp.allocate(1, state=state)
+        qp.CNOT(wires=[q[0], 0])
+        return qp.probs(wires=[0])
+
+    assert np.allclose(baseline(), circuit())
+
+
+@pytest.mark.old_frontend
+def test_no_capture(backend):
+    """Test error message when allocate is used without program capture."""
+
+    @qjit(capture=False)
+    @qp.qnode(qp.device(backend, wires=1))
+    def circuit():
+        with qp.allocate(1) as _:
+            pass
+        return qp.probs(wires=[0])
 
     with pytest.raises(
         CompileError,
@@ -552,20 +582,74 @@ def test_no_capture(backend):
         circuit()
 
 
+def test_deallocate_mixed_fabricate_and_register():
+    """Test deallocating fabricate and register wires together is rejected."""
+
+    @qjit(capture=True)
+    @qp.qnode(qp.device("lightning.qubit", wires=3))
+    def circuit():
+        q_magic = qp.allocate(1, state="magic-T")
+        q_reg = qp.allocate(1)
+        qp.deallocate([q_magic[0], q_reg[0]])
+        return qp.probs(wires=[0])
+
+    with pytest.raises(Exception, match="same allocation instruction"):
+        circuit()
+
+
+def test_deallocate_multiple_register_allocations():
+    """Test deallocating wires from separate register allocations is rejected."""
+
+    @qjit(capture=True)
+    @qp.qnode(qp.device("lightning.qubit", wires=3))
+    def circuit():
+        q1 = qp.allocate(1)
+        q2 = qp.allocate(1)
+        qp.deallocate([q1[0], q2[0]])
+        return qp.probs(wires=[0])
+
+    with pytest.raises(Exception, match="same allocation instruction"):
+        circuit()
+
+
+def test_deallocate_non_allocated_wire():
+    """Test deallocating a device wire is rejected at compile time."""
+
+    @qjit(capture=True)
+    @qp.qnode(qp.device("lightning.qubit", wires=1))
+    def circuit():
+        qp.deallocate(0)
+        return qp.probs(wires=[0])
+
+    with pytest.raises(Exception, match="Manual deallocation is only supported"):
+        circuit()
+
+
+def test_magic_state_manual_deallocate(backend):
+    """Test manual deallocation of a magic state wire without entangling gates."""
+
+    @qjit(capture=True)
+    @qp.qnode(qp.device(backend, wires=1))
+    def circuit():
+        q = qp.allocate(1, state="magic-T-adj")
+        qp.deallocate(q[0])
+        return qp.probs(wires=[0])
+
+    assert np.allclose([1, 0], circuit())
+
+
 def test_use_after_free(backend):
     """
     Test error message when used after free.
     """
 
-    with pytest.warns(UserWarning, match="AOT.*failed"):
-
-        @qjit(capture=True)
-        @qp.qnode(qp.device(backend, wires=1))
-        def circuit():
-            with qp.allocate(1) as q:
-                qp.X(q[0])
-            qp.Hadamard(q[0])
-            return qp.probs(wires=[0])
+    @qjit(capture=True, collect_decomp_rules=False)
+    @qp.qnode(qp.device(backend, wires=1))
+    def circuit():
+        with qp.allocate(1) as q:
+            qp.X(q[0])
+        qp.Hadamard(q[0])
+        return qp.probs(wires=[0])
 
     with pytest.raises(
         CompileError,
@@ -579,14 +663,12 @@ def test_terminal_MP_all_wires(backend):
     Test error message when used with terminal measurements on all wires.
     """
 
-    with pytest.warns(UserWarning, match="AOT.*failed"):
-
-        @qjit(capture=True)
-        @qp.qnode(qp.device(backend, wires=1))
-        def circuit():
-            with qp.allocate(1) as _:
-                pass
-            return qp.probs()
+    @qjit(capture=True, collect_decomp_rules=False)
+    @qp.qnode(qp.device(backend, wires=1))
+    def circuit():
+        with qp.allocate(1) as _:
+            pass
+        return qp.probs()
 
     with pytest.raises(
         CompileError,
@@ -598,18 +680,61 @@ def test_terminal_MP_all_wires(backend):
         circuit()
 
 
+def test_allocate_state_any_unsupported():
+    """Test error when allocating with state=\"any\"."""
+
+    @qjit(capture=True)
+    @qp.qnode(qp.device("null.qubit", wires=1))
+    def circuit():
+        qp.allocate(1, state="any")
+        return qp.expval(qp.Z(0))
+
+    with pytest.raises(
+        CompileError,
+        match='qp.allocate with state="any" is not supported in Catalyst',
+    ):
+        circuit()
+
+
+def test_allocate_restored_flag_ignored():
+    """Test that restored=True is ignored (PennyLane work-wire metadata only)."""
+
+    @qjit(capture=True)
+    @qp.qnode(qp.device("null.qubit", wires=2))
+    def circuit():
+        with qp.allocate(1, restored=True) as w:
+            qp.H(w)
+        return qp.expval(qp.Z(0))
+
+    assert "qref.alloc" in circuit.mlir
+
+
+def test_normalize_allocate_state_maps_python_and_enum_values():
+    """Map user-facing magic-T strings and AllocateState enums onto MLIR init names."""
+    assert _normalize_allocate_state("magic-T") == "magic"
+    assert _normalize_allocate_state("magic-T-adj") == "magic_conj"
+    assert _normalize_allocate_state(qp.allocation.AllocateState.MAGIC_T) == "magic"
+    assert _normalize_allocate_state(qp.allocation.AllocateState.MAGIC_T_ADJ) == "magic_conj"
+    assert _normalize_allocate_state("zero") == "zero"
+
+
+def test_deallocate_unsupported_defining_op():
+    """Reject deallocation of wires that did not come from allocate."""
+    qubit = SimpleNamespace(owner=SimpleNamespace(name="quantum.custom"))
+    with pytest.raises(TypeError, match="Manual deallocation is only supported"):
+        _deallocate_prim_lowering(None, qubit)
+
+
 def test_terminal_MP_dynamic_wires(backend):
     """
     Test error message when used with terminal measurements on dynamic wires.
     """
 
-    with pytest.warns(UserWarning, match="AOT.*failed"):
-
-        @qjit(capture=True)
-        @qp.qnode(qp.device(backend, wires=1))
-        def circuit():
-            q = qp.allocate(1)
-            return qp.probs(q)
+    @qjit(capture=True, collect_decomp_rules=False)
+    @qp.qnode(qp.device(backend, wires=1))
+    def circuit():
+        q = qp.allocate(1)
+        return qp.probs(q)
 
     with pytest.raises(
         CompileError,

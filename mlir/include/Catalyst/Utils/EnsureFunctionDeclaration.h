@@ -14,7 +14,9 @@
 
 #pragma once
 
+#include "llvm/ADT/STLExtras.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
+#include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/IR/SymbolTable.h"
 using namespace mlir;
@@ -27,6 +29,10 @@ namespace catalyst {
 // It supports both:
 // 1. LLVM::LLVMFuncOp (for LLVM dialect lowering)
 // 2. func::FuncOp (for standard MLIR lowering, marks visibility as private)
+//
+// Every i1 parameter of a new declaration is marked zeroext, since the runtime receives it as a
+// C++ bool. Without it, a computed i1 such as a negation can arrive with undefined upper bits and
+// read as true.
 template <typename OpT, typename TypeT>
 OpT ensureFunctionDeclaration(PatternRewriter &rewriter, Operation *op, StringRef fnSymbol,
                               TypeT fnType) {
@@ -46,6 +52,13 @@ OpT ensureFunctionDeclaration(PatternRewriter &rewriter, Operation *op, StringRe
         // func::FuncOp usually requires explicit private visibility for runtime decls.
         if (isa<func::FuncOp>(newFunc)) {
             newFunc.setPrivate();
+        }
+
+        for (auto [index, type] : llvm::enumerate(newFunc.getArgumentTypes())) {
+            if (type.isInteger(1)) {
+                newFunc.setArgAttr(index, LLVM::LLVMDialect::getZExtAttrName(),
+                                   rewriter.getUnitAttr());
+            }
         }
 
         fnDecl = newFunc;

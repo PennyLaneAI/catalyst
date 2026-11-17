@@ -28,3 +28,20 @@ func.func @test_ppr_canonicalize_multiple_identity(%q1 : !quantum.bit, %q2 : !qu
     return %out_qubits#0, %out_qubits#1, %out_qubits#2 : !quantum.bit, !quantum.bit, !quantum.bit
     // CHECK-NOT: pbc.ppr ["I", "I", "I"](4)
 }
+
+// -----
+
+func.func @test_ref_ppr_canonicalize_single_identity(%q1 : !qref.bit, %q2 : !qref.bit) {
+    pbc.ref.ppr ["I"](4) %q1
+    pbc.ref.ppr ["I"](4) %q2
+    return
+    // CHECK-NOT: pbc.ref.ppr ["I"](4)
+}
+
+// -----
+
+func.func @test_ref_ppr_canonicalize_multiple_identity(%q1 : !qref.bit, %q2 : !qref.bit, %q3 : !qref.bit) {
+    pbc.ref.ppr ["I", "I", "I"](4) %q1, %q2, %q3
+    return
+    // CHECK-NOT: pbc.ref.ppr ["I", "I", "I"](4)
+}

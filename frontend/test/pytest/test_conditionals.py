@@ -28,6 +28,7 @@ from catalyst import api_extensions
 from catalyst import cond as catalyst_cond
 from catalyst import measure as catalyst_measure
 from catalyst import qjit
+from catalyst.api_extensions.control_flow import collect_estimated_probabilities
 from catalyst.utils.exceptions import PlxprCaptureCFCompatibilityError
 
 # pylint: disable=missing-function-docstring
@@ -54,6 +55,7 @@ class TestCondToJaxpr:
                     c:i64[] = cond[
                     args_slice=(3, None, None)
                     consts_slices=((1, 2, None), (2, 3, None))
+                    estimated_probabilities=None
                     jaxpr_branches=(
                         { lambda d:i64[]; . let e:i64[] = integer_pow[y=2] d in (e,) }
                         { lambda f:i64[]; . let g:i64[] = integer_pow[y=3] f in (g,) }
@@ -68,6 +70,7 @@ class TestCondToJaxpr:
                     c:i64[] = cond[
                     branch_jaxprs=[{ lambda ; a:i64[] b:i64[]. let c:i64[] = integer_pow[y=2] a in (c,) },
                                     { lambda ; a:i64[] b:i64[]. let c:i64[] = integer_pow[y=3] b in (c,) }]
+                    estimated_probabilities=None
                     num_implicit_outputs=0
                     ] b a a
                 in (c,) }
@@ -93,6 +96,208 @@ class TestCondToJaxpr:
 
         result = circuit.jaxpr
         assert asline(expected) == asline(result)
+
+    def test_single_estimated_probability(self):
+        """Check the JAXPR of a simple conditional function that uses the
+        ``branch-prob`` resource hint."""
+
+        expected = dedent("""
+            { lambda ; a:i64[]. let
+                b:bool[] = eq a 5:i64[]
+                c:i64[] = cond[
+                args_slice=(3, None, None)
+                consts_slices=((1, 2, None), (2, 3, None))
+                estimated_probabilities=(0.2, 0.8)
+                jaxpr_branches=(
+                    { lambda d:i64[]; . let e:i64[] = integer_pow[y=2] d in (e,) }
+                    { lambda f:i64[]; . let g:i64[] = integer_pow[y=3] f in (g,) }
+                )
+                ] b a a
+            in (c,) }
+            """)
+
+        @qjit
+        def circuit(n: int):
+            @qp.cond(n == 5)
+            @qp.hint({"branch-prob": 0.2})
+            def cond_fn():
+                return n**2
+
+            @cond_fn.otherwise
+            def cond_fn():
+                return n**3
+
+            out = cond_fn()
+            return out
+
+        def asline(text):
+            return " ".join(
+                map(lambda x: re.sub(r"\033\[[0-9;]*m", "", x).strip(), str(text).split("\n"))
+            ).strip()
+
+        result = circuit.jaxpr
+        assert asline(expected) == asline(result)
+
+    def test_estimated_probability_with_else_ifs(self):
+        """Check the JAXPR of a conditional function with else_ifs that uses the
+        ``branch-prob`` resource hint."""
+
+        expected = dedent("""
+            { lambda ; a:i64[]. let
+                b:bool[] = eq a 5:i64[]
+                c:bool[] = lt a 8:i64[]
+                d:bool[] = gt a 3:i64[]
+                e:i64[] = cond[
+                args_slice=(7, None, None)
+                consts_slices=((3, 4, None), (4, 5, None), (5, 6, None), (6, 7, None))
+                estimated_probabilities=(0.2, 0.6, 0.1, 0.1)
+                jaxpr_branches=(
+                    { lambda f:i64[]; . let g:i64[] = integer_pow[y=2] f in (g,) }
+                    { lambda h:i64[]; . let i:i64[] = integer_pow[y=4] h in (i,) }
+                    { lambda j:i64[]; . let k:i64[] = integer_pow[y=5] j in (k,) }
+                    { lambda l:i64[]; . let m:i64[] = integer_pow[y=3] l in (m,) }
+                )
+                ] b c d a a a a
+            in (e,) }
+            """)
+
+        @qjit
+        def circuit(n: int):
+            @qp.cond(n == 5)
+            @qp.hint({"branch-prob": 0.2})
+            def cond_fn():
+                return n**2
+
+            @cond_fn.else_if(n < 8)
+            @qp.hint({"branch-prob": 0.6})
+            def first_elif():
+                return n**4
+
+            @cond_fn.else_if(n > 3)
+            @qp.hint({"branch-prob": 0.1})
+            def second_elif():
+                return n**5
+
+            @cond_fn.otherwise
+            @qp.hint({"branch-prob": 0.1})
+            def otherwise():
+                return n**3
+
+            out = cond_fn()
+            return out
+
+        def asline(text):
+            return " ".join(
+                map(lambda x: re.sub(r"\033\[[0-9;]*m", "", x).strip(), str(text).split("\n"))
+            ).strip()
+
+        result = circuit.jaxpr
+        assert asline(expected) == asline(result)
+
+
+class TestEstimatedProbabilityValidation:
+    """Validate legacy probability collection and captured ``branch-prob`` handling."""
+
+    def test_all_none_returns_none(self):
+        """When no branch provides a hint, no probabilities are collected."""
+        assert collect_estimated_probabilities([None, None, None]) is None
+
+    def test_valid_probabilities_are_floats(self):
+        """Valid hints are returned as a tuple of floats."""
+        assert collect_estimated_probabilities([0.2, 0.5]) == (0.2, 0.5)
+
+    def test_partial_probabilities_raise(self):
+        """A hint on some but not all non-default branches is an error."""
+        with pytest.raises(ValueError, match="must be provided for every non-default branch"):
+            collect_estimated_probabilities([0.2, None])
+
+    @pytest.mark.parametrize("invalid", [-0.1, 1.5])
+    def test_out_of_range_probability_raises(self, invalid):
+        """Each probability must lie in [0, 1]."""
+        with pytest.raises(ValueError, match=r"must be in \[0, 1\]"):
+            collect_estimated_probabilities([invalid])
+
+    def test_probabilities_summing_above_one_raise(self):
+        """The non-default branch probabilities must sum to at most 1."""
+        with pytest.raises(ValueError, match="must sum to at most 1"):
+            collect_estimated_probabilities([0.6, 0.6])
+
+    def test_partial_probabilities_fill_remainder_through_cond(self):
+        """Unhinted branches share the remaining probability through the ``cond`` API."""
+
+        @qjit
+        def circuit(n: int):
+            @qp.cond(n == 5)
+            @qp.hint({"branch-prob": 0.2})
+            def cond_fn():
+                return n**2
+
+            @cond_fn.else_if(n < 3)
+            def elif_fn():
+                return n**3
+
+            @cond_fn.otherwise
+            def otherwise():
+                return n
+
+            return cond_fn()
+
+        [cond_eqn] = [eqn for eqn in circuit.jaxpr.eqns if eqn.primitive.name == "cond"]
+        assert cond_eqn.params["estimated_probabilities"] == pytest.approx((0.2, 0.4, 0.4))
+        assert circuit(5) == 25
+        assert circuit(2) == 8
+        assert circuit(4) == 4
+
+    def test_probabilities_summing_above_one_are_clamped_through_cond(self):
+        """Conditional probabilities are clamped to one during captured ``cond`` lowering."""
+
+        @qjit(target="mlir")
+        def circuit(n: int):
+            @qp.cond(n == 5)
+            @qp.hint({"branch-prob": 0.7})
+            def cond_fn():
+                return n**2
+
+            @cond_fn.else_if(n < 3)
+            @qp.hint({"branch-prob": 0.6})
+            def elif_fn():
+                return n**3
+
+            @cond_fn.otherwise
+            def otherwise():
+                return n
+
+            return cond_fn()
+
+        [cond_eqn] = [eqn for eqn in circuit.jaxpr.eqns if eqn.primitive.name == "cond"]
+        assert cond_eqn.params["estimated_probabilities"] == pytest.approx((0.7, 0.6, 0.0))
+        probabilities = re.findall(r"catalyst.estimated_probability = ([\d.e+-]+)", circuit.mlir)
+        assert sorted(float(probability) for probability in probabilities) == pytest.approx(
+            (0.7, 1.0)
+        )
+
+
+class TestCaptureCondEstimatedProbabilityLowering:
+    """Lowering of ``branch-prob`` hints through the program-capture ``cond`` path."""
+
+    def test_pl_cond_lowering_attaches_probabilities(self):
+        """Captured hints annotate each nested ``scf.if`` with a conditional probability."""
+
+        @qjit(target="mlir")
+        @qp.qnode(qp.device("lightning.qubit", wires=1))
+        def circuit(n: int):
+            # if (n <= 5) -> X, elif (n <= 8) -> Y, else -> H : two nested scf.if ops
+            qp.cond(
+                n <= 5,
+                qp.hint(qp.X, {"branch-prob": 0.5}),
+                qp.Hadamard,
+                ((n <= 8, qp.hint(qp.Y, {"branch-prob": 0.125})),),
+            )(wires=0)
+            return qp.probs()
+
+        mlir_module = circuit.mlir
+        assert "catalyst.estimated_probability = 5.000000e-01" in mlir_module
+        assert "catalyst.estimated_probability = 2.500000e-01" in mlir_module
 
 
 # pylint: disable=too-many-public-methods,too-many-lines
@@ -251,8 +456,7 @@ class TestCond:
 
             return cond_fn()
 
-        with pytest.warns(UserWarning, match="AOT.*failed"):
-            circuit = qjit(circuit, capture=capture_mode)
+        circuit = qjit(circuit, capture=capture_mode)
 
         with pytest.raises(
             TypeError,
@@ -273,15 +477,13 @@ class TestCond:
             return cond_fn()
 
         if capture_mode:
-            with pytest.warns(UserWarning, match="AOT.*failed"):
-                circuit = qjit(qp.qnode(qp.device(backend, wires=1))(circuit), capture=capture_mode)
+            circuit = qjit(qp.qnode(qp.device(backend, wires=1))(circuit), capture=capture_mode)
             with pytest.raises(
                 ValueError, match="false branch must be provided if the true branch"
             ):
                 circuit(True)
         else:
-            with pytest.warns(UserWarning, match="AOT.*failed"):
-                circuit = qjit(qp.qnode(qp.device(backend, wires=1))(circuit), capture=capture_mode)
+            circuit = qjit(qp.qnode(qp.device(backend, wires=1))(circuit), capture=capture_mode)
             with pytest.raises(
                 TypeError,
                 match="Control flow requires a consistent return structure across all branches",
@@ -304,8 +506,7 @@ class TestCond:
 
         if capture_mode:
             # [sc-97387] improve error message
-            with pytest.warns(UserWarning, match="AOT.*failed"):
-                circuit = qjit(circuit, capture=capture_mode)
+            circuit = qjit(circuit, capture=capture_mode)
             with pytest.raises(
                 ValueError,
                 match=r"argument 2 is shorter than argument 1",
@@ -313,8 +514,7 @@ class TestCond:
                 circuit(True)
         else:
             m = "Control flow requires a consistent array shape per result across all branches"
-            with pytest.warns(UserWarning, match="AOT.*failed"):
-                circuit = qjit(circuit, capture=capture_mode)
+            circuit = qjit(circuit, capture=capture_mode)
             with pytest.raises(
                 TypeError,
                 match=m,
@@ -337,8 +537,7 @@ class TestCond:
 
         if capture_mode:
             # [sc-97387] improve error message
-            with pytest.warns(UserWarning, match="AOT.*failed"):
-                circuit = qjit(qp.qnode(qp.device(backend, wires=1))(circuit), capture=capture_mode)
+            circuit = qjit(qp.qnode(qp.device(backend, wires=1))(circuit), capture=capture_mode)
             with pytest.raises(
                 ValueError,
                 match="Mismatch in output abstract values in false branch",
@@ -346,8 +545,7 @@ class TestCond:
                 circuit(True)
         else:
             m = "Control flow requires a consistent array shape per result across all branches"
-            with pytest.warns(UserWarning, match="AOT.*failed"):
-                circuit = qjit(qp.qnode(qp.device(backend, wires=1))(circuit), capture=capture_mode)
+            circuit = qjit(qp.qnode(qp.device(backend, wires=1))(circuit), capture=capture_mode)
             with pytest.raises(
                 TypeError,
                 match=m,
@@ -558,13 +756,11 @@ class TestCond:
             return cond_fn()
 
         if capture_mode:
-            with pytest.warns(UserWarning, match="AOT.*failed"):
-                circuit = qjit(circuit, capture=capture_mode)
+            circuit = qjit(circuit, capture=capture_mode)
             with pytest.raises(ValueError, match="Mismatch in number of output variables"):
                 circuit(True)
         else:
-            with pytest.warns(UserWarning, match="AOT.*failed"):
-                circuit = qjit(circuit, capture=capture_mode)
+            circuit = qjit(circuit, capture=capture_mode)
             with pytest.raises(
                 TypeError,
                 match="Control flow requires a consistent return structure across all branches",
@@ -621,13 +817,11 @@ class TestCond:
             return res
 
         if capture_mode:
-            with pytest.warns(UserWarning, match="AOT.*failed"):
-                f_jit = qjit(f, capture=capture_mode)
+            f_jit = qjit(f, capture=capture_mode)
             with pytest.raises(ValueError, match="false branch must be provided"):
                 f_jit(0)
         else:
-            with pytest.warns(UserWarning, match="AOT.*failed"):
-                f_jit = qjit(f, capture=capture_mode)
+            f_jit = qjit(f, capture=capture_mode)
             with pytest.raises(TypeError, match="requires a consistent return structure"):
                 f_jit(0)
 
@@ -637,15 +831,13 @@ class TestCond:
             return res
 
         if capture_mode:
-            with pytest.warns(UserWarning, match="AOT.*failed"):
-                g_jit = qjit(g, capture=capture_mode)
+            g_jit = qjit(g, capture=capture_mode)
             with pytest.raises(
                 ValueError, match="Mismatch in number of output variables in false branch"
             ):
                 g_jit(0)
         else:
-            with pytest.warns(UserWarning, match="AOT.*failed"):
-                g_jit = qjit(g, capture=capture_mode)
+            g_jit = qjit(g, capture=capture_mode)
             with pytest.raises(
                 TypeError, match="requires a consistent return structure across all branches"
             ):
@@ -657,15 +849,13 @@ class TestCond:
             return res
 
         if capture_mode:
-            with pytest.warns(UserWarning, match="AOT.*failed"):
-                h_jit = qjit(h, capture=capture_mode)
+            h_jit = qjit(h, capture=capture_mode)
             with pytest.raises(
                 ValueError, match="Mismatch in number of output variables in elif branch"
             ):
                 h_jit(0)
         else:
-            with pytest.warns(UserWarning, match="AOT.*failed"):
-                h_jit = qjit(h, capture=capture_mode)
+            h_jit = qjit(h, capture=capture_mode)
             with pytest.raises(
                 TypeError, match="requires a consistent return structure across all branches"
             ):
@@ -849,8 +1039,7 @@ class TestClassicalCompilation:
 
             return branch()
 
-        with pytest.warns(UserWarning, match="AOT.*failed"):
-            arithc2_jit = qjit(arithc2, capture=capture_mode)
+        arithc2_jit = qjit(arithc2, capture=capture_mode)
 
         with pytest.raises(TypeError, match="missing 1 required positional argument"):
             arithc2_jit(True)
@@ -866,8 +1055,7 @@ class TestClassicalCompilation:
 
             return branch()  # pylint: disable=no-value-for-parameter
 
-        with pytest.warns(UserWarning, match="AOT.*failed"):
-            arithc1_jit = qjit(arithc1, capture=capture_mode)
+        arithc1_jit = qjit(arithc1, capture=capture_mode)
 
         with pytest.raises(TypeError, match="missing 1 required positional argument"):
             arithc1_jit(True)
@@ -1194,7 +1382,7 @@ class TestStaticConditionalFolding:
 
         @qjit(target="mlir")
         def circuit():
-            @catalyst_cond(predicate)
+            @qp.cond(predicate)
             def branch():
                 return 1
 
@@ -1206,11 +1394,12 @@ class TestStaticConditionalFolding:
 
         assert "cond" not in [eqn.primitive.name for eqn in circuit.jaxpr.eqns]
 
+    @pytest.mark.old_frontend
     def test_static_conditional_not_folded_when_disabled(self):
         """Disabling the toggle keeps the cond primitive even for a constant predicate."""
         catalyst.compile_without_static_conditionals = False
 
-        @qjit(target="mlir")
+        @qjit(target="mlir", capture=False)
         def circuit():
             @catalyst_cond(True)
             def branch():
@@ -1229,7 +1418,7 @@ class TestStaticConditionalFolding:
 
         @qjit(target="mlir")
         def circuit(n: int):
-            @catalyst_cond(n == 5)
+            @qp.cond(n == 5)
             def branch():
                 return n**2
 

@@ -5,7 +5,7 @@ import lit.formats
 from lit.llvm import llvm_config
 
 config.name = "Compiler test suite"
-config.test_format = lit.formats.ShTest(True)
+config.test_format = lit.formats.ShTest()
 
 # Define the file extensions to treat as test files.
 config.suffixes = [".mlir", ".py"]
@@ -35,7 +35,7 @@ if "Address" in getattr(config, "llvm_use_sanitizer", ""):
         assert False, "Testing with sanitized builds requires Linux or MacOS"
 
 config.substitutions.append(("%PYTHON", python_executable))
-config.substitutions.append(("%BYTECODE_PATH", config.bytecode_path))
+config.substitutions.append(("%PRECOMPILED_BYTECODE_PATH", config.precompiled_bytecode_path))
 
 # Define PATH to include the various tools needed for our tests.
 try:

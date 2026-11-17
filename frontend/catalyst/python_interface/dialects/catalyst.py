@@ -41,6 +41,8 @@ from xdsl.dialects.builtin import (
 from xdsl.ir import AttributeCovT, Dialect, Generic, ParametrizedAttribute, TypeAttribute
 from xdsl.irdl import (
     AnyAttr,
+    AttrSizedOperandSegments,
+    AttrSizedResultSegments,
     IRDLOperation,
     ParsePropInAttrDict,
     VarConstraint,
@@ -144,6 +146,37 @@ class CustomCallOp(IRDLOperation):
     custom_results = var_result_def()
 
     irdl_options = (ParsePropInAttrDict(),)
+
+
+@irdl_op_definition
+class RuntimeCallOp(IRDLOperation):
+    """Invoke a local native C ABI symbol."""
+
+    name = "catalyst.runtime_call"
+
+    inputs = var_operand_def()
+
+    dest_buffers = var_operand_def()
+
+    callee = prop_def(StringAttr)
+
+    c_params = prop_def(ArrayAttr[StringAttr])
+
+    c_result = prop_def(StringAttr)
+
+    c_strings = opt_prop_def(ArrayAttr[StringAttr])
+
+    dispatch = opt_prop_def(StringAttr)
+
+    scalar_result = var_result_def()
+
+    out_tensors = var_result_def()
+
+    irdl_options = (
+        AttrSizedOperandSegments(as_property=True),
+        AttrSizedResultSegments(as_property=True),
+        ParsePropInAttrDict(),
+    )
 
 
 @irdl_op_definition
@@ -254,6 +287,7 @@ Catalyst = Dialect(
         CallbackCallOp,
         CallbackOp,
         CustomCallOp,
+        RuntimeCallOp,
         LaunchKernelOp,
         ListDeallocOp,
         ListInitOp,

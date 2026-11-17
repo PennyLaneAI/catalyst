@@ -585,11 +585,10 @@ def test_non_jax_jittable(capture_mode):
         return 1
 
     msg = "Function impossible must be jax.jit-able"
-    with pytest.warns(UserWarning, match="AOT.*failed"):
 
-        @qjit(capture=capture_mode)
-        def func(x: bool):
-            return impossible(x)
+    @qjit(capture=capture_mode)
+    def func(x: bool):
+        return impossible(x)
 
     with pytest.raises(ValueError, match=msg):
         func(True)
@@ -641,7 +640,7 @@ def test_inactive_debug_grad(capsys, arg):
     and not affects the output"""
 
     @qjit
-    @grad
+    @qp.grad
     def identity(x: float):
         debug.print(x)
         return x
@@ -661,7 +660,7 @@ def test_inactive_debug_jacobian(capsys, arg):
     and not affects the output"""
 
     @qjit
-    @jacobian
+    @qp.jacobian
     def identity(x):
         debug.print(x)
         return x
@@ -680,6 +679,7 @@ def test_inactive_debug_jacobian(capsys, arg):
     assert str(arg) in captured.out.strip()
 
 
+@pytest.mark.old_frontend
 @pytest.mark.parametrize("scale", [(0.1), (0.2), (0.3)])
 def test_active_grad_no_tape(scale):
     """Test that pure callback can be differentiated no tape"""
@@ -697,7 +697,7 @@ def test_active_grad_no_tape(scale):
     def bwd(_res, cot):
         return cot
 
-    @qjit
+    @qjit(capture=False)
     @grad
     def wrapper(x):
         return scale * identity(x)
@@ -705,6 +705,7 @@ def test_active_grad_no_tape(scale):
     assert np.allclose(wrapper(42.0), scale)
 
 
+@pytest.mark.old_frontend
 @pytest.mark.parametrize("scale", [(0.1), (0.2), (0.3)])
 def test_active_grad_tape(scale):
     """Test that pure callback can be differentiated with a tape"""
@@ -721,7 +722,7 @@ def test_active_grad_tape(scale):
     def bwd(res, cot):
         return cot * res
 
-    @qjit
+    @qjit(capture=False)
     @grad
     def wrapper(x):
         return scale * identity(x)
@@ -729,6 +730,7 @@ def test_active_grad_tape(scale):
     assert np.allclose(wrapper(42.0), scale)
 
 
+@pytest.mark.old_frontend
 @pytest.mark.parametrize("scale", [(0.1), (0.2), (0.3)])
 @pytest.mark.parametrize("space", [(2), (3), (4)])
 def test_active_grad_many_residuals(scale, space):
@@ -747,7 +749,7 @@ def test_active_grad_many_residuals(scale, space):
     def bwd(res, cot):
         return cot * sum(res)
 
-    @qjit
+    @qjit(capture=False)
     @grad
     def wrapper(x):
         return scale * identity(x)
@@ -755,6 +757,7 @@ def test_active_grad_many_residuals(scale, space):
     assert np.allclose(wrapper(42.0), scale)
 
 
+@pytest.mark.old_frontend
 @pytest.mark.parametrize("scale", [(0.1), (0.2), (0.3)])
 @pytest.mark.parametrize("space", [(2), (3), (4)])
 def test_active_jacobian_many_residuals(scale, space):
@@ -776,7 +779,7 @@ def test_active_jacobian_many_residuals(scale, space):
     def bwd(res, cot):
         return cot * sum(res)
 
-    @qjit
+    @qjit(capture=False)
     @jacobian
     def wrapper(x):
         return scale * identity(x)
@@ -789,6 +792,7 @@ def test_active_jacobian_many_residuals(scale, space):
     assert np.allclose(wrapper(arg), wrapper_jax(arg))
 
 
+@pytest.mark.old_frontend
 @pytest.mark.parametrize("arg0", [(0.1), (0.2), (0.3)])
 @pytest.mark.parametrize("arg1", [(2.0), (3.0), (4.0)])
 def test_example_from_story(arg0, arg1):
@@ -809,7 +813,7 @@ def test_example_from_story(arg0, arg1):
         cos_x, sin_x, y = res  # Gets residuals computed in f_fwd
         return (cos_x * dy * y, sin_x * dy)
 
-    @qjit
+    @qjit(capture=False)
     @grad
     def cost(x, y):
         return jnp.sin(some_func(jnp.cos(x), y))
@@ -823,6 +827,7 @@ def test_example_from_story(arg0, arg1):
     assert np.allclose(jax_jit_cost(arg0, arg1), cost(arg0, arg1))
 
 
+@pytest.mark.old_frontend
 @pytest.mark.parametrize("scale", [(0.1), (0.2), (0.3)])
 def test_active_grad_inside_qjit(backend, scale):
     """Test that pure callback can be differentiated no tape"""
@@ -840,7 +845,7 @@ def test_active_grad_inside_qjit(backend, scale):
     def bwd(_res, cot):
         return cot
 
-    @qjit
+    @qjit(capture=False)
     @grad
     @qp.qnode(qp.device(backend, wires=1))
     def wrapper(x):
@@ -858,6 +863,7 @@ def test_active_grad_inside_qjit(backend, scale):
     assert np.allclose(wrapper_jit(42.0), wrapper(42.0))
 
 
+@pytest.mark.old_frontend
 @pytest.mark.parametrize(
     "arg", [jnp.array([0.1, 0.2]), jnp.array([0.2, 0.3]), jnp.array([0.3, 0.4])]
 )
@@ -880,7 +886,7 @@ def test_array_input(arg):
         # parameter of the same shape
         return (jnp.array([cos_x0 * dy * x1, sin_x0 * dy]),)
 
-    @qjit
+    @qjit(capture=False)
     @grad
     def cost(x):
         y = jnp.array([jnp.cos(x[0]), x[1]])
@@ -895,6 +901,7 @@ def test_array_input(arg):
     assert np.allclose(cost(arg), cost_jax(arg))
 
 
+@pytest.mark.old_frontend
 def test_array_in_scalar_out():
     """Test array in scalar out"""
 
@@ -911,7 +918,7 @@ def test_array_in_scalar_out():
         cos_x0, sin_x0, x1 = res
         return (jnp.array([cos_x0 * dy * x1, sin_x0 * dy]),)
 
-    @qjit
+    @qjit(capture=False)
     @grad
     def result(x):
         y = jnp.array([jnp.cos(x[0]), x[1]])
@@ -929,6 +936,7 @@ def test_array_in_scalar_out():
     # Array([-0.34893507,  0.49747506], dtype=float64)
 
 
+@pytest.mark.old_frontend
 @pytest.mark.parametrize("dtype", [jnp.float32, jnp.float64])
 def test_scalar_in_array_out(dtype):
     """Test scalar in array out"""
@@ -946,7 +954,7 @@ def test_scalar_in_array_out(dtype):
         x = res
         return (jnp.array([jnp.cos(x), -jnp.sin(x)]) @ dy,)
 
-    @qjit
+    @qjit(capture=False)
     @grad
     def result(x):
         return jnp.sum(some_func(jnp.sin(x)))
@@ -963,6 +971,7 @@ def test_scalar_in_array_out(dtype):
     # Array(0.4565774, dtype=float64)
 
 
+@pytest.mark.old_frontend
 def test_scalar_in_array_out_float32_wrong():
     """Test float32 support in pure callbacks, result in type mismatch"""
 
@@ -979,7 +988,7 @@ def test_scalar_in_array_out_float32_wrong():
         x = res
         return (jnp.array([jnp.cos(x), -jnp.sin(x)]) @ dy,)
 
-    @qjit
+    @qjit(capture=False)
     @grad
     def result(x):
         return jnp.sum(some_func(jnp.sin(x)))
@@ -995,6 +1004,7 @@ def test_scalar_in_array_out_float32_wrong():
         result(x)
 
 
+@pytest.mark.old_frontend
 def test_scalar_in_tuple_scalar_array_out():
     """Test scalar in tuple scalar array out"""
 
@@ -1016,7 +1026,7 @@ def test_scalar_in_tuple_scalar_array_out():
         vjp1 = jnp.array([jnp.cos(x), -jnp.sin(x)]) @ dy[1]
         return (vjp0 + vjp1,)
 
-    @qjit
+    @qjit(capture=False)
     @grad
     def result(x):
         a, b = some_func(jnp.sin(x))
@@ -1034,6 +1044,7 @@ def test_scalar_in_tuple_scalar_array_out():
     # Array(1.2209063, dtype=float64)
 
 
+@pytest.mark.old_frontend
 def test_array_in_tuple_array_out():
     """Test array in tuple array out"""
 
@@ -1057,7 +1068,7 @@ def test_array_in_tuple_array_out():
         vjp1 = 2 * x * dy[1]
         return (vjp0 + vjp1,)
 
-    @qjit
+    @qjit(capture=False)
     @grad
     def result(x):
         return jnp.dot(*some_func(jnp.sin(x)))
@@ -1074,6 +1085,7 @@ def test_array_in_tuple_array_out():
     # Array([0.9329284 , 0.56711537], dtype=float64)
 
 
+@pytest.mark.old_frontend
 def test_tuple_array_in_tuple_array_out():
     """Test tuple array in tuple array out"""
 
@@ -1094,7 +1106,7 @@ def test_tuple_array_in_tuple_array_out():
         vjp1 = dy[0] @ jnp.sin(x) + 2 * y * dy[1]
         return (vjp0, vjp1)
 
-    @qjit
+    @qjit(capture=False)
     @partial(grad, argnums=[0, 1])
     def result(x, y):
         return jnp.dot(*some_func(x, y**2))
@@ -1117,6 +1129,7 @@ def test_tuple_array_in_tuple_array_out():
     #  Array([-0.40939555,  0.02444299], dtype=float64))
 
 
+@pytest.mark.old_frontend
 def test_pytree_in_pytree_out():
     """Test pytree in pytree out"""
 
@@ -1139,7 +1152,7 @@ def test_pytree_in_pytree_out():
         vjp1 = dy["one"] @ jnp.sin(res["x"]) + 2 * res["y"] * dy["two"]
         return ({"x": vjp0, "y": vjp1},)
 
-    @qjit
+    @qjit(capture=False)
     @grad
     def result(weights):
         weights["y"] = weights["y"] ** 2
@@ -1165,6 +1178,7 @@ def test_pytree_in_pytree_out():
     # 'y': Array([-0.40939555,  0.02444299], dtype=float64)}
 
 
+@pytest.mark.old_frontend
 def test_callback_backwards_function():
     """Test a workflow where the bwd function is also using
     a callback to compute the VJP"""
@@ -1196,7 +1210,7 @@ def test_callback_backwards_function():
     def some_func_bwd(res, dy):
         return some_func_bwd_vjp(res, dy)
 
-    @qjit
+    @qjit(capture=False)
     @grad
     def result(weights):
         weights["y"] = weights["y"] ** 2
@@ -1218,6 +1232,7 @@ def test_callback_backwards_function():
         assert np.allclose(obs, exp)
 
 
+@pytest.mark.old_frontend
 def test_different_shapes():
     """Different input output shape"""
 
@@ -1253,7 +1268,7 @@ def test_different_shapes():
     def fun_bwd(_res, cot):
         return fun_bwd_callback(cot)
 
-    @qjit
+    @qjit(capture=False)
     @jacobian
     def wrapper(x):
         return fun_callback(x)
@@ -1267,6 +1282,7 @@ def test_different_shapes():
     assert np.allclose(wrapper(arg), wrapper_jax(arg))
 
 
+@pytest.mark.old_frontend
 def test_multiply_two_matrices_to_get_something_with_different_dimensions():
     """matrix multiplication with constant"""
 
@@ -1305,7 +1321,7 @@ def test_multiply_two_matrices_to_get_something_with_different_dimensions():
     def matrix_multiply_bwd(_residuals, cotangents):
         return matrix_multiply_vjp(cotangents)
 
-    @qjit
+    @qjit(capture=False)
     @jacobian
     def mul(X):
         return matrix_multiply_callback(X)
@@ -1318,6 +1334,7 @@ def test_multiply_two_matrices_to_get_something_with_different_dimensions():
     assert np.allclose(mul(A), mul_jax(A))
 
 
+@pytest.mark.old_frontend
 def test_multiply_two_matrices_to_get_something_with_different_dimensions2():
     """Matrix multiply argnums=0"""
 
@@ -1357,7 +1374,7 @@ def test_multiply_two_matrices_to_get_something_with_different_dimensions2():
     def matrix_multiply_bwd(_residuals, cotangents):
         return matrix_multiply_vjp(cotangents)
 
-    @qjit
+    @qjit(capture=False)
     @jacobian
     def mul(X, Y):
         return matrix_multiply_callback(X, Y)
@@ -1423,6 +1440,7 @@ def test_multiply_two_matrices_to_get_something_with_different_dimensions3():
     assert np.allclose(mul(A, B), mul_jax(A, B))
 
 
+@pytest.mark.old_frontend
 @pytest.mark.parametrize("arg", [jnp.array([[0.1, 0.2], [0.3, 0.4]])])
 @pytest.mark.parametrize("order", ["truth_hypo", "hypo_truth"])
 def test_vjp_as_residual(arg, order):
@@ -1445,7 +1463,7 @@ def test_vjp_as_residual(arg, order):
 
         return callback_fn
 
-    @qjit
+    @qjit(capture=False)
     @jacobian
     def hypothesis(x):
         expm = jax_callback(jax.scipy.linalg.expm, jax.ShapeDtypeStruct((2, 2), jnp.float64))
@@ -1464,12 +1482,13 @@ def test_vjp_as_residual(arg, order):
     assert np.allclose(obs, exp)
 
 
+@pytest.mark.old_frontend
 @pytest.mark.parametrize("arg", [jnp.array([[0.1, 0.2], [0.3, 0.4]])])
 @pytest.mark.parametrize("order", ["truth_hypo", "hypo_truth"])
 def test_vjp_as_residual_automatic(arg, order):
     """Test automatic differentiation of accelerated function"""
 
-    @qjit
+    @qjit(capture=False)
     @jacobian
     def hypothesis(x):
         return accelerate(jax.scipy.linalg.expm)(x)
@@ -1487,11 +1506,12 @@ def test_vjp_as_residual_automatic(arg, order):
     assert np.allclose(obs, exp)
 
 
+@pytest.mark.old_frontend
 @pytest.mark.parametrize("arg", [jnp.array([[0.1, 0.2], [0.3, 0.4]])])
 def test_example_from_epic(arg):
     """Test example from epic"""
 
-    @qjit
+    @qjit(capture=False)
     @grad
     def hypothesis(x):
         expm = accelerate(jax.scipy.linalg.expm)
@@ -1508,10 +1528,11 @@ def test_example_from_epic(arg):
     assert np.allclose(obs, exp)
 
 
+@pytest.mark.old_frontend
 def test_automatic_differentiation_of_accelerate():
     """Same but easier"""
 
-    @qjit
+    @qjit(capture=False)
     @grad
     @accelerate
     def identity(x: float):
@@ -1535,8 +1556,7 @@ def test_error_incomplete_grad_only_forward():
     def wrapper(x: float):
         return identity(x)
 
-    with pytest.warns(UserWarning, match="AOT.*failed"):
-        wrapper = qjit(wrapper)
+    wrapper = qjit(wrapper)
 
     with pytest.raises(DifferentiableCompileError, match="missing reverse pass"):
         wrapper(1.2)
@@ -1557,17 +1577,17 @@ def test_error_incomplete_grad_only_reverse():
     def wrapper(x: float):
         return identity(x)
 
-    with pytest.warns(UserWarning, match="AOT.*failed"):
-        wrapper = qjit(wrapper)
+    wrapper = qjit(wrapper)
 
     with pytest.raises(DifferentiableCompileError, match="missing forward pass"):
         wrapper(1.2)
 
 
+@pytest.mark.old_frontend
 def test_nested_accelerate_grad():
     """https://github.com/PennyLaneAI/catalyst/issues/1086"""
 
-    @qjit
+    @qjit(capture=False)
     @grad
     def hypothesis(x):
         return accelerate(accelerate(jnp.sin))(x)

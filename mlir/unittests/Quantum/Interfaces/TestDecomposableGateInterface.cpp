@@ -17,7 +17,6 @@
 
 #include "gtest/gtest.h"
 #include "llvm/ADT/SmallVector.h"
-#include "llvm/ADT/StringMap.h"
 #include "llvm/Support/Format.h" // for gtest printing on failure
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
@@ -69,16 +68,91 @@ module {
 
     ASSERT_EQ(customOp.getOperatorName(), "RX");
 
-    llvm::StringMap<llvm::SmallVector<mlir::Type>> expectedDynamicShape = {
-        {"0", {Float64Type::get(&context)}}};
+    catalyst::quantum::DynamicShape expectedDynamicShape = {{"0", {Float64Type::get(&context)}}};
     ASSERT_EQ(customOp.getDynamicShape(), expectedDynamicShape);
 
-    llvm::StringMap<size_t> expectedWires = {{"wires", 2}};
+    catalyst::quantum::WireLens expectedWires = {{"wires", 2}};
     ASSERT_EQ(customOp.getWireLens(), expectedWires);
 
     ASSERT_EQ(customOp.getStaticData().size(), 0);
 
     ASSERT_EQ(customOp.getGraphOpId(), "RX{0:[f64]}{wires:2}{}");
+    ASSERT_EQ(customOp.getGraphOpIdExplicitModifiers(false, 0, 0, false), "RX{0:[f64]}{wires:2}{}");
+}
+
+TEST(DecomposableGateInterfaceTests, MultiControlledCustomOp) {
+    std::string moduleStr = R"mlir(
+module {
+  %true = arith.constant true
+  %q0 = quantum.alloc_qb : !quantum.bit
+  %c0 = quantum.alloc_qb : !quantum.bit
+  %c1 = quantum.alloc_qb : !quantum.bit
+  %oq, %oc:2 = quantum.custom "PauliX"() %q0 ctrls(%c0, %c1) ctrlvals(%true, %true) : !quantum.bit ctrls !quantum.bit, !quantum.bit
+}
+    )mlir";
+
+    DialectRegistry registry;
+    registry.insert<mlir::arith::ArithDialect, QuantumDialect>();
+    MLIRContext context(registry);
+    ParserConfig config(&context, /*verifyAfterParse=*/false);
+    OwningOpRef<ModuleOp> module = parseSourceString<ModuleOp>(moduleStr, config);
+
+    DecomposableGate op = *module->getOps<CustomOp>().begin();
+
+    // Two control wires fold as `2C(...)`
+    ASSERT_EQ(op.getGraphOpId(), "2C(PauliX){}{wires:1}{}");
+    ASSERT_EQ(op.getGraphOpIdExplicitModifiers(false, 2, 0, false), "2C(PauliX){}{wires:1}{}");
+}
+
+TEST(DecomposableGateInterfaceTests, ControlledAdjointCustomOp) {
+    std::string moduleStr = R"mlir(
+module {
+  %true = arith.constant true
+  %angle = arith.constant 0.1 : f64
+  %q0 = quantum.alloc_qb : !quantum.bit
+  %c0 = quantum.alloc_qb : !quantum.bit
+  %oq, %oc = quantum.custom "RX"(%angle) %q0 adj ctrls(%c0) ctrlvals(%true) : !quantum.bit ctrls !quantum.bit
+}
+    )mlir";
+
+    DialectRegistry registry;
+    registry.insert<mlir::arith::ArithDialect, QuantumDialect>();
+    MLIRContext context(registry);
+    ParserConfig config(&context, /*verifyAfterParse=*/false);
+    OwningOpRef<ModuleOp> module = parseSourceString<ModuleOp>(moduleStr, config);
+
+    DecomposableGate op = *module->getOps<CustomOp>().begin();
+
+    // Modifiers fold control-outermost
+    ASSERT_EQ(op.getGraphOpId(), "1C(Adjoint(RX)){0:[f64]}{wires:1}{}");
+    ASSERT_EQ(op.getGraphOpIdExplicitModifiers(true, 1, 0, false),
+              "1C(Adjoint(RX)){0:[f64]}{wires:1}{}");
+}
+
+TEST(DecomposableGateInterfaceTests, MultiControlledAdjointCustomOp) {
+    std::string moduleStr = R"mlir(
+module {
+  %true = arith.constant true
+  %angle = arith.constant 0.1 : f64
+  %q0 = quantum.alloc_qb : !quantum.bit
+  %c0 = quantum.alloc_qb : !quantum.bit
+  %c1 = quantum.alloc_qb : !quantum.bit
+  %oq, %oc:2 = quantum.custom "RX"(%angle) %q0 adj ctrls(%c0, %c1) ctrlvals(%true, %true) : !quantum.bit ctrls !quantum.bit, !quantum.bit
+}
+    )mlir";
+
+    DialectRegistry registry;
+    registry.insert<mlir::arith::ArithDialect, QuantumDialect>();
+    MLIRContext context(registry);
+    ParserConfig config(&context, /*verifyAfterParse=*/false);
+    OwningOpRef<ModuleOp> module = parseSourceString<ModuleOp>(moduleStr, config);
+
+    DecomposableGate op = *module->getOps<CustomOp>().begin();
+
+    // Controls + Adjoint folding
+    ASSERT_EQ(op.getGraphOpId(), "2C(Adjoint(RX)){0:[f64]}{wires:1}{}");
+    ASSERT_EQ(op.getGraphOpIdExplicitModifiers(true, 2, 0, false),
+              "2C(Adjoint(RX)){0:[f64]}{wires:1}{}");
 }
 
 TEST(DecomposableGateInterfaceTests, MultiRZOp) {
@@ -103,16 +177,18 @@ module {
 
     ASSERT_EQ(multiRZ.getOperatorName(), "MultiRZ");
 
-    llvm::StringMap<llvm::SmallVector<mlir::Type>> expectedDynamicShape = {
+    catalyst::quantum::DynamicShape expectedDynamicShape = {
         {"theta", {Float64Type::get(&context)}}};
     ASSERT_EQ(multiRZ.getDynamicShape(), expectedDynamicShape);
 
-    llvm::StringMap<size_t> expectedWires = {{"wires", 3}};
+    catalyst::quantum::WireLens expectedWires = {{"wires", 3}};
     ASSERT_EQ(multiRZ.getWireLens(), expectedWires);
 
     ASSERT_EQ(multiRZ.getStaticData().size(), 0);
 
     ASSERT_EQ(multiRZ.getGraphOpId(), "MultiRZ{theta:[f64]}{wires:3}{}");
+    ASSERT_EQ(multiRZ.getGraphOpIdExplicitModifiers(false, 0, 0, false),
+              "MultiRZ{theta:[f64]}{wires:3}{}");
 }
 
 TEST(DecomposableGateInterfaceTests, PauliRotOp) {
@@ -137,11 +213,11 @@ module {
 
     ASSERT_EQ(paulirot.getOperatorName(), "PauliRot");
 
-    llvm::StringMap<llvm::SmallVector<mlir::Type>> expectedDynamicShape = {
+    catalyst::quantum::DynamicShape expectedDynamicShape = {
         {"theta", {Float64Type::get(&context)}}};
     ASSERT_EQ(paulirot.getDynamicShape(), expectedDynamicShape);
 
-    llvm::StringMap<size_t> expectedWires = {{"wires", 3}};
+    catalyst::quantum::WireLens expectedWires = {{"wires", 3}};
     ASSERT_EQ(paulirot.getWireLens(), expectedWires);
 
     mlir::NamedAttribute entry(mlir::StringAttr::get(&context, "pauli_word"),
@@ -149,7 +225,9 @@ module {
     mlir::DictionaryAttr expectedStaticData = mlir::DictionaryAttr::get(&context, {entry});
     ASSERT_EQ(paulirot.getStaticData(), expectedStaticData);
 
-    ASSERT_EQ(paulirot.getGraphOpId(), "PauliRot{theta:[f64]}{wires:3}{pauli_word:XYZ}");
+    ASSERT_EQ(paulirot.getGraphOpId(), "PauliRot{theta:[f64]}{wires:3}{pauli_word = \"XYZ\"}");
+    ASSERT_EQ(paulirot.getGraphOpIdExplicitModifiers(false, 0, 0, false),
+              "PauliRot{theta:[f64]}{wires:3}{pauli_word = \"XYZ\"}");
 }
 
 TEST(DecomposableGateInterfaceTests, PCPhaseOP) {
@@ -174,12 +252,11 @@ module {
 
     ASSERT_EQ(pcphase.getOperatorName(), "PCPhase");
 
-    llvm::StringMap<llvm::SmallVector<mlir::Type>> expectedDynamicShape = {
-        {"phi", {Float64Type::get(&context)}}};
+    catalyst::quantum::DynamicShape expectedDynamicShape = {{"phi", {Float64Type::get(&context)}}};
     ASSERT_EQ(pcphase.getDynamicShape(), expectedDynamicShape);
 
     // Controls are not part of the gate wires considered by the decomp interface
-    llvm::StringMap<size_t> expectedWires = {{"wires", 2}};
+    catalyst::quantum::WireLens expectedWires = {{"wires", 2}};
     ASSERT_EQ(pcphase.getWireLens(), expectedWires);
 
     mlir::NamedAttribute entry(mlir::StringAttr::get(&context, "dim"),
@@ -187,7 +264,10 @@ module {
     mlir::DictionaryAttr expectedStaticData = mlir::DictionaryAttr::get(&context, {entry});
     ASSERT_EQ(pcphase.getStaticData(), expectedStaticData);
 
-    ASSERT_EQ(pcphase.getGraphOpId(), "PCPhase{phi:[f64]}{wires:2}{dim:0}");
+    // The op carries one control wire, folded into the id (control-outermost).
+    ASSERT_EQ(pcphase.getGraphOpId(), "1C(PCPhase){phi:[f64]}{wires:2}{dim = 0 : i64}");
+    ASSERT_EQ(pcphase.getGraphOpIdExplicitModifiers(false, 1, 0, false),
+              "1C(PCPhase){phi:[f64]}{wires:2}{dim = 0 : i64}");
 }
 
 TEST(DecomposableGateInterfaceTests, GlobalPhaseOp) {
@@ -209,16 +289,18 @@ module {
 
     ASSERT_EQ(gphase.getOperatorName(), "GlobalPhase");
 
-    llvm::StringMap<llvm::SmallVector<mlir::Type>> expectedDynamicShape = {
+    catalyst::quantum::DynamicShape expectedDynamicShape = {
         {"phi", {mlir::Float64Type::get(&context)}}};
     ASSERT_EQ(gphase.getDynamicShape(), expectedDynamicShape);
 
-    llvm::StringMap<size_t> expectedWires = {};
+    catalyst::quantum::WireLens expectedWires = {};
     ASSERT_EQ(gphase.getWireLens(), expectedWires);
 
     ASSERT_EQ(gphase.getStaticData().size(), 0);
 
     ASSERT_EQ(gphase.getGraphOpId(), "GlobalPhase{phi:[f64]}{}{}");
+    ASSERT_EQ(gphase.getGraphOpIdExplicitModifiers(false, 0, 0, false),
+              "GlobalPhase{phi:[f64]}{}{}");
 }
 
 TEST(DecomposableGateInterfaceTests, ControlledGlobalPhaseOp) {
@@ -242,16 +324,20 @@ module {
 
     ASSERT_EQ(gphase.getOperatorName(), "GlobalPhase");
 
-    llvm::StringMap<llvm::SmallVector<mlir::Type>> expectedDynamicShape = {
+    catalyst::quantum::DynamicShape expectedDynamicShape = {
         {"phi", {mlir::Float64Type::get(&context)}}};
     ASSERT_EQ(gphase.getDynamicShape(), expectedDynamicShape);
 
-    llvm::StringMap<size_t> expectedWires = {};
+    catalyst::quantum::WireLens expectedWires = {};
     ASSERT_EQ(gphase.getWireLens(), expectedWires);
 
     ASSERT_EQ(gphase.getStaticData().size(), 0);
 
-    ASSERT_EQ(gphase.getGraphOpId(), "GlobalPhase{phi:[f64]}{}{}");
+    // Controlled global phase: the control wire is folded into the id as `1C(GlobalPhase)`,
+    // which a rule maps to `PhaseShift`/`ControlledPhaseShift`.
+    ASSERT_EQ(gphase.getGraphOpId(), "1C(GlobalPhase){phi:[f64]}{}{}");
+    ASSERT_EQ(gphase.getGraphOpIdExplicitModifiers(false, 1, 0, false),
+              "1C(GlobalPhase){phi:[f64]}{}{}");
 }
 
 TEST(DecomposableGateInterfaceTests, QubitUnitaryOp) {
@@ -277,23 +363,20 @@ module {
 
     ASSERT_EQ(unitary.getOperatorName(), "QubitUnitary");
 
-    llvm::StringMap<llvm::SmallVector<mlir::Type>> expectedDynamicShape = {
+    catalyst::quantum::DynamicShape expectedDynamicShape = {
         {"U",
          {mlir::RankedTensorType::get({4, 4},
                                       mlir::ComplexType::get(mlir::Float64Type::get(&context)))}}};
     ASSERT_EQ(unitary.getDynamicShape(), expectedDynamicShape);
 
-    llvm::StringMap<size_t> expectedWires = {{"wires", 2}};
+    catalyst::quantum::WireLens expectedWires = {{"wires", 2}};
     ASSERT_EQ(unitary.getWireLens(), expectedWires);
 
     ASSERT_EQ(unitary.getStaticData().size(), 0);
 
-    ASSERT_EQ(unitary.getGraphOpId(), "QubitUnitary{U:["
-                                      "[[complex<f64>,complex<f64>,complex<f64>,complex<f64>],"
-                                      "[complex<f64>,complex<f64>,complex<f64>,complex<f64>],"
-                                      "[complex<f64>,complex<f64>,complex<f64>,complex<f64>],"
-                                      "[complex<f64>,complex<f64>,complex<f64>,complex<f64>]]"
-                                      "]}{wires:2}{}");
+    ASSERT_EQ(unitary.getGraphOpId(), "1C(QubitUnitary){U:[tensor<4x4xcomplex<f64>>]}{wires:2}{}");
+    ASSERT_EQ(unitary.getGraphOpIdExplicitModifiers(false, 1, 0, false),
+              "1C(QubitUnitary){U:[tensor<4x4xcomplex<f64>>]}{wires:2}{}");
 }
 
 TEST(DecomposableGateInterfaceTests, OperatorOpQubits) {
@@ -320,13 +403,13 @@ module {
 
     ASSERT_EQ(op.getOperatorName(), "testInterfaceOp");
 
-    llvm::StringMap<llvm::SmallVector<mlir::Type>> expectedDynamicShape = {
+    catalyst::quantum::DynamicShape expectedDynamicShape = {
         {"flag", {mlir::IntegerType::get(&context, 1)}},
         {"angle", {mlir::Float64Type::get(&context)}},
         {"index", {mlir::IntegerType::get(&context, 64)}}};
     ASSERT_EQ(op.getDynamicShape(), expectedDynamicShape);
 
-    llvm::StringMap<size_t> expectedWires = {{"wire1", 1}, {"wire2", 1}};
+    catalyst::quantum::WireLens expectedWires = {{"wire1", 1}, {"wire2", 1}};
     ASSERT_EQ(op.getWireLens(), expectedWires);
 
     IntegerType i64 = IntegerType::get(&context, 64);
@@ -349,7 +432,48 @@ module {
 
     ASSERT_EQ(op.getGraphOpId(),
               "testInterfaceOp{angle:[f64],flag:[i1],index:[i64]}{wire1:1,wire2:1}{"
-              "myStaticArray:[1,2,3],myStaticInt:4,myStaticString:Test}");
+              "myStaticArray = [1, 2, 3], myStaticInt = 4 : i64, myStaticString = \"Test\"}");
+    ASSERT_EQ(op.getGraphOpIdExplicitModifiers(false, 0, 0, false),
+              "testInterfaceOp{angle:[f64],flag:[i1],index:[i64]}{wire1:1,wire2:1}{"
+              "myStaticArray = [1, 2, 3], myStaticInt = 4 : i64, myStaticString = \"Test\"}");
+}
+
+TEST(DecomposableGateInterfaceTests, OperatorOpDistinguishesGenericAndControlWorkWires) {
+    std::string moduleStr = R"mlir(
+module {
+  %true = arith.constant true
+  %q0 = quantum.alloc_qb : !quantum.bit
+  %generic_work = quantum.alloc_qb : !quantum.bit
+  %ctrl_work = quantum.alloc_qb : !quantum.bit
+  %ctrl = quantum.alloc_qb : !quantum.bit
+  %oq:3, %oc = quantum.operator "MultiControlledX"() qubits(%q0, %generic_work, %ctrl_work)
+      ctrls(%ctrl) ctrl_vals(%true)
+      static_data = {ctrl_work_wire_type = "zeroed", work_wire_type = "borrowed"}
+      param_map = {}
+      qubit_map = {ctrl_work_wires = [2], wires = [0], work_wires = [1]}
+}
+    )mlir";
+
+    DialectRegistry registry;
+    registry.insert<mlir::arith::ArithDialect, QuantumDialect>();
+    MLIRContext context(registry);
+    ParserConfig config(&context, /*verifyAfterParse=*/false);
+    OwningOpRef<ModuleOp> module = parseSourceString<ModuleOp>(moduleStr, config);
+
+    auto operatorOp = *module->getOps<OperatorOp>().begin();
+    DecomposableGate op = operatorOp;
+    catalyst::quantum::WireLens expectedWires = {
+        {"wires", 1}, {"work_wires", 1}, {"ctrl_work_wires", 1}};
+
+    ASSERT_EQ(op.getWireLens(), expectedWires);
+    ASSERT_EQ(op.getNonCtrlQubitOperands().size(), 3u);
+    ASSERT_EQ(op.getGraphOpId(),
+              "1C(MultiControlledX){}{ctrl_work_wires:1,wires:1,work_wires:1}{"
+              "ctrl_work_wire_type = \"zeroed\", work_wire_type = \"borrowed\"}");
+
+    ASSERT_EQ(op.getGraphOpIdExplicitModifiers(false, 1, 1, false),
+              "1C(MultiControlledX){}{ctrl_work_wires:1,wires:1,work_wires:1}{"
+              "ctrl_work_wire_type = \"zeroed\", work_wire_type = \"borrowed\"}");
 }
 
 TEST(DecomposableGateInterfaceTests, OperatorOpQureg) {
@@ -361,7 +485,7 @@ func.func @testfunc(%first : tensor<1xi64>, %secondthird : tensor<2xi64>) {
 
   %reg = quantum.alloc(4) : !quantum.reg
 
-  %0 = quantum.operator "testOperatorQureg"(%flag: i1, %angle: f64, %index: i64) quregs(%reg) indices(%first: tensor<1xi64>, %secondthird: tensor<2xi64>) static_data={"myStaticArray"=[4,2.4,4], "myStaticString"="string", "myStaticInt"=8} param_map = {angle=[1], index=[2], flag=[0]} qubit_map = {reg=[0, 1]} 
+  %0 = quantum.operator "testOperatorQureg"(%flag: i1, %angle: f64, %index: i64) quregs(%reg) indices(%first: tensor<1xi64>, %secondthird: tensor<2xi64>) static_data={"myStaticArray"=[4,2.4,4], "myStaticString"="string", "myStaticInt"=8} param_map = {angle=[1], index=[2], flag=[0]} qubit_map = {reg=[0, 1]}
   return
 }
     )mlir";
@@ -378,13 +502,13 @@ func.func @testfunc(%first : tensor<1xi64>, %secondthird : tensor<2xi64>) {
 
     ASSERT_EQ(op.getOperatorName(), "testOperatorQureg");
 
-    llvm::StringMap<llvm::SmallVector<mlir::Type>> expectedDynamicShape = {
+    catalyst::quantum::DynamicShape expectedDynamicShape = {
         {"flag", {mlir::IntegerType::get(&context, 1)}},
         {"angle", {mlir::Float64Type::get(&context)}},
         {"index", {mlir::IntegerType::get(&context, 64)}}};
     ASSERT_EQ(op.getDynamicShape(), expectedDynamicShape);
 
-    llvm::StringMap<size_t> expectedWires = {{"reg", 3}};
+    catalyst::quantum::WireLens expectedWires = {{"reg", 3}};
     ASSERT_EQ(op.getWireLens(), expectedWires);
 
     IntegerType i64 = IntegerType::get(&context, 64);
@@ -406,23 +530,25 @@ func.func @testfunc(%first : tensor<1xi64>, %secondthird : tensor<2xi64>) {
         mlir::DictionaryAttr::get(&context, {arrAttr, stringAttr, intAttr});
     ASSERT_EQ(op.getStaticData(), expectedStaticData);
 
-    ASSERT_EQ(op.getGraphOpId(),
+    ASSERT_EQ(op.getGraphOpId(), "testOperatorQureg{angle:[f64],flag:[i1],index:[i64]}{reg:3}{"
+                                 "myStaticArray = [4, 2.400000e+00, 4], myStaticInt = 8 : i64, "
+                                 "myStaticString = \"string\"}");
+    ASSERT_EQ(op.getGraphOpIdExplicitModifiers(false, 0, 0, false),
               "testOperatorQureg{angle:[f64],flag:[i1],index:[i64]}{reg:3}{"
-              "myStaticArray:[4,2.400000e+00,4],myStaticInt:8,myStaticString:string}");
+              "myStaticArray = [4, 2.400000e+00, 4], myStaticInt = 8 : i64, "
+              "myStaticString = \"string\"}");
 }
 
 TEST(DecomposableGateInterfaceTests, OperatorOpUID) {
     std::string moduleStr = R"mlir(
-func.func @testfunc(%first : tensor<1xi64>, %secondthird : tensor<2xi64>) {
-  %angle = arith.constant 3.1 : f64
-  %flag = arith.constant 0 : i1
-  %index = arith.constant 5 : i64
+func.func @testfunc(%first : tensor<1xi64>, %secondthird : tensor<2xi64>, %arg1 : tensor<i1>, %arg2: tensor<f64>, %arg3: tensor<i64>) {
 
   %reg = quantum.alloc(4) : !quantum.reg
   %q0 = quantum.extract %reg[0] : !quantum.reg -> !quantum.bit
 
-  %0 = quantum.operator "testOperatorUID"(%flag: i1, %angle: f64, %index: i64)
-    UID(248) quregs(%reg) indices(%first: tensor<1xi64>, %secondthird: tensor<2xi64>) param_map = {flag=[0], angle=[1], index=[2]} qubit_map = {reg=[0, 1]}
+    // testOperatorUID(angle=float, index=[bool, int])
+  %0 = quantum.operator "testOperatorUID"(%arg1: tensor<i1>, %arg2: tensor<f64>, %arg3: tensor<i64>)
+    UID(248) quregs(%reg) indices(%first: tensor<1xi64>, %secondthird: tensor<2xi64>) param_map = {angle=[1], index=[0, 2]} qubit_map = {reg=[0, 1]}
   return
 }
     )mlir";
@@ -439,21 +565,22 @@ func.func @testfunc(%first : tensor<1xi64>, %secondthird : tensor<2xi64>) {
 
     ASSERT_EQ(op.getOperatorName(), "testOperatorUID");
 
-    // This is needed to keep the backing array from being deleted
-    // llvm::SmallVector<llvm::SmallVector<mlir::Type>, 1> backing(
-    //     {mlir::IntegerType::get(&context, 1), mlir::Float64Type::get(&context),
-    //      mlir::IntegerType::get(&context, 64)});
-    llvm::StringMap<llvm::SmallVector<mlir::Type>> expectedDynamicShape = {
-        {"flag", {mlir::IntegerType::get(&context, 1)}},
-        {"angle", {mlir::Float64Type::get(&context)}},
-        {"index", {mlir::IntegerType::get(&context, 64)}}};
+    catalyst::quantum::DynamicShape expectedDynamicShape = {
+        {"index",
+         {mlir::RankedTensorType::get({}, mlir::IntegerType::get(&context, 1)),
+          mlir::RankedTensorType::get({}, mlir::IntegerType::get(&context, 64))}},
+        {"angle", {mlir::RankedTensorType::get({}, mlir::Float64Type::get(&context))}}};
     ASSERT_EQ(op.getDynamicShape(), expectedDynamicShape);
 
-    llvm::StringMap<size_t> expectedWires = {{"reg", 3}};
+    catalyst::quantum::WireLens expectedWires = {{"reg", 3}};
     ASSERT_EQ(op.getWireLens(), expectedWires);
 
     ASSERT_EQ(op.getStaticData(), mlir::DictionaryAttr::get(&context, {}));
 
-    ASSERT_EQ(op.getGraphOpId(),
-              "testOperatorUID{angle:[f64],flag:[i1],index:[i64]}{reg:3}{}[248]");
+    ASSERT_EQ(op.getGraphOpId(), "testOperatorUID{angle:[tensor<f64>],index:["
+                                 "tensor<i1>,tensor<i64>]}{reg:3}{}[248]");
+    ASSERT_EQ(op.getGraphOpIdExplicitModifiers(false, 0, 0, false),
+              "testOperatorUID{angle:[tensor<f64>],index:["
+              "tensor<i1>,tensor<i64>]}{reg:3}{}[248]");
+    // TODO: better separate these tests to unittests
 }

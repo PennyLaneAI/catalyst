@@ -91,3 +91,7 @@ endif()
 
 set_target_properties(catalyst-executor PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY ${CMAKE_LIBRARY_OUTPUT_DIRECTORY})
+
+# The binary ships beside the libraries, matching RUNTIME_OUTPUT_DIRECTORY above and
+# ExecutorPaths.default_executor_bin(), which looks for it under RUNTIME_LIB_DIR.
+catalyst_runtime_install(catalyst_executor_session rt_executor catalyst-executor)

@@ -11,12 +11,11 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""
-Sets up the PLxPRToQuantumJaxprInterpreter for converting plxpr to catalyst jaxpr.
-"""
+"""Sets up the PLxPRToQuantumJaxprInterpreter for converting plxpr to catalyst jaxpr."""
 
 # pylint: disable=protected-access
 import textwrap
+import warnings
 from copy import copy
 from functools import partial
 
@@ -24,8 +23,10 @@ import jax
 import jax.numpy as jnp
 import pennylane as qp
 from jax._src.sharding_impls import UNSPECIFIED
+from jax.core import take_current_trace
 from pennylane.capture import PlxprInterpreter, pause
 from pennylane.capture.base_interpreter import jaxpr_to_jaxpr
+from pennylane.capture.primitives import adjoint_transform_prim as plxpr_adjoint_transform_prim
 from pennylane.capture.primitives import cond_prim as pl_cond_prim
 from pennylane.capture.primitives import ctrl_transform_prim as plxpr_ctrl_transform_prim
 from pennylane.capture.primitives import measure_prim as plxpr_measure_prim
@@ -42,11 +43,24 @@ from pennylane.measurements import CountsMP
 from pennylane.pytrees import flatten, unflatten
 from pennylane.wires import AbstractQubit, Wires, is_abstract_qubit
 
+from catalyst.decomposition.capture_session import (
+    DecompositionScope,
+    OpDecompRequest,
+    RuleIdentity,
+    TracedRule,
+)
+from catalyst.decomposition.decomposition_rules import (
+    DecompTargetSpec,
+    rule_call_operands,
+    walk_reachable_decomp_rule_sets,
+)
+from catalyst.decomposition.modifier_state import ModifierState
+from catalyst.decomposition.precompiled_rule_loading import load_precompiled_rule_identities
+from catalyst.decomposition.rule_lowering_warning import RuleLoweringWarning
 from catalyst.from_plxpr.qref_jax_primitives import (
     MeasurementPlane,
-    qref_alloc_p,
+    QrefQreg,
     qref_compbasis_p,
-    qref_dealloc_p,
     qref_get_p,
     qref_gphase_p,
     qref_hermitian_p,
@@ -63,6 +77,7 @@ from catalyst.from_plxpr.qref_jax_primitives import (
 )
 from catalyst.jax_primitives import (
     counts_p,
+    decomp_definition_p,
     decomprule_p,
     expval_p,
     hamiltonian_p,
@@ -112,7 +127,7 @@ class PLxPRToQuantumJaxprInterpreter(PlxprInterpreter):
         *,
         control_wires=(),
         control_values=(),
-        collect_decomp_rules=True,
+        decomposition_scope: DecompositionScope | None = None,
     ):
         self.device = device
         self.shots = shots
@@ -122,8 +137,10 @@ class PLxPRToQuantumJaxprInterpreter(PlxprInterpreter):
         """Any control wires used for a subroutine."""
         self.control_values = control_values
         """Any control values for executing a subroutine."""
+        self.modifier_context = ModifierState()
+        """Modifier context surrounding decomposition requests."""
         self.has_dynamic_allocation = False
-        self.collect_decomp_rules = collect_decomp_rules
+        self.decomposition_scope = decomposition_scope
 
         super().__init__()
 
@@ -141,6 +158,10 @@ class PLxPRToQuantumJaxprInterpreter(PlxprInterpreter):
             with qp.QueuingManager.stop_recording():
                 op = eqn.primitive.impl(*invals, **eqn.params)
             if isinstance(eqn.outvars[0], jax.core.DropVar):
+                if self.decomposition_scope is not None:
+                    self.decomposition_scope.record_root(
+                        OpDecompRequest.from_operation(op, self.modifier_context)
+                    )
                 _apply_operator2_gate(self, *invals, **eqn.params)
                 return ()
             return op
@@ -337,7 +358,7 @@ def _new_hybrid_arg(interp: PLxPRToQuantumJaxprInterpreter, arg) -> list:
     return new_args
 
 
-# pylint: disable=too-many-arguments
+# pylint: disable=too-many-arguments,unused-argument
 def _apply_operator2_gate(
     self,
     *args,
@@ -347,13 +368,20 @@ def _apply_operator2_gate(
     hybrid_trees,
     forward_mask,
     adjoint,
-    n_ctrls,
+    n_ctrls=0,
+    n_ctrl_work_wires=0,
+    ctrl_work_wire_type="borrowed",
     **kwargs,
 ):
     """Apply an Operator2 as a gate instruction using qref_operator_p."""
     n_wires = sum(wire_lens)
     wire_inputs = args[len(op_cls.dynamic_argnames) : len(op_cls.dynamic_argnames) + n_wires]
+    work_wire_inputs = ()
     if n_ctrls:
+        if n_ctrl_work_wires:
+            work_wire_inputs = args[-n_ctrl_work_wires:]
+            args = args[:-n_ctrl_work_wires]
+
         control_wire_inputs = args[-2 * n_ctrls : -n_ctrls]
         control_values = args[-n_ctrls:]
     else:
@@ -370,6 +398,14 @@ def _apply_operator2_gate(
         w if is_abstract_qubit(w) else qref_get_p.bind(self.init_qreg, w)
         for w in control_wire_inputs
     ]
+    new_work_wires = [
+        w if is_abstract_qubit(w) else qref_get_p.bind(self.init_qreg, w) for w in work_wire_inputs
+    ]
+    work_wire_params = (
+        {"n_ctrl_work_wires": len(new_work_wires), "ctrl_work_wire_type": ctrl_work_wire_type}
+        if new_work_wires
+        else {}
+    )
 
     # Hybrid wire arguments: this contains wires that are in both wire_argnames and hybrid_argnames,
     # and also the wires of any operators that are part of the hybrid arguments.
@@ -387,6 +423,7 @@ def _apply_operator2_gate(
         *new_hybrid_args,
         *new_control_wires,
         *control_values,
+        *new_work_wires,
         op_cls=op_cls,
         wire_lens=wire_lens,
         hybrid_lens=hybrid_lens,
@@ -394,9 +431,120 @@ def _apply_operator2_gate(
         forward_mask=forward_mask,
         adjoint=adjoint,
         n_ctrls=n_ctrls,
-        collect_decomp_rules=self.collect_decomp_rules,
+        **work_wire_params,
         **kwargs,
     )
+
+
+def _convert_decomp_target_spec(
+    interpreter: PLxPRToQuantumJaxprInterpreter,
+    target_spec: DecompTargetSpec,
+    precompiled_rule_identities: frozenset[RuleIdentity] = frozenset(),
+) -> list[TracedRule]:
+    """Convert uncached rules in one target specification into Catalyst rule JAXPRs."""
+    with take_current_trace():
+        operands = rule_call_operands(target_spec.trace_inputs)
+        operands = [jax.ShapeDtypeStruct(operand.shape, operand.dtype) for operand in operands]
+    out = []
+    for rule in target_spec.rules:
+        if (
+            RuleIdentity(
+                target_spec.target_id,
+                rule.frontend_name,
+                tuple(sorted(rule.resource_counts_by_id.items())),
+            )
+            in precompiled_rule_identities
+        ):
+            continue
+
+        prepared_rule_fn = rule.prepared_rule_fn
+        if not prepared_rule_fn.__name__.startswith("__builtin_"):
+            prepared_rule_fn.__name__ = "__builtin_" + prepared_rule_fn.__name__
+
+        with take_current_trace():
+            try:
+                plxpr = jax.make_jaxpr(prepared_rule_fn)(*operands)
+            except Exception as exc:  # pylint: disable=broad-except
+                warnings.warn(
+                    f"Failed to capture the {rule.frontend_name} decomposition rule for "
+                    f"{target_spec.target_id}: {exc}",
+                    category=RuleLoweringWarning,
+                )
+                continue
+            if target_spec.reject_noninvertible and _contains_noninvertible_equation(plxpr):
+                continue
+
+            def wrapper(global_qreg, *args):
+                converter = copy(interpreter)
+                converter.init_qreg = global_qreg
+                converter.decomposition_scope = None
+                converter.subroutine_cache = {}
+                converter(plxpr, *args)
+
+            try:
+                converted = jax.make_jaxpr(wrapper)(QrefQreg(), *plxpr.in_avals)
+            except Exception as exc:  # pylint: disable=broad-except
+                if isinstance(exc, CompileError):
+                    raise
+                warnings.warn(
+                    f"Failed to convert the {rule.frontend_name} decomposition rule for "
+                    f"{target_spec.target_id}: {exc}",
+                    category=RuleLoweringWarning,
+                )
+                continue
+        out.append(
+            TracedRule(
+                prepared_rule_fn=prepared_rule_fn,
+                closed_jaxpr=converted,
+                target_gate=target_spec.target_id,
+                resources=rule.resource_counts_by_id,
+                frontend_name=rule.frontend_name,
+            )
+        )
+    return out
+
+
+def _capture_scope_rules(
+    interpreter: PLxPRToQuantumJaxprInterpreter,
+    scope: DecompositionScope,
+    precompiled_rule_identities: frozenset[RuleIdentity] | None = None,
+) -> None:
+    """Populate one scope, loading cached identities unless the caller supplies them."""
+    if precompiled_rule_identities is None:
+        # default to empty-set - precompiled is an optimization, not required
+        precompiled_rule_identities = frozenset()
+        try:
+            precompiled_rule_identities = load_precompiled_rule_identities()
+        except Exception as e:
+            warnings.warn(f"Failed to load precompiled rules: {e}")
+    for target_spec in walk_reachable_decomp_rule_sets(list(scope.roots.values())):
+        for traced_rule in _convert_decomp_target_spec(
+            interpreter, target_spec, precompiled_rule_identities
+        ):
+            scope.record_definition(traced_rule)
+
+
+def capture_and_bind_kernel_rules(
+    interpreter: PLxPRToQuantumJaxprInterpreter,
+    precompiled_rule_identities: frozenset[RuleIdentity] | None = None,
+) -> None:
+    """Capture reachable rules and bind definitions, optionally using supplied cache identities."""
+    scope = interpreter.decomposition_scope
+    if scope is None:
+        return
+
+    with take_current_trace():
+        _capture_scope_rules(interpreter, scope, precompiled_rule_identities)
+
+    for traced_rule in scope.definitions.values():
+        decomp_definition_p.bind(
+            pyfun=traced_rule.prepared_rule_fn,
+            func_jaxpr=traced_rule.closed_jaxpr,
+            target_gate=traced_rule.target_gate,
+            resources=tuple(sorted(traced_rule.resources.items())),
+            frontend_name=traced_rule.frontend_name,
+            num_wires=None,
+        )
 
 
 # pylint: disable=unused-argument, too-many-arguments
@@ -484,31 +632,43 @@ _special_op_bind_call = {
 @PLxPRToQuantumJaxprInterpreter.register_primitive(qp.allocation.allocate_prim)
 def handle_allocate(self, *, num_wires, state=None, restored=False):
     """Handle the conversion from plxpr to Catalyst jaxpr for the qp.allocate primitive"""
+    # TODO: remove this wrapper once PLxPRToQuantumJaxprInterpreter can emit Catalyst
+    # jaxpr primitives directly without rebinding PennyLane allocate/deallocate.
 
     assert isinstance(
         num_wires, int
     ), "number of dynamically allocated qubits must be statically known"
 
     self.has_dynamic_allocation = True
-    new_qreg = qref_alloc_p.bind(static_num_qubits=num_wires)
-    return [qref_get_p.bind(new_qreg, i) for i in range(num_wires)]
+
+    state = (
+        qp.allocation.AllocateState(state)
+        if state is not None
+        else qp.allocation.AllocateState.ZERO
+    )
+    if state == qp.allocation.AllocateState.ANY:
+        raise CompileError(
+            'qp.allocate with state="any" is not supported in Catalyst. '
+            'Use state="zero" (default), state="magic-T", or state="magic-T-adj".'
+        )
+    # Catalyst does not track wire-restore semantics; zero/magic allocations behave the same
+    # regardless of PennyLane's ``restored`` flag (including decomposition work wires).
+    restored = False
+    return list(
+        qp.allocation.allocate_prim.bind(
+            num_wires=num_wires,
+            state=state,
+            restored=restored,
+        )
+    )
 
 
 @PLxPRToQuantumJaxprInterpreter.register_primitive(qp.allocation.deallocate_prim)
 def handle_deallocate(self, *wires):
     """Handle the conversion from plxpr to Catalyst jaxpr for the qp.deallocate primitive"""
-    qregs = set()
-    for w in wires:
-        get_op = w.parent
-        assert (
-            get_op.primitive is qref_get_p
-        ), "Manual deallocation is only supported for manually allocated wires"
-        qreg = get_op.in_tracers[0]
-        qregs.add(qreg)
-    assert (
-        len(qregs) == 1
-    ), "Expected all wires to deallocate to come from the same allocation instruction"
-    qref_dealloc_p.bind(list(qregs)[0])
+    # TODO: remove this wrapper once PLxPRToQuantumJaxprInterpreter can emit Catalyst
+    # jaxpr primitives directly without rebinding PennyLane allocate/deallocate.
+    qp.allocation.deallocate_prim.bind(*wires)
     return []
 
 
@@ -540,6 +700,31 @@ def _subroutine_kernel(interpreter, jaxpr, global_qreg, *args):
     return retvals
 
 
+def _any_equation(jaxpr, predicate):
+    """Return whether any equation in a PLxPR or its nested regions satisfies ``predicate``."""
+
+    def is_region(value):
+        return hasattr(value, "jaxpr") or hasattr(value, "eqns")
+
+    for eqn in getattr(jaxpr, "jaxpr", jaxpr).eqns:
+        if predicate(eqn):
+            return True
+        for value in eqn.params.values():
+            nested = value if isinstance(value, (tuple, list)) else (value,)
+            if any(is_region(item) and _any_equation(item, predicate) for item in nested):
+                return True
+    return False
+
+
+def _contains_noninvertible_equation(jaxpr):
+    """Return whether a PLxPR contains a measurement-like primitive."""
+
+    return _any_equation(
+        jaxpr,
+        lambda eqn: "measure" in eqn.primitive.name or eqn.primitive.name.endswith("ppm"),
+    )
+
+
 @PLxPRToQuantumJaxprInterpreter.register_primitive(quantum_subroutine_prim)
 def handle_subroutine(self, *args, **kwargs):
     """
@@ -547,7 +732,8 @@ def handle_subroutine(self, *args, **kwargs):
     """
     plxpr = kwargs["jaxpr"]
 
-    transformed = self.subroutine_cache.get(hash(str(plxpr)))
+    cache_key = hash(str(plxpr))
+    transformed = self.subroutine_cache.get(cache_key)
 
     if not transformed:
         f = partial(
@@ -556,7 +742,7 @@ def handle_subroutine(self, *args, **kwargs):
             plxpr,
         )
         converted_closed_jaxpr_branch = jax.make_jaxpr(f)(self.init_qreg, *args)
-        self.subroutine_cache[hash(str(plxpr))] = converted_closed_jaxpr_branch
+        self.subroutine_cache[cache_key] = converted_closed_jaxpr_branch
     else:
         converted_closed_jaxpr_branch = transformed
 
@@ -584,9 +770,7 @@ def handle_subroutine(self, *args, **kwargs):
 
 @PLxPRToQuantumJaxprInterpreter.register_primitive(decomprule_p)
 def handle_decomposition_rule(self, *, pyfun, func_jaxpr, is_qreg, num_params):
-    """
-    Transform a quantum decomposition rule from PLxPR into JAXPR with quantum primitives.
-    """
+    """Transform a source-level decomposition rule into a Catalyst rule definition."""
     if is_qreg:
 
         def wrapper(global_qreg, *args):
@@ -609,7 +793,13 @@ def handle_decomposition_rule(self, *, pyfun, func_jaxpr, is_qreg, num_params):
         ]
         converted_closed_jaxpr_branch = jax.make_jaxpr(wrapper)(*new_in_avals)
 
-    decomprule_p.bind(pyfun=pyfun, func_jaxpr=converted_closed_jaxpr_branch)
+    decomp_definition_p.bind(
+        pyfun=pyfun,
+        func_jaxpr=converted_closed_jaxpr_branch,
+        target_gate=getattr(pyfun, "target_gate", None),
+        resources=None,
+        frontend_name=getattr(pyfun, "frontend_name", None),
+    )
 
     return ()
 
@@ -714,26 +904,73 @@ def handle_measure_in_basis(self, angle, wire, plane, reset, postselect):
 
 
 # pylint: disable=unused-argument
-@PLxPRToQuantumJaxprInterpreter.register_primitive(plxpr_ctrl_transform_prim)
-def handle_ctrl_transform(self, *invals, jaxpr, n_control, control_values, work_wires, n_consts):
-    """Interpret a control transform, then re-bind it for lowering to a `qref.ctrl` region op."""
+@PLxPRToQuantumJaxprInterpreter.register_primitive(plxpr_adjoint_transform_prim)
+def handle_adjoint_transform(self, *invals, jaxpr, n_consts):
+    """Interpret an adjoint region while retaining its context for rule discovery."""
     consts = invals[:n_consts]
-    args = invals[n_consts:-n_control]
-    control_wires = invals[-n_control:]
+    args = invals[n_consts:]
+    body_interpreter = copy(self)
+    body_interpreter.modifier_context = self.modifier_context.compose(ModifierState(adjoint=True))
+    body = jaxpr_to_jaxpr(body_interpreter, jaxpr, consts, *args)
+
+    return plxpr_adjoint_transform_prim.bind(
+        *body.consts,
+        *args,
+        jaxpr=body.jaxpr,
+        n_consts=len(body.consts),
+    )
+
+
+# pylint: disable=unused-argument,too-many-arguments
+@PLxPRToQuantumJaxprInterpreter.register_primitive(plxpr_ctrl_transform_prim)
+def handle_ctrl_transform(
+    self,
+    *invals,
+    jaxpr,
+    n_control,
+    n_consts,
+    n_work_wires,
+    work_wire_type="borrowed",
+):
+    """Interpret a control transform, then re-bind it for lowering to a `qref.ctrl` region op.
+
+    Operands are constants, body arguments, control wires, control values, then work wires.
+    """
+    work_start = len(invals) - n_work_wires
+    values_start = work_start - n_control
+    controls_start = values_start - n_control
+    consts = invals[:n_consts]
+    args = invals[n_consts:controls_start]
+    control_wires = invals[controls_start:values_start]
+    control_values = invals[values_start:work_start]
+    work_wires = invals[work_start:]
 
     control_qubits = [
         w if is_abstract_qubit(w) else qref_get_p.bind(self.init_qreg, w) for w in control_wires
     ]
-    body = jaxpr_to_jaxpr(copy(self), jaxpr, consts, *args)
+    work_qubits = [
+        w if is_abstract_qubit(w) else qref_get_p.bind(self.init_qreg, w) for w in work_wires
+    ]
+    body_interpreter = copy(self)
+    body_interpreter.modifier_context = self.modifier_context.compose(
+        ModifierState(
+            control_count=n_control,
+            num_work_wires=len(work_qubits),
+            work_wire_type=work_wire_type,
+        )
+    )
+    body = jaxpr_to_jaxpr(body_interpreter, jaxpr, consts, *args)
 
     return plxpr_ctrl_transform_prim.bind(
         *body.consts,
         *args,
         *control_qubits,
+        *control_values,
+        *work_qubits,
         n_control=n_control,
         jaxpr=body.jaxpr,
-        control_values=control_values,
-        work_wires=work_wires,
+        n_work_wires=n_work_wires,
+        work_wire_type=work_wire_type,
         n_consts=len(body.consts),
     )
 

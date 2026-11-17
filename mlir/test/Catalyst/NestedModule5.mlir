@@ -61,3 +61,19 @@ module @global {
   }
 
 }
+
+// -----
+
+// The kernel entry point annotation is removed, and quantum.node is replaced by qnode.
+// CHECK-LABEL: @kernel_attributes
+// CHECK-NOT: quantum.kernel_entry_point
+// CHECK: attributes {qnode}
+module @kernel_attributes {
+  module @inner {
+    func.func @f() attributes {quantum.kernel_entry_point, quantum.node} {
+      return
+    }
+  }
+
+  catalyst.launch_kernel @inner::@f() : () -> ()
+}

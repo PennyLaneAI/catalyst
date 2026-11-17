@@ -19,7 +19,7 @@ import lit.formats
 from lit.llvm import llvm_config
 
 config.name = "Frontend Tests"
-config.test_format = lit.formats.ShTest(True)
+config.test_format = lit.formats.ShTest()
 
 # Define the file extensions to treat as test files (with the exception of this file).
 config.suffixes = [".py", ".mlir"]
@@ -69,13 +69,19 @@ if os.environ.get("ENABLE_LIT_COVERAGE", "0") == "1":
     config.environment["COVERAGE_FILE"] = os.environ.get(
         "COVERAGE_FILE", os.path.join(project_root, ".coverage.lit")
     )
+    # lit runs tests in parallel, and coverage's data file is a SQLite database that does not
+    # tolerate concurrent writers. `--parallel-mode` gives each process its own
+    # `.coverage.lit.<host>.<pid>.<random>` file, which `coverage combine` merges afterwards.
     python_executable = (
-        f"{python_executable} -m coverage run --source={catalyst_source} --append --branch"
+        f"{python_executable} -m coverage run --source={catalyst_source} --parallel-mode --branch"
     )
 
 config.substitutions.append(("%PYTHON", python_executable))
 config.substitutions.append(
-    ("%BYTECODE_PATH", config.test_source_root + "/GraphDecomposition/test_rules.mlirbc")
+    (
+        "%PRECOMPILED_BYTECODE_PATH",
+        config.test_source_root + "/GraphDecomposition/test_rules.mlirbc",
+    )
 )
 
 # allow virtual env for embedded interpreter

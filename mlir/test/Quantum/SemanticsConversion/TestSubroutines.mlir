@@ -438,3 +438,51 @@ func.func @main() attributes {quantum.node} {
     quantum.dealloc %3 : !quantum.reg
     return
 }
+
+
+// -----
+
+// Subroutines with the same name in different nested modules get the register sizes of their
+// own call sites.
+
+// CHECK: module @m1 {
+// CHECK:     func.func @sub(%arg0: !qref.reg<2>) {
+// CHECK:     func.func @main() attributes {quantum.node} {
+// CHECK:         [[reg:%.+]] = qref.alloc( 2) : !qref.reg<2>
+// CHECK:         call @sub([[reg]]) : (!qref.reg<2>) -> ()
+module @m1 {
+    func.func @sub(%arg0: !quantum.reg) -> !quantum.reg {
+        %0 = quantum.extract %arg0[ 0] : !quantum.reg -> !quantum.bit
+        %out_qubits = quantum.custom "PauliX"() %0 : !quantum.bit
+        %1 = quantum.insert %arg0[ 0], %out_qubits : !quantum.reg, !quantum.bit
+        return %1 : !quantum.reg
+    }
+
+    func.func @main() attributes {quantum.node} {
+        %0 = quantum.alloc( 2) : !quantum.reg
+        %1 = call @sub(%0) : (!quantum.reg) -> !quantum.reg
+        quantum.dealloc %1 : !quantum.reg
+        return
+    }
+}
+
+// CHECK: module @m2 {
+// CHECK:     func.func @sub(%arg0: !qref.reg<5>) {
+// CHECK:     func.func @main() attributes {quantum.node} {
+// CHECK:         [[reg:%.+]] = qref.alloc( 5) : !qref.reg<5>
+// CHECK:         call @sub([[reg]]) : (!qref.reg<5>) -> ()
+module @m2 {
+    func.func @sub(%arg0: !quantum.reg) -> !quantum.reg {
+        %0 = quantum.extract %arg0[ 0] : !quantum.reg -> !quantum.bit
+        %out_qubits = quantum.custom "PauliX"() %0 : !quantum.bit
+        %1 = quantum.insert %arg0[ 0], %out_qubits : !quantum.reg, !quantum.bit
+        return %1 : !quantum.reg
+    }
+
+    func.func @main() attributes {quantum.node} {
+        %0 = quantum.alloc( 5) : !quantum.reg
+        %1 = call @sub(%0) : (!quantum.reg) -> !quantum.reg
+        quantum.dealloc %1 : !quantum.reg
+        return
+    }
+}

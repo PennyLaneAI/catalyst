@@ -1,0 +1,57 @@
+// Copyright 2026 Xanadu Quantum Technologies Inc.
+
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+
+//     http://www.apache.org/licenses/LICENSE-2.0
+
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+// RUN: catalyst --tool=opt --pass-pipeline='builtin.module(graph-decomposition{gate-set=C(testT)=1.0})' %s | FileCheck %s --check-prefixes=ALL,CALL
+
+// RUN: catalyst --tool=opt --pass-pipeline='builtin.module(graph-decomposition{inline-rule-body gate-set=C(testT)=1.0})' %s | FileCheck %s --check-prefixes=ALL,INLINE
+
+// GraphDecomposition only solves GOIDs reachable from an entry function.
+func.func @entry(%c: !quantum.bit, %q: !quantum.bit) attributes {llvm.emit_c_interface} {
+  %0:2 = call @ctrl_in_gateset(%c, %q) : (!quantum.bit, !quantum.bit) -> (!quantum.bit, !quantum.bit)
+  %1:2 = call @decompose_to_ctrl(%c, %q) : (!quantum.bit, !quantum.bit) -> (!quantum.bit, !quantum.bit)
+  return
+}
+
+// A controlled op that is already in the gate set stays untouched (its id `1C(testT){}{wires:1}{}`
+// matches the `C(testT)` gate-set entry -- it is NOT stripped to its base `testT`).
+// ALL-LABEL: func.func @ctrl_in_gateset(
+// ALL-SAME:  [[Q:%.+]]: !quantum.bit, [[C:%.+]]: !quantum.bit
+func.func @ctrl_in_gateset(%c: !quantum.bit, %q: !quantum.bit) -> (!quantum.bit, !quantum.bit) {
+  // ALL: quantum.custom "testT"() [[Q]] ctrls([[C]]) ctrlvals({{%.+}}) : !quantum.bit ctrls !quantum.bit
+  %true = arith.constant true
+  %outq, %outc = quantum.custom "testT"() %q ctrls(%c) ctrlvals(%true) : !quantum.bit ctrls !quantum.bit
+  return %outq, %outc : !quantum.bit, !quantum.bit
+}
+
+// A plain op decomposes to a controlled op that is in the gate set: the rule's `C(testT)` resource
+// is parsed as a distinct node and reached.
+// ALL-LABEL: func.func @decompose_to_ctrl(
+// ALL-SAME:  [[Q0:%.+]]: !quantum.bit, [[Q1:%.+]]: !quantum.bit
+func.func @decompose_to_ctrl(%q0: !quantum.bit, %q1: !quantum.bit) -> (!quantum.bit, !quantum.bit) {
+  // ALL-NOT: quantum.custom "myCZ"
+  // CALL: call @cz_to_ct_0([[Q0]], [[Q1]])
+  // INLINE: quantum.custom "testT"() [[Q0]] ctrls([[Q1]]) ctrlvals({{%.+}}) : !quantum.bit ctrls !quantum.bit
+  %o:2 = quantum.custom "myCZ"() %q0, %q1 : !quantum.bit, !quantum.bit
+  return %o#0, %o#1 : !quantum.bit, !quantum.bit
+}
+
+func.func private @cz_to_ct(%q0: !quantum.bit, %q1: !quantum.bit) -> (!quantum.bit, !quantum.bit) attributes {
+    target_gate = "myCZ{}{wires:2}{}",
+    resources = {operations = {"1C(testT){}{wires:1}{}" = 1 : i64}} } {
+  %true = arith.constant true
+  %oq, %oc = quantum.custom "testT"() %q1 ctrls(%q0) ctrlvals(%true) : !quantum.bit ctrls !quantum.bit
+  return %oc, %oq : !quantum.bit, !quantum.bit
+}
+
+// CALL: func.func private @cz_to_ct_0

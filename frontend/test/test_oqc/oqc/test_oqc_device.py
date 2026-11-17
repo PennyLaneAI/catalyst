@@ -107,14 +107,12 @@ class TestOQCCircuit:
         os.environ["OQC_EMAIL"] = "email"
         os.environ["OQC_URL"] = "url"
 
-        with pytest.warns(UserWarning, match="AOT capture of jaxpr failed"):
+        @qp.qjit
+        @qp.qnode(qp.device("oqc.cloud", backend="lucy", wires=8))
+        def circuit():
+            return qp.probs()
 
-            @qp.qjit
-            @qp.qnode(qp.device("oqc.cloud", backend="lucy", wires=8))
-            def circuit():
-                return qp.probs()
-
-        with pytest.raises(CompileError, match="Please supply the number of shots on the qnode."):
+        with pytest.raises(CompileError, match="OQCDevice' only supports finite shot measurements"):
 
             circuit()
 

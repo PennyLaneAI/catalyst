@@ -6,6 +6,7 @@
 # reference one copy of `acquire_memcpy_link` and its static registry map.
 add_library(memcpy_cpu_impl SHARED
     MemcpyLink.cpp
+    MessageWorker.cpp
     cpu_controller/CpuControllerSession.cpp
     cpu_coprocessor/CpuCoprocessorSession.cpp
 )
@@ -19,14 +20,13 @@ target_link_libraries(memcpy_cpu_impl PUBLIC catalyst_transport_common)
 set_property(TARGET memcpy_cpu_impl PROPERTY POSITION_INDEPENDENT_CODE ON)
 
 # Plugins are dlopen'd by absolute path; $ORIGIN / @loader_path lets them find sibling
-# libmemcpy_cpu_impl.so at load time without LD_LIBRARY_PATH help.
+# libmemcpy_cpu_impl.so at load time without LD_LIBRARY_PATH help. The installed-tree
+# equivalent comes from CMAKE_INSTALL_RPATH, set in runtime/CMakeLists.txt.
 function(_memcpy_set_plugin_rpath tgt)
     if(APPLE)
         set_property(TARGET ${tgt} APPEND PROPERTY BUILD_RPATH @loader_path)
-        set_property(TARGET ${tgt} APPEND PROPERTY INSTALL_RPATH @loader_path)
     else()
         set_property(TARGET ${tgt} APPEND PROPERTY BUILD_RPATH $ORIGIN)
-        set_property(TARGET ${tgt} APPEND PROPERTY INSTALL_RPATH $ORIGIN)
     endif()
 endfunction()
 
@@ -41,6 +41,12 @@ add_library(catalyst_transport_memcpy_coprocessor SHARED
 )
 target_link_libraries(catalyst_transport_memcpy_coprocessor PRIVATE memcpy_cpu_impl)
 _memcpy_set_plugin_rpath(catalyst_transport_memcpy_coprocessor)
+
+# memcpy_cpu_impl is SHARED (see above), so the plugins need it at run time.
+catalyst_runtime_install(
+    memcpy_cpu_impl
+    catalyst_transport_memcpy_controller
+    catalyst_transport_memcpy_coprocessor)
 
 # memcpy_gpu depends only on HIP (via the shared catalyst_transport_coproc_gpu).
 if(TRANSPORT_HAS_HIP)
@@ -70,4 +76,6 @@ if(TRANSPORT_HAS_HIP)
     )
     target_link_libraries(catalyst_transport_memcpy_gpu_coprocessor PRIVATE memcpy_gpu_impl)
     _memcpy_set_plugin_rpath(catalyst_transport_memcpy_gpu_coprocessor)
+
+    catalyst_runtime_install(catalyst_transport_memcpy_gpu_coprocessor)
 endif()

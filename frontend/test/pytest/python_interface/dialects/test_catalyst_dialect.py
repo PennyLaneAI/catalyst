@@ -27,6 +27,7 @@ expected_ops_names = {
     "CallbackCallOp": "catalyst.callback_call",
     "CallbackOp": "catalyst.callback",
     "CustomCallOp": "catalyst.custom_call",
+    "RuntimeCallOp": "catalyst.runtime_call",
     "LaunchKernelOp": "catalyst.launch_kernel",
     "ListDeallocOp": "catalyst.list_dealloc",
     "ListInitOp": "catalyst.list_init",

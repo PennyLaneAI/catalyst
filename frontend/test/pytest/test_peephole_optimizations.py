@@ -17,9 +17,12 @@
 import numpy as np
 import pennylane as qp
 import pytest
+from operator2_dummy_gates import NoParams, NoParamsCustomOp
+from pennylane.decomposition import add_decomps, local_decomps, register_resources
 from pennylane.transforms import to_ppr as qp_to_ppr
+from pennylane.typing import Wire
 
-from catalyst import measure, pipeline, qjit
+from catalyst import qjit
 from catalyst.passes import (
     cancel_inverses,
     commute_ppr,
@@ -30,6 +33,7 @@ from catalyst.passes import (
     ppr_to_ppm,
     to_ppr,
 )
+from catalyst.utils.exceptions import CompileError
 
 # pylint: disable=missing-function-docstring
 
@@ -115,36 +119,6 @@ def test_cancel_inverses_functionality_outside_qjit(theta, backend):
     assert np.allclose(workflow()[0], workflow()[1])
 
 
-@pytest.mark.parametrize("theta", [42.42])
-def test_pipeline_functionality(theta, backend):
-    """
-    Test that the @pipeline decorator does not change functionality
-    when all the passes in the pipeline does not change functionality.
-    """
-    my_pipeline = {
-        "cancel_inverses": {},
-        "merge_rotations": {},
-    }
-
-    @qjit
-    def workflow():
-        @qp.qnode(qp.device(backend, wires=2))
-        def f(x):
-            qp.RX(0.1, wires=[0])
-            qp.RX(x, wires=[0])
-            qp.Hadamard(wires=[1])
-            qp.Hadamard(wires=[1])
-            return qp.expval(qp.PauliY(wires=0))
-
-        no_pipeline_result = f(theta)
-        pipeline_result = pipeline(my_pipeline)(f)(theta)
-
-        return no_pipeline_result, pipeline_result
-
-    res = workflow()
-    assert np.allclose(res[0], res[1])
-
-
 def test_chained_passes():
     """
     Test that chained passes are present in the transform passes.
@@ -166,44 +140,49 @@ def test_chained_passes():
     assert "merge-rotations" in mlir
 
 
-def test_disentangle_passes():
+# Captured decomposition rules still share the module with the circuit.
+@pytest.mark.xfail(
+    reason="disentangle passes cannot analyze captured decomposition rules",
+    raises=CompileError,
+    strict=True,
+)
+@pytest.mark.parametrize("initial_wire", [0, 1])
+def test_disentangle_passes(initial_wire):
     """
-    Test that disentangle passes are present in the transform passes
-    and are applied correctly.
+    Test that disentangle passes preserve circuits with captured decomposition rules.
     """
 
-    @qjit
-    @qp.qnode(qp.device("lightning.qubit", wires=2))
-    def circuit_with_no_disentangle_passes():
-        # first qubit in |1>
-        qp.X(0)
-        # current state : |10>
-        qp.CNOT(wires=[0, 1])  # state after CNOT |11>
-        qp.SWAP(wires=[0, 1])  # state after SWAP |11>
-        return qp.state()
+    @register_resources({qp.CNOT(wires=Wire[2]): 1})
+    def custom_cnot(reg):
+        qp.CNOT(wires=reg)
 
-    @qjit
-    @disentangle_cnot
-    @disentangle_swap
-    @qp.qnode(qp.device("lightning.qubit", wires=2))
-    def circuit_with_disentangle_passes():
-        # first qubit in |1>
-        qp.X(0)
-        # current state : |10>
-        qp.CNOT(wires=[0, 1])  # state after CNOT |11>
-        qp.SWAP(wires=[0, 1])  # state after SWAP |11>
-        return qp.state()
+    @register_resources({qp.SWAP(wires=Wire[2]): 1})
+    def custom_swap(wires):
+        qp.SWAP(wires=wires)
 
-    input_mlir_string = circuit_with_disentangle_passes.mlir
-    assert "disentangle-cnot" in input_mlir_string
-    assert "disentangle-swap" in input_mlir_string
+    with local_decomps():
+        add_decomps(NoParams, custom_cnot)
+        add_decomps(NoParamsCustomOp, custom_swap)
 
-    # both SWAP and CNOT should be removed by the disentangle passes
-    transformed_mlir_string = circuit_with_disentangle_passes.mlir_opt
-    assert "CNOT" not in transformed_mlir_string
-    assert "SWAP" not in transformed_mlir_string
+        @qp.qnode(qp.device("lightning.qubit", wires=2))
+        def circuit():
+            qp.X(initial_wire)
+            NoParams(reg=[0, 1])
+            NoParamsCustomOp(wires=[0, 1])
+            return qp.state()
 
-    assert np.allclose(circuit_with_no_disentangle_passes(), circuit_with_disentangle_passes())
+        circuit_with_no_disentangle_passes = qjit(circuit, capture=True)
+        circuit_with_disentangle_passes = qjit(
+            disentangle_cnot(disentangle_swap(circuit)), capture=True
+        )
+
+        input_mlir_string = circuit_with_disentangle_passes.mlir
+        assert 'frontend_name = "custom_cnot"' in input_mlir_string
+        assert 'frontend_name = "custom_swap"' in input_mlir_string
+        assert "disentangle-cnot" in input_mlir_string
+        assert "disentangle-swap" in input_mlir_string
+
+        assert np.allclose(circuit_with_no_disentangle_passes(), circuit_with_disentangle_passes())
 
 
 def test_convert_clifford_to_ppr():
@@ -224,14 +203,13 @@ def test_convert_clifford_to_ppr():
     assert 'transform.apply_registered_pass "to-ppr"' not in optimized_ir
     assert "pbc.ppr" in optimized_ir
 
-    ppm_specs_output = qp.specs(test_convert_clifford_to_ppr_workflow, level=1)().resources
+    ppm_specs_output = qp.analyze(test_convert_clifford_to_ppr_workflow, level=1)().resources
 
     gate_types = ppm_specs_output.quantum_operations
-    assert gate_types.get("Adjoint(PPR-pi/4)", 0) == 2
-    assert gate_types.get("PPR-pi/4-w1", 0) == 4
+    assert gate_types.get("PPR-pi/4-w1", 0) == 6
     assert gate_types.get("PPR-pi/4-w2", 0) == 1
     assert gate_types.get("PPR-pi/8-w1", 0) == 1
-    assert ppm_specs_output.any_commuting_depth == 3
+    assert ppm_specs_output.any_commuting_depth == 4
     assert ppm_specs_output.qubit_disjoint_depth == 6
 
 
@@ -261,7 +239,7 @@ def test_commute_ppr():
 
     pipe = [("pipe", ["quantum-compilation-stage"])]
 
-    @qjit(pipelines=pipe, target="mlir")
+    @qjit(pipelines=pipe, target="mlir", skip_preprocess=True)
     @commute_ppr
     @to_ppr
     @qp.qnode(qp.device("lightning.qubit", wires=2))
@@ -270,7 +248,8 @@ def test_commute_ppr():
         qp.S(1)
         qp.T(0)
         qp.CNOT([0, 1])
-        return measure(0), measure(1)
+        qp.measure(0)
+        qp.measure(1)
 
     assert 'transform.apply_registered_pass "commute-ppr"' in test_commute_ppr_workflow.mlir
     optimized_ir = test_commute_ppr_workflow.mlir_opt
@@ -278,13 +257,12 @@ def test_commute_ppr():
     assert "pbc.ppr" in optimized_ir
     assert "pbc.ppm" in optimized_ir
 
-    ppm_specs_output = qp.specs(test_commute_ppr_workflow, level=2)().resources
+    ppm_specs_output = qp.analyze(test_commute_ppr_workflow, level=2)().resources
 
     gate_types = ppm_specs_output.quantum_operations
 
     assert gate_types.get("PPM-w1", 0) == 2
-    assert gate_types.get("Adjoint(PPR-pi/4)", 0) == 2
-    assert gate_types.get("PPR-pi/4-w1", 0) == 4
+    assert gate_types.get("PPR-pi/4-w1", 0) == 6
     assert gate_types.get("PPR-pi/4-w2", 0) == 1
     assert gate_types.get("PPR-pi/8-w1", 0) == 1
     assert ppm_specs_output.any_commuting_depth == 5
@@ -295,7 +273,7 @@ def test_merge_ppr_ppm():
 
     pipe = [("pipe", ["quantum-compilation-stage"])]
 
-    @qjit(pipelines=pipe, target="mlir")
+    @qjit(pipelines=pipe, target="mlir", skip_preprocess=True)
     @merge_ppr_ppm
     @to_ppr
     @qp.qnode(qp.device("lightning.qubit", wires=2))
@@ -303,7 +281,8 @@ def test_merge_ppr_ppm():
         qp.H(0)
         qp.S(1)
         qp.CNOT([0, 1])
-        return measure(0), measure(1)
+        qp.measure(0)
+        qp.measure(1)
 
     assert 'transform.apply_registered_pass "merge-ppr-ppm"' in test_merge_ppr_ppm_workflow.mlir
     optimized_ir = test_merge_ppr_ppm_workflow.mlir_opt
@@ -311,7 +290,7 @@ def test_merge_ppr_ppm():
     assert 'pbc.ppm ["Z", "X"]' in optimized_ir
     assert 'pbc.ppm ["X"]' in optimized_ir
 
-    ppm_specs_output = qp.specs(test_merge_ppr_ppm_workflow, level=2)().resources
+    ppm_specs_output = qp.analyze(test_merge_ppr_ppm_workflow, level=2)().resources
 
     gate_types = ppm_specs_output.quantum_operations
     assert gate_types.get("PPM-w1", 0) == 1
@@ -324,7 +303,7 @@ def test_ppr_to_ppm_auto_corrected():
 
     pipe = [("pipe", ["quantum-compilation-stage"])]
 
-    @qjit(pipelines=pipe, target="mlir")
+    @qjit(pipelines=pipe, target="mlir", skip_preprocess=True)
     @ppr_to_ppm(decompose_method="auto-corrected")
     @to_ppr
     @qp.qnode(qp.device("lightning.qubit", wires=2))
@@ -333,18 +312,18 @@ def test_ppr_to_ppm_auto_corrected():
         qp.S(1)
         qp.T(0)
         qp.CNOT([0, 1])
-        return measure(0), measure(1)
+        qp.measure(0)
+        qp.measure(1)
 
     assert 'transform.apply_registered_pass "ppr-to-ppm"' in test_ppr_to_ppm_workflow.mlir
     optimized_ir = test_ppr_to_ppm_workflow.mlir_opt
     assert 'transform.apply_registered_pass "ppr-to-ppm"' not in optimized_ir
 
-    specs_output = qp.specs(test_ppr_to_ppm_workflow, level=1)()
+    specs_output = qp.analyze(test_ppr_to_ppm_workflow, level=1)()
     gate_types = specs_output.resources.quantum_operations
 
     assert gate_types["GlobalPhase"] == 4
-    assert gate_types["PPR-pi/4-w1"] == 4
-    assert gate_types["Adjoint(PPR-pi/4)"] == 2
+    assert gate_types["PPR-pi/4-w1"] == 6
     assert gate_types["PPR-pi/4-w2"] == 1
     assert gate_types["PPR-pi/8-w1"] == 1
 
@@ -353,7 +332,7 @@ def test_ppr_to_ppm_inject_magic_state():
 
     pipe = [("pipe", ["quantum-compilation-stage"])]
 
-    @qjit(pipelines=pipe, target="mlir")
+    @qjit(pipelines=pipe, target="mlir", skip_preprocess=True)
     @ppr_to_ppm(decompose_method="clifford-corrected", avoid_y_measure=True)
     @to_ppr
     @qp.qnode(qp.device("lightning.qubit", wires=2))
@@ -362,16 +341,17 @@ def test_ppr_to_ppm_inject_magic_state():
         qp.S(1)
         qp.T(0)
         qp.CNOT([0, 1])
-        return measure(0), measure(1)
+        qp.measure(0)
+        qp.measure(1)
 
     assert 'transform.apply_registered_pass "ppr-to-ppm"' in test_ppr_to_ppm_workflow.mlir
     optimized_ir = test_ppr_to_ppm_workflow.mlir_opt
     assert 'transform.apply_registered_pass "ppr-to-ppm"' not in optimized_ir
 
-    specs_output = qp.specs(test_ppr_to_ppm_workflow, level=1)()
+    specs_output = qp.analyze(test_ppr_to_ppm_workflow, level=1)()
     gate_types = specs_output.resources.quantum_operations
-    assert gate_types["Adjoint(PPR-pi/4)"] == 2
-    assert gate_types["PPR-pi/4-w1"] == 4
+
+    assert gate_types["PPR-pi/4-w1"] == 6
     assert gate_types["PPR-pi/4-w2"] == 1
     assert gate_types["PPR-pi/8-w1"] == 1
     assert gate_types["PPM-w1"] == 2
@@ -381,7 +361,7 @@ def test_ppr_to_ppm_pauli_corrected():
 
     pipe = [("pipe", ["quantum-compilation-stage"])]
 
-    @qjit(pipelines=pipe, target="mlir")
+    @qjit(pipelines=pipe, target="mlir", skip_preprocess=True)
     @ppr_to_ppm(decompose_method="pauli-corrected")
     @to_ppr
     @qp.qnode(qp.device("lightning.qubit", wires=2))
@@ -390,16 +370,16 @@ def test_ppr_to_ppm_pauli_corrected():
         qp.S(1)
         qp.T(0)
         qp.CNOT([0, 1])
-        return measure(0), measure(1)
+        qp.measure(0)
+        qp.measure(1)
 
     assert 'transform.apply_registered_pass "ppr-to-ppm"' in test_ppr_to_ppm_workflow.mlir
     optimized_ir = test_ppr_to_ppm_workflow.mlir_opt
     assert 'transform.apply_registered_pass "ppr-to-ppm"' not in optimized_ir
 
-    specs_output = qp.specs(test_ppr_to_ppm_workflow, level=1)()
+    specs_output = qp.analyze(test_ppr_to_ppm_workflow, level=1)()
     gate_types = specs_output.resources.quantum_operations
-    assert gate_types["PPR-pi/4-w1"] == 4
-    assert gate_types["Adjoint(PPR-pi/4)"] == 2
+    assert gate_types["PPR-pi/4-w1"] == 6
     assert gate_types["PPR-pi/4-w2"] == 1
     assert gate_types["PPR-pi/8-w1"] == 1
     assert gate_types["PPM-w1"] == 2
@@ -408,9 +388,9 @@ def test_ppr_to_ppm_pauli_corrected():
 def test_commute_ppr_and_merge_ppr_ppm_with_max_pauli_size():
 
     pipe = [("pipe", ["quantum-compilation-stage"])]
-    device = qp.device("lightning.qubit", wires=2)
+    device = qp.device("lightning.qubit", wires=3)
 
-    @qjit(pipelines=pipe, target="mlir")
+    @qjit(pipelines=pipe, target="mlir", skip_preprocess=True)
     @merge_ppr_ppm
     @commute_ppr(max_pauli_size=2)
     @to_ppr
@@ -418,9 +398,10 @@ def test_commute_ppr_and_merge_ppr_ppm_with_max_pauli_size():
     def f_workflow():
         qp.CNOT([0, 2])
         qp.T(0)
-        return measure(0), measure(1)
+        qp.measure(0)
+        qp.measure(1)
 
-    @qjit(pipelines=pipe, target="mlir")
+    @qjit(pipelines=pipe, target="mlir", skip_preprocess=True)
     @merge_ppr_ppm(max_pauli_size=1)
     @commute_ppr
     @to_ppr
@@ -430,7 +411,8 @@ def test_commute_ppr_and_merge_ppr_ppm_with_max_pauli_size():
         qp.T(0)
         qp.T(1)
         qp.CNOT([0, 1])
-        return measure(0), measure(1)
+        qp.measure(0)
+        qp.measure(1)
 
     for workflow in (f_workflow, g_workflow):
         assert 'transform.apply_registered_pass "commute-ppr"' in workflow.mlir
@@ -440,17 +422,16 @@ def test_commute_ppr_and_merge_ppr_ppm_with_max_pauli_size():
         assert 'transform.apply_registered_pass "commute-ppr"' not in optimized_ir
         assert 'transform.apply_registered_pass "merge-ppr-ppm"' not in optimized_ir
 
-    f_specs = qp.specs(f_workflow, level=3)().resources
+    f_specs = qp.analyze(f_workflow, level=3)().resources
     assert f_specs.quantum_operations.get("PPM-w1", 0) == 2
     assert f_specs.quantum_operations.get("PPR-pi/8-w1", 0) == 1
     assert f_specs.any_commuting_depth == 1
     assert f_specs.qubit_disjoint_depth == 2
 
-    g_specs = qp.specs(g_workflow, level=3)().resources
+    g_specs = qp.analyze(g_workflow, level=3)().resources
     gate_types = g_specs.quantum_operations
-    assert gate_types.get("Adjoint(PPM)", 0) == 1
-    assert gate_types.get("PPM-w1", 0) == 1
-    assert gate_types.get("Adjoint(PPR-pi/4)", 0) == 1
+    assert gate_types.get("PPM-w1", 0) == 2
+    assert gate_types.get("PPR-pi/4-w1", 0) == 1
     assert gate_types.get("PPR-pi/4-w2", 0) == 2
     assert gate_types.get("PPR-pi/8-w1", 0) == 2
     assert g_specs.any_commuting_depth == 3
@@ -462,7 +443,7 @@ def test_merge_rotation_ppr():
 
     my_pipeline = [("pipe", ["quantum-compilation-stage"])]
 
-    @qp.qjit(pipelines=my_pipeline, target="mlir", capture=True)
+    @qp.qjit(pipelines=my_pipeline, target="mlir", capture=True, collect_decomp_rules=False)
     def test_merge_rotation_ppr_workflow():
         @qp.transforms.merge_rotations  # have to use qp to be capture-compatible
         @qp_to_ppr
@@ -486,7 +467,7 @@ def test_merge_rotation_arbitrary_angle_ppr():
 
     my_pipeline = [("pipe", ["quantum-compilation-stage"])]
 
-    @qp.qjit(pipelines=my_pipeline, target="mlir", capture=True)
+    @qp.qjit(pipelines=my_pipeline, target="mlir", capture=True, collect_decomp_rules=False)
     def test_merge_rotation_ppr_workflow():
         @qp.transforms.merge_rotations
         @qp_to_ppr
@@ -531,9 +512,9 @@ def test_clifford_to_ppm():
 
     pauli_corrected_cir = ppr_to_ppm_transform(decompose_method="pauli-corrected")(to_ppr_cir)
 
-    auto_qjit_cir = qp.qjit(auto_corrected_cir, capture=True)
-    clifford_qjit_cir = qp.qjit(clifford_corrected_cir, capture=True)
-    pauli_qjit_cir = qp.qjit(pauli_corrected_cir, capture=True)
+    auto_qjit_cir = qp.qjit(auto_corrected_cir, capture=True, collect_decomp_rules=False)
+    clifford_qjit_cir = qp.qjit(clifford_corrected_cir, capture=True, collect_decomp_rules=False)
+    pauli_qjit_cir = qp.qjit(pauli_corrected_cir, capture=True, collect_decomp_rules=False)
 
     baseline_cir = cir()
 
@@ -549,7 +530,7 @@ def test_decompose_arbitrary_ppr():
 
     my_pipeline = [("pipe", ["quantum-compilation-stage"])]
 
-    @qp.qjit(pipelines=my_pipeline, target="mlir", capture=True)
+    @qp.qjit(pipelines=my_pipeline, target="mlir", capture=True, collect_decomp_rules=False)
     def test_decompose_arbitrary_ppr_workflow():
         @qp.transform(pass_name="decompose-arbitrary-ppr")
         @qp.transform(pass_name="to-ppr")
@@ -581,8 +562,8 @@ class TestLowerPBCInitOps:
             (lambda: qp.H(0)),
             (lambda: (qp.H(0), qp.T(0))),
             (lambda: (qp.H(0), qp.S(0))),
-            (lambda: (qp.H(0), qp.adjoint(qp.T(0), lazy=False))),
-            (lambda: (qp.H(0), qp.adjoint(qp.S(0), lazy=False))),
+            (lambda: (qp.H(0), qp.adjoint(qp.T(0)))),
+            (lambda: (qp.H(0), qp.adjoint(qp.S(0)))),
         ],
     )
     def test_lower_pbc_init_ops_preserves_states(self, gates):

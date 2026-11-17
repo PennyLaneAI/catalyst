@@ -1311,7 +1311,7 @@ class TestControlFlow:
         """
         dev = qp.device("null.qubit", wires=1)
 
-        @qp.qjit(capture=True, target="mlir")
+        @qp.qjit(capture=True, collect_decomp_rules=False, target="mlir")
         @convert_qecl_to_qecp_pass(qec_code="Steane")
         @qp.transform(pass_name="symbol-dce")
         @convert_quantum_to_qecl_pass(k=1)
@@ -1348,7 +1348,7 @@ class TestControlFlow:
         """
         dev = qp.device("null.qubit", wires=1)
 
-        @qp.qjit(capture=True, target="mlir")
+        @qp.qjit(capture=True, collect_decomp_rules=False, target="mlir")
         @convert_qecl_to_qecp_pass(qec_code="Steane")
         @qp.transform(pass_name="symbol-dce")
         @convert_quantum_to_qecl_pass(k=1)
@@ -1382,7 +1382,7 @@ class TestControlFlow:
         """
         dev = qp.device("null.qubit", wires=1)
 
-        @qp.qjit(capture=True, target="mlir")
+        @qp.qjit(capture=True, collect_decomp_rules=False, target="mlir")
         @convert_qecl_to_qecp_pass(qec_code="Steane")
         @qp.transform(pass_name="symbol-dce")
         @convert_quantum_to_qecl_pass(k=1)
@@ -1430,7 +1430,7 @@ class TestQECPLoweringIntegration:
         GHZ circuit."""
         dev = qp.device("null.qubit", wires=3)
 
-        @qp.qjit(capture=True, target="mlir")
+        @qp.qjit(capture=True, collect_decomp_rules=False, target="mlir")
         @convert_qecl_to_qecp_pass(qec_code="Steane")
         @convert_quantum_to_qecl_pass(k=1)
         @qp.qnode(dev, shots=1)
@@ -1473,7 +1473,7 @@ class TestQECPLoweringIntegration:
         non-trivial circuit."""
         dev = qp.device("null.qubit", wires=1)
 
-        @qp.qjit(target="mlir", capture=True)
+        @qp.qjit(target="mlir", capture=True, collect_decomp_rules=False)
         @convert_qecl_to_qecp_pass(qec_code="Steane", number_errors=1)
         @inject_noise_to_qecl_pass
         @convert_quantum_to_qecl_pass(k=1)
@@ -1511,7 +1511,7 @@ class TestGenerality:
         dev = qp.device("lightning.qubit", wires=2)
         pipe = [("pipe", ["quantum-compilation-stage"])]
 
-        @qp.qjit(capture=True, pipelines=pipe, target="mlir")
+        @qp.qjit(capture=True, collect_decomp_rules=False, pipelines=pipe, target="mlir")
         @convert_qecl_to_qecp_pass(qec_code="Shor913", number_errors=0)
         @convert_quantum_to_qecl_pass(k=1)
         @qp.set_shots(1000)

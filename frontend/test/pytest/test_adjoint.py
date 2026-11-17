@@ -279,6 +279,7 @@ class TestCatalyst:
 
         self.verify_catalyst_adjoint_against_pennylane(func, qp.device(backend, wires=2))
 
+    @pytest.mark.old_frontend
     def test_adjoint_no_measurements(self):
         """Checks that catalyst.adjoint rejects functions containing quantum measurements."""
 
@@ -288,7 +289,7 @@ class TestCatalyst:
 
         with pytest.raises(ValueError, match="Measurement process cannot be used"):
 
-            @qjit
+            @qjit(capture=False)
             @qp.qnode(qp.device("lightning.qubit", wires=2))
             def C_workflow():
                 adjoint(func)()
@@ -296,11 +297,12 @@ class TestCatalyst:
 
             C_workflow()
 
+    @pytest.mark.old_frontend
     def test_adjoint_invalid_argument(self):
         """Checks that catalyst.adjoint rejects non-quantum program arguments."""
         with pytest.raises(ValueError, match="Expected a callable"):
 
-            @qjit
+            @qjit(capture=False)
             @qp.qnode(qp.device("lightning.qubit", wires=2))
             def C_workflow():
                 adjoint(33)()
@@ -362,6 +364,31 @@ class TestCatalyst:
 
         dev = qp.device(backend, wires=1)
         self.verify_catalyst_adjoint_against_pennylane(func, dev, 10, capture_mode=capture_mode)
+
+    # Fail if capture falls back to Python unrolling, which would make the control values
+    # constant and let the test pass without exercising dynamic control-value caching. This
+    # should never happen in practice, but adding this just ensures the validity of the test.
+    @pytest.mark.filterwarnings("error:Structured capture")
+    def test_adjoint_dynamic_control_values(self):
+        """Test that loop-local control values stay paired with their angles when reversing
+        the loop.
+        """
+
+        @qjit(capture=True)
+        @qp.qnode(qp.device("lightning.qubit", wires=2))
+        def circuit(theta):
+            @for_loop(2)
+            def body(i):
+                qp.ctrl(qp.RX, control=0, control_values=[i == 1])((i + 1) * theta, wires=1)
+
+            qp.adjoint(body)()
+            return qp.expval(qp.Y(1))
+
+        # The control remains |0>, so only i=0 contributes RX(theta). Its
+        # adjoint gives cos(theta/2)|0> + i sin(theta/2)|1> on wire 1, hence
+        # <Y(1)> = 2 cos(theta/2) sin(theta/2) = sin(theta)
+        theta = 0.3
+        assert_allclose(circuit(theta), np.sin(theta), atol=1e-12)
 
     def test_adjoint_for_loop(self, backend, capture_mode):
         """Tests the correct application of gates (with dynamic wires)"""
@@ -507,10 +534,11 @@ class TestCatalyst:
         dev = qp.device(backend, wires=1)
         self.verify_catalyst_adjoint_against_pennylane(func, dev, jnp.pi, capture_mode=capture_mode)
 
+    @pytest.mark.old_frontend
     def test_adjoint_wires(self, backend):
         """Test the wires property of Adjoint"""
 
-        @qjit
+        @qjit(capture=False)
         @qp.qnode(qp.device(backend, wires=3))
         def circuit(theta):
             def func(theta):
@@ -524,10 +552,11 @@ class TestCatalyst:
         # Without the `wires` property, returns `[-1]`
         assert circuit(0.3) == qp.wires.Wires([0, 2])
 
+    @pytest.mark.old_frontend
     def test_adjoint_wires_qubitunitary(self, backend):
         """Test the wires property of nested Adjoint with QubitUnitary"""
 
-        @qjit
+        @qjit(capture=False)
         @qp.qnode(qp.device(backend, wires=3))
         def circuit():
             def func():
@@ -1406,16 +1435,6 @@ class TestAdjointConstructorPreconstructedOp:
         assert len(q) == 1
         assert q.queue[0] is out
 
-    def test_single_op_defined_outside_queue_eager(self):
-        """Test if base is defined outside context and the function eagerly simplifies
-        the adjoint, the base is not added to queue."""
-        base = qp.RX(1.2, wires=0)
-        with qp.queuing.AnnotatedQueue() as q:
-            out = adjoint(base, lazy=False)
-
-        assert len(q) == 1
-        assert q.queue[0] is out
-
     def test_single_observable(self):
         """Test passing a single preconstructed observable in a queuing context."""
 
@@ -1505,78 +1524,6 @@ class TestAdjointConstructorDifferentCallableTypes:
         assert out.wires == qp.wires.Wires(1)
 
 
-class TestAdjointConstructorNonLazyExecution:
-    """Test the lazy=False keyword."""
-
-    def test_single_decomposeable_op(self):
-        """Test lazy=False for a single op that gets decomposed."""
-
-        x = 1.23
-        with qp.queuing.AnnotatedQueue() as q:
-            base = qp.RX(x, wires=1)
-            out = adjoint(base, lazy=False)
-
-        assert len(q) == 1
-        assert q.queue[0] is out
-
-        assert isinstance(out, qp.RX)
-        assert out.data == (-1.23,)
-
-    def test_single_nondecomposable_op(self):
-        """Test lazy=false for a single op that can't be decomposed."""
-        with qp.queuing.AnnotatedQueue() as q:
-            base = qp.S(0)
-            out = adjoint(base, lazy=False)
-
-        assert len(q) == 1
-        assert q.queue[0] is out
-
-        assert isinstance(out, Adjoint)
-        assert isinstance(out.base, qp.S)
-
-    def test_single_decomposable_op_function(self):
-        """Test lazy=False for a single op callable that gets decomposed."""
-        x = 1.23
-        with qp.queuing.AnnotatedQueue() as q:
-            out = adjoint(qp.RX, lazy=False)(x, wires=1)
-
-        tape = qp.tape.QuantumScript.from_queue(q)
-        assert out is tape[0]
-        assert not isinstance(out, Adjoint)
-        assert isinstance(out, qp.RX)
-        assert out.data == (-x,)
-
-    def test_single_nondecomposable_op_function(self):
-        """Test lazy=False for a single op function that can't be decomposed."""
-        with qp.queuing.AnnotatedQueue() as q:
-            out = adjoint(qp.S, lazy=False)(0)
-
-        tape = qp.tape.QuantumScript.from_queue(q)
-        assert out is tape[0]
-        assert isinstance(out, Adjoint)
-        assert isinstance(out.base, qp.S)
-
-    @pytest.mark.skip(reason="Catalyst and PL are not unified in the qfunc case.")
-    def test_mixed_function(self):
-        """Test lazy=False with a function that applies operations of both types."""
-        x = 1.23
-
-        def qfunc(x):
-            qp.RZ(x, wires="b")
-            qp.T("b")
-
-        with qp.queuing.AnnotatedQueue() as q:
-            out = adjoint(qfunc, lazy=False)(x)
-
-        tape = qp.tape.QuantumScript.from_queue(q)
-        assert len(tape) == len(out) == 2
-        assert isinstance(tape[0], Adjoint)
-        assert isinstance(tape[0].base, qp.T)
-
-        assert isinstance(tape[1], qp.RZ)
-        assert tape[1].data[0] == -x
-
-
 class TestAdjointConstructorOutsideofQueuing:
     """Test the behaviour of the adjoint transform when not called in a queueing context."""
 
@@ -1590,16 +1537,6 @@ class TestAdjointConstructorOutsideofQueuing:
         assert out.base.__class__ is qp.RZ
         assert out.base.phi == 1.234
         assert out.wires == qp.wires.Wires(0)
-
-    def test_single_op_eager(self):
-        """Test a single op that can be decomposed in eager mode outside of a queuing context."""
-
-        x = 1.234
-        base = qp.RX(x, wires=0)
-        out = adjoint(base, lazy=False)
-
-        assert isinstance(out, qp.RX)
-        assert out.data == (-x,)
 
     def test_single_op_function(self):
         """Test the transform on a single op as a callable outside of a queuing context."""
@@ -1625,14 +1562,6 @@ class TestAdjointConstructorOutsideofQueuing:
         assert len(out) == 2
         assert all(isinstance(op, Adjoint) for op in out)
         assert all(op.wires == qp.wires.Wires(wire) for op in out)
-
-    def test_nonlazy_op_function(self):
-        """Test non-lazy mode on a simplifiable op outside of a queuing context."""
-
-        out = adjoint(qp.PauliX, lazy=False)(0)
-
-        assert not isinstance(out, Adjoint)
-        assert isinstance(out, qp.PauliX)
 
 
 class TestAdjointConstructorIntegration:
@@ -1668,6 +1597,7 @@ class TestAdjointConstructorIntegration:
         assert qp.math.allclose(jax.grad(circ)(x), expected_grad)
 
 
+@pytest.mark.old_frontend
 class TestMidCircuitMeasurementAfterAdjoint:
     def test_issue_1055(self, backend):
         """See https://github.com/PennyLaneAI/catalyst/issues/1055"""
@@ -1675,7 +1605,7 @@ class TestMidCircuitMeasurementAfterAdjoint:
         def subroutine():
             qp.Hadamard(wires=1)
 
-        @qjit
+        @qjit(capture=False)
         @qp.qnode(qp.device("lightning.qubit", wires=2))
         def circuit():
             # Comment/uncomment to toggle bug
@@ -1691,13 +1621,14 @@ class TestMidCircuitMeasurementAfterAdjoint:
         assert not circuit()
 
 
+@pytest.mark.old_frontend
 class TestAdjointOfTemplates:
     """Test behaviour of adjoint around complex templates."""
 
     def test_adjoint_for_loop(self, backend):
         """Test operator adjoint works around templates that decompose into for loops."""
 
-        @qp.qjit
+        @qp.qjit(capture=False)
         @qp.qnode(qp.device(backend, wires=1))
         def circuit(n: int):
             qp.H(0)
@@ -1719,7 +1650,7 @@ class TestAdjointOfTemplates:
     def test_adjoint_while_loop(self, backend):
         """Test operator adjoint works around templates that decompose into for loops."""
 
-        @qp.qjit
+        @qp.qjit(capture=False)
         @qp.qnode(qp.device(backend, wires=1))
         def circuit(n: int):
             qp.H(0)
@@ -1742,7 +1673,7 @@ class TestAdjointOfTemplates:
     def test_adjoint_cond(self, backend):
         """Test operator adjoint works around templates that decompose into if conditionals."""
 
-        @qp.qjit
+        @qp.qjit(capture=False)
         @qp.qnode(qp.device(backend, wires=1))
         def circuit(b: bool):
             qp.H(0)
@@ -1774,7 +1705,7 @@ class TestAdjointOfTemplates:
 
             return qp.expval(qp.Z(0))
 
-        result = qjit(circuit)(0)
+        result = qjit(circuit, capture=False)(0)
         assert np.isclose(result, 1.0)
 
 

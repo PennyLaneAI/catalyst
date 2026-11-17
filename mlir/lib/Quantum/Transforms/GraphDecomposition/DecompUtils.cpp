@@ -24,20 +24,11 @@ namespace catalyst {
 namespace quantum {
 namespace DecompUtils {
 
-bool isDecompositionFunction(func::FuncOp func) { return func->hasAttr(target_gate_attr_name); }
-
 StringRef getTargetGateName(func::FuncOp func) {
     if (auto target_op_attr = func->getAttrOfType<StringAttr>(target_gate_attr_name)) {
         return target_op_attr.getValue();
     }
     return StringRef{};
-}
-
-uint64_t getNumWires(func::FuncOp func) {
-    if (auto num_wires_attr = func->getAttrOfType<IntegerAttr>("num_wires")) {
-        return num_wires_attr.getValue().getZExtValue();
-    }
-    return 0;
 }
 
 bool isInDecompRule(Operation *op) {

@@ -12,4 +12,9 @@ add_mlir_library(MLIRQuantum
     MLIRQuantumInterfacesIncGen
     MLIRQuantumOpsIncGen
     MLIRQRefOpsIncGen
+
+    LINK_LIBS PRIVATE
+    MLIRMBQC
+    MLIRPBC
+    MLIRQRef
 )

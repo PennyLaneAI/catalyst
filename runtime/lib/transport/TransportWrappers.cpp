@@ -14,15 +14,12 @@
 
 // TransportWrappers.cpp
 //
+//   __call      in-process, through the C ABI. Takes and returns what the function it names does,
+//               and raises a runtime error naming the call when that function fails.
 //   __wrapper   dispatched. The executor resolves the symbol through LLVM ORC and calls it with one
 //               flat argument buffer; the result goes back as another flat buffer. Neither buffer
 //               is framed, so the layout comes from the signature the call site declared.
-//   __call      in-process, through catalyst.custom_call. Each argument arrives as its own encoded
-//               memref, read through its data pointer.
 //
-// Both layouts have to agree with pennylane/runtime/operands.py, which is what builds the
-// arguments.
-
 #include <cstdint>
 #include <cstdlib>
 #include <cstring>
@@ -31,31 +28,6 @@
 #include "TransportCAPI.h"
 
 namespace {
-
-//===----------------------------------------------------------------------===//
-// In-process: an array of pointers to encoded memrefs
-//===----------------------------------------------------------------------===//
-
-// Where operand `i` keeps its data. Results are addressed the same way
-void *data_of(void **slots, unsigned i) {
-    return static_cast<CatalystEncodedMemref *>(slots[i])->data_aligned;
-}
-
-template <typename T> T arg(void **args, unsigned i) {
-    return *static_cast<const T *>(data_of(args, i));
-}
-
-// A str operand is already NUL-terminated bytes, so its data pointer is the C string.
-const char *str_arg(void **args, unsigned i) { return static_cast<const char *>(data_of(args, i)); }
-
-// A session handle crosses as a plain integer and is never dereferenced on the way here.
-CatalystTransportSession *session_arg(void **args, unsigned i) {
-    return reinterpret_cast<CatalystTransportSession *>(arg<std::uintptr_t>(args, i));
-}
-
-template <typename T> void put(void **results, unsigned i, T value) {
-    *static_cast<T *>(data_of(results, i)) = value;
-}
 
 //===----------------------------------------------------------------------===//
 // Dispatched: one flat argument buffer in, one flat result buffer out
@@ -177,9 +149,90 @@ constexpr std::size_t I32 = sizeof(std::int32_t);
 constexpr std::size_t I64 = sizeof(std::int64_t);
 constexpr std::size_t U64 = sizeof(std::uint64_t);
 
+int checked_status(int rc, const char *what) {
+    __catalyst__transport__check(rc, what);
+    return rc;
+}
+
+CatalystTransportSession *checked_session(CatalystTransportSession *s, const char *what) {
+    __catalyst__transport__check_session(s, what);
+    return s;
+}
+
 } // namespace
 
 extern "C" {
+
+//===----------------------------------------------------------------------===//
+// In-process, checked: the C function's own arguments, stopping the program if it fails
+//===----------------------------------------------------------------------===//
+
+CatalystTransportSession *__catalyst__transport__create__call(const char *backend_lib,
+                                                              const char *config, int32_t role,
+                                                              const char *key) {
+    return checked_session(__catalyst__transport__create(backend_lib, config, role, key), "create");
+}
+
+CatalystTransportSession *__catalyst__transport__get_session__call(int32_t role, const char *key) {
+    return checked_session(__catalyst__transport__get_session(role, key), "get_session");
+}
+
+int __catalyst__transport__connect__call(CatalystTransportSession *s, const char *peer,
+                                         uint16_t oob_port) {
+    return checked_status(__catalyst__transport__connect(s, peer, oob_port), "connect");
+}
+
+int __catalyst__transport__exchange_keys__call(CatalystTransportSession *s) {
+    return checked_status(__catalyst__transport__exchange_keys(s), "exchange_keys");
+}
+
+int __catalyst__transport__await__call(int64_t token) {
+    return checked_status(__catalyst__transport__await(token), "await");
+}
+
+int __catalyst__transport__establish_channel__call(CatalystTransportSession *s,
+                                                   const char *transport) {
+    return checked_status(__catalyst__transport__establish_channel(s, transport),
+                          "establish_channel");
+}
+
+int __catalyst__transport__set_coprocessor_fn__call(CatalystTransportSession *s,
+                                                    const char *symbol) {
+    return checked_status(__catalyst__transport__set_coprocessor_fn(s, symbol),
+                          "set_coprocessor_fn");
+}
+
+int __catalyst__transport__set_message_sizes__call(CatalystTransportSession *s,
+                                                   uint32_t work_item_idx, uint64_t in_bytes,
+                                                   uint64_t out_bytes) {
+    return checked_status(
+        __catalyst__transport__set_message_sizes(s, work_item_idx, in_bytes, out_bytes),
+        "set_message_sizes");
+}
+
+int __catalyst__transport__stage_payload__call(CatalystTransportSession *s, const void *src,
+                                               uint64_t bytes, uint32_t decoder_id) {
+    return checked_status(__catalyst__transport__stage_payload(s, src, bytes, decoder_id),
+                          "stage_payload");
+}
+
+int __catalyst__transport__post__call(CatalystTransportSession *s, uint32_t work_item_idx) {
+    return checked_status(__catalyst__transport__post(s, work_item_idx), "post");
+}
+
+int __catalyst__transport__collect__call(CatalystTransportSession *s, void *reply,
+                                         uint64_t reply_bytes) {
+    return checked_status(__catalyst__transport__collect(s, reply, reply_bytes), "collect");
+}
+
+int __catalyst__transport__start_benchmark__call(CatalystTransportSession *s, uint32_t iters,
+                                                 uint32_t decoder_id, uint32_t flags,
+                                                 uint64_t *samples, uint64_t samples_bytes,
+                                                 uint64_t *rounds) {
+    return checked_status(__catalyst__transport__start_benchmark(s, iters, decoder_id, flags,
+                                                                 samples, samples_bytes, rounds),
+                          "start_benchmark");
+}
 
 //===----------------------------------------------------------------------===//
 // Dispatched wrappers: sessions
@@ -194,7 +247,7 @@ CatalystWrapperResult __catalyst__transport__create__wrapper(const char *buf, st
     Out out(U64);
     if (in.ok() && out) {
         *out.slot<std::uint64_t>() = reinterpret_cast<std::uintptr_t>(
-            __catalyst__transport__create(library, config, role, key));
+            checked_session(__catalyst__transport__create(library, config, role, key), "create"));
     }
     return finish(in, out);
 }
@@ -206,8 +259,8 @@ CatalystWrapperResult __catalyst__transport__get_session__wrapper(const char *bu
     const char *key = in.str();
     Out out(U64);
     if (in.ok() && out) {
-        *out.slot<std::uint64_t>() =
-            reinterpret_cast<std::uintptr_t>(__catalyst__transport__get_session(role, key));
+        *out.slot<std::uint64_t>() = reinterpret_cast<std::uintptr_t>(
+            checked_session(__catalyst__transport__get_session(role, key), "get_session"));
     }
     return finish(in, out);
 }
@@ -223,7 +276,8 @@ CatalystWrapperResult __catalyst__transport__connect__wrapper(const char *buf, s
     auto port = in.get<std::uint16_t>();
     Out out(I32);
     if (in.ok() && out) {
-        *out.slot<std::int32_t>() = __catalyst__transport__connect(session, peer, port);
+        *out.slot<std::int32_t>() =
+            checked_status(__catalyst__transport__connect(session, peer, port), "connect");
     }
     return finish(in, out);
 }
@@ -257,7 +311,7 @@ CatalystWrapperResult __catalyst__transport__await__wrapper(const char *buf, std
     auto token = in.get<std::int64_t>();
     Out out(I32);
     if (in.ok() && out) {
-        *out.slot<std::int32_t>() = __catalyst__transport__await(token);
+        *out.slot<std::int32_t>() = checked_status(__catalyst__transport__await(token), "await");
     }
     return finish(in, out);
 }
@@ -268,7 +322,8 @@ CatalystWrapperResult __catalyst__transport__exchange_keys__wrapper(const char *
     auto *session = in.session();
     Out out(I32);
     if (in.ok() && out) {
-        *out.slot<std::int32_t>() = __catalyst__transport__exchange_keys(session);
+        *out.slot<std::int32_t>() =
+            checked_status(__catalyst__transport__exchange_keys(session), "exchange_keys");
     }
     return finish(in, out);
 }
@@ -284,7 +339,8 @@ CatalystWrapperResult __catalyst__transport__establish_channel__wrapper(const ch
     const char *transport = in.str();
     Out out(I32);
     if (in.ok() && out) {
-        *out.slot<std::int32_t>() = __catalyst__transport__establish_channel(session, transport);
+        *out.slot<std::int32_t>() = checked_status(
+            __catalyst__transport__establish_channel(session, transport), "establish_channel");
     }
     return finish(in, out);
 }
@@ -296,7 +352,8 @@ CatalystWrapperResult __catalyst__transport__set_coprocessor_fn__wrapper(const c
     const char *symbol = in.str();
     Out out(I32);
     if (in.ok() && out) {
-        *out.slot<std::int32_t>() = __catalyst__transport__set_coprocessor_fn(session, symbol);
+        *out.slot<std::int32_t>() = checked_status(
+            __catalyst__transport__set_coprocessor_fn(session, symbol), "set_coprocessor_fn");
     }
     return finish(in, out);
 }
@@ -310,8 +367,9 @@ CatalystWrapperResult __catalyst__transport__set_message_sizes__wrapper(const ch
     auto out_bytes = in.get<std::uint64_t>();
     Out out(I32);
     if (in.ok() && out) {
-        *out.slot<std::int32_t>() =
-            __catalyst__transport__set_message_sizes(session, work_item, in_bytes, out_bytes);
+        *out.slot<std::int32_t>() = checked_status(
+            __catalyst__transport__set_message_sizes(session, work_item, in_bytes, out_bytes),
+            "set_message_sizes");
     }
     return finish(in, out);
 }
@@ -340,8 +398,10 @@ CatalystWrapperResult __catalyst__transport__start_benchmark__wrapper(const char
         // reserve the samples buffer with the caller's capacity
         auto *samples = static_cast<std::uint64_t *>(out.reserve(samples_bytes));
         auto *rounds = out.slot<std::uint64_t>();
-        *status = __catalyst__transport__start_benchmark(session, iters, decoder_id, flags, samples,
-                                                         samples_bytes, rounds);
+        *status =
+            checked_status(__catalyst__transport__start_benchmark(session, iters, decoder_id, flags,
+                                                                  samples, samples_bytes, rounds),
+                           "start_benchmark");
     }
     return finish(in, out);
 }
@@ -381,146 +441,6 @@ CatalystWrapperResult __catalyst__transport__destroy__wrapper(const char *buf, s
         *out.slot<std::int32_t>() = CATALYST_TRANSPORT_OK;
     }
     return finish(in, out);
-}
-
-//===----------------------------------------------------------------------===//
-// In-process adapters: sessions
-//===----------------------------------------------------------------------===//
-
-void __catalyst__transport__create__call(void **args, void **results) {
-    put<std::uint64_t>(
-        results, 0,
-        reinterpret_cast<std::uintptr_t>(__catalyst__transport__create(
-            str_arg(args, 0), str_arg(args, 1), arg<std::int32_t>(args, 2), str_arg(args, 3))));
-}
-
-void __catalyst__transport__get_session__call(void **args, void **results) {
-    put<std::uint64_t>(results, 0,
-                       reinterpret_cast<std::uintptr_t>(__catalyst__transport__get_session(
-                           arg<std::int32_t>(args, 0), str_arg(args, 1))));
-}
-
-//===----------------------------------------------------------------------===//
-// In-process adapters: connecting and key exchange
-//===----------------------------------------------------------------------===//
-
-void __catalyst__transport__connect__call(void **args, void **results) {
-    put<std::int32_t>(results, 0,
-                      __catalyst__transport__connect(session_arg(args, 0), str_arg(args, 1),
-                                                     arg<std::uint16_t>(args, 2)));
-}
-
-void __catalyst__transport__connect_async__call(void **args, void **results) {
-    put<std::int64_t>(results, 0,
-                      __catalyst__transport__connect_async(session_arg(args, 0), str_arg(args, 1),
-                                                           arg<std::uint16_t>(args, 2)));
-}
-
-void __catalyst__transport__exchange_keys__call(void **args, void **results) {
-    put<std::int32_t>(results, 0, __catalyst__transport__exchange_keys(session_arg(args, 0)));
-}
-
-void __catalyst__transport__exchange_keys_async__call(void **args, void **results) {
-    put<std::int64_t>(results, 0, __catalyst__transport__exchange_keys_async(session_arg(args, 0)));
-}
-
-void __catalyst__transport__await__call(void **args, void **results) {
-    put<std::int32_t>(results, 0, __catalyst__transport__await(arg<std::int64_t>(args, 0)));
-}
-
-//===----------------------------------------------------------------------===//
-// In-process adapters: channel setup
-//===----------------------------------------------------------------------===//
-
-void __catalyst__transport__establish_channel__call(void **args, void **results) {
-    put<std::int32_t>(
-        results, 0,
-        __catalyst__transport__establish_channel(session_arg(args, 0), str_arg(args, 1)));
-}
-
-void __catalyst__transport__set_coprocessor_fn__call(void **args, void **results) {
-    put<std::int32_t>(
-        results, 0,
-        __catalyst__transport__set_coprocessor_fn(session_arg(args, 0), str_arg(args, 1)));
-}
-
-void __catalyst__transport__set_message_sizes__call(void **args, void **results) {
-    put<std::int32_t>(results, 0,
-                      __catalyst__transport__set_message_sizes(
-                          session_arg(args, 0), arg<std::uint32_t>(args, 1),
-                          arg<std::uint64_t>(args, 2), arg<std::uint64_t>(args, 3)));
-}
-
-//===----------------------------------------------------------------------===//
-// In-process adapters: data path
-//===----------------------------------------------------------------------===//
-
-void __catalyst__transport__request_slot__call(void **args, void **results) {
-    put<std::uint64_t>(results, 0,
-                       reinterpret_cast<std::uintptr_t>(
-                           __catalyst__transport__request_slot(session_arg(args, 0))));
-}
-
-void __catalyst__transport__reply_slot__call(void **args, void **results) {
-    put<std::uint64_t>(
-        results, 0,
-        reinterpret_cast<std::uintptr_t>(__catalyst__transport__reply_slot(session_arg(args, 0))));
-}
-
-// The source is a buf: its data pointer, with the byte count as its own argument.
-void __catalyst__transport__stage_payload__call(void **args, void **results) {
-    put<std::int32_t>(results, 0,
-                      __catalyst__transport__stage_payload(session_arg(args, 0), data_of(args, 1),
-                                                           arg<std::uint64_t>(args, 2),
-                                                           arg<std::uint32_t>(args, 3)));
-}
-
-void __catalyst__transport__post__call(void **args, void **results) {
-    put<std::int32_t>(
-        results, 0, __catalyst__transport__post(session_arg(args, 0), arg<std::uint32_t>(args, 1)));
-}
-
-// The reply is an out buffer, so it comes from results[1] while its size is argument 1.
-void __catalyst__transport__collect__call(void **args, void **results) {
-    put<std::int32_t>(results, 0,
-                      __catalyst__transport__collect(session_arg(args, 0), data_of(results, 1),
-                                                     arg<std::uint64_t>(args, 1)));
-}
-
-void __catalyst__transport__last_rtt_ns__call(void **args, void **results) {
-    put<std::uint64_t>(results, 0, __catalyst__transport__last_rtt_ns(session_arg(args, 0)));
-}
-
-//===----------------------------------------------------------------------===//
-// In-process adapters: benchmark
-//===----------------------------------------------------------------------===//
-
-void __catalyst__transport__start_benchmark__call(void **args, void **results) {
-    put<std::int32_t>(
-        results, 0,
-        __catalyst__transport__start_benchmark(
-            session_arg(args, 0), arg<std::uint32_t>(args, 1), arg<std::uint32_t>(args, 2),
-            arg<std::uint32_t>(args, 3), static_cast<std::uint64_t *>(data_of(results, 1)),
-            arg<std::uint64_t>(args, 4), static_cast<std::uint64_t *>(data_of(results, 2))));
-}
-
-//===----------------------------------------------------------------------===//
-// In-process adapters: lifecycle
-//===----------------------------------------------------------------------===//
-
-void __catalyst__transport__start__call(void **args, void **results) {
-    __catalyst__transport__start(session_arg(args, 0));
-    put<std::int32_t>(results, 0, CATALYST_TRANSPORT_OK);
-}
-
-void __catalyst__transport__stop__call(void **args, void **results) {
-    __catalyst__transport__stop(session_arg(args, 0));
-    put<std::int32_t>(results, 0, CATALYST_TRANSPORT_OK);
-}
-
-void __catalyst__transport__destroy__call(void **args, void **results) {
-    __catalyst__transport__destroy(session_arg(args, 0));
-    put<std::int32_t>(results, 0, CATALYST_TRANSPORT_OK);
 }
 
 } // extern "C"

@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# old_frontend: tests the Catalyst switch API.
 # RUN: %PYTHON %s | FileCheck %s
 
 # pylint: disable=missing-function-docstring
@@ -24,7 +25,7 @@ from catalyst import qjit, switch
 
 
 # CHECK-LABEL: public @jit_no_branches
-@qjit(target="mlir")
+@qjit(capture=False, target="mlir")
 def no_branches(i: int):
 
     # cast index and use as arg for switch
@@ -46,7 +47,7 @@ print(no_branches.mlir)
 
 
 # CHECK-LABEL: public @jit_classical_circuit
-@qjit(target="mlir")
+@qjit(capture=False, target="mlir")
 def classical_circuit(i: int):
 
     # cast index and use as arg for switch
@@ -89,7 +90,7 @@ print(classical_circuit.mlir)
 
 
 # CHECK-LABEL: public @quantum_circuit
-@qjit(target="mlir")
+@qjit(capture=False, target="mlir")
 
 # CHECK: quantum.device
 @qp.qnode(qp.device("lightning.qubit", wires=1))
@@ -122,3 +123,30 @@ def quantum_circuit(i: int):
 
 
 print(quantum_circuit.mlir)
+
+# ----------------------------------------------------------------------------------------------- #
+
+
+# The per-case `estimated_probability` hints are attached as a `catalyst.estimated_probabilities`
+# array (one entry per non-default case, in case order) on the emitted `scf.index_switch`.
+# CHECK-LABEL: public @jit_estimated_probabilities
+@qjit(capture=False, target="mlir")
+def estimated_probabilities(i: int):
+
+    # CHECK:    scf.index_switch {{.*}} {catalyst.estimated_probabilities = [3.000000e-01, 5.000000e-01]}
+    @switch(i)
+    def my_switch():
+        return 5
+
+    @my_switch.branch(0, estimated_probability=0.3)
+    def my_branch():
+        return 9
+
+    @my_switch.branch(3, estimated_probability=0.5)
+    def my_branch():
+        return 4
+
+    return my_switch()
+
+
+print(estimated_probabilities.mlir)

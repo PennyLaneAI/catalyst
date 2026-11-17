@@ -39,7 +39,7 @@ def test_measure_x():
     qp.capture.enable()
 
     # CHECK-LABEL: @workload_measure_x
-    @qjit(target="mlir")
+    @qjit(target="mlir", collect_decomp_rules=False)
     @qp.qnode(dev)
     def workload_measure_x():
         # CHECK: [[angle:%.+]] = arith.constant 0.000000e+00 : f64
@@ -68,7 +68,7 @@ def test_measure_y():
     qp.capture.enable()
 
     # CHECK-LABEL: @workload_measure_y
-    @qjit(target="mlir")
+    @qjit(target="mlir", collect_decomp_rules=False)
     @qp.qnode(dev)
     def workload_measure_y():
         # CHECK: [[angle:%.+]] = arith.constant 1.5707963267948966 : f64
@@ -101,7 +101,7 @@ def test_measure_z():
     qp.capture.enable()
 
     # COM: CHECK-LABEL: @workload_measure_z
-    @qjit(target="mlir")
+    @qjit(target="mlir", collect_decomp_rules=False)
     @qp.qnode(dev)
     def workload_measure_z():
         # COM: CHECK: [[qreg:%.+]] = qref.alloc( 1) : !qref.reg<1>
@@ -133,7 +133,7 @@ def test_measure_arbitrary_basis(angle, plane):
 
     qp.capture.enable()
 
-    @qjit(target="mlir")
+    @qjit(target="mlir", collect_decomp_rules=False)
     @qp.qnode(dev)
     def workload_measure_arbitrary_basis():
         _ = plft.measure_arbitrary_basis(wires=0, angle=angle, plane=plane)
@@ -187,7 +187,7 @@ def test_measure_arbitrary_basis_dyn_angle(plane):
 
     qp.capture.enable()
 
-    @qjit(target="mlir")
+    @qjit(target="mlir", collect_decomp_rules=False)
     @qp.qnode(dev)
     def workload_measure_arbitrary_basis_dyn_angle(_angle: float):
         _ = plft.measure_arbitrary_basis(wires=0, angle=_angle, plane=plane)
@@ -219,7 +219,7 @@ def test_pseudo_mbqc_workload():
     qp.capture.enable()
 
     # CHECK-LABEL: public @workload_pseudo_mbqc(
-    @qjit(target="mlir")
+    @qjit(target="mlir", collect_decomp_rules=False)
     @qp.qnode(dev)
     def workload_pseudo_mbqc(rotation_angle: float):
         # CHECK: [[cst_zero:%.+]] = arith.constant 0.000000e+00 : f64

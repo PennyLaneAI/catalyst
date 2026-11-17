@@ -35,6 +35,7 @@ from pennylane.devices.capabilities import (
     ExecutionCondition,
     OperatorProperties,
 )
+from pennylane.logging import debug_logger, debug_logger_init
 from pennylane.transforms import (
     diagonalize_measurements,
     split_non_commuting,
@@ -53,7 +54,6 @@ from catalyst.device.verification import (
     verify_no_state_variance_returns,
     verify_operations,
 )
-from catalyst.logging import debug_logger, debug_logger_init
 from catalyst.utils.exceptions import CompileError
 from catalyst.utils.runtime_environment import get_lib_path
 
@@ -288,6 +288,14 @@ def get_qjit_device_capabilities(target_capabilities: DeviceCapabilities) -> Dev
     qjit_capabilities.operations.update(
         {"Snapshot": OperatorProperties(invertible=False, controllable=False, differentiable=False)}
     )
+
+    # Catalyst supports dynamic qubit allocation on qjit-compatible devices. Target device
+    # TOMLs (e.g. lightning) still default this flag to false; expose Catalyst support via
+    # qjit capabilities so verification can check the field rather than bypassing Allocate.
+    # TODO: remove this override once all qjit-compatible backends declare
+    # dynamic_qubit_management=true in their device TOMLs.
+    if target_capabilities.qjit_compatible:
+        qjit_capabilities.dynamic_qubit_management = True
 
     # TODO: Optionally enable runtime-powered quantum gate controlling once they
     #       are supported natively in MLIR.

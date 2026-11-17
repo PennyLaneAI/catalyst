@@ -46,7 +46,8 @@ jobs:
         git config --global user.email '${{ secrets.AUTO_UPDATE_VERSION_RINGO_EMAIL }}'
         git config --global user.name "ringo-but-quantum"
         git add $GITHUB_WORKSPACE/frontend/catalyst/_version.py
-        git commit -m "[no ci] bump nightly rc version"
+        DEV_VERSION=$(grep __version__ "$GITHUB_WORKSPACE/frontend/catalyst/_version.py" | cut -d'"' -f2 | cut -d'-' -f2)
+        git commit -m "[no ci] bump nightly version to ${DEV_VERSION}"
         git push
 
   # Only build the most popular configurations on a nightly schedule to save PyPI storage.
