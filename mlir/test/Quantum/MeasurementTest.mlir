@@ -20,9 +20,10 @@
 // CHECK-LABEL: @qubits
 func.func @qubits(%angle: f64, %data: tensor<?xf64>, %q0: !quantum.bit, %q1: !quantum.bit)
     -> (i1, tensor<2xf64>, !quantum.bit, !quantum.bit) {
-  // CHECK: quantum.measurement "MeasurePair"(%{{.*}}: f64, %{{.*}}: tensor<?xf64>) qubits(%{{.*}}, %{{.*}}) static_data = {plane = "XY", reset = true} {tag = "preserved"} : i1, tensor<2xf64>, !quantum.bit, !quantum.bit
+  // CHECK: quantum.measurement "MeasurePair"(%{{.*}}: f64, %{{.*}}: tensor<?xf64>) qubits(%{{.*}}, %{{.*}}) static_data = {plane = "XY", reset = true} param_map = {angle = [0], data = [1]} qubit_map = {wires = [0, 1]} {tag = "preserved"} : i1, tensor<2xf64>, !quantum.bit, !quantum.bit
   %m, %data_out, %out:2 = quantum.measurement "MeasurePair"(%angle: f64, %data: tensor<?xf64>)
-      qubits(%q0, %q1) static_data = {plane = "XY", reset = true} {tag = "preserved"}
+      qubits(%q0, %q1) static_data = {plane = "XY", reset = true}
+      param_map = {angle = [0], data = [1]} qubit_map = {wires = [0, 1]} {tag = "preserved"}
       : i1, tensor<2xf64>, !quantum.bit, !quantum.bit
   return %m, %data_out, %out#0, %out#1 : i1, tensor<2xf64>, !quantum.bit, !quantum.bit
 }
@@ -30,9 +31,10 @@ func.func @qubits(%angle: f64, %data: tensor<?xf64>, %q0: !quantum.bit, %q1: !qu
 // CHECK-LABEL: @register
 func.func @register(%reg: !quantum.reg, %wires: tensor<?xi64>, %other: tensor<1xi64>)
     -> (tensor<?xi1>, !quantum.reg) {
-  // CHECK: quantum.measurement "MeasureMany"() quregs(%{{.*}}) indices(%{{.*}}: tensor<?xi64>, %{{.*}}: tensor<1xi64>) : tensor<?xi1>, !quantum.reg
+  // CHECK: quantum.measurement "MeasureMany"() quregs(%{{.*}}) indices(%{{.*}}: tensor<?xi64>, %{{.*}}: tensor<1xi64>) qubit_map = {other = [1], wires = [0]} : tensor<?xi1>, !quantum.reg
   %m, %out = quantum.measurement "MeasureMany"()
       quregs(%reg) indices(%wires: tensor<?xi64>, %other: tensor<1xi64>)
+      qubit_map = {wires = [0], other = [1]}
       : tensor<?xi1>, !quantum.reg
   return %m, %out : tensor<?xi1>, !quantum.reg
 }

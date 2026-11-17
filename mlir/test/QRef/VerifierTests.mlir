@@ -639,6 +639,37 @@ func.func @measurement_static_data_type() {
 
 // -----
 
+func.func @measurement_custom_invalid_param_map_coverage(%p0 : f64, %p1 : i64, %q0 : !qref.bit, %q1 : !qref.bit) {
+  // expected-error@+1 {{param_map must cover all params when provided: expected 2, got 1}}
+  %m = qref.measurement "custom_bad_param_map"(%p0 : f64, %p1 : i64) qubits(%q0, %q1)
+    param_map = {p0 = [0]}
+    : i1
+  return
+}
+
+// -----
+
+func.func @measurement_custom_invalid_qubit_map_coverage(%r : !qref.reg<?>, %idx0 : tensor<2xi64>, %idx1 : tensor<1xi64>) {
+  // expected-error@+1 {{qubit_map must cover all index arrays in register mode: expected 2, got 1}}
+  %m = qref.measurement "custom_bad_qubit_map"()
+    quregs(%r : !qref.reg<?>) indices(%idx0 : tensor<2xi64>, %idx1 : tensor<1xi64>)
+    qubit_map = {qi0 = [0]}
+    : i1
+  return
+}
+
+// -----
+
+func.func @measurement_custom_invalid_qubit_map_sum(%q0 : !qref.bit, %q1 : !qref.bit) {
+  // expected-error@+1 {{qubit_map must cover all qubit values in qubit mode: expected 2, got 1}}
+  %m = qref.measurement "custom_bad_qubit_map_sum"() qubits(%q0, %q1)
+    qubit_map = {pair = [0]}
+    : i1
+  return
+}
+
+// -----
+
 func.func @measurement_adjoint(%q: !qref.bit) {
   // expected-error@+1 {{quantum measurements are not allowed in the adjoint regions}}
   qref.adjoint {
