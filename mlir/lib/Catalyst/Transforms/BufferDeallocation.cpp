@@ -83,6 +83,7 @@
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/IR/Operation.h"
 #include "mlir/IR/PatternMatch.h"
+#include "mlir/IR/SymbolTable.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
@@ -94,6 +95,7 @@ using namespace catalyst;
 namespace catalyst {
 
 #define GEN_PASS_DEF_BUFFERDEALLOCATIONPASS
+#define GEN_PASS_DEF_ANNOTATEBUFFEROWNERSHIPPASS
 #include "Catalyst/Transforms/Passes.h.inc"
 
 } // namespace catalyst
@@ -147,6 +149,150 @@ static bool validateSupportedControlFlow(Operation *op) {
 }
 
 namespace {
+
+constexpr llvm::StringLiteral ownedBufferResultsAttr = "catalyst.owned_buffer_results";
+
+/// Infer ownership before running function passes: inspecting sibling functions
+/// from the nested deallocation pass would race with their transformations.
+struct AnnotateBufferOwnershipPass
+    : public catalyst::impl::AnnotateBufferOwnershipPassBase<AnnotateBufferOwnershipPass> {
+    void runOnOperation() override {
+        SmallVector<func::FuncOp> functions;
+        getOperation().walk([&](func::FuncOp function) {
+            if (!function.isExternal()) {
+                functions.push_back(function);
+            }
+        });
+        DenseMap<Operation *, SmallVector<bool>> ownedResults;
+        for (auto function : functions) {
+            ownedResults[function] = SmallVector<bool>(function.getNumResults(), false);
+        }
+
+        // The fixed point also handles helpers that forward fresh callee results.
+        // Recursive or otherwise unknown origins remain conservatively unowned.
+        bool changed;
+        do {
+            changed = false;
+            for (auto function : functions) {
+                BufferViewFlowAnalysis origins(function);
+                SetVector<Value> freshCallResults;
+                function.walk([&](func::CallOp call) {
+                    auto callee = SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(
+                        call, call.getCalleeAttr());
+                    auto it = ownedResults.find(callee);
+                    if (it == ownedResults.end()) {
+                        return;
+                    }
+                    for (auto [index, owned] : llvm::enumerate(it->second)) {
+                        if (owned) {
+                            freshCallResults.insert(call.getResult(index));
+                        }
+                    }
+                });
+                // A proven fresh result cannot alias the call's operands.
+                origins.remove(freshCallResults);
+                // remove() updates only the forward graph. Rebuild the reverse
+                // edges so ownership does not follow the removed dependencies.
+                BufferViewFlowAnalysis::ValueMapT reverseOrigins;
+                for (const auto &[source, destinations] : origins) {
+                    for (Value destination : destinations) {
+                        reverseOrigins[destination].insert(source);
+                    }
+                }
+                auto resolveOrigins = [&](Value value) {
+                    BufferViewFlowAnalysis::ValueSetT visited;
+                    SmallVector<Value> pending{value};
+                    while (!pending.empty()) {
+                        Value current = pending.pop_back_val();
+                        if (!visited.insert(current).second) {
+                            continue;
+                        }
+                        auto it = reverseOrigins.find(current);
+                        if (it != reverseOrigins.end()) {
+                            llvm::append_range(pending, it->second);
+                        }
+                    }
+                    return visited;
+                };
+                SmallVector<BufferViewFlowAnalysis::ValueSetT> resultOrigins(
+                    function.getNumResults());
+                SmallVector<bool> fresh(function.getNumResults(), true);
+                bool hasReturn = false;
+                function.walk([&](func::ReturnOp ret) {
+                    if (ret->getParentOfType<func::FuncOp>() != function) {
+                        return;
+                    }
+                    hasReturn = true;
+                    for (auto [index, value] : llvm::enumerate(ret.getOperands())) {
+                        if (!isa<BaseMemRefType>(value.getType())) {
+                            fresh[index] = false;
+                            continue;
+                        }
+                        bool hasOrigin = false;
+                        for (Value source : resolveOrigins(value)) {
+                            if (!isa<BaseMemRefType>(source.getType())) {
+                                continue;
+                            }
+                            // Deallocating a returned subview is not ownership
+                            // transfer of a base buffer. Only casts are accepted.
+                            if (source.getDefiningOp() &&
+                                isa<ViewLikeOpInterface>(source.getDefiningOp()) &&
+                                !source.getDefiningOp<memref::CastOp>()) {
+                                fresh[index] = false;
+                            }
+                            if (!origins.mayBeTerminalBuffer(source)) {
+                                continue;
+                            }
+                            hasOrigin = true;
+                            resultOrigins[index].insert(source);
+                            if (!source.getDefiningOp<memref::AllocOp>() &&
+                                !freshCallResults.contains(source)) {
+                                fresh[index] = false;
+                            }
+                        }
+                        fresh[index] = fresh[index] && hasOrigin;
+                    }
+                });
+                if (!hasReturn) {
+                    continue;
+                }
+                for (unsigned i = 0; i < fresh.size(); ++i) {
+                    for (unsigned j = 0; j < fresh.size(); ++j) {
+                        if (i != j && llvm::any_of(resultOrigins[i], [&](Value origin) {
+                                return resultOrigins[j].contains(origin);
+                            })) {
+                            fresh[i] = false;
+                        }
+                    }
+                    if (fresh[i] && !ownedResults[function][i]) {
+                        ownedResults[function][i] = true;
+                        changed = true;
+                    }
+                }
+            }
+        } while (changed);
+
+        getOperation().walk([&](func::CallOp call) {
+            call->removeAttr(ownedBufferResultsAttr);
+            auto callee =
+                SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(call, call.getCalleeAttr());
+            auto it = ownedResults.find(callee);
+            if (it == ownedResults.end()) {
+                return;
+            }
+            SmallVector<int32_t> indices;
+            for (auto [index, owned] : llvm::enumerate(it->second)) {
+                if (owned) {
+                    indices.push_back(index);
+                }
+            }
+            if (!indices.empty()) {
+                call->setAttr(ownedBufferResultsAttr,
+                              DenseI32ArrayAttr::get(&getContext(), indices));
+            }
+        });
+    }
+};
 
 //===----------------------------------------------------------------------===//
 // Backedges analysis
@@ -244,7 +390,37 @@ class BufferDeallocation : public BufferPlacementTransformationBase {
     using AliasAllocationMapT = llvm::DenseMap<Value, bufferization::AllocationOpInterface>;
 
     BufferDeallocation(Operation *op)
-        : BufferPlacementTransformationBase(op), dominators(op), postDominators(op) {}
+        : BufferPlacementTransformationBase(op), dominators(op), postDominators(op) {
+        SetVector<Value> nonAliases;
+        op->walk([&](Operation *operation) {
+            for (Value result : operation->getResults()) {
+                if (!isa<BaseMemRefType>(result.getType())) {
+                    nonAliases.insert(result);
+                }
+            }
+            auto call = dyn_cast<func::CallOp>(operation);
+            auto owned = call ? call->getAttrOfType<DenseI32ArrayAttr>(ownedBufferResultsAttr)
+                              : DenseI32ArrayAttr{};
+            if (!owned) {
+                return;
+            }
+            for (int32_t index : owned.asArrayRef()) {
+                Value result = call.getResult(index);
+                // Disconnect conservative operand-to-result aliases for buffers
+                // that the module analysis proved to be fresh.
+                nonAliases.insert(result);
+                auto dealloc = memref::findDealloc(result);
+                if (dealloc) {
+                    ownedCallResults.insert(result);
+                    allocs.registerAlloc({result, *dealloc});
+                }
+            }
+            call->removeAttr(ownedBufferResultsAttr);
+        });
+        // Call analysis also connects memrefs to scalar/quantum results. Such
+        // results cannot carry ownership of these classical buffers.
+        aliases.remove(nonAliases);
+    }
 
     /// Checks if all allocation operations either provide an already existing
     /// deallocation operation or implement the AllocationOpInterface. In
@@ -256,6 +432,9 @@ class BufferDeallocation : public BufferPlacementTransformationBase {
             // Get the defining allocation operation.
             Value alloc = std::get<0>(entry);
             auto allocationInterface = alloc.getDefiningOp<bufferization::AllocationOpInterface>();
+            if (ownedCallResults.contains(alloc)) {
+                continue;
+            }
             // If there is no existing deallocation operation and no implementation of
             // the AllocationOpInterface, we cannot apply the BufferDeallocation pass.
             if (!std::get<1>(entry) && !allocationInterface) {
@@ -660,6 +839,9 @@ class BufferDeallocation : public BufferPlacementTransformationBase {
 
     /// Stores already cloned buffers to avoid additional clones of clones.
     ValueSetT clonedValues;
+
+    /// Fresh results whose ownership was established at module scope.
+    DenseSet<Value> ownedCallResults;
 
     /// Maps aliases to their source allocation interfaces (inverse mapping).
     AliasAllocationMapT aliasToAllocations;
