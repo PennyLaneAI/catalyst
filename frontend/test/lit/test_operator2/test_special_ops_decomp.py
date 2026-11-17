@@ -137,10 +137,10 @@ def test_qubit_unitary():
 # CHECK: func.func private @__builtin_xyx{{(_[0-9]+)?}}
 # CHECK-SAME:   target_gate = "QubitUnitary{U:[tensor<2x2xcomplex<f64>>]}{wires:1}{}"
 #
-# CHECK: func.func private @__builtin_two_qubit_decomp_rule{{(_[0-9]+)?}}
+# CHECK: func.func private @__builtin_two_qubit{{(_[0-9]+)?}}
 # CHECK-SAME:   target_gate = "QubitUnitary{U:[tensor<4x4xcomplex<f64>>]}{wires:2}{}"
 #
-# CHECK: func.func private @__builtin_multi_qubit_decomp_rule{{(_[0-9]+)?}}
+# CHECK: func.func private @__builtin_multi_qubit{{(_[0-9]+)?}}
 # CHECK-SAME:   target_gate = "QubitUnitary{U:[tensor<8x8xcomplex<f64>>]}{wires:3}{}"
 test_qubit_unitary()
 
