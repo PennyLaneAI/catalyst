@@ -48,6 +48,10 @@ struct ResourceResult {
     // Per-GOID resource counts
     llvm::StringMap<double> detailedOperations;
 
+    // The `operations` that are not decomposable gates (e.g. PBC ops), with the same keys, when
+    // `collectDetailedOperations` is enabled. These ops are outside the decomposition graph.
+    llvm::StringMap<llvm::DenseMap<std::pair<int, int>, double>> nonGraphOperations;
+
     // Set of GOIDs observed under this result when `collectDetailedOperations` is
     // enabled. Accounts for dynamic-trip loops.
     llvm::StringSet<> observedGraphOpIds;
