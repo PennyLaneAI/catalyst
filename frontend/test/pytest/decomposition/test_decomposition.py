@@ -986,7 +986,7 @@ class TestPrecompiled:
                 f'frontend_name = "{frontend_name}"' in line
                 and f'target_gate = "{target_gate}"' in line
                 for line in bytecode.splitlines()
-            )
+            ), f"Missing precompiled rule {frontend_name!r} for {target_gate!r}"
 
     def test_precompile_writes_hash_to_manifest(self, mocker, tmp_path):
         """The manifest contains the hash of the associated bytecode."""
