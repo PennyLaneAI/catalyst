@@ -405,6 +405,60 @@ def CombineGlobalPhasesPass : Pass<"combine-global-phases", "mlir::ModuleOp"> {
     let summary = "Scope-wise merging of global phase operators (safe).";
 }
 
+def TagClassicalControlMeasurementsPass : Pass<"tag-classical-control-measurements", "mlir::ModuleOp"> {
+    let summary = "Tag the measurements whose classically controlled operations are instrumented.";
+    let description = [{
+        Tags the measurements (`quantum.measure`, `pbc.ppm` and `pbc.select.ppm`) with the
+        `quantum.track_classical_control` attribute, so that the `instrument-classical-control`
+        pass instruments the operations classically controlled by them.
+
+        This pass is added by device preprocessing to the QNodes of devices tracking the circuit
+        depth (i.e. `null.qubit` with `track_resources` and `compute_depth`), so that only their
+        measurements are tracked. The tags are carried by the measurements through the rest of
+        the pipeline, including the copies of the circuit made by other passes.
+    }];
+}
+
+def InstrumentClassicalControlPass : Pass<"instrument-classical-control", "mlir::ModuleOp"> {
+    let summary = "Inform the runtime which operations are classically controlled by measurements.";
+    let description = [{
+        Instruments the program with runtime calls that tell the device which operations are
+        classically controlled by mid-circuit measurement results. This is used by resource
+        tracking on `null.qubit` to place classically controlled operations after the
+        measurements they depend on when computing the circuit depth.
+
+        Only the measurements tagged with the `quantum.track_classical_control` attribute by the
+        `tag-classical-control-measurements` pass are tracked, and the tags are removed. The pass
+        does nothing if there are no tagged measurements.
+
+        A region is classically controlled if the value deciding whether it executes depends on
+        a tracked measurement result: the branches of `scf.if` and `scf.index_switch`, the body of
+        `scf.while`, and the body of `scf.for` when its bounds depend on a measurement. A
+        `pbc.select.ppm` whose basis selection depends on a tracked measurement is also
+        classically controlled. Each such region is wrapped in
+        `__catalyst__rt__begin_classical_control(token)` and
+        `__catalyst__rt__end_classical_control()`, where `token` is the maximum of the
+        tokens returned by `__catalyst__rt__measurement_token()` right after each measurement
+        the region depends on. The runtime functions are declared in the nearest symbol table of
+        their calls, so that nested modules compiled separately have their own declarations.
+
+        Dependencies are traced through the classical operations that compute the controlling
+        value, and through the values carried by `scf` control flow. A measurement whose
+        token does not dominate the controlled region, e.g. one carried by a loop from a
+        previous iteration, is represented by the token of the most recent measurement at the
+        start of the region. Dependencies through function arguments, the results of function
+        calls (other than through the call operands), and memory are not traced.
+
+        This pass must run before bufferization, while the controlling values are still SSA
+        values, and before control flow is lowered to the `cf` dialect.
+    }];
+
+    let dependentDialects = [
+        "func::FuncDialect",
+        "arith::ArithDialect"
+    ];
+}
+
 // ----- Quantum circuit transformation passes end ----- //
 
 #endif // QUANTUM_PASSES

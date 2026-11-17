@@ -530,18 +530,24 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
     }
 
     /**
-     * @brief Performs a dummy measurement that always returns false
+     * @brief Performs a dummy measurement
      *
      * Since the null device simulates the ground state |0⟩^⊗n, all single-qubit
-     * measurements in the computational basis always yield 0 (false).
+     * measurements in the computational basis yield 0 (false), unless a postselection
+     * value is given, in which case the postselected outcome is returned.
      *
-     * @param wire The qubit to measure (ignored)
-     * @param postselect Optional postselection value (ignored)
-     * @return Result Always returns a reference to the global false constant
+     * If resource tracking is enabled, records the mid-circuit measurement on the given wire.
+     *
+     * @param wire The qubit to measure
+     * @param postselect Optional postselection value
+     * @return Result A reference to the global constant of the measurement outcome
      */
-    auto Measure(QubitIdType, std::optional<int32_t>) -> Result {
+    auto Measure(QubitIdType wire, std::optional<int32_t> postselect) -> Result {
         if (this->track_resources_) {
-            this->resource_tracker_.MidMeasurement();
+            this->resource_tracker_.MidMeasurement(wire);
+        }
+        if (postselect == 1) {
+            return const_cast<Result>(&GLOBAL_RESULT_TRUE_CONST);
         }
         return const_cast<Result>(&GLOBAL_RESULT_FALSE_CONST);
     }
@@ -602,6 +608,55 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
      */
     auto IsTrackingResources() const -> bool { return track_resources_; }
 
+    /**
+     * @brief Returns the token of the most recent measurement
+     *
+     * Together with `BeginClassicalControl` and `EndClassicalControl`, this lets a compiled
+     * program inform the device which operations are classically controlled by measurement
+     * results, so that resource tracking can account for these dependencies when computing the
+     * circuit depth. These are not part of the `QuantumDevice` interface: the runtime looks them
+     * up as optional extensions of the device library (see the `NullQubit*` functions exported
+     * in NullQubit.cpp).
+     *
+     * If resource tracking is enabled, the token is the depth of the most recent measurement,
+     * otherwise it is always 0. Tokens are ordered: for a region controlled by several
+     * measurements, the maximum of their tokens is passed to `BeginClassicalControl`.
+     *
+     * @return int64_t The token of the most recent measurement
+     */
+    auto GetMeasurementToken() -> int64_t {
+        if (this->track_resources_) {
+            return static_cast<int64_t>(this->resource_tracker_.GetLastMeasurementDepth());
+        }
+        return 0;
+    }
+
+    /**
+     * @brief Enters a region of operations classically controlled by measurements
+     *
+     * If resource tracking is enabled, operations in the region are placed after the
+     * measurements controlling it when computing the circuit depth. Regions can be nested, and
+     * each call is matched by a call to `EndClassicalControl`. See
+     * `ResourceTracker::BeginClassicalControl` for the current limitations.
+     *
+     * @param token The maximum token of the measurements controlling the region
+     */
+    void BeginClassicalControl(int64_t token) {
+        RT_FAIL_IF(token < 0, "Measurement tokens must be non-negative.");
+        if (this->track_resources_) {
+            this->resource_tracker_.BeginClassicalControl(static_cast<std::size_t>(token));
+        }
+    }
+
+    /**
+     * @brief Exits the innermost region of classically controlled operations
+     */
+    void EndClassicalControl() {
+        if (this->track_resources_) {
+            this->resource_tracker_.EndClassicalControl();
+        }
+    }
+
   private:
     void MakeProbsDummyReturn(DataView<double, 1> &probs) {
         auto iter = probs.begin();
@@ -642,5 +697,6 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
 
     // static constants for RESULT values
     static constexpr bool GLOBAL_RESULT_FALSE_CONST = false;
+    static constexpr bool GLOBAL_RESULT_TRUE_CONST = true;
 };
 } // namespace Catalyst::Runtime::Devices

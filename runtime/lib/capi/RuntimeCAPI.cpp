@@ -303,6 +303,34 @@ void __catalyst__rt__toggle_recorder(bool status) {
     }
 }
 
+// The classical control functions inform the active device which operations are classically
+// controlled by measurement results. They are optional device extensions, and are no-ops for
+// devices that do not export them (see `RTDevice::getDeviceExtension`).
+
+int64_t __catalyst__rt__measurement_token() {
+    using MeasurementTokenFn = int64_t (*)(QuantumDevice *);
+    auto fn = reinterpret_cast<MeasurementTokenFn>(RTD_PTR->getDeviceExtension("MeasurementToken"));
+    return fn ? fn(getQuantumDevicePtr().get()) : 0;
+}
+
+void __catalyst__rt__begin_classical_control(int64_t token) {
+    using BeginClassicalControlFn = void (*)(QuantumDevice *, int64_t);
+    auto fn = reinterpret_cast<BeginClassicalControlFn>(
+        RTD_PTR->getDeviceExtension("BeginClassicalControl"));
+    if (fn) {
+        fn(getQuantumDevicePtr().get(), token);
+    }
+}
+
+void __catalyst__rt__end_classical_control() {
+    using EndClassicalControlFn = void (*)(QuantumDevice *);
+    auto fn =
+        reinterpret_cast<EndClassicalControlFn>(RTD_PTR->getDeviceExtension("EndClassicalControl"));
+    if (fn) {
+        fn(getQuantumDevicePtr().get());
+    }
+}
+
 static QUBIT *__catalyst__rt__qubit_allocate__impl() {
     RT_ASSERT(getQuantumDevicePtr() != nullptr);
     RT_ASSERT(CTX->getMemoryManager() != nullptr);

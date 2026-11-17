@@ -24,6 +24,7 @@
 #include <string>
 #include <string_view>
 #include <tuple>
+#include <unordered_map>
 #include <unordered_set>
 
 #include "DataView.hpp"
@@ -161,6 +162,19 @@ class SharedLibraryManager final {
         RT_FAIL_IF(!sym, dlerror());
         return sym;
     }
+
+    /**
+     * @brief Look up a symbol that the library may not export.
+     *
+     * @return The symbol, or nullptr if the library does not export it
+     */
+    void *tryGetSymbol(const std::string &symbol) {
+        void *sym = dlsym(_handler, symbol.c_str());
+        if (!sym) {
+            dlerror(); // Clear the error so that it is not reported by a later lookup
+        }
+        return sym;
+    }
 };
 
 /**
@@ -196,6 +210,8 @@ class RTDevice {
 
     std::unique_ptr<SharedLibraryManager> rtd_dylib{nullptr};
     std::unique_ptr<QuantumDevice> rtd_qdevice{nullptr};
+    // Cache of the optional extension functions looked up in the device library
+    std::unordered_map<std::string, void *> rtd_extensions;
 
     RTDeviceStatus status{RTDeviceStatus::Inactive};
 
@@ -269,6 +285,30 @@ class RTDevice {
                 ? reinterpret_cast<decltype(GenericDeviceFactory) *>(f_ptr)(rtd_kwargs.c_str())
                 : nullptr);
         return rtd_qdevice;
+    }
+
+    /**
+     * @brief Look up an optional extension function exported by the device library.
+     *
+     * Extensions provide device-specific functionality outside of the `QuantumDevice` interface,
+     * so that devices which do not support them are unaffected. Like the device factory, they
+     * are exported as `<device name><extension name>`, e.g. `NullQubitBeginClassicalControl`.
+     *
+     * @param extension_name The name of the extension
+     * @return The extension function, or nullptr if the device library does not export it
+     */
+    [[nodiscard]] auto getDeviceExtension(const std::string &extension_name) -> void * {
+        if (!getQuantumDevicePtr()) {
+            return nullptr;
+        }
+
+        auto it = rtd_extensions.find(extension_name);
+        if (it == rtd_extensions.end()) {
+            it = rtd_extensions
+                     .emplace(extension_name, rtd_dylib->tryGetSymbol(rtd_name + extension_name))
+                     .first;
+        }
+        return it->second;
     }
 
     [[nodiscard]] auto getDeviceInfo() const

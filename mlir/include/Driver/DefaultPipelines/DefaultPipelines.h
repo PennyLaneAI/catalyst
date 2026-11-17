@@ -96,7 +96,11 @@ const PipelineList pipelineList{
      {"annotate-invalid-gradient-functions",
       "lower-gradients"}},
     {"bufferization-stage",
-     {// Resolve the mangled symbols for the runtime calls.
+     {// Inform the runtime which operations are classically controlled by the measurements
+      // tagged by device preprocessing. Must run after all transformations copying circuits
+      // (e.g. gradients, mitigation), and before measurement results are stored in memory.
+      "instrument-classical-control",
+      // Resolve the mangled symbols for the runtime calls.
       "resolve-runtime-symbols",
       // Dispatched runtime calls are lowered to executor.call
       "lower-runtime-dispatch",
