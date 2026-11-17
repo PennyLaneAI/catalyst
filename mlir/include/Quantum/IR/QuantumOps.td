@@ -1266,9 +1266,15 @@ def MeasurementOp : Quantum_Op<"measurement", [
         order) or the updated register. Their types are supplied by the caller.
         The operation has measurement effects even when its results are unused.
 
+        Optional frontend-level metadata:
+          * `param_map` — maps frontend argument names to the lowered `params` operand positions
+          * `qubit_map` — maps frontend argument names to lowered qubit/index-array positions
+
         ```mlir
         %m, %out = quantum.measurement "MeasureInBasis"(%angle: f64)
-            qubits(%q) static_data = {plane = "XY"} : i1, !quantum.bit
+            qubits(%q) static_data = {plane = "XY"}
+            param_map = {angle = [0]} qubit_map = {wires = [0]}
+            : i1, !quantum.bit
 
         %bits, %out_reg = quantum.measurement "MeasureMany"()
             quregs(%reg) indices(%wires: tensor<?xi64>)
@@ -1293,7 +1299,9 @@ def MeasurementOp : Quantum_Op<"measurement", [
         Variadic<QubitType>:$in_qubits,
         Optional<QuregType>:$in_qreg,
         Variadic<1DTensorOf<[I64]>>:$arr_qubit_indices,
-        DefaultValuedOptionalAttr<DictionaryAttr, "{}">:$static_data
+        DefaultValuedOptionalAttr<DictionaryAttr, "{}">:$static_data,
+        DefaultValuedOptionalAttr<I64ArrayDictAttr, "{}">:$param_map,
+        DefaultValuedOptionalAttr<I64ArrayDictAttr, "{}">:$qubit_map
     );
 
     let results = (outs
@@ -1308,7 +1316,9 @@ def MeasurementOp : Quantum_Op<"measurement", [
             "llvm::StringRef":$op_name,
             "mlir::ValueRange":$params,
             "mlir::ValueRange":$in_qubits,
-            CArg<"mlir::DictionaryAttr", "nullptr">:$static_data
+            CArg<"mlir::DictionaryAttr", "nullptr">:$static_data,
+            CArg<"mlir::DictionaryAttr", "nullptr">:$param_map,
+            CArg<"mlir::DictionaryAttr", "nullptr">:$qubit_map
         )>,
         OpBuilder<(ins
             "mlir::TypeRange":$mres,
@@ -1316,7 +1326,9 @@ def MeasurementOp : Quantum_Op<"measurement", [
             "mlir::ValueRange":$params,
             "mlir::Value":$in_qreg,
             "mlir::ValueRange":$arr_qubit_indices,
-            CArg<"mlir::DictionaryAttr", "nullptr">:$static_data
+            CArg<"mlir::DictionaryAttr", "nullptr">:$static_data,
+            CArg<"mlir::DictionaryAttr", "nullptr">:$param_map,
+            CArg<"mlir::DictionaryAttr", "nullptr">:$qubit_map
         )>
     ];
 

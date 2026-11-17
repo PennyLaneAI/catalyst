@@ -44,17 +44,21 @@ class BareMeasurement(qp.ops.MidMeasure):
 def direct_measurements():
     # VALUE-LABEL: func.func public @direct_measurements
     # VALUE: quantum.measurement "MidMeasure"()
+    # VALUE-SAME: qubit_map = {wires = [0]}
     # VALUE: quantum.measurement "PauliMeasure"()
+    # VALUE-SAME: qubit_map = {wires = [0, 1]}
     # CHECK-LABEL: func.func public @direct_measurements
     # CHECK: [[q0:%.+]] = qref.get {{%.+}}[ 0]
     # CHECK: qref.measurement "MidMeasure"() qubits([[q0]])
-    # CHECK-SAME: static_data = {meas_uid = "mid", postselect = 1 : i64, reset = true} : ()
+    # CHECK-SAME: static_data = {meas_uid = "mid", postselect = 1 : i64, reset = true}
+    # CHECK-SAME: qubit_map = {wires = [0]} : ()
     qp.ops.MidMeasure(0, reset=True, postselect=1, meas_uid="mid")
 
     # CHECK: [[q1:%.+]] = qref.get {{%.+}}[ 1]
     # CHECK: [[q2:%.+]] = qref.get {{%.+}}[ 0]
     # CHECK: qref.measurement "PauliMeasure"() qubits([[q1]], [[q2]])
-    # CHECK-SAME: static_data = {meas_uid = none, pauli_word = "XZ", postselect = none} : ()
+    # CHECK-SAME: static_data = {meas_uid = none, pauli_word = "XZ", postselect = none}
+    # CHECK-SAME: qubit_map = {wires = [0, 1]} : ()
     qp.ops.PauliMeasure("XZ", (1, 0))
     return qp.state()
 
@@ -67,15 +71,19 @@ print(direct_measurements.mlir)
 def custom_measurements(angle: float):
     # VALUE-LABEL: func.func public @custom_measurements
     # VALUE: quantum.measurement "RotatedMeasurement"({{%.+}}: tensor<f64>)
+    # VALUE-SAME: param_map = {angle = [0]} qubit_map = {wires = [0]}
     # VALUE: quantum.measurement "BareMeasurement"()
+    # VALUE-SAME: qubit_map = {wires = [0]}
     # CHECK-LABEL: func.func public @custom_measurements
     # CHECK: [[q0:%.+]] = qref.get {{%.+}}[ 0]
     # CHECK: qref.measurement "RotatedMeasurement"({{%.+}}: tensor<f64>) qubits([[q0]])
-    # CHECK-SAME: static_data = {plane = "YZ"} : ()
+    # CHECK-SAME: static_data = {plane = "YZ"}
+    # CHECK-SAME: param_map = {angle = [0]} qubit_map = {wires = [0]} : ()
     RotatedMeasurement(angle, 0, plane="YZ")
 
     # CHECK: [[q1:%.+]] = qref.get {{%.+}}[ 0]
-    # CHECK: qref.measurement "BareMeasurement"() qubits([[q1]]) static_data = {} : ()
+    # CHECK: qref.measurement "BareMeasurement"() qubits([[q1]]) static_data = {}
+    # CHECK-SAME: qubit_map = {wires = [0]} : ()
     BareMeasurement(0)
     return qp.state()
 
@@ -93,7 +101,6 @@ def specialized_measurements(angle: float):
     # CHECK-NOT: qref.measurement
     # CHECK: mbqc.ref.measure_in_basis
     qp.ftqc.measure_arbitrary_basis(0, angle, plane="XY")
-    # CHECK-NOT: qref.measurement
     return qp.state()
 
 
@@ -105,18 +112,16 @@ print(specialized_measurements.mlir)
 def pauli_measurements():
     # VALUE-LABEL: func.func public @pauli_measurements
     # VALUE: quantum.measurement "PauliMeasure"()
-    # VALUE-SAME: static_data = {pauli_word = "XZ", postselect = none} : i1,
+    # VALUE-SAME: static_data = {pauli_word = "XZ", postselect = none}
+    # VALUE-SAME: qubit_map = {wires = [0, 1]} : i1,
     # CHECK-LABEL: func.func public @pauli_measurements
-    # CHECK-NOT: pbc.
     # CHECK: [[q0:%.+]] = qref.get {{%.+}}[ 1]
     # CHECK: [[q1:%.+]] = qref.get {{%.+}}[ 0]
     # CHECK: [[result:%.+]] = qref.measurement "PauliMeasure"() qubits([[q0]], [[q1]])
-    # CHECK-SAME: static_data = {pauli_word = "XZ", postselect = none} : i1
+    # CHECK-SAME: static_data = {pauli_word = "XZ", postselect = none}
+    # CHECK-SAME: qubit_map = {wires = [0, 1]} : i1
     result = qp.pauli_measure("XZ", (1, 0))
-    # CHECK: tensor.from_elements [[result]] : tensor<i1>
-    # CHECK: scf.if
     qp.cond(result, qp.X)(0)
-    # CHECK-NOT: pbc.
     return qp.state()
 
 

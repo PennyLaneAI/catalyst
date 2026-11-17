@@ -14,7 +14,7 @@
 
 // RUN: quantum-opt --convert-quantum-to-llvm %s | FileCheck %s
 
-// CHECK-DAG: llvm.func @__catalyst__qis__PauliMeasure(!llvm.ptr, i1, !llvm.ptr, i1, i1, i64, ...) -> !llvm.ptr
+// CHECK-DAG: llvm.func @__catalyst__qis__PauliMeasure(!llvm.ptr, i1 {llvm.zeroext}, !llvm.ptr, i1 {llvm.zeroext}, i1 {llvm.zeroext}, i64, ...) -> !llvm.ptr
 // CHECK-DAG: llvm.mlir.global internal constant @pauli_word_IXYZ("IXYZ\00")
 // CHECK-DAG: llvm.mlir.global internal constant @pauli_word_Z("Z\00")
 

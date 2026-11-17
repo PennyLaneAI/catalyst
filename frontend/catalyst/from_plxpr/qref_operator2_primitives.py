@@ -315,13 +315,16 @@ def _qref_operator_p_lowering(jax_ctx: mlir.LoweringRuleContext, *args, op_cls, 
             )
         # Operator2 equations applied directly have no classical outputs. Measurement
         # primitives that return outcomes use their specialized lowerings instead.
+        # MeasurementOp has no UID/forward channel; leave forward_args unused for now.
         MeasurementOp(
             mres=[],
             op_name=name_attr,
-            params=params + forward_args,
+            params=params,
             qubits=qubits,
             arr_qubit_indices=[],
             static_data=get_mlir_attribute_from_pyval(repack_static_data),
+            param_map=param_map,
+            qubit_map=qubit_map,
         )
         return []
 

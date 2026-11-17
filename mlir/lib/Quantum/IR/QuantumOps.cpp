@@ -248,6 +248,34 @@ LogicalResult CustomOp::verify() {
     return success();
 }
 
+/// Verify that a name -> dense-i64-index dictionary is in-bounds and covers every
+/// index in `[0, numInputs)`. No-op when `dict` is null (attribute absent).
+static LogicalResult verifyDenseI64DictCoversAll(Operation *op, DictionaryAttr dict,
+                                                 StringRef mapName, size_t numInputs,
+                                                 StringRef boundsNoun, StringRef coverageNoun) {
+    if (!dict) {
+        return success();
+    }
+
+    llvm::SmallDenseSet<int64_t> covered;
+    for (NamedAttribute namedAttr : dict) {
+        auto denseArray = cast<DenseI64ArrayAttr>(namedAttr.getValue());
+        for (int64_t idx : denseArray.asArrayRef()) {
+            if (idx < 0 || idx >= static_cast<int64_t>(numInputs)) {
+                return op->emitOpError()
+                       << mapName << " index is out of bounds with respect to " << boundsNoun
+                       << ": " << idx << " is not in [0, " << numInputs << ")";
+            }
+            covered.insert(idx);
+        }
+    }
+    if (covered.size() != numInputs) {
+        return op->emitOpError() << mapName << " must cover all " << coverageNoun << ": expected "
+                                 << numInputs << ", got " << covered.size();
+    }
+    return success();
+}
+
 LogicalResult OperatorOp::verify() {
     const bool hasQregInput = static_cast<bool>(getInQreg());
     const bool hasQregOutput = static_cast<bool>(getOutQreg());
@@ -296,56 +324,17 @@ LogicalResult OperatorOp::verify() {
         }
     }
 
-    if (getParamMapAttr()) {
-        const size_t numParams = getParams().size();
-        std::vector<bool> coveredParams(numParams, false);
-        size_t coveredCount = 0;
-        for (NamedAttribute namedAttr : getParamMap()) {
-            auto denseArray = cast<DenseI64ArrayAttr>(namedAttr.getValue());
-            for (int64_t idx : denseArray.asArrayRef()) {
-                if (idx < 0 || idx >= static_cast<int64_t>(numParams)) {
-                    return emitOpError() << "param_map index is out of bounds with respect to "
-                                            "params: "
-                                         << idx << " is not in [0, " << numParams << ")";
-                }
-                if (!coveredParams[static_cast<size_t>(idx)]) {
-                    coveredParams[static_cast<size_t>(idx)] = true;
-                    ++coveredCount;
-                }
-            }
-        }
-        if (coveredCount != numParams) {
-            return emitOpError() << "param_map must cover all params when provided: expected "
-                                 << numParams << ", got " << coveredCount;
-        }
+    if (failed(verifyDenseI64DictCoversAll(getOperation(), getParamMapAttr(), "param_map",
+                                           getParams().size(), "params", "params when provided"))) {
+        return failure();
     }
 
-    auto qubitMap = getQubitMap();
-    if (qubitMap) {
-        const size_t numTargets = hasQregMode ? getArrQubitIndices().size() : getInQubits().size();
-        const char *boundsNoun = hasQregMode ? "index arrays" : "qubits";
-        const char *coverageNoun =
-            hasQregMode ? "index arrays in register mode" : "qubit values in qubit mode";
-
-        llvm::SmallDenseSet<int64_t> coveredTargets;
-        for (NamedAttribute namedAttr : qubitMap) {
-            auto denseArray = cast<DenseI64ArrayAttr>(namedAttr.getValue());
-            for (int64_t idx : denseArray.asArrayRef()) {
-                if (idx < 0 || idx >= static_cast<int64_t>(numTargets)) {
-                    return emitOpError()
-                           << "qubit_map index is out of bounds with respect to " << boundsNoun
-                           << ": " << idx << " is not in [0, " << numTargets << ")";
-                }
-                coveredTargets.insert(idx);
-            }
-        }
-        if (getQubitMapAttr() && coveredTargets.size() != numTargets) {
-            return emitOpError() << "qubit_map must cover all " << coverageNoun << ": expected "
-                                 << numTargets << ", got " << coveredTargets.size();
-        }
-    }
-
-    return success();
+    const size_t numTargets = hasQregMode ? getArrQubitIndices().size() : getInQubits().size();
+    const char *boundsNoun = hasQregMode ? "index arrays" : "qubits";
+    const char *coverageNoun =
+        hasQregMode ? "index arrays in register mode" : "qubit values in qubit mode";
+    return verifyDenseI64DictCoversAll(getOperation(), getQubitMapAttr(), "qubit_map", numTargets,
+                                       boundsNoun, coverageNoun);
 }
 
 LogicalResult ExtractOp::verify() {
@@ -659,10 +648,12 @@ LogicalResult VarianceOp::verify() {
 }
 
 LogicalResult MeasurementOp::verify() {
-    if (getInQreg() && !getInQubits().empty()) {
+    const bool hasQregMode = static_cast<bool>(getInQreg());
+
+    if (hasQregMode && !getInQubits().empty()) {
         return emitOpError("must use either qubits or registers, but not both");
     }
-    if (!getInQreg() && !getArrQubitIndices().empty()) {
+    if (!hasQregMode && !getArrQubitIndices().empty()) {
         return emitOpError("index arrays require a register");
     }
 
@@ -690,10 +681,21 @@ LogicalResult MeasurementOp::verify() {
     if (getInQubits().size() != getOutQubits().size()) {
         return emitOpError("number of input and output qubits must be the same");
     }
-    if (static_cast<bool>(getInQreg()) != static_cast<bool>(getOutQreg())) {
+    if (hasQregMode != static_cast<bool>(getOutQreg())) {
         return emitOpError("in_qreg and out_qreg must either both be present or absent");
     }
-    return success();
+
+    if (failed(verifyDenseI64DictCoversAll(getOperation(), getParamMapAttr(), "param_map",
+                                           getParams().size(), "params", "params when provided"))) {
+        return failure();
+    }
+
+    const size_t numTargets = hasQregMode ? getArrQubitIndices().size() : getInQubits().size();
+    const char *boundsNoun = hasQregMode ? "index arrays" : "qubits";
+    const char *coverageNoun =
+        hasQregMode ? "index arrays in register mode" : "qubit values in qubit mode";
+    return verifyDenseI64DictCoversAll(getOperation(), getQubitMapAttr(), "qubit_map", numTargets,
+                                       boundsNoun, coverageNoun);
 }
 
 LogicalResult AdjointOp::verify() {
@@ -779,16 +781,18 @@ LogicalResult CtrlOp::verify() {
 
 void MeasurementOp::build(OpBuilder &builder, OperationState &state, TypeRange mres,
                           llvm::StringRef op_name, ValueRange params, ValueRange in_qubits,
-                          DictionaryAttr static_data) {
+                          DictionaryAttr static_data, DictionaryAttr param_map,
+                          DictionaryAttr qubit_map) {
     build(builder, state, mres, TypeRange(in_qubits), Type(), op_name, params, in_qubits, Value(),
-          ValueRange(), static_data);
+          ValueRange(), static_data, param_map, qubit_map);
 }
 
 void MeasurementOp::build(OpBuilder &builder, OperationState &state, TypeRange mres,
                           llvm::StringRef op_name, ValueRange params, Value in_qreg,
-                          ValueRange arr_qubit_indices, DictionaryAttr static_data) {
+                          ValueRange arr_qubit_indices, DictionaryAttr static_data,
+                          DictionaryAttr param_map, DictionaryAttr qubit_map) {
     build(builder, state, mres, TypeRange(), in_qreg.getType(), op_name, params, ValueRange(),
-          in_qreg, arr_qubit_indices, static_data);
+          in_qreg, arr_qubit_indices, static_data, param_map, qubit_map);
 }
 
 void OperatorOp::build(OpBuilder &odsBuilder, OperationState &odsState, llvm::StringRef op_name,
@@ -854,6 +858,56 @@ void OperatorOp::build(OpBuilder &odsBuilder, OperationState &odsState, llvm::St
 // Quantum op printers/parsers.
 //===----------------------------------------------------------------------===//
 
+static void printDenseI64ArrayAsList(OpAsmPrinter &p, DenseI64ArrayAttr attr) {
+    p << "[";
+    llvm::interleaveComma(attr.asArrayRef(), p, [&](int64_t value) { p << value; });
+    p << "]";
+}
+
+static void printDictionaryWithDenseI64Lists(OpAsmPrinter &p, DictionaryAttr dict) {
+    p << "{";
+    llvm::interleaveComma(dict, p, [&](NamedAttribute namedAttr) {
+        p.printKeywordOrString(namedAttr.getName().strref());
+        p << " = ";
+        if (auto denseArray = dyn_cast<DenseI64ArrayAttr>(namedAttr.getValue())) {
+            printDenseI64ArrayAsList(p, denseArray);
+        } else {
+            p << namedAttr.getValue();
+        }
+    });
+    p << "}";
+}
+
+static ParseResult parseDenseI64ArrayDictionary(OpAsmParser &parser, Builder &builder,
+                                                DictionaryAttr &dict) {
+    NamedAttrList attrs;
+    auto parseDictEntry = [&]() -> ParseResult {
+        StringRef key;
+        SmallVector<int64_t> values;
+        auto parseArrayValue = [&]() -> ParseResult {
+            int64_t value = 0;
+            if (parser.parseInteger(value)) {
+                return failure();
+            }
+            values.push_back(value);
+            return success();
+        };
+
+        if (parser.parseKeyword(&key) || parser.parseEqual() ||
+            parser.parseCommaSeparatedList(OpAsmParser::Delimiter::Square, parseArrayValue)) {
+            return failure();
+        }
+        attrs.append(builder.getStringAttr(key), builder.getDenseI64ArrayAttr(values));
+        return success();
+    };
+
+    if (parser.parseCommaSeparatedList(OpAsmParser::Delimiter::Braces, parseDictEntry)) {
+        return failure();
+    }
+    dict = attrs.getDictionary(parser.getContext());
+    return success();
+}
+
 void MeasurementOp::print(OpAsmPrinter &p) {
     // 1. Measurement name
     p << " ";
@@ -883,12 +937,23 @@ void MeasurementOp::print(OpAsmPrinter &p) {
         p << " static_data = " << staticData;
     }
 
-    // 5. Optional metadata
-    p.printOptionalAttrDict((*this)->getAttrs(), {"op_name", "static_data", "operandSegmentSizes",
-                                                  "resultSegmentSizes"});
+    // 5. Optional frontend maps
+    if (getParamMapAttr()) {
+        p << " param_map = ";
+        printDictionaryWithDenseI64Lists(p, getParamMap());
+    }
+    if (getQubitMapAttr()) {
+        p << " qubit_map = ";
+        printDictionaryWithDenseI64Lists(p, getQubitMap());
+    }
+
+    // 6. Optional metadata
+    p.printOptionalAttrDict((*this)->getAttrs(),
+                            {"op_name", "static_data", "param_map", "qubit_map",
+                             "operandSegmentSizes", "resultSegmentSizes"});
     p << " : ";
 
-    // 6. Result types
+    // 7. Result types
     if (getOperation()->getNumResults() == 0) {
         p << "()";
     } else {
@@ -954,12 +1019,28 @@ ParseResult MeasurementOp::parse(OpAsmParser &parser, OperationState &result) {
         }
     }
 
-    // 5. Optional metadata
+    // 5. Optional frontend maps
+    if (succeeded(parser.parseOptionalKeyword("param_map"))) {
+        DictionaryAttr paramMap;
+        if (parser.parseEqual() || parseDenseI64ArrayDictionary(parser, builder, paramMap)) {
+            return failure();
+        }
+        result.addAttribute("param_map", paramMap);
+    }
+    if (succeeded(parser.parseOptionalKeyword("qubit_map"))) {
+        DictionaryAttr qubitMap;
+        if (parser.parseEqual() || parseDenseI64ArrayDictionary(parser, builder, qubitMap)) {
+            return failure();
+        }
+        result.addAttribute("qubit_map", qubitMap);
+    }
+
+    // 6. Optional metadata
     if (parser.parseOptionalAttrDict(result.attributes) || parser.parseColon()) {
         return failure();
     }
 
-    // 6. Result types (optional parentheses)
+    // 7. Result types (optional parentheses)
     if (succeeded(parser.parseOptionalLParen())) {
         if (failed(parser.parseOptionalRParen()) &&
             (parser.parseTypeList(resultTypes) || parser.parseRParen())) {
@@ -969,7 +1050,7 @@ ParseResult MeasurementOp::parse(OpAsmParser &parser, OperationState &result) {
         return failure();
     }
 
-    // 7. Resolve operands and result segments
+    // 8. Resolve operands and result segments
     Type qubitType = QubitType::get(ctx);
     if (parser.resolveOperands(params, paramTypes, loc, result.operands) ||
         parser.resolveOperands(qubits, qubitType, result.operands) ||
@@ -1003,26 +1084,6 @@ ParseResult MeasurementOp::parse(OpAsmParser &parser, OperationState &result) {
                                                       static_cast<int32_t>(numQubits),
                                                       static_cast<int32_t>(numQregs)}));
     return success();
-}
-
-static void printDenseI64ArrayAsList(OpAsmPrinter &p, DenseI64ArrayAttr attr) {
-    p << "[";
-    llvm::interleaveComma(attr.asArrayRef(), p, [&](int64_t value) { p << value; });
-    p << "]";
-}
-
-static void printDictionaryWithDenseI64Lists(OpAsmPrinter &p, DictionaryAttr dict) {
-    p << "{";
-    llvm::interleaveComma(dict, p, [&](NamedAttribute namedAttr) {
-        p.printKeywordOrString(namedAttr.getName().strref());
-        p << " = ";
-        if (auto denseArray = dyn_cast<DenseI64ArrayAttr>(namedAttr.getValue())) {
-            printDenseI64ArrayAsList(p, denseArray);
-        } else {
-            p << namedAttr.getValue();
-        }
-    });
-    p << "}";
 }
 
 void OperatorOp::print(OpAsmPrinter &p) {
@@ -1115,36 +1176,6 @@ void OperatorOp::print(OpAsmPrinter &p) {
 static ParseResult parseOperandTypePair(OpAsmParser &parser,
                                         OpAsmParser::UnresolvedOperand &operand, Type &type) {
     return failure(parser.parseOperand(operand) || parser.parseColon() || parser.parseType(type));
-}
-
-static ParseResult parseDenseI64ArrayDictionary(OpAsmParser &parser, Builder &builder,
-                                                DictionaryAttr &dict) {
-    NamedAttrList attrs;
-    auto parseDictEntry = [&]() -> ParseResult {
-        StringRef key;
-        SmallVector<int64_t> values;
-        auto parseArrayValue = [&]() -> ParseResult {
-            int64_t value = 0;
-            if (parser.parseInteger(value)) {
-                return failure();
-            }
-            values.push_back(value);
-            return success();
-        };
-
-        if (parser.parseKeyword(&key) || parser.parseEqual() ||
-            parser.parseCommaSeparatedList(OpAsmParser::Delimiter::Square, parseArrayValue)) {
-            return failure();
-        }
-        attrs.append(builder.getStringAttr(key), builder.getDenseI64ArrayAttr(values));
-        return success();
-    };
-
-    if (parser.parseCommaSeparatedList(OpAsmParser::Delimiter::Braces, parseDictEntry)) {
-        return failure();
-    }
-    dict = attrs.getDictionary(parser.getContext());
-    return success();
 }
 
 ParseResult OperatorOp::parse(OpAsmParser &parser, OperationState &result) {

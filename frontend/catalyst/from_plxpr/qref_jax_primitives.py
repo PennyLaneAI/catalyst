@@ -623,6 +623,12 @@ def _qref_pauli_measure_lowering(
 
     result_type = ir.IntegerType.get_signless(1)
 
+    qubit_map = (
+        get_mlir_attribute_from_pyval({"wires": ir.DenseI64ArrayAttr.get(list(range(len(qubits))))})
+        if qubits
+        else None
+    )
+
     result = MeasurementOp(
         mres=[result_type],
         op_name="PauliMeasure",
@@ -632,6 +638,7 @@ def _qref_pauli_measure_lowering(
         static_data=get_mlir_attribute_from_pyval(
             {"pauli_word": pauli_word, "postselect": postselect}
         ),
+        qubit_map=qubit_map,
     ).results[0]
 
     result_type = ir.RankedTensorType.get((), result.type)
