@@ -29,6 +29,7 @@ from operator2_dummy_gates import (
     CompilableData,
     HybridNoOpArg,
     HybridOpArg,
+    HybridOpArgs,
     HybridWires,
     MultiParams,
     MultiParamsCustom,
@@ -39,6 +40,7 @@ from operator2_dummy_gates import (
     SingleParamCustomOp,
     StaticData,
     TestQubitUnitary,
+    hybrid_op_args_decomp,
 )
 from pennylane import qnode
 from pennylane.core.operator import abstractify
@@ -823,10 +825,7 @@ class TestGenericUtilities:
         assert call_kwargs["b"] == 3.14
         assert call_kwargs["thing"] == "string"
 
-        probe_wires = np.asarray(call_kwargs["wires"])
-        assert probe_wires.shape == (2,)
-        assert np.all(probe_wires < 0)
-        assert len(np.unique(probe_wires)) == 2
+        assert call_kwargs["wires"] == Wire[2]
 
     def test_rule_with_unreadable_work_wire_spec_is_excluded(self):
         """A rule whose work-wire spec cannot be read is excluded, with a warning.
@@ -1568,6 +1567,97 @@ class TestHybridOperatorArgDecomposition:
             assert qp.math.allclose(
                 compiled(theta, angles), reference(theta, angles), rtol=1e-7, atol=1e-7
             )
+
+    @pytest.mark.parametrize("modifier", ["plain", "adjoint", "controlled"])
+    @pytest.mark.parametrize("dynamic_wire", [False, True])
+    def test_operator_arguments_share_wire(self, modifier, dynamic_wire):
+        """Operator arguments retain shared wires, parameters, and order under modifiers."""
+
+        with local_decomps():
+            add_decomps(HybridOpArgs, hybrid_op_args_decomp)
+
+            def composite(theta, wire):
+                HybridOpArgs(qp.RX(theta, wire), qp.RY(2 * theta, wire), qp.RZ(3 * theta, wire))
+
+            def expanded(theta, wire):
+                qp.RX(theta, wire)
+                qp.RY(2 * theta, wire)
+                qp.RZ(3 * theta, wire)
+
+            def circuit_body(theta, wire, operation):
+                qp.H(2)
+                if modifier == "controlled":
+                    qp.ctrl(operation, control=2)(theta, wire)
+                elif modifier == "adjoint":
+                    qp.adjoint(operation)(theta, wire)
+                else:
+                    operation(theta, wire)
+
+            @qp.qjit(capture=True)
+            @qp.decompose(gate_set={qp.RX, qp.RY, qp.RZ, qp.H, qp.X, qp.CNOT})
+            @qp.qnode(qp.device("lightning.qubit", wires=3))
+            def compiled(theta, wire):
+                circuit_body(theta, wire if dynamic_wire else 0, composite)
+                return qp.state()
+
+            @qp.qnode(qp.device("default.qubit", wires=3))
+            def reference(theta, wire):
+                circuit_body(theta, wire if dynamic_wire else 0, expanded)
+                return qp.state()
+
+            for theta, wire in [(0.17, 0), (0.49, 1)]:
+                np.testing.assert_allclose(compiled(theta, wire), reference(theta, wire), atol=1e-8)
+            assert 'qref.operator "HybridOpArgs"' in compiled.mlir
+
+    def test_operator_arguments_shared_wire_estimate(self):
+        """Resource estimation counts repeated operator arguments sharing a wire."""
+
+        with local_decomps():
+            add_decomps(HybridOpArgs, hybrid_op_args_decomp)
+
+            @qp.qjit(capture=True, target="mlir", enable_aot_compilation=False)
+            @qp.qnode(qp.device("null.qubit", wires=1))
+            def circuit(theta):
+                HybridOpArgs(qp.H(0), qp.RX(theta, 0), qp.H(0))
+                return qp.probs(wires=0)
+
+            specs = qp.estimate(circuit, target={qp.H, qp.RX})(0.17)
+            assert specs.resources.counts == {"Hadamard": 2, "RX": 1}
+
+    def test_nested_operator_arguments(self):
+        """Nested operator arguments preserve partially overlapping and permuted wires."""
+
+        with local_decomps():
+            add_decomps(HybridOpArgs, hybrid_op_args_decomp)
+
+            @qp.qjit(capture=True)
+            @qp.decompose(gate_set={qp.RX, qp.RY, qp.RZ, qp.H, qp.X, qp.CNOT})
+            @qp.qnode(qp.device("lightning.qubit", wires=3))
+            def compiled(theta):
+                qp.H(0)
+                qp.H(1)
+                HybridOpArgs(
+                    qp.CNOT([2, 0]),
+                    HybridOpArgs(
+                        qp.RX(2 * theta, 1), qp.IsingZZ(3 * theta, [0, 1]), qp.RY(4 * theta, 0)
+                    ),
+                    qp.RZ(5 * theta, 2),
+                )
+                return qp.state()
+
+            @qp.qnode(qp.device("default.qubit", wires=3))
+            def reference(theta):
+                qp.H(0)
+                qp.H(1)
+                qp.CNOT([2, 0])
+                qp.RX(2 * theta, 1)
+                qp.IsingZZ(3 * theta, [0, 1])
+                qp.RY(4 * theta, 0)
+                qp.RZ(5 * theta, 2)
+                return qp.state()
+
+            for theta in (0.17, 0.49):
+                np.testing.assert_allclose(compiled(theta), reference(theta), atol=1e-8)
 
 
 class TestOnDemand:
@@ -2490,6 +2580,30 @@ class TestSymbolicRules:
             GraphOpID(abstractify(qp.CH(wires=jnp.array([0, 1])))).getGraphOpId()
             == "CH{}{wires:2}{}"
         )
+
+    def test_controlled_adjoint_rule_composes_resource_controls(self):
+        """Controls on an adjoint rule combine with controls already on its resources."""
+
+        @register_resources({ControlledOp2(qp.S(Wire[1]), Wire[1]): 1})
+        def adjoint_rule(base):
+            qp.ctrl(qp.S(base.reg[0]), control=base.reg[1])
+
+        with local_decomps():
+            add_decomps("Adjoint(NoParams)", adjoint_rule)
+            module = compile_registered_symbolic_rules(
+                "NoParams",
+                "NoParams{}{reg:2}{}",
+                {},
+                {"reg": 2},
+                {},
+                op_cls=NoParams,
+                modifiers=ModifierState(adjoint=True, control_count=1),
+            )
+
+        rules = get_rule_strings_from_module(module)
+        assert len(rules) == 1
+        rule = rules[0]
+        assert '"2C(S){}{wires:1}{}" = 1 : i64' in rule
 
     def test_no_registered_symbolic_rules(self):
         """Test an op with no symbolic rules registered against its adjoint yields no module."""
