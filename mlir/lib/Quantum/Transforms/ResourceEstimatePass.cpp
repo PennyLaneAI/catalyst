@@ -124,15 +124,6 @@ struct ResourceEstimatePass : public impl::ResourceEstimatePassBase<ResourceEsti
         estimate.hasDynLoop = result.hasDynLoop;
         estimate.autoQubitManagement = result.autoQubitManagement;
 
-        // The ops outside the decomposition graph (e.g. Pauli product rotations) are never
-        // decomposed, so they are kept as in `ResourceAnalysis`, with their sizes.
-        for (const auto &opEntry : result.nonGraphOperations) {
-            auto &sizes = estimate.operations[opEntry.getKey()];
-            for (const auto &sizeEntry : opEntry.getValue()) {
-                sizes[sizeEntry.first] += sizeEntry.second;
-            }
-        }
-
         // Decomposable gates are keyed by their graph op id (GOID).
         for (const auto &opEntry : result.detailedOperations) {
             OperatorNode operatorNode;
@@ -142,11 +133,9 @@ struct ResourceEstimatePass : public impl::ResourceEstimatePassBase<ResourceEsti
 
             auto graphOp = solution.find(operatorNode);
             if (graphOp == solution.end()) {
-                // Already counted above if it is not a graph operator. Otherwise, as a
-                // safeguard, count the op itself by its name.
-                if (result.observedGraphOpIds.contains(goid)) {
-                    estimate.operations[GraphPrep::getGraphOpName(goid)][{-1, -1}] += scale;
-                }
+                // this case should not happen, because the graph should be complete
+                // Not a graph operator (e.g. a mid-circuit measurement): count the op itself.
+                estimate.operations[goid][{-1, -1}] += scale;
                 continue;
             }
             for (const auto &[basisOp, count] : graphOp->second.basisCounts) {

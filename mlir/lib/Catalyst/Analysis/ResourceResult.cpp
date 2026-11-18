@@ -59,20 +59,14 @@ template <typename Map> static void mergeStringMap(Map &dst, const Map &src, Mer
     }
 }
 
-// Merge a map of operation name -> ((numWires, numParams) -> count).
-template <typename Map> static void mergeOperations(Map &dst, const Map &src, MergeMethod method) {
-    for (const auto &opEntry : src) {
-        auto &innerDst = dst[opEntry.getKey()];
+void ResourceResult::mergeWith(const ResourceResult &other, MergeMethod method) {
+    for (const auto &opEntry : other.operations) {
+        auto &innerDst = operations[opEntry.getKey()];
         for (const auto &sizeEntry : opEntry.getValue()) {
             auto &slot = innerDst[sizeEntry.first];
             slot = applyMerge(slot, sizeEntry.second, method);
         }
     }
-}
-
-void ResourceResult::mergeWith(const ResourceResult &other, MergeMethod method) {
-    mergeOperations(operations, other.operations, method);
-    mergeOperations(nonGraphOperations, other.nonGraphOperations, method);
 
     mergeStringMap(measurements, other.measurements, method);
     mergeStringMap(detailedOperations, other.detailedOperations, method);
@@ -114,11 +108,9 @@ void ResourceResult::mergeWith(const ResourceResult &other, MergeMethod method) 
 }
 
 void ResourceResult::multiplyBy(double scalar) {
-    for (auto *ops : {&operations, &nonGraphOperations}) {
-        for (auto &opEntry : *ops) {
-            for (auto &sizeEntry : opEntry.getValue()) {
-                sizeEntry.second *= scalar;
-            }
+    for (auto &opEntry : operations) {
+        for (auto &sizeEntry : opEntry.getValue()) {
+            sizeEntry.second *= scalar;
         }
     }
 

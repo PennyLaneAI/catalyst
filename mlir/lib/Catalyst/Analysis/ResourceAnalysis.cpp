@@ -632,9 +632,6 @@ void ResourceAnalysis::collectOperation(Operation *op, ResourceResult &result, b
         uint64_t nParams = inst.getResourceNumParams();
         uint64_t nQubits = inst.getResourceNumQubits() + nCtrlQubits + numWorkWires;
         result.operations[name][{nQubits, nParams}] += 1;
-        if (collectDetailedOperations && !isa<quantum::DecomposableGate>(op)) {
-            result.nonGraphOperations[name][{nQubits, nParams}] += 1;
-        }
 
         // Ops may also allocate (e.g. mbqc.graph_state_prep, pbc.prepare, pbc.fabricate).
         if (auto alloc = dyn_cast<ResourceAllocQubitOpInterface>(op)) {
@@ -766,16 +763,12 @@ void ResourceAnalysis::collectDetailedOperation(Operation *op, ResourceResult &r
  */
 static void accumulateScaled(ResourceResult &dest, const ResourceResult &source,
                              double count = 1.0) {
-    auto accumulateOperations = [count](auto &destOps, const auto &sourceOps) {
-        for (const auto &opEntry : sourceOps) {
-            auto &innerDst = destOps[opEntry.getKey()];
-            for (const auto &sizeEntry : opEntry.getValue()) {
-                innerDst[sizeEntry.first] += sizeEntry.second * count;
-            }
+    for (const auto &opEntry : source.operations) {
+        auto &innerDst = dest.operations[opEntry.getKey()];
+        for (const auto &sizeEntry : opEntry.getValue()) {
+            innerDst[sizeEntry.first] += sizeEntry.second * count;
         }
-    };
-    accumulateOperations(dest.operations, source.operations);
-    accumulateOperations(dest.nonGraphOperations, source.nonGraphOperations);
+    }
     for (const auto &opEntry : source.detailedOperations) {
         dest.detailedOperations[opEntry.getKey()] += opEntry.getValue() * count;
     }
