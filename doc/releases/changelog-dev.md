@@ -994,6 +994,9 @@
 
 <h3>Bug fixes 🐛</h3>
 
+* Fixed a memory leak from repeated `qjit` calls and callback invocations on Python 3.12 and 3.13.
+  [(#3500)](https://github.com/PennyLaneAI/catalyst/pull/3500)
+
 * The `--convert-to-value-semantics` and `--convert-to-reference-semantics` passes no longer read
   freed memory.
   [(#3496)](https://github.com/PennyLaneAI/catalyst/pull/3496)

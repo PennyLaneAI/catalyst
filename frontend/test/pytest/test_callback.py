@@ -13,6 +13,7 @@
 # limitations under the License.
 """Test callbacks"""
 
+import ctypes
 from collections.abc import Sequence
 from functools import partial
 
@@ -300,6 +301,24 @@ def test_pure_callback_no_return_value(capture_mode):
     msg += "passed in as a parameter or type annotation."
     with pytest.raises(TypeError, match=msg):
         cir(0.0)
+
+
+def test_repeated_calls_reuse_ctypes_types(capture_mode):
+    """Test that repeated calls reuse ctypes types, which ctypes keeps alive before Python 3.14."""
+
+    @pure_callback
+    def double(x) -> jax.ShapeDtypeStruct((2,), jnp.float64):
+        return 2 * x
+
+    @qjit(capture=capture_mode)
+    def f(x, y):
+        return x * double(y)
+
+    f(1.0, jnp.ones(2))
+    known_types = set(ctypes.Structure.__subclasses__())
+    f(2.0, jnp.ones(2))
+
+    assert set(ctypes.Structure.__subclasses__()) <= known_types
 
 
 def test_debug_callback(capsys, capture_mode):
