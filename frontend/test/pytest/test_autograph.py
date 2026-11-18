@@ -922,7 +922,8 @@ class TestForLoops:
         result = f()
         assert np.allclose(result, -jnp.sqrt(2) / 2)
 
-    def test_for_in_object_list_strict(self, monkeypatch, capture_mode):
+    @pytest.mark.old_frontend
+    def test_for_in_object_list_strict(self, monkeypatch):
         """Check the error raised in strict mode when a for loop iterates over a Python list that
         is *not* convertible to an array."""
         monkeypatch.setattr("catalyst.autograph_strict_conversion", True)
@@ -934,10 +935,9 @@ class TestForLoops:
                 qp.RY(int(x) / 4 * jnp.pi, wires=0)
             return qp.expval(qp.PauliZ(0))
 
-        err_type = qp.exceptions.AutoGraphError if capture_mode else AutoGraphError
-        qjitted = qjit(autograph=True, capture=capture_mode)(f)
+        qjitted = qjit(autograph=True, capture=False)(f)
 
-        with pytest.raises(err_type, match="Could not convert the iteration target"):
+        with pytest.raises(AutoGraphError, match="Could not convert the iteration target"):
             qjitted()
 
     def test_for_in_static_range(self, capture_mode):

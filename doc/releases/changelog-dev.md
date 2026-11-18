@@ -389,6 +389,7 @@
     [(#3053)](https://github.com/PennyLaneAI/catalyst/pull/3053)
     [(#3229)](https://github.com/PennyLaneAI/catalyst/pull/3229)
     [(#3251)](https://github.com/PennyLaneAI/catalyst/pull/3251)
+    [(#3481)](https://github.com/PennyLaneAI/catalyst/pull/3481)
 
     The format of `graphOpID` is as follows:
         op_name{dynamic_shape_dictionary}{wire_lens_dictionary}{static_data_dictionary}[UID]
@@ -416,7 +417,7 @@
     Every registered signature is lowered, as well as any operations/rules reachable from these signatures, or their adjoint/control variants.
     [(#3057)](https://github.com/PennyLaneAI/catalyst/pull/3057)
 
-    2. When tracing a gate operation to JAXPR, all rules reachable from that gate are injected. Note that rules already available in the precompiled rule library will not get re-traced. 
+    2. When tracing a gate operation to JAXPR, all rules reachable from that gate are injected. Note that rules already available in the precompiled rule library will not get re-traced.
     [(#3061)](https://github.com/PennyLaneAI/catalyst/pull/3061)
     [(#3160)](https://github.com/PennyLaneAI/catalyst/pull/3160)
     [(#3149)](https://github.com/PennyLaneAI/catalyst/pull/3149)
@@ -993,6 +994,10 @@
 
 <h3>Bug fixes 🐛</h3>
 
+* The `--convert-to-value-semantics` and `--convert-to-reference-semantics` passes no longer read
+  freed memory.
+  [(#3496)](https://github.com/PennyLaneAI/catalyst/pull/3496)
+
 * The `gpu_verbs` coprocessor now supports the NVIDIA GH200 with CUDA 12.4.
   [(#3467)](https://github.com/PennyLaneAI/catalyst/pull/3467)
 
@@ -1181,6 +1186,11 @@
 
 * Fixed hinted while loops to be counted symbolically in `ResourceAnalysis`.
   [(#3370)](https://github.com/PennyLaneAI/catalyst/pull/3370)
+
+* `adjoint-lowering` no longer aborts when an extract inside an adjoint region reads the
+  register from before an insert at another index. When the register an extract reads is replaced
+  by something other than a single insert, the pass now reports an error instead of aborting.
+  [(#3409)](https://github.com/PennyLaneAI/catalyst/pull/3409)
 
 <h3>Internal changes ⚙️</h3>
 

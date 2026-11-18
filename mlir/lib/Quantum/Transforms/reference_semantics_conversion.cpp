@@ -493,24 +493,27 @@ void handleCall(IRRewriter &builder, func::CallOp callOp, QubitValueTracker &tra
 }
 
 void handleCompbasis(IRRewriter &builder, quantum::ComputationalBasisOp vCompbasisOp,
-                     QubitValueTracker &tracker) {
+                     QubitValueTracker &tracker, SmallVector<Operation *> &erasureWorklist) {
     auto rCompbasisOp =
         migrateOpToReferenceSemantics<qref::ComputationalBasisOp>(builder, vCompbasisOp, tracker);
-    builder.replaceOp(vCompbasisOp, rCompbasisOp);
+    builder.replaceAllOpUsesWith(vCompbasisOp, rCompbasisOp);
+    erasureWorklist.push_back(vCompbasisOp);
 }
 
 void handleNamedObs(IRRewriter &builder, quantum::NamedObsOp vNamedObsOp,
-                    QubitValueTracker &tracker) {
+                    QubitValueTracker &tracker, SmallVector<Operation *> &erasureWorklist) {
     auto rNamedObsOp =
         migrateOpToReferenceSemantics<qref::NamedObsOp>(builder, vNamedObsOp, tracker);
-    builder.replaceOp(vNamedObsOp, rNamedObsOp);
+    builder.replaceAllOpUsesWith(vNamedObsOp, rNamedObsOp);
+    erasureWorklist.push_back(vNamedObsOp);
 }
 
 void handleHermitian(IRRewriter &builder, quantum::HermitianOp vHermitianOp,
-                     QubitValueTracker &tracker) {
+                     QubitValueTracker &tracker, SmallVector<Operation *> &erasureWorklist) {
     auto rHermitianOp =
         migrateOpToReferenceSemantics<qref::HermitianOp>(builder, vHermitianOp, tracker);
-    builder.replaceOp(vHermitianOp, rHermitianOp);
+    builder.replaceAllOpUsesWith(vHermitianOp, rHermitianOp);
+    erasureWorklist.push_back(vHermitianOp);
 }
 
 void handleGraphStatePrep(IRRewriter &builder, mbqc::GraphStatePrepOp vGraphStatePrepOp,
@@ -883,6 +886,7 @@ std::optional<SmallVector<Operation *>> handleRegion(IRRewriter &builder, Region
     assert(r.hasOneBlock() && "Expected region to have a single block");
     assert(r.front().getTerminator() && "Expected the region body to have a terminator");
 
+    // Do not erase operations during pre-order traversal (without producing a skip result)!
     SmallVector<Operation *> erasureWorklist;
     r.walk<WalkOrder::PreOrder>([&](Operation *op) {
         llvm::TypeSwitch<Operation *, void>(op)
@@ -901,9 +905,11 @@ std::optional<SmallVector<Operation *>> handleRegion(IRRewriter &builder, Region
                 [&](auto o) { handleGate(builder, o, tracker, erasureWorklist); })
             .Case<func::CallOp>([&](auto o) { handleCall(builder, o, tracker, erasureWorklist); })
             .Case<quantum::ComputationalBasisOp>(
-                [&](auto o) { handleCompbasis(builder, o, tracker); })
-            .Case<quantum::NamedObsOp>([&](auto o) { handleNamedObs(builder, o, tracker); })
-            .Case<quantum::HermitianOp>([&](auto o) { handleHermitian(builder, o, tracker); })
+                [&](auto o) { handleCompbasis(builder, o, tracker, erasureWorklist); })
+            .Case<quantum::NamedObsOp>(
+                [&](auto o) { handleNamedObs(builder, o, tracker, erasureWorklist); })
+            .Case<quantum::HermitianOp>(
+                [&](auto o) { handleHermitian(builder, o, tracker, erasureWorklist); })
             .Case<quantum::MeasureOp>(
                 [&](auto o) { handleMeasure(builder, o, tracker, erasureWorklist); })
             .Case<mbqc::MeasureInBasisOp>(
