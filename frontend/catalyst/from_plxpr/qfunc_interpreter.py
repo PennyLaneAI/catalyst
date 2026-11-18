@@ -148,16 +148,27 @@ class PLxPRToQuantumJaxprInterpreter(PlxprInterpreter):
         super().__init__()
 
     def interpret_operation_eqn(self, eqn):
-        """Override to handle Operator2 equations, including the dedicated Barrier primitive.
+        """Interpret Operator2 and Barrier equations through separate primitive handlers.
 
-        For Operator2 ops used as observables (output is not DropVar),
-        return the operator instance without applying it as a gate.
-        For Operator2 ops used as gates (output is DropVar), apply the gate
-        using the Operator2-specific lowering.
-        Barrier uses the same operands and metadata as operator_p.
-        For legacy ops, delegate to the parent implementation.
+        Operator2 equations return the operator instance when the output is not a ``DropVar``.
+        When the output is a ``DropVar``, the handler records the operation in the decomposition
+        scope, if present, and applies it using ``qref_operator_p``.
+        Barrier equations map their wire operands to qubits and bind a Barrier instruction
+        using ``qref_qinst_p``.
+        Legacy operations are delegated to the parent implementation.
+
+        Args:
+            eqn (jax.core.JaxprEqn): operation equation to interpret
         """
-        if eqn.primitive in (operator_p, barrier_p):
+        if eqn.primitive is barrier_p:
+            wires = [self.read(invar) for invar in eqn.invars]
+            qubits = [
+                wire if is_abstract_qubit(wire) else qref_get_p.bind(self.init_qreg, wire)
+                for wire in wires
+            ]
+            qref_qinst_p.bind(*qubits, op="Barrier", qubits_len=len(qubits))
+            return ()
+        if eqn.primitive is operator_p:
             invals = [self.read(invar) for invar in eqn.invars]
             with qp.QueuingManager.stop_recording():
                 op = eqn.primitive.impl(*invals, **eqn.params)
