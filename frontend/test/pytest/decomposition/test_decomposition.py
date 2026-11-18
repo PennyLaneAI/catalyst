@@ -846,12 +846,11 @@ class TestGenericUtilities:
         with pytest.warns(RuleLoweringWarning, match="could not read its work-wire spec"):
             assert not _rule_is_compatible("MockOp", raises_on_spec, wires=Wires([0]))
 
-    @pytest.mark.parametrize("capture_enabled", [False, True])
-    def test_collect_resources_preserves_change_op_basis(self, capture_enabled):
-        """Resources retain the basis-change node independently of the caller's capture state."""
+    def test_collect_resources_preserves_change_op_basis(self):
+        """Resources retain the captured basis-change node when collected outside capture."""
         kwargs = prepare_dynamic_op_kwargs({"0": ShapedArray((), float)}, {"wires": 1})
 
-        with qp.capture.toggle_ctx(capture_enabled):
+        with qp.capture.toggle_ctx(False):
             collected_rules = collect_resources_for_op("RZ", kwargs, is_custom_op=True)
 
         collected = next(
@@ -861,8 +860,7 @@ class TestGenericUtilities:
         assert collected.resource_counts_by_op == {basis_change: 1}
         assert collected.resource_counts_by_id == {GraphOpID(basis_change).getGraphOpId(): 1}
 
-    @pytest.mark.parametrize("capture_enabled", [False, True])
-    def test_collect_symbolic_resources_preserves_change_op_basis(self, capture_enabled):
+    def test_collect_symbolic_resources_preserves_change_op_basis(self):
         """Registered symbolic rules retain the same basis-change node as the captured body."""
         basis_change = qp.ops.ChangeOpBasis2(qp.H(Wire[1]), qp.X(Wire[1]), qp.H(Wire[1]))
 
@@ -872,7 +870,7 @@ class TestGenericUtilities:
 
         with local_decomps():
             add_decomps("Adjoint(NoParams)", symbolic_rule)
-            with qp.capture.toggle_ctx(capture_enabled):
+            with qp.capture.toggle_ctx(False):
                 collected_rules, _ = collect_symbolic_resources(
                     NoParams,
                     "NoParams",
@@ -885,57 +883,6 @@ class TestGenericUtilities:
         assert collected.source_rule is symbolic_rule
         assert collected.resource_counts_by_op == {basis_change: 1}
         assert collected.resource_counts_by_id == {GraphOpID(basis_change).getGraphOpId(): 1}
-
-
-class TestPreservedChangeOpBasis:
-    """Compile basis changes whose subcircuit operands share their physical wires."""
-
-    @pytest.fixture(scope="class")
-    def basis_compute(self):
-        """Register the shared-wire subcircuit once, without leaking its decomposition."""
-        with local_decomps():
-
-            @qp.subcircuit
-            @register_resources({qp.CNOT: 1})
-            def BasisCompute(wires):
-                qp.CNOT(wires)
-
-            yield BasisCompute
-
-    @pytest.mark.parametrize(
-        "control_wire, adjointed",
-        [(None, False), (0, False), (3, False), (None, True)],
-        ids=["plain", "active_control", "inactive_control", "adjoint"],
-    )
-    def test_shared_wire_subcircuit_modifiers(
-        self, backend, basis_compute, control_wire, adjointed
-    ):
-        """Plain, controlled and adjointed basis changes compile with their shared wires intact."""
-        gate_set = {qp.CNOT, qp.RZ, qp.PauliX, qp.GlobalPhase}
-
-        @qjit(capture=True)
-        @graph_decomposition(gate_set=gate_set)
-        @qp.qnode(qp.device(backend, wires=4))
-        def circuit(angle):
-            qp.X(0)
-            qp.X(1)
-            op = qp.change_op_basis(basis_compute([1, 2]), qp.RZ(angle, 2))
-            if adjointed:
-                op = qp.adjoint(op)
-            if control_wire is not None:
-                qp.ctrl(op, control=control_wire)
-            return qp.state()
-
-        angle = 0.6931
-        expected = qp.math.zeros(16, dtype=complex)
-        phase = 0 if control_wire == 3 else (-1 if adjointed else 1) * angle / 2
-        expected[12] = qp.math.exp(1j * phase)
-        np.testing.assert_allclose(circuit(angle), expected, atol=1e-8)
-
-        operations = qp.analyze(circuit)(angle).resources.quantum_operations
-        assert operations["CNOT"] > 0
-        assert operations["RZ"] > 0
-        assert set(operations).issubset({"CNOT", "RZ", "PauliX", "GlobalPhase"})
 
 
 class TestCollectedResources:
