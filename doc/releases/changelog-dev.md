@@ -1187,6 +1187,11 @@
 * Fixed hinted while loops to be counted symbolically in `ResourceAnalysis`.
   [(#3370)](https://github.com/PennyLaneAI/catalyst/pull/3370)
 
+* `adjoint-lowering` no longer aborts when an extract inside an adjoint region reads the
+  register from before an insert at another index. When the register an extract reads is replaced
+  by something other than a single insert, the pass now reports an error instead of aborting.
+  [(#3409)](https://github.com/PennyLaneAI/catalyst/pull/3409)
+
 <h3>Internal changes ⚙️</h3>
 
 * Updated `pylint` to version 4.1.3 in the development requirements and CI formatting workflow.
