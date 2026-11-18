@@ -20,7 +20,6 @@ from typing import Any
 
 import pennylane as qp
 from jax._src.lib.mlir import ir
-from pennylane.decomposition.utils import to_name
 from pennylane.pytrees import flatten
 
 from catalyst.decomposition.modifier_state import ModifierState
@@ -245,6 +244,7 @@ class GraphOpID:
         self.op = op
         self.is_custom_op = self.parse_is_custom_op()
 
+        # Match Operator2 lowering and OperatorRegistry, including when op.name differs.
         self.operator_name = type(op).__name__
         self.dynamic_shape = self.parse_dynamic_shape()
         self.wire_lens = self.parse_wire_lens()
