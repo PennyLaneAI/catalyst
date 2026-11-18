@@ -845,31 +845,6 @@ OpTy migrateOpToValueSemantics(IRRewriter &builder, Operation *qrefOp, QubitValu
     return cast<OpTy>(newOp);
 }
 
-void expandWirelessBarriers(Region &region, SetVector<Value> registers = {}) {
-    for (Block &block : region) {
-        SetVector<Value> availableRegisters = registers;
-        for (BlockArgument argument : block.getArguments()) {
-            if (isa<qref::QuregType>(argument.getType())) {
-                availableRegisters.insert(argument);
-            }
-        }
-        for (Operation &op : block) {
-            if (auto alloc = dyn_cast<qref::AllocOp>(op)) {
-                availableRegisters.insert(alloc.getQreg());
-            } else if (auto dealloc = dyn_cast<qref::DeallocOp>(op)) {
-                availableRegisters.remove(dealloc.getQreg());
-            } else if (auto barrier = dyn_cast<qref::BarrierOp>(op)) {
-                if (barrier.getQubits().empty()) {
-                    barrier->setOperands(availableRegisters.getArrayRef());
-                }
-            }
-            for (Region &nested : op.getRegions()) {
-                expandWirelessBarriers(nested, availableRegisters);
-            }
-        }
-    }
-}
-
 void _getNecessaryRegionRValuesImpl(Region &r, SetVector<Value> &necessaryRegionRValues,
                                     std::function<bool(Region &, Value)> isFromOutside) {
     llvm::SmallDenseSet<Value, 8> rQregsTakenIn;
@@ -2236,10 +2211,6 @@ struct ValueSemanticsConversionPass
         Operation *mod = getOperation();
         MLIRContext *ctx = mod->getContext();
         IRRewriter builder(ctx);
-
-        mod->walk([&](func::FuncOp function) {
-            expandWirelessBarriers(function.getBody());
-        });
 
         WalkResult getOpVerification = mod->walk([&](qref::GetOp getOp) {
             if (!llvm::all_of(getOp->getUsers(),
