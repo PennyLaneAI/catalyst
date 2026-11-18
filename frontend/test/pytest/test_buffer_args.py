@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Tests for compiled function input and output buffers."""
+
 import jax
 import jax.numpy as jnp
 import numpy as np
@@ -76,6 +78,35 @@ def test_qjit_does_not_mutate_numpy_input_buffers():
 
     assert np.allclose(matrix, original)
     assert jnp.allclose(result, expected)
+
+
+@pytest.mark.parametrize(
+    "array",
+    [
+        pytest.param(np.arange(12.0).reshape(3, 4).T, id="transpose"),
+        pytest.param(np.arange(12.0).reshape(3, 4)[:, ::2], id="slice"),
+    ],
+)
+def test_qjit_noncontiguous_numpy_input(array):
+    """Compiled calls read the logical values of transposed and sliced NumPy inputs."""
+
+    @qjit
+    def scale(values):
+        return values * 3.0
+
+    np.testing.assert_array_equal(scale(array), array * 3.0)
+
+
+def test_qjit_scalar_input_rank():
+    """Normalizing an input's layout preserves the rank of a zero-dimensional array."""
+
+    @qjit
+    def identity(value):
+        return value
+
+    result = identity(np.array(2.0))
+
+    assert result.ndim == 0
 
 
 class TestReturnValues:
