@@ -998,6 +998,10 @@
 
 <h3>Bug fixes 🐛</h3>
 
+* The `--convert-to-value-semantics` and `--convert-to-reference-semantics` passes no longer read
+  freed memory.
+  [(#3496)](https://github.com/PennyLaneAI/catalyst/pull/3496)
+
 * The `gpu_verbs` coprocessor now supports the NVIDIA GH200 with CUDA 12.4.
   [(#3467)](https://github.com/PennyLaneAI/catalyst/pull/3467)
 
@@ -1186,6 +1190,11 @@
 
 * Fixed hinted while loops to be counted symbolically in `ResourceAnalysis`.
   [(#3370)](https://github.com/PennyLaneAI/catalyst/pull/3370)
+
+* `adjoint-lowering` no longer aborts when an extract inside an adjoint region reads the
+  register from before an insert at another index. When the register an extract reads is replaced
+  by something other than a single insert, the pass now reports an error instead of aborting.
+  [(#3409)](https://github.com/PennyLaneAI/catalyst/pull/3409)
 
 <h3>Internal changes ⚙️</h3>
 
