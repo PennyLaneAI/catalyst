@@ -70,10 +70,12 @@ void handleGraphStatePrep(IRRewriter &builder, mbqc::RefGraphStatePrepOp rGraphS
                           QubitValueTracker &tracker);
 void handleAdjoint(IRRewriter &builder, qref::AdjointOp rAdjointOp, QubitValueTracker &tracker);
 void handleCtrl(IRRewriter &builder, qref::CtrlOp rCtrlOp, QubitValueTracker &tracker);
-void handleIf(IRRewriter &builder, scf::IfOp ifOp, QubitValueTracker &tracker);
-void handleSwitch(IRRewriter &builder, scf::IndexSwitchOp switchOp, QubitValueTracker &tracker);
-void handleFor(IRRewriter &builder, scf::ForOp forOp, QubitValueTracker &tracker);
-void handleWhile(IRRewriter &builder, scf::WhileOp whileOp, QubitValueTracker &tracker);
+// The scf handlers return true if they converted (and erased) the op, and false if they left it
+// in place because its regions capture no quantum values from above.
+bool handleIf(IRRewriter &builder, scf::IfOp ifOp, QubitValueTracker &tracker);
+bool handleSwitch(IRRewriter &builder, scf::IndexSwitchOp switchOp, QubitValueTracker &tracker);
+bool handleFor(IRRewriter &builder, scf::ForOp forOp, QubitValueTracker &tracker);
+bool handleWhile(IRRewriter &builder, scf::WhileOp whileOp, QubitValueTracker &tracker);
 void handleSubroutine(IRRewriter &builder, func::FuncOp f,
                       const SetVector<Value> &rValuesUsedBySubroutine);
 
