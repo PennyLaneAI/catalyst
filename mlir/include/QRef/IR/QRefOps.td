@@ -867,6 +867,7 @@ def HermitianOp : Observable_Op<"hermitian"> {
 
 def MeasurementOp : QRef_Op<"measurement", [
         MeasurementProcess, AttrSizedOperandSegments,
+        DeclareOpInterfaceMethods<DecomposableOp>,
         DeclareOpInterfaceMethods<ResourceQuantumOpInterface>]> {
     let summary = "A generic mid-circuit measurement with classical results.";
     let description = [{

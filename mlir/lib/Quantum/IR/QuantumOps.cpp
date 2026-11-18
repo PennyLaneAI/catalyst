@@ -1542,49 +1542,69 @@ getEntriesInOperandOrder(mlir::DictionaryAttr map) {
     return entries;
 }
 
-// OperatorOp
-
-std::string OperatorOp::getOperatorName() { return getOpName().str(); }
-
-DynamicShape OperatorOp::getDynamicShape() {
+// Build DynamicShape from a param_map over a params operand list.
+static DynamicShape getDynamicShapeFromParamMap(mlir::ValueRange params,
+                                                mlir::DictionaryAttr paramMap) {
     DynamicShape dynamicShape;
-    auto params = getParams();
-
-    for (auto [name, indices] : getEntriesInOperandOrder(getParamMap())) {
+    for (auto [name, indices] : getEntriesInOperandOrder(paramMap)) {
         llvm::SmallVector<mlir::Type> types;
         for (int64_t index : indices) {
             types.push_back(params[index].getType());
         }
         dynamicShape.emplace_back(name.str(), std::move(types));
     }
-
     return dynamicShape;
 }
 
-WireLens OperatorOp::getWireLens() {
+// Build WireLens from a qubit_map; in register mode, lengths come from index-tensor dims.
+static WireLens getWireLensFromQubitMap(mlir::DictionaryAttr qubitMap,
+                                        mlir::ValueRange arrQubitIndices, bool hasQreg) {
     WireLens wireLens;
-
-    for (auto [name, indices] : getEntriesInOperandOrder(getQubitMap())) {
+    for (auto [name, indices] : getEntriesInOperandOrder(qubitMap)) {
         size_t numQubits;
-        if (getInQreg()) {
+        if (hasQreg) {
             numQubits = 0;
             for (int64_t index : indices) {
                 auto indexTensorType =
-                    cast<mlir::RankedTensorType>(getArrQubitIndices()[index].getType());
+                    cast<mlir::RankedTensorType>(arrQubitIndices[index].getType());
                 numQubits += indexTensorType.getDimSize(0);
             }
         } else {
             numQubits = indices.size();
         }
-
         wireLens.emplace_back(name.str(), numQubits);
     }
-
     return wireLens;
+}
+
+// OperatorOp
+
+std::string OperatorOp::getOperatorName() { return getOpName().str(); }
+
+DynamicShape OperatorOp::getDynamicShape() {
+    return getDynamicShapeFromParamMap(getParams(), getParamMap());
+}
+
+WireLens OperatorOp::getWireLens() {
+    return getWireLensFromQubitMap(getQubitMap(), getArrQubitIndices(),
+                                   static_cast<bool>(getInQreg()));
 }
 
 std::string OperatorOp::getExtraData() {
     return getUID().has_value() ? std::to_string(getUID().value()) : "";
+}
+
+// MeasurementOp
+
+std::string MeasurementOp::getOperatorName() { return getOpName().str(); }
+
+DynamicShape MeasurementOp::getDynamicShape() {
+    return getDynamicShapeFromParamMap(getParams(), getParamMap());
+}
+
+WireLens MeasurementOp::getWireLens() {
+    return getWireLensFromQubitMap(getQubitMap(), getArrQubitIndices(),
+                                   static_cast<bool>(getInQreg()));
 }
 
 //===----------------------------------------------------------------------===//

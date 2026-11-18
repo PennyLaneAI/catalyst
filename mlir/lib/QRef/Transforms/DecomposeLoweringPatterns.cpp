@@ -115,8 +115,8 @@ struct DecomposableOpPattern final : public OpInterfaceRewritePattern<Decomposab
 
   public:
     DecomposableOpPattern(MLIRContext *context, const llvm::StringMap<func::FuncOp> &registry,
-                            bool inlineRule, const llvm::StringSet<llvm::MallocAllocator> &gateSet,
-                            SymbolTable &symbolTable)
+                          bool inlineRule, const llvm::StringSet<llvm::MallocAllocator> &gateSet,
+                          SymbolTable &symbolTable)
         : OpInterfaceRewritePattern<DecomposableOp>(context), decompositionRegistry(registry),
           inlineRuleBody(inlineRule), targetGateSet(gateSet), moduleSymbolTable(symbolTable) {};
 
@@ -226,7 +226,7 @@ void populateDecomposeLoweringPatterns(RewritePatternSet &patterns,
                                        const llvm::StringSet<llvm::MallocAllocator> &targetGateSet,
                                        SymbolTable &moduleSymbolTable) {
     patterns.add<DecomposableOpPattern>(patterns.getContext(), decompositionRegistry,
-                                          inlineRuleBody, targetGateSet, moduleSymbolTable);
+                                        inlineRuleBody, targetGateSet, moduleSymbolTable);
 }
 
 } // namespace qref

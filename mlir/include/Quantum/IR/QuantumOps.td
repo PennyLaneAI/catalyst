@@ -1253,6 +1253,7 @@ class Measurement_Op<string mnemonic, list<Trait> traits = []> :
 
 def MeasurementOp : Quantum_Op<"measurement", [
         MeasurementProcess, AttrSizedOperandSegments, AttrSizedResultSegments,
+        DeclareOpInterfaceMethods<DecomposableOp>,
         DeclareOpInterfaceMethods<ResourceQuantumOpInterface>]> {
     let summary = "A generic mid-circuit measurement with classical results.";
     let description = [{

@@ -124,8 +124,7 @@ std::string defaultGetGraphOpId(Operation *op) {
     std::string name = decomposable.getOperatorName();
     if (decomposable.isModifiable()) {
         bool isAdjoint = op->hasAttr("adjoint");
-        unsigned numCtrlQubits =
-            cast<QuantumGate>(op).getCtrlQubitOperands().size();
+        unsigned numCtrlQubits = cast<QuantumGate>(op).getCtrlQubitOperands().size();
         name = wrapModifiers(name, op, isAdjoint, numCtrlQubits);
     }
 
