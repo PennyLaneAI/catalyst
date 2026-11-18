@@ -13,9 +13,8 @@
 # limitations under the License.
 """Test generic and specialized lowering of mid-circuit measurements."""
 
-# RUN: %PYTHON %s > %t
-# RUN: FileCheck %s < %t
-# RUN: quantum-opt --convert-to-value-semantics --canonicalize %t | FileCheck %s --check-prefix=VALUE
+# RUN: %PYTHON %s | FileCheck %s
+# RUN: catalyst --tool=opt --convert-to-value-semantics --canonicalize %t | FileCheck %s --check-prefix=VALUE
 
 import pennylane as qp
 
