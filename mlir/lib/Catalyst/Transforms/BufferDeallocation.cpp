@@ -91,6 +91,10 @@
 #include "QRef/IR/QRefDialect.h"
 #include "Quantum/IR/QuantumDialect.h"
 
+#include <mlir/IR/Builders.h>
+#include <mlir/IR/BuiltinTypeInterfaces.h>
+#include <mlir/IR/BuiltinTypes.h>
+
 using namespace mlir;
 using namespace catalyst;
 
@@ -396,8 +400,10 @@ class BufferDeallocation : public BufferPlacementTransformationBase {
         SetVector<Value> nonAliases;
         op->walk([&](Operation *operation) {
             for (Value result : operation->getResults()) {
+                Type t = result.getType();
                 if (isa<catalyst::quantum::QuantumDialect, catalyst::qref::QRefDialect>(
-                        result.getType().getDialect())) {
+                        t.getDialect()) ||
+                    isa<IntegerType, FloatType, ComplexType>(t)) {
                     nonAliases.insert(result);
                 }
             }
