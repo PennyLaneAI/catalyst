@@ -361,8 +361,8 @@ class BaseSignatureAnalyzer {
 class DecomposableGateSignatureAnalyzer : public BaseSignatureAnalyzer {
     static SmallVector<Value> getRuleQubits(DecomposableGate op) {
         auto qubits = op.getNonCtrlQubitOperands();
-        if (auto genericOp = dyn_cast<OperatorOp>(op.getOperation())) {
-            if (!genericOp.getQreg() && !genericOp.getQubitMap().empty()) {
+        if (auto operatorOp = dyn_cast<OperatorOp>(op.getOperation())) {
+            if (!operatorOp.getQreg() && !operatorOp.getQubitMap().empty()) {
                 // Rule capture groups base wires by name, followed by control work wires.
                 // Gather through the map so shared and permuted groups retain their wires.
                 SmallVector<Value> ruleQubits;
@@ -371,13 +371,16 @@ class DecomposableGateSignatureAnalyzer : public BaseSignatureAnalyzer {
                         ruleQubits.push_back(qubits[index]);
                     }
                 };
-                for (NamedAttribute group : genericOp.getQubitMap()) {
+                for (NamedAttribute group : operatorOp.getQubitMap()) {
                     if (group.getName().getValue() != catalyst::CTRL_WORK_WIRES) {
                         appendGroup(cast<DenseI64ArrayAttr>(group.getValue()));
                     }
                 }
-                if (auto workWires = genericOp.getQubitMap().get(catalyst::CTRL_WORK_WIRES)) {
-                    appendGroup(cast<DenseI64ArrayAttr>(workWires));
+                // signature_wire_lens in the frontend appends control work wires after the rest of
+                // the wire groups. Keep that order so unpack_rule_operands slices the wire tensor
+                // correctly; qubit_map sorts ctrl_work_wires alphabetically among the wire groups.
+                if (auto ctrlWorkWires = operatorOp.getQubitMap().get(catalyst::CTRL_WORK_WIRES)) {
+                    appendGroup(cast<DenseI64ArrayAttr>(ctrlWorkWires));
                 }
                 return ruleQubits;
             }
