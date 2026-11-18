@@ -241,11 +241,24 @@ def Observable : OpInterface<"Observable"> {
 
 def MeasurementProcess : OpInterface<"MeasurementProcess"> {
     let description = [{
-        This interface provides a generic way to interact with quantum measurement processes.
-        These are instructions that represent some information extraction procedure on the
-        underlying statevector. On simulators, they may be implemented by direct manipulation
-        of the statevector, but on hardware they typically turn into procedures over the quantum
-        program as a whole, usually requiring many executions of the same circuit.
+        Identifies quantum measurement processes, including mid-circuit measurements
+        and terminal result extraction. This marker interface does not require an
+        observable or impose a common operand or result layout.
+    }];
+
+    let cppNamespace = "::catalyst::quantum";
+}
+
+def TerminalMeasurement : OpInterface<"TerminalMeasurement", [MeasurementProcess]> {
+    let description = [{
+        Identifies terminal circuit-result extraction, such as samples, counts,
+        expectation values, variances, probabilities, and simulator state queries.
+        These operations consume an observable and return classical results or write
+        them to buffers, without returning updated quantum state.
+
+        Terminal describes the operation's role, not its literal position in a block.
+        Its observable may also represent earlier mid-circuit measurement outcomes.
+        On hardware, extracting these results may require many circuit executions.
     }];
 
     let cppNamespace = "::catalyst::quantum";
