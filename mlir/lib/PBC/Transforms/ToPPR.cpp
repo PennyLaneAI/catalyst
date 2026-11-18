@@ -596,9 +596,6 @@ struct PBCPauliMeasureLowering : public OpConversionPattern<MeasurementOp> {
 
         SmallVector<Attribute> paulis;
         for (char pauli : pauliWord.getValue()) {
-            if (pauli != 'I' && pauli != 'X' && pauli != 'Y' && pauli != 'Z') {
-                return rewriter.notifyMatchFailure(op, "invalid Pauli word");
-            }
             paulis.push_back(rewriter.getStringAttr(StringRef(&pauli, 1)));
         }
         auto ppm = PPMeasurementOp::create(rewriter, op.getLoc(), rewriter.getArrayAttr(paulis),
