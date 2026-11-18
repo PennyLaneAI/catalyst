@@ -16,6 +16,7 @@
 
 import contextlib
 import ctypes
+import functools
 import logging
 from dataclasses import dataclass
 from typing import Tuple
@@ -24,7 +25,7 @@ import jax.numpy as jnp
 import numpy as np
 from jax.interpreters import mlir
 from jax.tree_util import PyTreeDef, tree_flatten, tree_unflatten
-from mlir_quantum.runtime import as_ctype, make_nd_memref_descriptor, make_zero_d_memref_descriptor
+from mlir_quantum.runtime import as_ctype
 from pennylane.logging import debug_logger_init
 
 from catalyst.jax_extras import get_implicit_and_explicit_flat_args
@@ -37,10 +38,26 @@ from catalyst.tracing.type_signatures import (
 from catalyst.utils import wrapper
 from catalyst.utils.c_template import get_template, mlir_type_to_numpy_type
 from catalyst.utils.filesystem import Directory
-from catalyst.utils.jnp_to_memref import get_ranked_memref_descriptor
+from catalyst.utils.jnp_to_memref import get_ranked_memref_descriptor, memref_descriptor_type
 
 logger = logging.getLogger(__name__)
 logger.addHandler(logging.NullHandler())
+
+
+@functools.lru_cache(maxsize=None)
+def _arg_value_type(field_types):
+    """Get the ctypes structure type that bundles pointers to the argument descriptors.
+
+    Cache by actual pointer types to keep fields compatible with their descriptors.
+    On CPython before 3.14, ctypes retains every structure type used with pointer().
+    """
+
+    class CompiledFunctionArgValue(ctypes.Structure):
+        """Programmatically create a structure which holds tensors of varying base types."""
+
+        _fields_ = [("f" + str(i), t) for i, t in enumerate(field_types)]
+
+    return CompiledFunctionArgValue
 
 
 def _run_setup(setup, teardown):
@@ -202,12 +219,7 @@ class CompiledFunction:
         mlir_element_type = mlir.ir.RankedTensorType(mlir_tensor_type).element_type
         numpy_element_type = mlir_type_to_numpy_type(mlir_element_type)
         ctp = as_ctype(numpy_element_type)
-        if shape:
-            memref_descriptor = make_nd_memref_descriptor(len(shape), ctp)()
-        else:
-            memref_descriptor = make_zero_d_memref_descriptor(ctp)()
-
-        return memref_descriptor
+        return memref_descriptor_type(len(shape), ctp)()
 
     @staticmethod
     def get_etypes(mlir_tensor_type):
@@ -318,20 +330,11 @@ class CompiledFunction:
 
         args = tree_unflatten(args_shape, c_abi_args)
 
-        class CompiledFunctionArgValue(ctypes.Structure):
-            """Programmatically create a structure which holds tensors of varying base types."""
-
-            _fields_ = [("f" + str(i), type(t)) for i, t in enumerate(c_abi_args)]
-
-            def __init__(self, c_abi_args):
-                for ft_tuple, c_abi_arg in zip(CompiledFunctionArgValue._fields_, c_abi_args):
-                    f = ft_tuple[0]
-                    setattr(self, f, c_abi_arg)
-
         arg_value_pointer = ctypes.POINTER(ctypes.c_int)()
 
         if len(args) > 0:
-            arg_value = CompiledFunctionArgValue(c_abi_args)
+            arg_value_type = _arg_value_type(tuple(type(t) for t in c_abi_args))
+            arg_value = arg_value_type(*c_abi_args)
             arg_value_pointer = ctypes.pointer(arg_value)
 
         c_abi_args = [return_value_pointer] + [arg_value_pointer]

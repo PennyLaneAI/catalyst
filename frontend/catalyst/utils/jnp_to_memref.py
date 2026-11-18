@@ -11,17 +11,17 @@ This file is a wrapper around MLIR's np_to_memref to allow for abstract types an
 to be converted to and from memrefs.
 """
 
+import ctypes
+import functools
+
 import jax
 import numpy as np
 from mlir_quantum.runtime import (
     as_ctype,
 )
-from mlir_quantum.runtime import get_ranked_memref_descriptor as mlir_get_ranked_memref_descriptor
-from mlir_quantum.runtime import (
-    get_unranked_memref_descriptor as mlir_get_unranked_memref_descriptor,
-)
 from mlir_quantum.runtime import ranked_memref_to_numpy as mlir_ranked_memref_to_numpy
 from mlir_quantum.runtime.np_to_memref import (
+    UnrankedMemRefDescriptor,
     make_nd_memref_descriptor,
     make_zero_d_memref_descriptor,
     move_aligned_ptr_by_offset,
@@ -29,6 +29,35 @@ from mlir_quantum.runtime.np_to_memref import (
 )
 
 from catalyst.jax_extras import DynamicJaxprTracer, ShapedArray
+
+
+@functools.lru_cache(maxsize=None)
+def memref_descriptor_type(rank, ctp):
+    """Get a ranked descriptor type cached by rank and element type.
+
+    On CPython before 3.14, ctypes retains every descriptor class used with pointer().
+    Keep the cache unbounded: rebuilding an evicted class creates an incompatible type.
+    """
+    if rank == 0:
+        return make_zero_d_memref_descriptor(ctp)
+    return make_nd_memref_descriptor(rank, ctp)
+
+
+def _numpy_to_ranked_memref_descriptor(nparray):
+    """Convert a NumPy array using the cached descriptor type."""
+    ctp = as_ctype(nparray.dtype)
+    descriptor = memref_descriptor_type(nparray.ndim, ctp)()
+    descriptor.allocated = nparray.ctypes.data
+    descriptor.aligned = nparray.ctypes.data_as(ctypes.POINTER(ctp))
+    descriptor.offset = ctypes.c_longlong(0)
+    if nparray.ndim == 0:
+        return descriptor
+
+    descriptor.shape = nparray.ctypes.shape
+    # NumPy strides are in bytes; MLIR strides are in elements.
+    strides_type = ctypes.c_longlong * nparray.ndim
+    descriptor.strides = strides_type(*[s // nparray.itemsize for s in nparray.strides])
+    return descriptor
 
 
 def get_ranked_memref_descriptor_from_shaped_array(array: ShapedArray):
@@ -40,14 +69,11 @@ def get_ranked_memref_descriptor_from_shaped_array(array: ShapedArray):
     """
 
     ctp = as_ctype(array.dtype)
-    if array.ndim == 0:
-        return make_zero_d_memref_descriptor(ctp)()
-
-    return make_nd_memref_descriptor(array.ndim, ctp)()
+    return memref_descriptor_type(array.ndim, ctp)()
 
 
 def get_ranked_memref_descriptor(array):
-    """Wrapper around MLIR's get_ranked_memref_descriptor."""
+    """Convert an array, scalar, or abstract value to a ranked memref descriptor."""
 
     if isinstance(array, DynamicJaxprTracer):
         array = array.aval
@@ -63,12 +89,11 @@ def get_ranked_memref_descriptor(array):
         # If input is ShapedArray
         return get_ranked_memref_descriptor_from_shaped_array(array)
 
-    # Use default implementation from MLIR's library.
-    return mlir_get_ranked_memref_descriptor(array)
+    return _numpy_to_ranked_memref_descriptor(array)
 
 
 def get_unranked_memref_descriptor(array):
-    """Wrapper around MLIR's get_unranked_memref_descriptor."""
+    """Convert an array or scalar to an unranked memref descriptor."""
 
     if isinstance(array, (int, float, bool, complex)):
         # Convenience
@@ -77,8 +102,11 @@ def get_unranked_memref_descriptor(array):
     if isinstance(array, jax.Array):
         array = np.asarray(array)
 
-    # Use default implementation from MLIR's library.
-    return mlir_get_unranked_memref_descriptor(array)
+    descriptor = UnrankedMemRefDescriptor()
+    descriptor.rank = array.ndim
+    ranked = _numpy_to_ranked_memref_descriptor(array)
+    descriptor.descriptor = ctypes.cast(ctypes.pointer(ranked), ctypes.c_void_p)
+    return descriptor
 
 
 def ranked_memref_to_numpy(ranked_memref):
