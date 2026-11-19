@@ -43,6 +43,7 @@ from pennylane.measurements import CountsMP
 from pennylane.pytrees import flatten, unflatten
 from pennylane.wires import AbstractQubit, Wires, is_abstract_qubit
 
+import catalyst
 from catalyst.decomposition.capture_session import (
     DecompositionScope,
     OpDecompRequest,
@@ -464,7 +465,11 @@ def _convert_decomp_target_spec(
 
         with take_current_trace():
             if estimate_decomps:
-                converted = jax.make_jaxpr(lambda *args: None)(QrefQreg(), *operands)
+                converted = jax.make_jaxpr(
+                    lambda *args: catalyst.debug_assert(
+                        False, "rule without implementation for estimation purposes"
+                    )
+                )(QrefQreg(), *operands)
             else:
                 try:
                     plxpr = jax.make_jaxpr(prepared_rule_fn)(*operands)
