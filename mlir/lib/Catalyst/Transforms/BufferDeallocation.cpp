@@ -171,9 +171,9 @@ inferOwnedBufferResults(func::FuncOp function,
         if (it == ownedResults.end()) {
             return;
         }
-        for (auto [index, owned] : llvm::enumerate(it->second)) {
-            if (owned) {
-                freshCallResults.insert(call.getResult(index));
+        for (auto [i, isOwned] : llvm::enumerate(it->second)) {
+            if (isOwned) {
+                freshCallResults.insert(call.getResult(i));
             }
         }
     });
@@ -298,15 +298,15 @@ struct AnnotateBufferOwnershipPass
             if (it == ownedResults.end()) {
                 return;
             }
-            SmallVector<int32_t> indices;
-            for (auto [index, owned] : llvm::enumerate(it->second)) {
-                if (owned) {
-                    indices.push_back(index);
+            SmallVector<int32_t> ownedResultIndices;
+            for (auto [i, isOwned] : llvm::enumerate(it->second)) {
+                if (isOwned) {
+                    ownedResultIndices.push_back(i);
                 }
             }
-            if (!indices.empty()) {
+            if (!ownedResultIndices.empty()) {
                 call->setAttr(catalyst::OWNED_BUFFER_RESULTS_ATTR,
-                              DenseI32ArrayAttr::get(&getContext(), indices));
+                              DenseI32ArrayAttr::get(&getContext(), ownedResultIndices));
             }
         });
     }
