@@ -94,6 +94,8 @@
 #include "QRef/IR/QRefDialect.h"
 #include "Quantum/IR/QuantumDialect.h"
 
+#include "StringConstants.h"
+
 using namespace mlir;
 using namespace catalyst;
 
@@ -154,8 +156,6 @@ static bool validateSupportedControlFlow(Operation *op) {
 }
 
 namespace {
-
-constexpr llvm::StringLiteral ownedBufferResultsAttr = "catalyst.owned_buffer_results";
 
 /// Infer one function's owned results using the current callee summaries.
 static SmallVector<bool>
@@ -291,7 +291,7 @@ struct AnnotateBufferOwnershipPass
         } while (changed);
 
         getOperation().walk([&](func::CallOp call) {
-            call->removeAttr(ownedBufferResultsAttr);
+            call->removeAttr(catalyst::OWNED_BUFFER_RESULTS_ATTR);
             auto callee =
                 symbolTables.lookupNearestSymbolFrom<func::FuncOp>(call, call.getCalleeAttr());
             auto it = ownedResults.find(callee);
@@ -305,7 +305,7 @@ struct AnnotateBufferOwnershipPass
                 }
             }
             if (!indices.empty()) {
-                call->setAttr(ownedBufferResultsAttr,
+                call->setAttr(catalyst::OWNED_BUFFER_RESULTS_ATTR,
                               DenseI32ArrayAttr::get(&getContext(), indices));
             }
         });
@@ -420,8 +420,9 @@ class BufferDeallocation : public BufferPlacementTransformationBase {
                 }
             }
             auto call = dyn_cast<func::CallOp>(operation);
-            auto owned = call ? call->getAttrOfType<DenseI32ArrayAttr>(ownedBufferResultsAttr)
-                              : DenseI32ArrayAttr{};
+            auto owned =
+                call ? call->getAttrOfType<DenseI32ArrayAttr>(catalyst::OWNED_BUFFER_RESULTS_ATTR)
+                     : DenseI32ArrayAttr{};
             if (!owned) {
                 return;
             }
@@ -436,7 +437,7 @@ class BufferDeallocation : public BufferPlacementTransformationBase {
                     allocs.registerAlloc({result, *dealloc});
                 }
             }
-            call->removeAttr(ownedBufferResultsAttr);
+            call->removeAttr(catalyst::OWNED_BUFFER_RESULTS_ATTR);
         });
         // Call analysis also connects memrefs to scalar/quantum results. Such
         // results cannot carry ownership of these classical buffers.
