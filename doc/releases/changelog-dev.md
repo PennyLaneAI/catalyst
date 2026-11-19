@@ -998,6 +998,10 @@
 
 <h3>Bug fixes 🐛</h3>
 
+* Subroutines with the same structure that close over different JAX arrays are no longer
+  compiled as the same subroutine.
+  [(#3502)](https://github.com/PennyLaneAI/catalyst/pull/3502)
+
 * The `--convert-to-value-semantics` and `--convert-to-reference-semantics` passes no longer read
   freed memory.
   [(#3496)](https://github.com/PennyLaneAI/catalyst/pull/3496)
@@ -1546,6 +1550,7 @@ Marcus Edwards,
 Lillian Frederiksen,
 Sengthai Heng,
 David Ittah,
+Harshal Janjani,
 JiaRung Jian,
 Jeffrey Kam,
 Jacob Kitchen,
