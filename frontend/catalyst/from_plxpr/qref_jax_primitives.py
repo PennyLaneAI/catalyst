@@ -623,11 +623,11 @@ def _qref_pauli_measure_lowering(
 
     result_type = ir.IntegerType.get_signless(1)
 
-    qubit_map = (
-        get_mlir_attribute_from_pyval({"wires": ir.DenseI64ArrayAttr.get(list(range(len(qubits))))})
-        if qubits
-        else None
-    )
+    qubit_map = None
+    if qubits:
+        qubit_map = get_mlir_attribute_from_pyval(
+            {"wires": ir.DenseI64ArrayAttr.get(list(range(len(qubits))))}
+        )
 
     result = MeasurementOp(
         mres=[result_type],
