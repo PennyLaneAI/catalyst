@@ -25,7 +25,7 @@ from jax._src.lib.mlir import ir
 from pennylane.testing import find_eqns
 from pennylane.typing import Float, Wire
 
-from catalyst import qjit
+from catalyst import QJIT, CompileOptions, qjit
 from catalyst.decomposition.capture_session import OpDecompRequest, RuleIdentity
 from catalyst.decomposition.decomposition_rules import (
     DecompRuleSpec,
@@ -1120,10 +1120,13 @@ def test_multiple_qnodes_capture_and_materialize_locally(mocker, estimate_decomp
     with qp.decomposition.local_decomps():
         qp.add_decomps(RepeatedGate, empty_rule)
 
-        @qjit(capture=True, target="mlir", estimate_decomps=estimate_decomps)
         def workflow():
             return first(), second()
 
+        workflow = QJIT(
+            workflow,
+            CompileOptions(capture=True, target="mlir", estimate_decomps=estimate_decomps),
+        )
         mlir = str(workflow.mlir_module)
 
     assert spy.call_count == 2
@@ -1219,7 +1222,7 @@ def test_estimate_decomps_preserves_signatures_and_resources(mocker, adjoint, co
         qp.add_decomps(ParameterizedGate, root_rule)
         qp.add_decomps(RepeatedGate, leaf_rule)
         definitions = qjit(circuit, target="mlir")
-        declarations = qjit(circuit, target="mlir", estimate_decomps=True)
+        declarations = QJIT(circuit, CompileOptions(target="mlir", estimate_decomps=True))
 
     target_names = {
         ModifierState(adjoint=adjoint, control_count=2 if controlled else 0).wrap_name(name)
@@ -1271,12 +1274,13 @@ def test_estimate_decomps_does_not_trace_implementations(mocker):
     with qp.decomposition.local_decomps():
         qp.add_decomps(RepeatedGate, unavailable_rule, empty_rule)
 
-        @qjit(target="mlir", estimate_decomps=True)
         @qp.qnode(qp.device("null.qubit", wires=1))
         def circuit():
             RepeatedGate(0)
             RepeatedGate(0)
             return qp.state()
+
+        circuit = QJIT(circuit, CompileOptions(target="mlir", estimate_decomps=True))
 
     load_cache.assert_not_called()
     rules = _rule_funcops(circuit)
@@ -1315,7 +1319,7 @@ def test_estimate_decomps_includes_precompiled_rules(mocker):
             return qp.state()
 
         definitions = qjit(circuit, target="mlir")
-        declarations = qjit(circuit, target="mlir", estimate_decomps=True)
+        declarations = QJIT(circuit, CompileOptions(target="mlir", estimate_decomps=True))
 
     assert not _rule_funcops(definitions)
     assert len(_rule_funcops(declarations)) == 1
@@ -1325,17 +1329,20 @@ def test_estimate_decomps_includes_precompiled_rules(mocker):
 def test_estimate_decomps_requires_capture_and_collection(capture, collect_rules):
     """Disabling capture or rule collection takes precedence over requesting declarations."""
 
-    @qjit(
-        target="mlir",
-        capture=capture,
-        collect_decomp_rules=collect_rules,
-        estimate_decomps=True,
-    )
     @qp.qnode(qp.device("null.qubit", wires=1))
     def circuit():
         qp.RX(0.5, wires=0)
         return qp.state()
 
+    circuit = QJIT(
+        circuit,
+        CompileOptions(
+            target="mlir",
+            capture=capture,
+            collect_decomp_rules=collect_rules,
+            estimate_decomps=True,
+        ),
+    )
     assert not _rule_funcops(circuit)
 
 
@@ -1369,7 +1376,7 @@ def test_resource_estimate_uses_declarations(tmp_path, estimate_api):
             return qp.state()
 
         if estimate_api == "qp.estimate":
-            compiled = qjit(circuit, target="mlir", estimate_decomps=True)
+            compiled = QJIT(circuit, CompileOptions(target="mlir", estimate_decomps=True))
             assert all(len(op.regions[0].blocks) == 0 for op in _rule_funcops(compiled))
             counts = qp.estimate(compiled, target={"RepeatedGate"})().resources.quantum_operations
         else:
@@ -1377,11 +1384,9 @@ def test_resource_estimate_uses_declarations(tmp_path, estimate_api):
             transformed = qp.transform(pass_name="resource-estimate")(
                 gate_set={"RepeatedGate"}, output_json=True, output_fname=str(output)
             )(circuit)
-            qjit(
+            QJIT(
                 transformed,
-                target="mlir_opt",
-                skip_preprocess=True,
-                estimate_decomps=True,
+                CompileOptions(target="mlir_opt", skip_preprocess=True, estimate_decomps=True),
             )
             resources = json.loads(output.read_text())
             counts = resources["circuit"]["quantum_operations"]["-1"]
