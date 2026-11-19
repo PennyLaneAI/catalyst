@@ -690,6 +690,9 @@ LogicalResult MeasurementOp::verify() {
     }
 
     const size_t numTargets = hasQregMode ? getArrQubitIndices().size() : getInQubits().size();
+    if (numTargets == 0) {
+        return emitOpError("expected at least one target qubit");
+    }
     const char *boundsNoun = hasQregMode ? "index arrays" : "qubits";
     const char *coverageNoun =
         hasQregMode ? "index arrays in register mode" : "qubit values in qubit mode";
@@ -952,12 +955,10 @@ void MeasurementOp::print(OpAsmPrinter &p) {
                              "operandSegmentSizes", "resultSegmentSizes"});
     p << " : ";
 
-    // 7. Result types
-    if (getOperation()->getNumResults() == 0) {
-        p << "()";
-    } else {
-        p << getOperation()->getResultTypes();
-    }
+    // 7. Result types (always parenthesized)
+    p << "(";
+    llvm::interleaveComma(getOperation()->getResultTypes(), p);
+    p << ")";
 }
 
 ParseResult MeasurementOp::parse(OpAsmParser &parser, OperationState &result) {
@@ -1039,13 +1040,9 @@ ParseResult MeasurementOp::parse(OpAsmParser &parser, OperationState &result) {
         return failure();
     }
 
-    // 7. Result types (optional parentheses)
-    if (succeeded(parser.parseOptionalLParen())) {
-        if (failed(parser.parseOptionalRParen()) &&
-            (parser.parseTypeList(resultTypes) || parser.parseRParen())) {
-            return failure();
-        }
-    } else if (parser.parseTypeList(resultTypes)) {
+    // 7. Result types
+    if (parser.parseLParen() || (failed(parser.parseOptionalRParen()) &&
+                                 (parser.parseTypeList(resultTypes) || parser.parseRParen()))) {
         return failure();
     }
 

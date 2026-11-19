@@ -1917,7 +1917,7 @@ func.func @measurement_ops() {
 // CHECK: "1"
 // CHECK: "MeasureInBasis": 1
 func.func @reference_measurement(%q: !qref.bit, %angle: f64) -> i1 {
-  %m = qref.measurement "MeasureInBasis"(%angle: f64) qubits(%q) static_data = {plane = "XY"} : i1
+  %m = qref.measurement "MeasureInBasis"(%angle: f64) qubits(%q) static_data = {plane = "XY"} : (i1)
   return %m : i1
 }
 
@@ -1927,7 +1927,7 @@ func.func @reference_measurement(%q: !qref.bit, %angle: f64) -> i1 {
 // CHECK: "2"
 // CHECK: "MeasurePair": 1
 func.func @value_measurement(%q0: !quantum.bit, %q1: !quantum.bit) -> (i1, !quantum.bit, !quantum.bit) {
-  %m, %out:2 = quantum.measurement "MeasurePair"() qubits(%q0, %q1) : i1, !quantum.bit, !quantum.bit
+  %m, %out:2 = quantum.measurement "MeasurePair"() qubits(%q0, %q1) : (i1, !quantum.bit, !quantum.bit)
   return %m, %out#0, %out#1 : i1, !quantum.bit, !quantum.bit
 }
 
