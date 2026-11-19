@@ -593,6 +593,13 @@ struct PBCPauliMeasureLowering : public OpConversionPattern<MeasurementOp> {
             postselect && !isa<TypeAttr>(postselect)) {
             return op.emitOpError("postselection is not supported by PBC conversion");
         }
+        for (NamedAttribute entry : staticData) {
+            StringRef key = entry.getName();
+            if (key != "pauli_word" && key != "postselect" && key != "meas_uid") {
+                return op.emitOpError()
+                       << "static_data entry '" << key << "' is not supported by PBC conversion";
+            }
+        }
 
         SmallVector<Attribute> paulis;
         for (char pauli : pauliWord.getValue()) {
