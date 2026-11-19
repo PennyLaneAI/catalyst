@@ -415,7 +415,7 @@ class BufferDeallocation : public BufferPlacementTransformationBase {
                 Type t = result.getType();
                 if (isa<catalyst::quantum::QuantumDialect, catalyst::qref::QRefDialect>(
                         t.getDialect()) ||
-                    isa<IntegerType, FloatType, ComplexType>(t)) {
+                    isa<IntegerType, FloatType, ComplexType, IndexType>(t)) {
                     nonAliases.insert(result);
                 }
             }
