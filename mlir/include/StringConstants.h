@@ -19,4 +19,6 @@ inline constexpr char CTRL_WORK_WIRES[] = "ctrl_work_wires";
 inline constexpr char CTRL_WORK_WIRE_TYPE[] = "ctrl_work_wire_type";
 inline constexpr char CTRL_WORK_WIRE_TYPE_BORROWED[] = "borrowed";
 inline constexpr char CTRL_WORK_WIRE_TYPE_ZEROED[] = "zeroed";
+
+inline constexpr char OWNED_BUFFER_RESULTS_ATTR[] = "catalyst.owned_buffer_results";
 } // namespace catalyst

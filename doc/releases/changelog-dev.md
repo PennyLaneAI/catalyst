@@ -998,6 +998,21 @@
 
 <h3>Bug fixes 🐛</h3>
 
+* Buffers returned by internal helper functions, such as the Givens rotation helpers of
+  `qp.BasisRotation`, are now deallocated by the caller instead of leaking until the end of
+  execution.
+  [(#3491)](https://github.com/PennyLaneAI/catalyst/pull/3491)
+
+* Buffers passed to decomposition rules, such as the wire index arrays created by decompose
+  lowering, are now deallocated after the call. Before, `buffer-deallocation` treated them
+  as aliases of the returned `!quantum.reg`, so they leaked until the end of execution.
+  [(#3491)](https://github.com/PennyLaneAI/catalyst/pull/3491)
+
+* With `async_qnodes=True`, buffers passed to a QNode are no longer deallocated before its
+  `async.execute` completes. Their deallocations now come after the final await on the
+  execute's token.
+  [(#3491)](https://github.com/PennyLaneAI/catalyst/pull/3491)
+
 * Subroutines with the same structure that close over different JAX arrays are no longer
   compiled as the same subroutine.
   [(#3502)](https://github.com/PennyLaneAI/catalyst/pull/3502)
