@@ -193,6 +193,10 @@
 
 <h3>Improvements 🛠</h3>
 
+* Operators whose operator-valued arguments share wires are now supported
+  with `qjit`.
+  [(#3470)](https://github.com/PennyLaneAI/catalyst/pull/3470)
+
 * Ahead-of-time compilation with `qjit` can now stop at any of the main internal compiler stages,
   in addition to the frontend-controlled stages (`target="jaxpr"|"mlir"|"binary"`).
   The `"llvmir"` target now correctly stops after LLVM IR is first generated from the MLIR, and
