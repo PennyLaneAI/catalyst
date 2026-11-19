@@ -732,7 +732,7 @@ def handle_subroutine(self, *args, **kwargs):
     """
     plxpr = kwargs["jaxpr"]
 
-    cache_key = hash(str(plxpr))
+    cache_key = hash((str(plxpr), tuple(id(const) for const in plxpr.consts)))
     transformed = self.subroutine_cache.get(cache_key)
 
     if not transformed:
