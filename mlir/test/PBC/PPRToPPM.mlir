@@ -122,3 +122,25 @@ func.func @test_ppr_to_ppm_lowers_adjoint(%r: !quantum.reg) -> !quantum.reg {
     }
     return %r_out : !quantum.reg
 }
+
+// -----
+
+// Device, observable and measurement-process ops are allowed to remain after the conversion.
+
+// CHECK-LABEL: @test_ppr_to_ppm_keeps_device_and_measurements
+func.func @test_ppr_to_ppm_keeps_device_and_measurements(%q0 : !quantum.bit) -> f64 {
+    %c1_i64 = arith.constant 1 : i64
+    // CHECK: quantum.device
+    quantum.device shots(%c1_i64) ["../runtime/build/lib/librtd_null_qubit.dylib", "NullQubit", ""]
+    // CHECK: pbc.ppm ["Z", "Y"]
+    // CHECK: pbc.ppm ["X"]
+    // CHECK: pbc.ppr ["Z"](2)
+    %0 = pbc.ppr ["Z"](4) %q0 : !quantum.bit
+    // CHECK: quantum.namedobs
+    %obs = quantum.namedobs %0[PauliZ] : !quantum.obs
+    // CHECK: quantum.expval
+    %ev = quantum.expval %obs : f64
+    // CHECK: quantum.device_release
+    quantum.device_release
+    return %ev : f64
+}

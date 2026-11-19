@@ -64,10 +64,18 @@ struct PPRToPPMPass : public impl::PPRToPPMPassBase<PPRToPPMPass> {
         target.addDynamicallyLegalOp<pbc::PPRotationOp>([](pbc::PPRotationOp op) {
             return !op.hasPiOverFourRotation() && (!op.isNonClifford() || op.getCondition());
         });
+        // Allowlist of Quantum ops that may stay in the PBC representation: runtime and device
+        // management, qubit/register handling, global phase, and the terminal observables and
+        // measurement processes. Gates and any other Quantum op must be converted before this pass.
         target.addDynamicallyLegalDialect<quantum::QuantumDialect>([](Operation *op) {
-            return isa<quantum::AllocOp, quantum::AllocQubitOp, quantum::DeallocOp,
-                       quantum::DeallocQubitOp, quantum::ExtractOp, quantum::InsertOp,
-                       quantum::GlobalPhaseOp>(op);
+            return isa<quantum::InitializeOp, quantum::FinalizeOp, quantum::DeviceInitOp,
+                       quantum::DeviceReleaseOp, quantum::NumQubitsOp, quantum::AllocOp,
+                       quantum::AllocQubitOp, quantum::DeallocOp, quantum::DeallocQubitOp,
+                       quantum::ExtractOp, quantum::InsertOp, quantum::GlobalPhaseOp,
+                       quantum::ComputationalBasisOp, quantum::NamedObsOp, quantum::MCMObsOp,
+                       quantum::HermitianOp, quantum::TensorOp, quantum::HamiltonianOp,
+                       quantum::SampleOp, quantum::CountsOp, quantum::ExpvalOp, quantum::VarianceOp,
+                       quantum::ProbsOp, quantum::StateOp>(op);
         });
 
         RewritePatternSet patterns(ctx);

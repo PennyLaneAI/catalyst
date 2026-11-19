@@ -130,10 +130,11 @@ def PPRToPPMPass : Pass<"ppr-to-ppm"> {
     let description = [{
         This pass first invokes `adjoint-lowering` as a nested pipeline so that
         PPRotation operations inside `quantum.adjoint` regions are reversed before
-        they are converted to Pauli Product Measurements. Quantum allocation,
-        deallocation, register access, and global phase operations may remain in
-        the resulting PBC representation; other Quantum dialect operations must
-        be converted before this pass.
+        they are converted to Pauli Product Measurements. Quantum runtime and
+        device operations, allocation, deallocation, register access, global
+        phase, observables, and measurement processes may remain in the
+        resulting PBC representation; other Quantum dialect operations, such as
+        gates, must be converted before this pass.
     }];
 
     let dependentDialects = [
