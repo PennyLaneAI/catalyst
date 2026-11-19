@@ -660,8 +660,7 @@ LogicalResult MeasurementOp::verify() {
     auto isClassical = [](Type type) {
         bool classical = true;
         type.walk([&](Type nested) {
-            if (isa<QubitType, QuregType, ObservableType, catalyst::qref::QubitType,
-                    catalyst::qref::QuregType>(nested)) {
+            if (isa<catalyst::qref::QRefDialect, QuantumDialect>(nested.getDialect())) {
                 classical = false;
             }
         });
