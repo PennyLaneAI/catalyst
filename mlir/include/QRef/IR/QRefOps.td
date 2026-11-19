@@ -408,7 +408,9 @@ def OperatorOp : UnitaryGate_Op<"operator", [ParametrizedGate, AttrSizedOperandS
                              just forwarded to decomposition functions after the params list.
         * Optional frontend-level metadata:
           * `param_map` — maps frontend argument names to the lowered `params` operand positions
-          * `qubit_map` — maps frontend argument names to lowered qubit/index-array positions
+          * `qubit_map` — maps frontend argument names to lowered qubit/index-array positions.
+            Entries may share positions when composite arguments use the same qubits; each
+            entry retains its argument's wire order and number of wire occurrences.
 
         Examples:
 
@@ -472,6 +474,8 @@ def OperatorOp : UnitaryGate_Op<"operator", [ParametrizedGate, AttrSizedOperandS
     );
 
     let extraClassDeclaration = extraBaseClassDeclaration # [{
+        bool requiresNonOverlappingNonCtrlQubitOperands();
+
         mlir::ValueRange getAllParams() {
             // the ODS operands must be next to each other
             auto [start, lenParams] = getODSOperandIndexAndLength(/*params=*/0);

@@ -2,6 +2,13 @@
 
 <h3>New features since last release</h3>
 
+* The new `CompileOptions(estimate_decomps=True)` setting prepares reachable decomposition rules for
+  resource estimation using their registered resource counts, without tracing or compiling
+  their implementations. `qp.estimate` can use these rules even when their implementations
+  cannot be compiled. This option requires program capture and `collect_decomp_rules=True`,
+  and defaults to `False`.
+ [(#3482)](https://github.com/PennyLaneAI/catalyst/pull/3482)
+ 
 * Backline can drive a VPK120 whose FPGA carries NVIDIA's Holoscan Sensor Bridge (HSB), through
   the new `hsb_hwhs` controller backend. Its coprocessors stay `cpu_verbs` and `gpu_verbs`,
   set to face HSB with `peer=hsb`.
@@ -192,6 +199,10 @@
   [(#3303)](https://github.com/PennyLaneAI/catalyst/pull/3303)
 
 <h3>Improvements 🛠</h3>
+
+* Operators whose operator-valued arguments share wires are now supported
+  with `qjit`.
+  [(#3470)](https://github.com/PennyLaneAI/catalyst/pull/3470)
 
 * Ahead-of-time compilation with `qjit` can now stop at any of the main internal compiler stages,
   in addition to the frontend-controlled stages (`target="jaxpr"|"mlir"|"binary"`).
@@ -417,7 +428,7 @@
     Every registered signature is lowered, as well as any operations/rules reachable from these signatures, or their adjoint/control variants.
     [(#3057)](https://github.com/PennyLaneAI/catalyst/pull/3057)
 
-    2. When tracing a gate operation to JAXPR, all rules reachable from that gate are injected. Note that rules already available in the precompiled rule library will not get re-traced. 
+    2. When tracing a gate operation to JAXPR, all rules reachable from that gate are injected. Note that rules already available in the precompiled rule library will not get re-traced.
     [(#3061)](https://github.com/PennyLaneAI/catalyst/pull/3061)
     [(#3160)](https://github.com/PennyLaneAI/catalyst/pull/3160)
     [(#3149)](https://github.com/PennyLaneAI/catalyst/pull/3149)
@@ -994,6 +1005,29 @@
 
 <h3>Bug fixes 🐛</h3>
 
+* Buffers returned by internal helper functions, such as the Givens rotation helpers of
+  `qp.BasisRotation`, are now deallocated by the caller instead of leaking until the end of
+  execution.
+  [(#3491)](https://github.com/PennyLaneAI/catalyst/pull/3491)
+
+* Buffers passed to decomposition rules, such as the wire index arrays created by decompose
+  lowering, are now deallocated after the call. Before, `buffer-deallocation` treated them
+  as aliases of the returned `!quantum.reg`, so they leaked until the end of execution.
+  [(#3491)](https://github.com/PennyLaneAI/catalyst/pull/3491)
+
+* With `async_qnodes=True`, buffers passed to a QNode are no longer deallocated before its
+  `async.execute` completes. Their deallocations now come after the final await on the
+  execute's token.
+  [(#3491)](https://github.com/PennyLaneAI/catalyst/pull/3491)
+
+* Subroutines with the same structure that close over different JAX arrays are no longer
+  compiled as the same subroutine.
+  [(#3502)](https://github.com/PennyLaneAI/catalyst/pull/3502)
+
+* The `--convert-to-value-semantics` and `--convert-to-reference-semantics` passes no longer read
+  freed memory.
+  [(#3496)](https://github.com/PennyLaneAI/catalyst/pull/3496)
+
 * The `gpu_verbs` coprocessor now supports the NVIDIA GH200 with CUDA 12.4.
   [(#3467)](https://github.com/PennyLaneAI/catalyst/pull/3467)
 
@@ -1182,6 +1216,11 @@
 
 * Fixed hinted while loops to be counted symbolically in `ResourceAnalysis`.
   [(#3370)](https://github.com/PennyLaneAI/catalyst/pull/3370)
+
+* `adjoint-lowering` no longer aborts when an extract inside an adjoint region reads the
+  register from before an insert at another index. When the register an extract reads is replaced
+  by something other than a single insert, the pass now reports an error instead of aborting.
+  [(#3409)](https://github.com/PennyLaneAI/catalyst/pull/3409)
 
 <h3>Internal changes ⚙️</h3>
 
@@ -1533,6 +1572,7 @@ Marcus Edwards,
 Lillian Frederiksen,
 Sengthai Heng,
 David Ittah,
+Harshal Janjani,
 JiaRung Jian,
 Jeffrey Kam,
 Jacob Kitchen,

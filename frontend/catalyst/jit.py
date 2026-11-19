@@ -886,6 +886,7 @@ class QJIT(CatalystCallable):
                     abstracted_axes=abstracted_axes,
                     skip_preprocess=self.compile_options.skip_preprocess,
                     collect_decomp_rules=self.compile_options.collect_decomp_rules,
+                    estimate_decomps=self.compile_options.estimate_decomps,
                     debug_info=dbg,
                 )
                 self.compile_options.pass_plugins.update(plugin_paths)
