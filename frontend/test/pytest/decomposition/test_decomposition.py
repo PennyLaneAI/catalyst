@@ -3358,7 +3358,7 @@ class TestDecomposeAlias:
 
     def test_decompose_requires_gate_set(self):
         """qp.decompose without a gate set is rejected with a clear error."""
-        with pytest.raises(ValueError, match="requires an explicit 'gate_set'"):
+        with pytest.raises(TypeError, match=r"The gate_set argument is required\."):
 
             @qjit(capture=True, target="mlir")
             @qp.decompose(gate_set=None)
