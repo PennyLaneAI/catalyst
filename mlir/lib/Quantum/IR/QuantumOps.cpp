@@ -1628,6 +1628,9 @@ static llvm::StringRef getObservableName(MLIRContext *ctx, llvm::StringRef baseN
 }
 
 llvm::StringRef MeasurementOp::getResourceName() { return getOpName(); }
+// Note: getResourceNumQubits for MeasurementOp does not consider QReg mode.
+// This is currently consistent with behavior of OperatorOp, and must be updated together if the
+// behavior is to be modifed.
 uint64_t MeasurementOp::getResourceNumQubits() { return getInQubits().size(); }
 uint64_t MeasurementOp::getResourceNumCtrlQubits() { return 0; }
 uint64_t MeasurementOp::getResourceNumParams() { return getParams().size(); }

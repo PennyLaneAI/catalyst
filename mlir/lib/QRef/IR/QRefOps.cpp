@@ -21,7 +21,6 @@
 #include <optional>
 #include <string>
 #include <utility>
-#include <vector>
 
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/DenseSet.h"
@@ -1211,6 +1210,9 @@ llvm::StringRef PCPhaseOp::getResourceName() { return "PCPhase"; }
 llvm::StringRef QubitUnitaryOp::getResourceName() { return "QubitUnitary"; }
 
 llvm::StringRef MeasurementOp::getResourceName() { return getOpName(); }
+// Note: getResourceNumQubits for MeasurementOp does not consider QReg mode.
+// This is currently consistent with behavior of OperatorOp, and must be updated together if the
+// behavior is to be modifed.
 uint64_t MeasurementOp::getResourceNumQubits() { return getQubits().size(); }
 uint64_t MeasurementOp::getResourceNumCtrlQubits() { return 0; }
 uint64_t MeasurementOp::getResourceNumParams() { return getParams().size(); }
