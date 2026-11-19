@@ -115,13 +115,7 @@ struct CallOpToAsyncOPRewritePattern : public mlir::OpRewritePattern<func::CallO
                 continue; // Not after the call in this block: already ordered after the await.
             }
             if (ancestor == dealloc.getOperation()) {
-                bool hasTerminator =
-                    !block->empty() && block->back().mightHaveTrait<OpTrait::IsTerminator>();
-                if (hasTerminator) {
-                    rewriter.moveOpBefore(dealloc, block->getTerminator());
-                } else {
-                    rewriter.moveOpAfter(dealloc, &block->back());
-                }
+                rewriter.moveOpBefore(dealloc, block->getTerminator());
             } else {
                 PatternRewriter::InsertionGuard insertGuard(rewriter);
                 rewriter.setInsertionPoint(dealloc);
