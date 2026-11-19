@@ -74,6 +74,9 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include <utility>
+
+#include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SetOperations.h"
 #include "mlir/Dialect/Bufferization/IR/AllocationOpInterface.h"
 #include "mlir/Dialect/Bufferization/IR/Bufferization.h"
@@ -157,34 +160,48 @@ static bool validateSupportedControlFlow(Operation *op) {
 
 namespace {
 
+/// Function-local information that stays unchanged while callee summaries converge.
+struct FunctionBufferOwnership {
+    func::FuncOp function;
+    BufferViewFlowAnalysis origins;
+    BufferViewFlowAnalysis::ValueMapT reverseOrigins;
+    SmallVector<std::pair<func::CallOp, func::FuncOp>> calls;
+    SmallVector<func::ReturnOp> returns;
+
+    FunctionBufferOwnership(func::FuncOp function, SymbolTableCollection &symbolTables)
+        : function(function), origins(function) {
+        for (const auto &[source, destinations] : origins) {
+            for (Value destination : destinations) {
+                reverseOrigins[destination].insert(source);
+            }
+        }
+        function.walk([&](Operation *operation) {
+            if (auto call = dyn_cast<func::CallOp>(operation)) {
+                calls.emplace_back(call, symbolTables.lookupNearestSymbolFrom<func::FuncOp>(
+                                             call, call.getCalleeAttr()));
+            } else if (auto ret = dyn_cast<func::ReturnOp>(operation);
+                       ret && ret->getParentOfType<func::FuncOp>() == function) {
+                returns.push_back(ret);
+            }
+        });
+    }
+};
+
 /// Infer one function's owned results using the current callee summaries.
 static SmallVector<bool>
-inferOwnedBufferResults(func::FuncOp function,
-                        const DenseMap<Operation *, SmallVector<bool>> &ownedResults,
-                        SymbolTableCollection &symbolTables) {
-    BufferViewFlowAnalysis origins(function);
+inferOwnedBufferResults(const FunctionBufferOwnership &analysis,
+                        const DenseMap<Operation *, SmallVector<bool>> &ownedResults) {
+    func::FuncOp function = analysis.function;
     SetVector<Value> freshCallResults;
-    function.walk([&](func::CallOp call) {
-        auto callee =
-            symbolTables.lookupNearestSymbolFrom<func::FuncOp>(call, call.getCalleeAttr());
+    for (auto [call, callee] : analysis.calls) {
         auto it = ownedResults.find(callee);
         if (it == ownedResults.end()) {
-            return;
+            continue;
         }
         for (auto [i, isOwned] : llvm::enumerate(it->second)) {
             if (isOwned) {
                 freshCallResults.insert(call.getResult(i));
             }
-        }
-    });
-    // A proven fresh result cannot alias the call's operands.
-    origins.remove(freshCallResults);
-    // remove() updates only the forward graph. Rebuild the reverse edges so
-    // ownership does not follow the removed dependencies.
-    BufferViewFlowAnalysis::ValueMapT reverseOrigins;
-    for (const auto &[source, destinations] : origins) {
-        for (Value destination : destinations) {
-            reverseOrigins[destination].insert(source);
         }
     }
     auto resolveOrigins = [&](Value value) {
@@ -195,8 +212,13 @@ inferOwnedBufferResults(func::FuncOp function,
             if (!visited.insert(current).second) {
                 continue;
             }
-            auto it = reverseOrigins.find(current);
-            if (it != reverseOrigins.end()) {
+            // A proven fresh call result cannot alias its operands. Stop at it
+            // instead of removing edges from the cached graph.
+            if (freshCallResults.contains(current)) {
+                continue;
+            }
+            auto it = analysis.reverseOrigins.find(current);
+            if (it != analysis.reverseOrigins.end()) {
                 llvm::append_range(pending, it->second);
             }
         }
@@ -204,12 +226,7 @@ inferOwnedBufferResults(func::FuncOp function,
     };
     SmallVector<BufferViewFlowAnalysis::ValueSetT> resultOrigins(function.getNumResults());
     SmallVector<bool> fresh(function.getNumResults(), true);
-    bool hasReturn = false;
-    function.walk([&](func::ReturnOp ret) {
-        if (ret->getParentOfType<func::FuncOp>() != function) {
-            return;
-        }
-        hasReturn = true;
+    for (func::ReturnOp ret : analysis.returns) {
         for (auto [index, value] : llvm::enumerate(ret.getOperands())) {
             if (!isa<BaseMemRefType>(value.getType())) {
                 fresh[index] = false;
@@ -226,7 +243,7 @@ inferOwnedBufferResults(func::FuncOp function,
                     !source.getDefiningOp<memref::CastOp>()) {
                     fresh[index] = false;
                 }
-                if (!origins.mayBeTerminalBuffer(source)) {
+                if (!analysis.origins.mayBeTerminalBuffer(source)) {
                     continue;
                 }
                 hasOrigin = true;
@@ -238,8 +255,8 @@ inferOwnedBufferResults(func::FuncOp function,
             }
             fresh[index] = fresh[index] && hasOrigin;
         }
-    });
-    if (!hasReturn) {
+    }
+    if (analysis.returns.empty()) {
         return SmallVector<bool>(function.getNumResults(), false);
     }
     // Include unowned results too: they can alias an otherwise fresh result.
@@ -273,22 +290,49 @@ struct AnnotateBufferOwnershipPass
         }
         SymbolTableCollection symbolTables;
 
-        // The fixed point also handles helpers that forward fresh callee results.
-        // Recursive or otherwise unknown origins remain conservatively unowned.
-        bool changed;
-        do {
-            changed = false;
-            for (auto function : functions) {
-                SmallVector<bool> fresh =
-                    inferOwnedBufferResults(function, ownedResults, symbolTables);
-                for (unsigned i = 0; i < fresh.size(); ++i) {
-                    if (fresh[i] && !ownedResults[function][i]) {
-                        ownedResults[function][i] = true;
-                        changed = true;
-                    }
+        DenseMap<Operation *, FunctionBufferOwnership> analyses;
+        DenseMap<Operation *, SetVector<Operation *>> callers;
+        SetVector<Operation *> worklist;
+        for (auto function : functions) {
+            // These functions cannot return owned buffers. Calls in their bodies
+            // are still annotated by the final module walk.
+            if (llvm::none_of(function.getResultTypes(),
+                              [](Type type) { return isa<BaseMemRefType>(type); })) {
+                continue;
+            }
+            auto [it, inserted] = analyses.try_emplace(function, function, symbolTables);
+            for (const auto &call : it->second.calls) {
+                if (call.second) {
+                    callers[call.second].insert(function);
                 }
             }
-        } while (changed);
+            worklist.insert(function);
+        }
+
+        // Revisit only callers whose callee summaries changed. Recursive calls
+        // participate in the same fixed point and cannot bootstrap ownership.
+        while (!worklist.empty()) {
+            Operation *function = worklist.pop_back_val();
+            SmallVector<bool> fresh =
+                inferOwnedBufferResults(analyses.find(function)->second, ownedResults);
+            auto &owned = ownedResults[function];
+            bool changed = false;
+            for (unsigned i = 0; i < fresh.size(); ++i) {
+                if (fresh[i] && !owned[i]) {
+                    owned[i] = true;
+                    changed = true;
+                }
+            }
+            if (!changed) {
+                continue;
+            }
+            auto it = callers.find(function);
+            if (it != callers.end()) {
+                for (Operation *caller : it->second) {
+                    worklist.insert(caller);
+                }
+            }
+        }
 
         getOperation().walk([&](func::CallOp call) {
             call->removeAttr(catalyst::OWNED_BUFFER_RESULTS_ATTR);
