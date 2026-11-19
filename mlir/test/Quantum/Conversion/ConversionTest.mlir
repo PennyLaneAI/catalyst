@@ -572,6 +572,113 @@ func.func @measure(%q : !quantum.bit) -> !quantum.bit {
 
 // -----
 
+// CHECK-DAG: llvm.func @__catalyst__qis__PauliMeasure(!llvm.ptr, i1 {llvm.zeroext}, !llvm.ptr, i1 {llvm.zeroext}, i1 {llvm.zeroext}, i64, ...) -> !llvm.ptr
+// CHECK-DAG: llvm.mlir.global internal constant @pauli_word_IXYZ("IXYZ\00")
+
+// CHECK-LABEL: llvm.func @pauli_measurement
+func.func @pauli_measurement(%q0: !quantum.bit, %q1: !quantum.bit,
+                            %q2: !quantum.bit, %q3: !quantum.bit)
+    -> (i1, !quantum.bit, !quantum.bit, !quantum.bit, !quantum.bit) {
+  // CHECK: llvm.mlir.addressof @pauli_word_IXYZ
+  // CHECK: [[WORD:%.+]] = llvm.getelementptr inbounds
+  // CHECK: [[FALSE:%.+]] = llvm.mlir.constant(false) : i1
+  // CHECK: [[TRUE:%.+]] = llvm.mlir.constant(true) : i1
+  // CHECK: [[COUNT:%.+]] = llvm.mlir.constant(4 : i64) : i64
+  // CHECK: [[PTR:%.+]] = llvm.call @__catalyst__qis__PauliMeasure([[WORD]], [[FALSE]], [[WORD]], [[FALSE]], [[TRUE]], [[COUNT]], %arg0, %arg1, %arg2, %arg3)
+  // CHECK: [[M:%.+]] = llvm.load [[PTR]] : !llvm.ptr -> i1
+  %m, %out:4 = quantum.measurement "PauliMeasure"() qubits(%q0, %q1, %q2, %q3)
+      static_data = {pauli_word = "IXYZ", postselect = none}
+      : i1, !quantum.bit, !quantum.bit, !quantum.bit, !quantum.bit
+  // CHECK: llvm.insertvalue [[M]]
+  // CHECK: llvm.insertvalue %arg0
+  // CHECK: llvm.insertvalue %arg1
+  // CHECK: llvm.insertvalue %arg2
+  // CHECK: llvm.insertvalue %arg3
+  return %m, %out#0, %out#1, %out#2, %out#3
+      : i1, !quantum.bit, !quantum.bit, !quantum.bit, !quantum.bit
+}
+
+// -----
+
+// CHECK-DAG: llvm.func @__catalyst__qis__PauliMeasure(!llvm.ptr, i1 {llvm.zeroext}, !llvm.ptr, i1 {llvm.zeroext}, i1 {llvm.zeroext}, i64, ...) -> !llvm.ptr
+// CHECK-DAG: llvm.mlir.global internal constant @pauli_word_Z("Z\00")
+
+// CHECK-LABEL: llvm.func @discarded_measurement_result
+func.func @discarded_measurement_result(%q: !quantum.bit) -> !quantum.bit {
+  // CHECK: llvm.call @__catalyst__qis__PauliMeasure
+  // CHECK-NOT: llvm.load
+  %out = quantum.measurement "PauliMeasure"() qubits(%q)
+      static_data = {pauli_word = "Z", meas_uid = "direct"} : !quantum.bit
+  // CHECK: llvm.return %arg0 : !llvm.ptr
+  return %out : !quantum.bit
+}
+
+// -----
+
+func.func @other_measurement(%q: !quantum.bit) -> (i1, !quantum.bit) {
+  // expected-error @+1 {{failed to legalize operation 'quantum.measurement'}}
+  %m, %out = quantum.measurement "OtherMeasurement"() qubits(%q)
+      static_data = {pauli_word = "Z"} : i1, !quantum.bit
+  return %m, %out : i1, !quantum.bit
+}
+
+// -----
+
+func.func @postselection(%q: !quantum.bit) -> (i1, !quantum.bit) {
+  // expected-error @+1 {{failed to legalize operation 'quantum.measurement'}}
+  %m, %out = quantum.measurement "PauliMeasure"() qubits(%q)
+      static_data = {pauli_word = "Z", postselect = 0 : i64} : i1, !quantum.bit
+  return %m, %out : i1, !quantum.bit
+}
+
+// -----
+
+func.func @register_measurement(%reg: !quantum.reg) -> (i1, !quantum.reg) {
+  // expected-error @+1 {{failed to legalize operation 'quantum.measurement'}}
+  %m, %out = quantum.measurement "PauliMeasure"() quregs(%reg)
+      indices() static_data = {pauli_word = "Z"}
+      : i1, !quantum.reg
+  return %m, %out : i1, !quantum.reg
+}
+
+// -----
+
+func.func @parameters(%q: !quantum.bit, %angle: f64) -> (i1, !quantum.bit) {
+  // expected-error @+1 {{failed to legalize operation 'quantum.measurement'}}
+  %m, %out = quantum.measurement "PauliMeasure"(%angle: f64) qubits(%q)
+      static_data = {pauli_word = "Z"} : i1, !quantum.bit
+  return %m, %out : i1, !quantum.bit
+}
+
+// -----
+
+func.func @invalid_word(%q: !quantum.bit) -> (i1, !quantum.bit) {
+  // expected-error @+1 {{failed to legalize operation 'quantum.measurement'}}
+  %m, %out = quantum.measurement "PauliMeasure"() qubits(%q)
+      static_data = {pauli_word = "H"} : i1, !quantum.bit
+  return %m, %out : i1, !quantum.bit
+}
+
+// -----
+
+func.func @word_length_mismatch(%q: !quantum.bit) -> (i1, !quantum.bit) {
+  // expected-error @+1 {{failed to legalize operation 'quantum.measurement'}}
+  %m, %out = quantum.measurement "PauliMeasure"() qubits(%q)
+      static_data = {pauli_word = "ZZ"} : i1, !quantum.bit
+  return %m, %out : i1, !quantum.bit
+}
+
+// -----
+
+func.func @invalid_result(%q: !quantum.bit) -> (i64, !quantum.bit) {
+  // expected-error @+1 {{failed to legalize operation 'quantum.measurement'}}
+  %m, %out = quantum.measurement "PauliMeasure"() qubits(%q)
+      static_data = {pauli_word = "Z"} : i64, !quantum.bit
+  return %m, %out : i64, !quantum.bit
+}
+
+// -----
+
 // CHECK: llvm.func @__catalyst__qis__Sample(!llvm.ptr, i64, ...)
 
 // CHECK-LABEL: @sample
