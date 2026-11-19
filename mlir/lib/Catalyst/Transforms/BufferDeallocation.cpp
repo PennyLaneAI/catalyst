@@ -157,6 +157,105 @@ namespace {
 
 constexpr llvm::StringLiteral ownedBufferResultsAttr = "catalyst.owned_buffer_results";
 
+/// Infer one function's owned results using the current callee summaries.
+static SmallVector<bool>
+inferOwnedBufferResults(func::FuncOp function,
+                        const DenseMap<Operation *, SmallVector<bool>> &ownedResults,
+                        SymbolTableCollection &symbolTables) {
+    BufferViewFlowAnalysis origins(function);
+    SetVector<Value> freshCallResults;
+    function.walk([&](func::CallOp call) {
+        auto callee =
+            symbolTables.lookupNearestSymbolFrom<func::FuncOp>(call, call.getCalleeAttr());
+        auto it = ownedResults.find(callee);
+        if (it == ownedResults.end()) {
+            return;
+        }
+        for (auto [index, owned] : llvm::enumerate(it->second)) {
+            if (owned) {
+                freshCallResults.insert(call.getResult(index));
+            }
+        }
+    });
+    // A proven fresh result cannot alias the call's operands.
+    origins.remove(freshCallResults);
+    // remove() updates only the forward graph. Rebuild the reverse edges so
+    // ownership does not follow the removed dependencies.
+    BufferViewFlowAnalysis::ValueMapT reverseOrigins;
+    for (const auto &[source, destinations] : origins) {
+        for (Value destination : destinations) {
+            reverseOrigins[destination].insert(source);
+        }
+    }
+    auto resolveOrigins = [&](Value value) {
+        BufferViewFlowAnalysis::ValueSetT visited;
+        SmallVector<Value> pending{value};
+        while (!pending.empty()) {
+            Value current = pending.pop_back_val();
+            if (!visited.insert(current).second) {
+                continue;
+            }
+            auto it = reverseOrigins.find(current);
+            if (it != reverseOrigins.end()) {
+                llvm::append_range(pending, it->second);
+            }
+        }
+        return visited;
+    };
+    SmallVector<BufferViewFlowAnalysis::ValueSetT> resultOrigins(function.getNumResults());
+    SmallVector<bool> fresh(function.getNumResults(), true);
+    bool hasReturn = false;
+    function.walk([&](func::ReturnOp ret) {
+        if (ret->getParentOfType<func::FuncOp>() != function) {
+            return;
+        }
+        hasReturn = true;
+        for (auto [index, value] : llvm::enumerate(ret.getOperands())) {
+            if (!isa<BaseMemRefType>(value.getType())) {
+                fresh[index] = false;
+                continue;
+            }
+            bool hasOrigin = false;
+            for (Value source : resolveOrigins(value)) {
+                if (!isa<BaseMemRefType>(source.getType())) {
+                    continue;
+                }
+                // Deallocating a returned subview is not ownership transfer of
+                // a base buffer. Only casts are accepted.
+                if (source.getDefiningOp() && isa<ViewLikeOpInterface>(source.getDefiningOp()) &&
+                    !source.getDefiningOp<memref::CastOp>()) {
+                    fresh[index] = false;
+                }
+                if (!origins.mayBeTerminalBuffer(source)) {
+                    continue;
+                }
+                hasOrigin = true;
+                resultOrigins[index].insert(source);
+                if (!source.getDefiningOp<memref::AllocOp>() &&
+                    !freshCallResults.contains(source)) {
+                    fresh[index] = false;
+                }
+            }
+            fresh[index] = fresh[index] && hasOrigin;
+        }
+    });
+    if (!hasReturn) {
+        return SmallVector<bool>(function.getNumResults(), false);
+    }
+    // Include unowned results too: they can alias an otherwise fresh result.
+    DenseMap<Value, size_t> firstResult;
+    for (auto [index, origins] : llvm::enumerate(resultOrigins)) {
+        for (Value origin : origins) {
+            auto [it, inserted] = firstResult.try_emplace(origin, index);
+            if (!inserted) {
+                fresh[index] = false;
+                fresh[it->second] = false;
+            }
+        }
+    }
+    return fresh;
+}
+
 /// Infer ownership before running function passes: inspecting sibling functions
 /// from the nested deallocation pass would race with their transformations.
 struct AnnotateBufferOwnershipPass
@@ -172,6 +271,7 @@ struct AnnotateBufferOwnershipPass
         for (auto function : functions) {
             ownedResults[function] = SmallVector<bool>(function.getNumResults(), false);
         }
+        SymbolTableCollection symbolTables;
 
         // The fixed point also handles helpers that forward fresh callee results.
         // Recursive or otherwise unknown origins remain conservatively unowned.
@@ -179,96 +279,9 @@ struct AnnotateBufferOwnershipPass
         do {
             changed = false;
             for (auto function : functions) {
-                BufferViewFlowAnalysis origins(function);
-                SetVector<Value> freshCallResults;
-                function.walk([&](func::CallOp call) {
-                    auto callee = SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(
-                        call, call.getCalleeAttr());
-                    auto it = ownedResults.find(callee);
-                    if (it == ownedResults.end()) {
-                        return;
-                    }
-                    for (auto [index, owned] : llvm::enumerate(it->second)) {
-                        if (owned) {
-                            freshCallResults.insert(call.getResult(index));
-                        }
-                    }
-                });
-                // A proven fresh result cannot alias the call's operands.
-                origins.remove(freshCallResults);
-                // remove() updates only the forward graph. Rebuild the reverse
-                // edges so ownership does not follow the removed dependencies.
-                BufferViewFlowAnalysis::ValueMapT reverseOrigins;
-                for (const auto &[source, destinations] : origins) {
-                    for (Value destination : destinations) {
-                        reverseOrigins[destination].insert(source);
-                    }
-                }
-                auto resolveOrigins = [&](Value value) {
-                    BufferViewFlowAnalysis::ValueSetT visited;
-                    SmallVector<Value> pending{value};
-                    while (!pending.empty()) {
-                        Value current = pending.pop_back_val();
-                        if (!visited.insert(current).second) {
-                            continue;
-                        }
-                        auto it = reverseOrigins.find(current);
-                        if (it != reverseOrigins.end()) {
-                            llvm::append_range(pending, it->second);
-                        }
-                    }
-                    return visited;
-                };
-                SmallVector<BufferViewFlowAnalysis::ValueSetT> resultOrigins(
-                    function.getNumResults());
-                SmallVector<bool> fresh(function.getNumResults(), true);
-                bool hasReturn = false;
-                function.walk([&](func::ReturnOp ret) {
-                    if (ret->getParentOfType<func::FuncOp>() != function) {
-                        return;
-                    }
-                    hasReturn = true;
-                    for (auto [index, value] : llvm::enumerate(ret.getOperands())) {
-                        if (!isa<BaseMemRefType>(value.getType())) {
-                            fresh[index] = false;
-                            continue;
-                        }
-                        bool hasOrigin = false;
-                        for (Value source : resolveOrigins(value)) {
-                            if (!isa<BaseMemRefType>(source.getType())) {
-                                continue;
-                            }
-                            // Deallocating a returned subview is not ownership
-                            // transfer of a base buffer. Only casts are accepted.
-                            if (source.getDefiningOp() &&
-                                isa<ViewLikeOpInterface>(source.getDefiningOp()) &&
-                                !source.getDefiningOp<memref::CastOp>()) {
-                                fresh[index] = false;
-                            }
-                            if (!origins.mayBeTerminalBuffer(source)) {
-                                continue;
-                            }
-                            hasOrigin = true;
-                            resultOrigins[index].insert(source);
-                            if (!source.getDefiningOp<memref::AllocOp>() &&
-                                !freshCallResults.contains(source)) {
-                                fresh[index] = false;
-                            }
-                        }
-                        fresh[index] = fresh[index] && hasOrigin;
-                    }
-                });
-                if (!hasReturn) {
-                    continue;
-                }
+                SmallVector<bool> fresh =
+                    inferOwnedBufferResults(function, ownedResults, symbolTables);
                 for (unsigned i = 0; i < fresh.size(); ++i) {
-                    for (unsigned j = 0; j < fresh.size(); ++j) {
-                        if (i != j && llvm::any_of(resultOrigins[i], [&](Value origin) {
-                                return resultOrigins[j].contains(origin);
-                            })) {
-                            fresh[i] = false;
-                        }
-                    }
                     if (fresh[i] && !ownedResults[function][i]) {
                         ownedResults[function][i] = true;
                         changed = true;
@@ -280,7 +293,7 @@ struct AnnotateBufferOwnershipPass
         getOperation().walk([&](func::CallOp call) {
             call->removeAttr(ownedBufferResultsAttr);
             auto callee =
-                SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(call, call.getCalleeAttr());
+                symbolTables.lookupNearestSymbolFrom<func::FuncOp>(call, call.getCalleeAttr());
             auto it = ownedResults.find(callee);
             if (it == ownedResults.end()) {
                 return;
