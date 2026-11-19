@@ -882,12 +882,10 @@
   [(#3312)](https://github.com/PennyLaneAI/catalyst/pull/3312)
 
 * IR amplification for circuits whose gate parameters are computed from runtime values
-  (e.g. `qml.TrotterProduct` with runtime Hamiltonian coefficients) is drastically reduced.
-  The new `scalarize-tensor-extracts` pass turns gate-angle dataflow into scalar arithmetic
-  instead of thousands of small tensors that each survive bufferization as an allocation,
-  and the new `reroll-loops` pass reconstructs the loops that tracing unrolled by rewriting
-  repeated op sequences as `scf.for` loops. On a Trotterized QPE workload with runtime
-  coefficients, compile time, peak memory, and final IR size all drop by large factors.
+  (e.g. `qp.TrotterProduct` with runtime Hamiltonian coefficients) is drastically reduced.
+  The new `scalarize-tensor-extracts` pass computes gate angles using scalar arithmetic,
+  and the default pipeline fuses remaining elementwise operations. This reduces the
+  number of temporary tensors that require allocations during bufferization.
   [(#3013)](https://github.com/PennyLaneAI/catalyst/pull/3013)
 
 <h3>Breaking changes 💔</h3>

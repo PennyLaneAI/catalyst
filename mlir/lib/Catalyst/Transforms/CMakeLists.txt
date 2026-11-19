@@ -26,7 +26,6 @@ file(GLOB SRC
     ResolveRuntimeSymbols.cpp
     ResourceAnalysisPass.cpp
     ScalarizeTensorExtractsPass.cpp
-    RegisterDecompRuleResourcePass.cpp
     SplitMultipleTapes.cpp
     TBAAPatterns.cpp
     TBAATagsPass.cpp

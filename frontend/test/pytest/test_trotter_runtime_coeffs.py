@@ -48,21 +48,21 @@ COEFFS = [
 def make_ops():
     """Build a fresh list of the Hamiltonian's Pauli-word operators."""
     return [
-        qml.Identity(0),
-        qml.PauliZ(0),
-        qml.PauliZ(1),
-        qml.PauliZ(2),
-        qml.PauliZ(3),
-        qml.PauliZ(0) @ qml.PauliZ(1),
-        qml.PauliY(0) @ qml.PauliX(1) @ qml.PauliX(2) @ qml.PauliY(3),
-        qml.PauliY(0) @ qml.PauliY(1) @ qml.PauliX(2) @ qml.PauliX(3),
-        qml.PauliX(0) @ qml.PauliX(1) @ qml.PauliY(2) @ qml.PauliY(3),
-        qml.PauliX(0) @ qml.PauliY(1) @ qml.PauliY(2) @ qml.PauliX(3),
-        qml.PauliZ(0) @ qml.PauliZ(2),
-        qml.PauliZ(0) @ qml.PauliZ(3),
-        qml.PauliZ(1) @ qml.PauliZ(2),
-        qml.PauliZ(1) @ qml.PauliZ(3),
-        qml.PauliZ(2) @ qml.PauliZ(3),
+        qp.Identity(0),
+        qp.PauliZ(0),
+        qp.PauliZ(1),
+        qp.PauliZ(2),
+        qp.PauliZ(3),
+        qp.PauliZ(0) @ qp.PauliZ(1),
+        qp.PauliY(0) @ qp.PauliX(1) @ qp.PauliX(2) @ qp.PauliY(3),
+        qp.PauliY(0) @ qp.PauliY(1) @ qp.PauliX(2) @ qp.PauliX(3),
+        qp.PauliX(0) @ qp.PauliX(1) @ qp.PauliY(2) @ qp.PauliY(3),
+        qp.PauliX(0) @ qp.PauliY(1) @ qp.PauliY(2) @ qp.PauliX(3),
+        qp.PauliZ(0) @ qp.PauliZ(2),
+        qp.PauliZ(0) @ qp.PauliZ(3),
+        qp.PauliZ(1) @ qp.PauliZ(2),
+        qp.PauliZ(1) @ qp.PauliZ(3),
+        qp.PauliZ(2) @ qp.PauliZ(3),
     ]
 
 
@@ -74,25 +74,25 @@ N_TROTTER = 6
 def make_qpe(dev, runtime: bool):
     """Controlled-power Trotterized QPE, with runtime or compile-time coeffs."""
 
-    @qml.qnode(dev)
+    @qp.qnode(dev)
     def qpe_circuit(coeffs):
-        qml.PauliX(0)
-        qml.PauliX(1)
+        qp.PauliX(0)
+        qp.PauliX(1)
         for k in range(N_EST):
-            qml.Hadamard(wires=N_QUBITS + k)
-        H = qml.dot(coeffs if runtime else COEFFS, make_ops())
+            qp.Hadamard(wires=N_QUBITS + k)
+        H = qp.dot(coeffs if runtime else COEFFS, make_ops())
         for k in range(N_EST):
             t = 2 ** (N_EST - 1 - k)
-            qml.ctrl(
-                qml.adjoint(
-                    qml.TrotterProduct(
+            qp.ctrl(
+                qp.adjoint(
+                    qp.TrotterProduct(
                         H, time=t, n=N_TROTTER, order=2, check_hermitian=False
                     )
                 ),
                 control=N_QUBITS + k,
             )
-        qml.adjoint(qml.QFT)(wires=range(N_QUBITS, N_QUBITS + N_EST))
-        return qml.probs(wires=range(N_QUBITS, N_QUBITS + N_EST))
+        qp.adjoint(qp.QFT)(wires=range(N_QUBITS, N_QUBITS + N_EST))
+        return qp.probs(wires=range(N_QUBITS, N_QUBITS + N_EST))
 
     return qpe_circuit
 
@@ -101,10 +101,10 @@ class TestRuntimeCoefficientTrotter:
     """Numerical equivalence of runtime- and fixed-coefficient Trotterization
     through the default pipeline (which scalarizes and fuses)."""
 
-    def test_runtime_matches_fixed(self):
-        """qml.dot with traced coefficients must produce the same distribution
+    def test_runtime_matches_fixed(self, backend):
+        """qp.dot with traced coefficients must produce the same distribution
         as the same Hamiltonian with Python-float coefficients."""
-        dev = qml.device("lightning.qubit", wires=N_QUBITS + N_EST)
+        dev = qp.device(backend, wires=N_QUBITS + N_EST)
         coeffs = jnp.array(COEFFS)
 
         dyn = qjit(make_qpe(dev, runtime=True))(coeffs)
