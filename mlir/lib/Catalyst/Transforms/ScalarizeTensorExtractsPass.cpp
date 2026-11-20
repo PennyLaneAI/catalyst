@@ -45,8 +45,7 @@ constexpr int64_t kMaxScalarizedElements = 16;
 
 /// Whether the generic's payload is speculatable scalar code that never reads
 /// the accumulator (output block arguments), so it can be inlined verbatim.
-bool hasInlinablePayload(linalg::GenericOp genericOp)
-{
+bool hasInlinablePayload(linalg::GenericOp genericOp) {
     Block *body = genericOp.getBody();
     for (Operation &op : body->without_terminator()) {
         if (!isPure(&op)) {
@@ -66,8 +65,7 @@ bool hasInlinablePayload(linalg::GenericOp genericOp)
 /// constant expressions, so per-input extraction indices can be derived from
 /// the iteration indices. Validated up front: patterns must not mutate the IR
 /// on the failure path, and ops are created per input during the rewrite.
-bool hasScalarizableInputMaps(linalg::GenericOp genericOp)
-{
+bool hasScalarizableInputMaps(linalg::GenericOp genericOp) {
     for (OpOperand *inOperand : genericOp.getDpsInputOperands()) {
         if (!isa<RankedTensorType>(inOperand->get().getType())) {
             continue;
@@ -87,8 +85,7 @@ bool hasScalarizableInputMaps(linalg::GenericOp genericOp)
 /// with the iteration indices. Scalar operands map through unchanged. Returns
 /// the block-argument-to-scalar mapping used to clone the payload.
 IRMapping materializeScalarOperands(PatternRewriter &rewriter, Location loc,
-                                    linalg::GenericOp genericOp, ArrayRef<Value> iterIndices)
-{
+                                    linalg::GenericOp genericOp, ArrayRef<Value> iterIndices) {
     Block *body = genericOp.getBody();
     IRMapping mapping;
     for (OpOperand *inOperand : genericOp.getDpsInputOperands()) {
@@ -103,8 +100,7 @@ IRMapping materializeScalarOperands(PatternRewriter &rewriter, Location loc,
         for (AffineExpr expr : inputMap.getResults()) {
             if (auto dimExpr = dyn_cast<AffineDimExpr>(expr)) {
                 inputIndices.push_back(iterIndices[dimExpr.getPosition()]);
-            }
-            else {
+            } else {
                 auto constExpr = cast<AffineConstantExpr>(expr);
                 inputIndices.push_back(
                     arith::ConstantIndexOp::create(rewriter, loc, constExpr.getValue()));
@@ -122,8 +118,7 @@ struct ExtractOfGeneric : public OpRewritePattern<tensor::ExtractOp> {
     using OpRewritePattern<tensor::ExtractOp>::OpRewritePattern;
 
     LogicalResult matchAndRewrite(tensor::ExtractOp extractOp,
-                                  PatternRewriter &rewriter) const override
-    {
+                                  PatternRewriter &rewriter) const override {
         auto genericOp = extractOp.getTensor().getDefiningOp<linalg::GenericOp>();
         if (!genericOp) {
             return failure();
@@ -183,8 +178,7 @@ struct ExtractOfCollapseShape : public OpRewritePattern<tensor::ExtractOp> {
     using OpRewritePattern<tensor::ExtractOp>::OpRewritePattern;
 
     LogicalResult matchAndRewrite(tensor::ExtractOp extractOp,
-                                  PatternRewriter &rewriter) const override
-    {
+                                  PatternRewriter &rewriter) const override {
         auto collapseOp = extractOp.getTensor().getDefiningOp<tensor::CollapseShapeOp>();
         if (!collapseOp) {
             return failure();
@@ -246,8 +240,7 @@ struct ExtractOfExtractSlice : public OpRewritePattern<tensor::ExtractOp> {
     using OpRewritePattern<tensor::ExtractOp>::OpRewritePattern;
 
     LogicalResult matchAndRewrite(tensor::ExtractOp extractOp,
-                                  PatternRewriter &rewriter) const override
-    {
+                                  PatternRewriter &rewriter) const override {
         auto sliceOp = extractOp.getTensor().getDefiningOp<tensor::ExtractSliceOp>();
         if (!sliceOp) {
             return failure();
@@ -299,8 +292,7 @@ struct ScalarizeTensorExtractsPass
     using impl::ScalarizeTensorExtractsPassBase<
         ScalarizeTensorExtractsPass>::ScalarizeTensorExtractsPassBase;
 
-    void runOnOperation() override
-    {
+    void runOnOperation() override {
         MLIRContext *context = &getContext();
         RewritePatternSet patterns(context);
         patterns.add<ExtractOfGeneric, ExtractOfCollapseShape, ExtractOfExtractSlice>(context);

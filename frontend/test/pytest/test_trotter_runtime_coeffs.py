@@ -83,12 +83,9 @@ def make_qpe(dev, runtime: bool):
         H = qp.dot(coeffs if runtime else COEFFS, make_ops())
         for k in range(N_EST):
             t = 2 ** (N_EST - 1 - k)
+            # For a symmetric second-order step, negating time gives its adjoint.
             qp.ctrl(
-                qp.adjoint(
-                    qp.TrotterProduct(
-                        H, time=t, n=N_TROTTER, order=2, check_hermitian=False
-                    )
-                ),
+                qp.TrotterProduct(H, time=-t, n=N_TROTTER, order=2, check_hermitian=False),
                 control=N_QUBITS + k,
             )
         qp.adjoint(qp.QFT)(wires=range(N_QUBITS, N_QUBITS + N_EST))
@@ -107,8 +104,8 @@ class TestRuntimeCoefficientTrotter:
         dev = qp.device(backend, wires=N_QUBITS + N_EST)
         coeffs = jnp.array(COEFFS)
 
-        dyn = qjit(make_qpe(dev, runtime=True))(coeffs)
-        fixed = qjit(make_qpe(dev, runtime=False))(coeffs)
+        dyn = qjit(make_qpe(dev, runtime=True), capture=False)(coeffs)
+        fixed = qjit(make_qpe(dev, runtime=False), capture=False)(coeffs)
 
         assert np.allclose(np.asarray(dyn), np.asarray(fixed), atol=1e-9)
 
