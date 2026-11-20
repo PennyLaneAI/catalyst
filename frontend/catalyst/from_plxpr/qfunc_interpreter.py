@@ -50,14 +50,12 @@ from catalyst.decomposition.capture_session import (
     RuleIdentity,
     TracedRule,
 )
-from catalyst.decomposition.decomposition_rules import (
-    DecompTargetSpec,
-    rule_call_operands,
-    walk_reachable_decomp_rule_sets,
-)
 from catalyst.decomposition.modifier_state import ModifierState
 from catalyst.decomposition.precompiled_rule_loading import load_precompiled_rule_identities
+from catalyst.decomposition.rule_arguments import rule_call_operands
+from catalyst.decomposition.rule_discovery import walk_reachable_decomp_rule_sets
 from catalyst.decomposition.rule_lowering_warning import RuleLoweringWarning
+from catalyst.decomposition.rule_preparation import DecompTargetSpec
 from catalyst.from_plxpr.qref_jax_primitives import (
     MeasurementPlane,
     QrefQreg,
