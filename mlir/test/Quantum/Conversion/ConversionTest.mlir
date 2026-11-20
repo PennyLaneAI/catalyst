@@ -588,7 +588,7 @@ func.func @pauli_measurement(%q0: !quantum.bit, %q1: !quantum.bit,
   // CHECK: [[M:%.+]] = llvm.load [[PTR]] : !llvm.ptr -> i1
   %m, %out:4 = quantum.measurement "PauliMeasure"() qubits(%q0, %q1, %q2, %q3)
       static_data = {pauli_word = "IXYZ", postselect = none}
-      : i1, !quantum.bit, !quantum.bit, !quantum.bit, !quantum.bit
+      : (i1, !quantum.bit, !quantum.bit, !quantum.bit, !quantum.bit)
   // CHECK: llvm.insertvalue [[M]]
   // CHECK: llvm.insertvalue %arg0
   // CHECK: llvm.insertvalue %arg1
@@ -608,7 +608,7 @@ func.func @discarded_measurement_result(%q: !quantum.bit) -> !quantum.bit {
   // CHECK: llvm.call @__catalyst__qis__PauliMeasure
   // CHECK-NOT: llvm.load
   %out = quantum.measurement "PauliMeasure"() qubits(%q)
-      static_data = {pauli_word = "Z", meas_uid = "direct"} : !quantum.bit
+      static_data = {pauli_word = "Z", meas_uid = "direct"} : (!quantum.bit)
   // CHECK: llvm.return %arg0 : !llvm.ptr
   return %out : !quantum.bit
 }
@@ -618,7 +618,7 @@ func.func @discarded_measurement_result(%q: !quantum.bit) -> !quantum.bit {
 func.func @other_measurement(%q: !quantum.bit) -> (i1, !quantum.bit) {
   // expected-error @+1 {{failed to legalize operation 'quantum.measurement'}}
   %m, %out = quantum.measurement "OtherMeasurement"() qubits(%q)
-      static_data = {pauli_word = "Z"} : i1, !quantum.bit
+      static_data = {pauli_word = "Z"} : (i1, !quantum.bit)
   return %m, %out : i1, !quantum.bit
 }
 
@@ -627,17 +627,18 @@ func.func @other_measurement(%q: !quantum.bit) -> (i1, !quantum.bit) {
 func.func @postselection(%q: !quantum.bit) -> (i1, !quantum.bit) {
   // expected-error @+1 {{failed to legalize operation 'quantum.measurement'}}
   %m, %out = quantum.measurement "PauliMeasure"() qubits(%q)
-      static_data = {pauli_word = "Z", postselect = 0 : i64} : i1, !quantum.bit
+      static_data = {pauli_word = "Z", postselect = 0 : i64} : (i1, !quantum.bit)
   return %m, %out : i1, !quantum.bit
 }
 
 // -----
 
-func.func @register_measurement(%reg: !quantum.reg) -> (i1, !quantum.reg) {
+func.func @register_measurement(%reg: !quantum.reg, %idx: i64) -> (i1, !quantum.reg) {
+  %wires = builtin.unrealized_conversion_cast %idx : i64 to tensor<1xi64>
   // expected-error @+1 {{failed to legalize operation 'quantum.measurement'}}
   %m, %out = quantum.measurement "PauliMeasure"() quregs(%reg)
-      indices() static_data = {pauli_word = "Z"}
-      : i1, !quantum.reg
+      indices(%wires: tensor<1xi64>) static_data = {pauli_word = "Z"}
+      : (i1, !quantum.reg)
   return %m, %out : i1, !quantum.reg
 }
 
@@ -646,7 +647,7 @@ func.func @register_measurement(%reg: !quantum.reg) -> (i1, !quantum.reg) {
 func.func @parameters(%q: !quantum.bit, %angle: f64) -> (i1, !quantum.bit) {
   // expected-error @+1 {{failed to legalize operation 'quantum.measurement'}}
   %m, %out = quantum.measurement "PauliMeasure"(%angle: f64) qubits(%q)
-      static_data = {pauli_word = "Z"} : i1, !quantum.bit
+      static_data = {pauli_word = "Z"} : (i1, !quantum.bit)
   return %m, %out : i1, !quantum.bit
 }
 
@@ -655,7 +656,7 @@ func.func @parameters(%q: !quantum.bit, %angle: f64) -> (i1, !quantum.bit) {
 func.func @invalid_word(%q: !quantum.bit) -> (i1, !quantum.bit) {
   // expected-error @+1 {{failed to legalize operation 'quantum.measurement'}}
   %m, %out = quantum.measurement "PauliMeasure"() qubits(%q)
-      static_data = {pauli_word = "H"} : i1, !quantum.bit
+      static_data = {pauli_word = "H"} : (i1, !quantum.bit)
   return %m, %out : i1, !quantum.bit
 }
 
@@ -664,7 +665,7 @@ func.func @invalid_word(%q: !quantum.bit) -> (i1, !quantum.bit) {
 func.func @word_length_mismatch(%q: !quantum.bit) -> (i1, !quantum.bit) {
   // expected-error @+1 {{failed to legalize operation 'quantum.measurement'}}
   %m, %out = quantum.measurement "PauliMeasure"() qubits(%q)
-      static_data = {pauli_word = "ZZ"} : i1, !quantum.bit
+      static_data = {pauli_word = "ZZ"} : (i1, !quantum.bit)
   return %m, %out : i1, !quantum.bit
 }
 
@@ -673,7 +674,7 @@ func.func @word_length_mismatch(%q: !quantum.bit) -> (i1, !quantum.bit) {
 func.func @invalid_result(%q: !quantum.bit) -> (i64, !quantum.bit) {
   // expected-error @+1 {{failed to legalize operation 'quantum.measurement'}}
   %m, %out = quantum.measurement "PauliMeasure"() qubits(%q)
-      static_data = {pauli_word = "Z"} : i64, !quantum.bit
+      static_data = {pauli_word = "Z"} : (i64, !quantum.bit)
   return %m, %out : i64, !quantum.bit
 }
 

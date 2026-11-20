@@ -20,7 +20,7 @@ func.func @pauli_measurement(%q0: !quantum.bit, %q1: !quantum.bit)
   // CHECK: [[M:%.+]], [[Q:%.+]]:2 = pbc.ppm ["X", "Z"]
   %m, %out0, %out1 = quantum.measurement "PauliMeasure"() qubits(%q0, %q1)
       static_data = {pauli_word = "XZ", postselect = none}
-      : i1, !quantum.bit, !quantum.bit
+      : (i1, !quantum.bit, !quantum.bit)
   // CHECK: return [[M]], [[Q]]#0, [[Q]]#1
   return %m, %out0, %out1 : i1, !quantum.bit, !quantum.bit
 }
@@ -30,7 +30,7 @@ func.func @discarded_measurement_result(%q0: !quantum.bit) -> !quantum.bit {
   // CHECK: {{%.+}}, [[Q:%.+]] = pbc.ppm ["Y"]
   %out = quantum.measurement "PauliMeasure"() qubits(%q0)
       static_data = {pauli_word = "Y", meas_uid = "direct"}
-      : !quantum.bit
+      : (!quantum.bit)
   // CHECK: return [[Q]]
   return %out : !quantum.bit
 }
@@ -39,6 +39,6 @@ func.func @discarded_measurement_result(%q0: !quantum.bit) -> !quantum.bit {
 func.func @other_measurements(%q0: !quantum.bit) -> (i1, !quantum.bit) {
   // CHECK: quantum.measurement "OtherMeasurement"()
   %m, %out = quantum.measurement "OtherMeasurement"() qubits(%q0)
-      : i1, !quantum.bit
+      : (i1, !quantum.bit)
   return %m, %out : i1, !quantum.bit
 }
