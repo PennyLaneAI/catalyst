@@ -3315,7 +3315,7 @@ class TestCustomRuleApplication:
 class TestDecomposeAlias:
     """``qp.decompose`` under capture is an alias for ``graph_decomposition`` (same C++ pass)."""
 
-    @pytest.mark.usefixtures("use_capture_dgraph")
+    @pytest.mark.usefixtures("use_capture")
     @pytest.mark.parametrize("clean", [False, None], ids=["false", "none"])
     @pytest.mark.xfail(
         reason="On-demand rules use separate JAX contexts and can produce duplicate symbols.",
@@ -3358,7 +3358,7 @@ class TestDecomposeAlias:
 
     def test_decompose_requires_gate_set(self):
         """qp.decompose without a gate set is rejected with a clear error."""
-        with pytest.raises(ValueError, match="requires an explicit 'gate_set'"):
+        with pytest.raises(TypeError, match=r"The gate_set argument is required\."):
 
             @qjit(capture=True, target="mlir")
             @qp.decompose(gate_set=None)
