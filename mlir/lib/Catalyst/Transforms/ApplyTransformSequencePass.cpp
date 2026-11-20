@@ -109,9 +109,13 @@ LogicalResult applyTransformsWithSubpassTracking(Operation *payload,
         return failure();
     }
 
+    // Instrumentations such as pass timing identify a pass by its address, so the subpasses are
+    // kept alive until the end of the sequence to give each transform op a distinct address
+    SmallVector<std::unique_ptr<TransformOpSubPass>> subPasses;
     for (Operation &transformOp : sequenceBlock.without_terminator()) {
         if (auto transformInterface = dyn_cast<transform::TransformOpInterface>(transformOp)) {
-            auto subPass = std::make_unique<TransformOpSubPass>(transformInterface);
+            auto &subPass =
+                subPasses.emplace_back(std::make_unique<TransformOpSubPass>(transformInterface));
 
             // hook before pass
             passInstrumentor->runBeforePass(subPass.get(), payload);
