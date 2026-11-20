@@ -162,11 +162,11 @@ def CastOp : Memory_Op<"cast", [Pure]> {
     let description = [{
         This operation converts a register reference to an equivalent type with a different
         static size information, e.g. from `!qref.reg<3>` to `!qref.reg<?>`. The result refers
-        to the same qubits as the source. The source and result types must be compatible: their
+        to the same register as the source. The source and result types must be compatible: their
         sizes are equal, or at least one of them is dynamic.
 
         Subroutines take registers of dynamic size, so call sites cast registers of static size
-        to `!qref.reg<?>` before passing them. A register reference has no counterpart in value
+        to `!qref.reg<?>` before passing them. A sized register has no counterpart in value
         semantics, so the conversion to value semantics folds the casts away.
 
         Example:
