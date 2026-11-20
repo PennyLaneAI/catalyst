@@ -15,12 +15,33 @@
 #include "Context.hpp"
 
 #include <algorithm>
+#include <cstdio>
 #include <cstring>
 #include <string>
+#include <sys/ioctl.h>
+#include <sys/socket.h>
 
 #include "Error.hpp"
+#include "OobSocket.hpp"
+
+#include <net/if.h>
 namespace catalyst::transport::common {
-Context::Context(const std::string &dev_name) {
+
+namespace {
+constexpr std::uint8_t V4_PREFIX[12] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0xff, 0xff};
+} // namespace
+
+ibv_gid ipv4_mapped_gid(std::uint32_t ip) {
+    ibv_gid gid{};
+    std::memcpy(gid.raw, V4_PREFIX, sizeof(V4_PREFIX));
+    gid.raw[12] = static_cast<std::uint8_t>(ip >> 24);
+    gid.raw[13] = static_cast<std::uint8_t>(ip >> 16);
+    gid.raw[14] = static_cast<std::uint8_t>(ip >> 8);
+    gid.raw[15] = static_cast<std::uint8_t>(ip);
+    return gid;
+}
+
+Context::Context(const std::string &dev_name) : dev_name_(dev_name) {
     int n = 0;
     ibv_device **devs = ibv_get_device_list(&n);
     TP_CHECK_ERRNO(devs && n > 0, "ibv_get_device_list");
@@ -58,5 +79,30 @@ ibv_gid Context::gid(std::uint8_t port, int idx) const {
     const int rc = ibv_query_gid(ctx_, port, idx, &gid);
     TP_CHECK(rc == 0, "ibv_query_gid(%u,%d) rc=%d (%s)", port, idx, rc, std::strerror(rc));
     return gid;
+}
+Ipv4Gid Context::ipv4_gid(std::uint8_t port, int idx) const {
+    ibv_gid_entry e{};
+    const int rc = ibv_query_gid_ex(ctx_, port, idx, &e, 0);
+    TP_CHECK(rc == 0, "ibv_query_gid_ex(%u,%d) rc=%d (%s)", port, idx, rc, std::strerror(rc));
+    TP_CHECK(std::memcmp(e.gid.raw, V4_PREFIX, sizeof(V4_PREFIX)) == 0,
+             "GID %d of %s is not an IPv4 GID; pick the RoCE v2 IPv4 one (gid=)", idx,
+             dev_name_.c_str());
+    if (e.gid_type != IBV_GID_TYPE_ROCE_V2) {
+        std::fprintf(stderr, "warning: GID %d of %s is not RoCE v2\n", idx, dev_name_.c_str());
+    }
+    Ipv4Gid out;
+    out.ip = (static_cast<std::uint32_t>(e.gid.raw[12]) << 24) |
+             (static_cast<std::uint32_t>(e.gid.raw[13]) << 16) |
+             (static_cast<std::uint32_t>(e.gid.raw[14]) << 8) | e.gid.raw[15];
+
+    ifreq ifr{};
+    TP_CHECK(e.ndev_ifindex != 0 && ::if_indextoname(e.ndev_ifindex, ifr.ifr_name) != nullptr,
+             "no netdev behind GID %d of %s", idx, dev_name_.c_str());
+    const FdGuard fd(::socket(AF_INET, SOCK_DGRAM, 0));
+    TP_CHECK_ERRNO(fd.valid(), "socket");
+    TP_CHECK_ERRNO(::ioctl(fd.get(), SIOCGIFHWADDR, &ifr) == 0, "cannot read the MAC of %s",
+                   ifr.ifr_name);
+    std::memcpy(out.mac, ifr.ifr_hwaddr.sa_data, sizeof(out.mac));
+    return out;
 }
 } // namespace catalyst::transport::common

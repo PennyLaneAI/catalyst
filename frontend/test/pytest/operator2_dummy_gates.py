@@ -16,6 +16,8 @@
 
 # pylint: disable = missing-class-docstring
 
+from collections import Counter
+
 import pennylane as qp
 
 
@@ -133,3 +135,23 @@ class HybridOpArg(qp.core.Operator2):
 
     def __init__(self, angle, op, cwires, n_iters=1):
         super().__init__(angle, op, cwires, n_iters)
+
+
+class HybridOpArgs(qp.core.Operator2):
+    """A sequence of three operator-valued arguments."""
+
+    hybrid_argnames = ("first_op", "second_op", "third_op")
+    wire_argnames = ()
+
+    def __init__(self, first_op, second_op, third_op):
+        super().__init__(first_op, second_op, third_op)
+
+
+@qp.register_resources(
+    lambda first_op, second_op, third_op: Counter([first_op, second_op, third_op])
+)
+def hybrid_op_args_decomp(first_op, second_op, third_op):
+    """Apply each operator argument in sequence, including repeated operators."""
+    qp.apply(first_op)
+    qp.apply(second_op)
+    qp.apply(third_op)

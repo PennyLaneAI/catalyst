@@ -75,6 +75,32 @@ class TestSubroutineHOP:
             subroutine_test(0), jax.numpy.array([complex(1.0, 0), complex(0.0, 0.0)], dtype=complex)
         )
 
+    def test_quantum_subroutine_different_constants(self):
+        """Test quantum subroutines with different constants"""
+
+        A = jax.numpy.array([0.1, 0.2])
+        B = jax.numpy.array([1.1, 1.2])
+
+        @subroutine
+        def RotA(wire):
+            qp.RX(A[0], wire)
+            qp.RY(A[1], wire)
+
+        @subroutine
+        def RotB(wire):
+            qp.RX(B[0], wire)
+            qp.RY(B[1], wire)
+
+        @qp.qjit(capture=True)
+        @qp.qnode(qp.device("lightning.qubit", wires=2))
+        def subroutine_test():
+            RotA(0)
+            RotB(1)
+            return qp.expval(qp.Z(0)), qp.expval(qp.Z(1))
+
+        expected = jax.numpy.array([np.cos(0.1) * np.cos(0.2), np.cos(1.1) * np.cos(1.2)])
+        assert np.allclose(subroutine_test(), expected)
+
     def test_quantum_subroutine_error_message(self):
         """Test error message for quantum operations outside of qnode."""
 

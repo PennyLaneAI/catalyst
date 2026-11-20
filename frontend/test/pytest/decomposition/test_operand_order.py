@@ -23,7 +23,8 @@ import re
 import numpy as np
 import pennylane as qp
 import pytest
-from pennylane.decomposition import add_decomps, register_resources
+from operator2_dummy_gates import HybridOpArgs, hybrid_op_args_decomp
+from pennylane.decomposition import add_decomps, local_decomps, register_resources
 
 from catalyst.decomposition import GraphOpID
 from catalyst.decomposition.rule_arguments import ordered_kwarg_names
@@ -341,3 +342,57 @@ def test_graph_op_id_metadata_matches_lowered_operands(op_name):
 
     if uid is not None:
         assert str.endswith(gid.getGraphOpId(), f"[{uid}]")
+
+
+@pytest.mark.parametrize("modifier", ["plain", "adjoint", "controlled"])
+def test_shared_operator_argument_wire_groups(modifier):
+    """Operator arguments preserve shared, permuted, and empty wire groups under modifiers."""
+
+    with local_decomps():
+        add_decomps(HybridOpArgs, hybrid_op_args_decomp)
+
+        def expanded(theta):
+            qp.CNOT([2, 0])
+            qp.CRX(theta, [0, 1])
+            qp.GlobalPhase(4 * theta)
+
+        def body(theta, operation):
+            qp.H(0)
+            qp.H(3)
+            if modifier == "controlled":
+                qp.ctrl(operation, control=3)(theta)
+            elif modifier == "adjoint":
+                qp.adjoint(operation)(theta)
+            else:
+                operation(theta)
+
+        @qp.qjit(capture=True)
+        @qp.decompose(gate_set={qp.RX, qp.RY, qp.RZ, qp.H, qp.X, qp.CNOT, qp.GlobalPhase})
+        @qp.qnode(qp.device("lightning.qubit", wires=4))
+        def compiled(theta):
+            qp.H(0)
+            qp.H(3)
+            operation = HybridOpArgs(
+                qp.CNOT([2, 0]),
+                qp.CRX(theta, [0, 1]),
+                qp.GlobalPhase(4 * theta),
+            )
+            if modifier == "controlled":
+                qp.ctrl(operation, control=3)
+            elif modifier == "adjoint":
+                qp.adjoint(operation)
+            return qp.state()
+
+        @qp.qnode(qp.device("default.qubit", wires=4))
+        def reference(theta):
+            body(theta, expanded)
+            return qp.state()
+
+        for theta in (0.17, 0.49):
+            with qp.capture.pause():
+                expected = reference(theta)
+            actual = compiled(theta)
+            # Compare relative phases while allowing decomposition to change the overall phase.
+            np.testing.assert_allclose(
+                np.outer(actual, np.conj(actual)), np.outer(expected, np.conj(expected)), atol=1e-8
+            )

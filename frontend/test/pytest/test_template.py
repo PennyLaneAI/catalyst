@@ -915,7 +915,6 @@ def test_qnn_ticket(backend):  # pylint: disable-next=line-too-long
     assert np.allclose(expected, observed)
 
 
-@pytest.mark.xfail(strict=True, reason="Needs distinct qubits.")
 def test_select(backend):
     """Test Select"""
 

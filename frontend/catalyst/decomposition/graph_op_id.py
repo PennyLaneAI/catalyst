@@ -244,7 +244,8 @@ class GraphOpID:
         self.op = op
         self.is_custom_op = self.parse_is_custom_op()
 
-        self.operator_name = op.name
+        # Match Operator2 lowering and OperatorRegistry, including when op.name differs.
+        self.operator_name = type(op).__name__
         self.dynamic_shape = self.parse_dynamic_shape()
         self.wire_lens = self.parse_wire_lens()
         self.static_data = self.parse_static_data()

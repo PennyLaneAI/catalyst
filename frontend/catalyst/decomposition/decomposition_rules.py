@@ -46,6 +46,9 @@ from catalyst.decomposition.rule_compilation import (
     get_rules_from_module,
     materialize_decomp_target_spec,
 )
+from catalyst.decomposition.rule_compilation import (
+    materialize_rule_strings as materialize_decomp_rule_strings,
+)
 from catalyst.decomposition.rule_discovery import walk_reachable_decomp_rule_sets
 from catalyst.decomposition.rule_preparation import (
     CollectedRule,
@@ -86,6 +89,7 @@ __all__ = (
     "flatten_hybrid_args",
     "get_rule_strings_from_module",
     "get_rules_from_module",
+    "materialize_decomp_rule_strings",
     "materialize_decomp_target_spec",
     "materialize_reachable_rule_strings",
     "ordered_kwarg_names",

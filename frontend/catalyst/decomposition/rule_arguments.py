@@ -326,7 +326,7 @@ def unpack_rule_operands(
         operands (tuple): the traced operands the rule body received
         n_params (int): how many of them are positional parameters
         kwarg_names (list[str]): parameter names first, followed by wire names
-        wire_lens (dict[str, int]): wire names in operand order and their lengths
+        wire_lens (dict[str, int]): wire names and their lengths
         has_ctrl_wires (bool): whether trailing control-wire and control-value operands are present
         hybrid_specs (list[HybridArgumentSpec]): reconstruction specs for hybrid arguments whose
             numeric leaves sit between the parameter kwargs and the grouped wire operand

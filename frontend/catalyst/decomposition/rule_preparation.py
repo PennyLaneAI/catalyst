@@ -315,6 +315,9 @@ def build_decomp_target_spec(
         DecompTargetSpec: callables and metadata consumable by either eager JAXPR capture or the
         legacy standalone MLIR materializer
     """
+    # Rule lowering gathers named base-wire groups in lexicographic order through qubit_map.
+    # Control work wires are appended separately below.
+    wire_lens = dict(sorted(wire_lens.items()))
     kwargs = prepare_dynamic_op_kwargs(dynamic_shape, wire_lens)
     extra_data = extra_data or {}
     n_base_wires = sum(wire_lens.values())
@@ -324,9 +327,12 @@ def build_decomp_target_spec(
         {**wire_lens, CTRL_WORK_WIRES: num_work_wires} if num_work_wires else wire_lens
     )
 
+    # Resource functions need wire types, while rule capture needs concrete dummy labels.
+    # Restore nested operators from extra_data after replacing their flattened wire groups.
+    resource_kwargs = kwargs | {name: qp.typing.Wire[length] for name, length in wire_lens.items()}
     collected_rules = collect_resources_for_op(
         op_name,
-        kwargs | static_data | extra_data,
+        resource_kwargs | static_data | extra_data,
         is_custom_op,
         op_cls=op_cls,
         modifiers=modifiers,
@@ -513,11 +519,11 @@ def build_registered_decomp_target_spec(
     body rebuilds the operator from its own traced arguments.
 
     An adjointed target is decomposed by the ``Adjoint(op)`` rules, and any controls are wrapped
-    around each rule body to synthesize the composed modifier ``C(Adjoint(op))``. This reduces the
-    adjoint under control (``C(Adjoint(RZ)) -> C(RZ)``), which the registered ``C(op)`` rules then
-    terminate (``C(RZ) -> CRZ``) -- something plain distribution cannot reach, since a registered
-    ``C(op)`` rule reads op-specific attributes and cannot take an adjoint base. A target that is
-    only controlled is decomposed by the ``C(op)`` rules, which take the controls as arguments.
+    around each rule body to synthesize the composed modifier ``<n>C(Adjoint(op))``. This reduces
+    the adjoint under control (``<n>C(Adjoint(RZ)) -> <n>C(RZ)``), which the registered ``C(op)``
+    rules then terminate (``1C(RZ) -> CRZ``) -- something plain distribution cannot reach, since a
+    registered ``C(op)`` rule reads op-specific attributes and cannot take an adjoint base. A target
+    that is only controlled is decomposed by the ``C(op)`` rules, which take the controls as arguments.
 
     Args:
         op_name (str): the base operator's name
@@ -548,6 +554,7 @@ def build_registered_decomp_target_spec(
 
     extra_data = extra_data or {}
     static_and_extra = static_data | extra_data
+    wire_lens = dict(sorted(wire_lens.items()))
     kwargs = prepare_dynamic_op_kwargs(dynamic_shape, wire_lens)
     n_base_wires = sum(wire_lens.values())
     kind = "adjoint" if modifiers.adjoint else "control"
@@ -593,7 +600,8 @@ def build_registered_decomp_target_spec(
                 collected.resource_counts_by_id = {controls.wrap_id(op_id): 1}
             elif wrap_control:
                 collected.resource_counts_by_id = {
-                    controls.wrap_id(rid): count for rid, count in ids.items()
+                    GraphOpID(op).getGraphOpId(controls): count
+                    for op, count in collected.resource_counts_by_op.items()
                 }
 
     call_args, call_kwargs = prepare_dummy_rule_arguments(kwargs, is_custom_op)
@@ -623,7 +631,7 @@ def build_registered_decomp_target_spec(
             # TODO: Call the rule itself instead of its _impl after merging
             # https://github.com/PennyLaneAI/pennylane/pull/10144
             if wrap_control:
-                # Reduce the adjoint under control: C(Adjoint(op)) -> C(<adjoint decomposition>).
+                # Reduce the adjoint under control: <n>C(Adjoint(op)) -> <n>C(<adjoint decomposition>).
                 controls.wrap_callable(
                     lambda: rule._impl(**symbolic_arguments(base, kind, None)),
                     _ctrl_wires,

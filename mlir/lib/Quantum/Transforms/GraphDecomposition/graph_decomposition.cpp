@@ -16,8 +16,10 @@
 #include <sstream>
 #include <string>
 #include <unordered_set>
+#include <utility>
 #include <vector>
 
+#include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/StringSet.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
@@ -26,11 +28,13 @@
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/BuiltinOps.h"
+#include "mlir/IR/OwningOpRef.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Support/LogicalResult.h"
 #include "stablehlo/dialect/StablehloOps.h"
 
 #include "Catalyst/Analysis/ResourceAnalysis.h"
+#include "Catalyst/Analysis/ResourceResult.h"
 #include "Driver/Timer.h"
 #include "QRef/Transforms/Passes.h"
 #include "Quantum/Transforms/Passes.h"
@@ -89,6 +93,7 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
         ///////////////////////////
         // Step 1–2: Prepare and solve the decomposition graph
         std::unique_ptr<DecompositionGraph> graph;
+        OwningOpRef<ModuleOp> ruleLibrary;
         {
             ScopedDiagnosticTimer prepareTimer("decomp:prepare");
 
@@ -112,7 +117,8 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
                                                 .bytecodeRulesFile = bytecodeRulesFile,
                                                 .libQPDPath = libQPDPath,
                                                 .libpythonPath = libpythonPath,
-                                            });
+                                            },
+                                            ruleLibrary);
         }
         if (!graph) {
             return signalPassFailure();
@@ -188,6 +194,15 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
                 for (const RuleTerm &input : chosenRule.inputs) {
                     worklist.push_back(input.op);
                 }
+            }
+            // An empty target-rules option means "apply all" to decompose-lowering. An empty
+            // rule set instead means that no decomposition is needed.
+            if (seenRules.empty()) {
+                return;
+            }
+            if (failed(GraphPrep::materializeSelectedLibraryRules(module, ruleLibrary.get(),
+                                                                  seenRules))) {
+                return signalPassFailure();
             }
             OpPassManager decomposePm("builtin.module");
             decomposePm.addPass(createDecomposeLoweringPass(dlOptions));
