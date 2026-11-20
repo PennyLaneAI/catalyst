@@ -1,6 +1,6 @@
 add_catalyst_unittest(CatalystQRefUnitTests
   InterfaceTest.cpp
-  TestDecomposableGateInterface.cpp
+  TestDecomposableOpInterface.cpp
 )
 
 target_link_libraries(CatalystQRefUnitTests PRIVATE

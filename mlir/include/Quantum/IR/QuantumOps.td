@@ -445,7 +445,7 @@ def SetBasisStateOp : Gate_Op<"set_basis_state"> {
 
 def CustomOp : UnitaryGate_Op<"custom", [DifferentiableGate, NoMemoryEffect,
                                          AttrSizedOperandSegments, AttrSizedResultSegments,
-                                         DeclareOpInterfaceMethods<DecomposableGate>]> {
+                                         DeclareOpInterfaceMethods<DecomposableOp>]> {
     let summary = "A generic quantum gate on n qubits with m floating point parameters.";
     let description = [{
     }];
@@ -570,7 +570,7 @@ def CustomOp : UnitaryGate_Op<"custom", [DifferentiableGate, NoMemoryEffect,
 
 def OperatorOp : UnitaryGate_Op<"operator", [ParametrizedGate, NoMemoryEffect,
                                              AttrSizedOperandSegments, AttrSizedResultSegments,
-                                             DeclareOpInterfaceMethods<DecomposableGate,
+                                             DeclareOpInterfaceMethods<DecomposableOp,
                                                 ["getExtraData"]>]> {
     let summary = "A generalized quantum operation with arbitrary input signature.";
     let description = [{
@@ -726,7 +726,7 @@ def OperatorOp : UnitaryGate_Op<"operator", [ParametrizedGate, NoMemoryEffect,
 
 def PauliRotOp : UnitaryGate_Op<"paulirot", [DifferentiableGate, NoMemoryEffect,
                                          AttrSizedOperandSegments, AttrSizedResultSegments,
-                                         DeclareOpInterfaceMethods<DecomposableGate>]> {
+                                         DeclareOpInterfaceMethods<DecomposableOp>]> {
     let summary = "Apply a Pauli Product Rotation";
     let description = [{
         The `quantum.paulirot` operation applies a rotation around a Pauli product
@@ -773,7 +773,7 @@ def PauliRotOp : UnitaryGate_Op<"paulirot", [DifferentiableGate, NoMemoryEffect,
 }
 
 def GlobalPhaseOp : UnitaryGate_Op<"gphase", [DifferentiableGate, AttrSizedOperandSegments,
-                                              DeclareOpInterfaceMethods<DecomposableGate>]> {
+                                              DeclareOpInterfaceMethods<DecomposableOp>]> {
     let summary = "Global Phase.";
 
     let description = [{
@@ -829,7 +829,7 @@ def GlobalPhaseOp : UnitaryGate_Op<"gphase", [DifferentiableGate, AttrSizedOpera
 
 def MultiRZOp : UnitaryGate_Op<"multirz", [DifferentiableGate, NoMemoryEffect,
                                            AttrSizedOperandSegments, AttrSizedResultSegments,
-                                           DeclareOpInterfaceMethods<DecomposableGate>]> {
+                                           DeclareOpInterfaceMethods<DecomposableOp>]> {
     let summary = "Apply an arbitrary multi Z rotation";
     let description = [{
         The `quantum.multirz` operation applies an arbitrary multi Z rotation to the state-vector.
@@ -868,7 +868,7 @@ def MultiRZOp : UnitaryGate_Op<"multirz", [DifferentiableGate, NoMemoryEffect,
 
 def PCPhaseOp : UnitaryGate_Op<"pcphase", [DifferentiableGate, NoMemoryEffect,
                                            AttrSizedOperandSegments, AttrSizedResultSegments,
-                                           DeclareOpInterfaceMethods<DecomposableGate>]> {
+                                           DeclareOpInterfaceMethods<DecomposableOp>]> {
     let summary = "Apply a projector-controlled phase gate";
     let description = [{
         This gate is built from simpler gates like `PhaseShift` and `PauliX` and acts on a group
@@ -917,7 +917,7 @@ def PCPhaseOp : UnitaryGate_Op<"pcphase", [DifferentiableGate, NoMemoryEffect,
 
 def QubitUnitaryOp : UnitaryGate_Op<"unitary", [ParametrizedGate, NoMemoryEffect,
                                                 AttrSizedOperandSegments, AttrSizedResultSegments,
-                                                DeclareOpInterfaceMethods<DecomposableGate>]> {
+                                                DeclareOpInterfaceMethods<DecomposableOp>]> {
     let summary = "Apply an arbitrary fixed unitary matrix";
     let description = [{
         The `quantum.unitary` operation applies an arbitrary fixed unitary matrix to the
@@ -1253,6 +1253,7 @@ class Measurement_Op<string mnemonic, list<Trait> traits = []> :
 
 def MeasurementOp : Quantum_Op<"measurement", [
         MeasurementProcess, AttrSizedOperandSegments, AttrSizedResultSegments,
+        DeclareOpInterfaceMethods<DecomposableOp>,
         DeclareOpInterfaceMethods<ResourceQuantumOpInterface>]> {
     let summary = "A generic mid-circuit measurement with classical results.";
     let description = [{

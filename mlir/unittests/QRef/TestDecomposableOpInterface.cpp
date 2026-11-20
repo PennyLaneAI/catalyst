@@ -48,7 +48,7 @@ namespace test {
 void registerTestDialect(mlir::DialectRegistry &);
 } // namespace test
 
-TEST(DecomposableGateInterfaceTests, CustomOp) {
+TEST(DecomposableOpInterfaceTests, CustomOp) {
     std::string moduleStr = R"mlir(
 module {
     %angle = arith.constant 3.1 : f64
@@ -65,9 +65,10 @@ module {
     ParserConfig config(&context, /*verifyAfterParse=*/false);
     OwningOpRef<ModuleOp> module = parseSourceString<ModuleOp>(moduleStr, config);
 
-    DecomposableGate customOp = *module->getOps<CustomOp>().begin();
+    DecomposableOp customOp = *module->getOps<CustomOp>().begin();
 
     ASSERT_EQ(customOp.getOperatorName(), "RX");
+    ASSERT_TRUE(customOp.isModifiable());
 
     catalyst::qref::DynamicShape expectedDynamicShape = {{"0", {Float64Type::get(&context)}}};
     ASSERT_EQ(customOp.getDynamicShape(), expectedDynamicShape);
@@ -80,7 +81,7 @@ module {
     ASSERT_EQ(customOp.getGraphOpId(), "RX{0:[f64]}{wires:2}{}");
 }
 
-TEST(DecomposableGateInterfaceTests, MultiControlledCustomOp) {
+TEST(DecomposableOpInterfaceTests, MultiControlledCustomOp) {
     std::string moduleStr = R"mlir(
 module {
   %true = arith.constant true
@@ -97,13 +98,14 @@ module {
     ParserConfig config(&context, /*verifyAfterParse=*/false);
     OwningOpRef<ModuleOp> module = parseSourceString<ModuleOp>(moduleStr, config);
 
-    DecomposableGate op = *module->getOps<CustomOp>().begin();
+    DecomposableOp op = *module->getOps<CustomOp>().begin();
 
+    ASSERT_TRUE(op.isModifiable());
     // Two control wires fold as `2C(...)`
     ASSERT_EQ(op.getGraphOpId(), "2C(PauliX){}{wires:1}{}");
 }
 
-TEST(DecomposableGateInterfaceTests, ControlledAdjointCustomOp) {
+TEST(DecomposableOpInterfaceTests, ControlledAdjointCustomOp) {
     std::string moduleStr = R"mlir(
 module {
   %true = arith.constant true
@@ -120,13 +122,14 @@ module {
     ParserConfig config(&context, /*verifyAfterParse=*/false);
     OwningOpRef<ModuleOp> module = parseSourceString<ModuleOp>(moduleStr, config);
 
-    DecomposableGate op = *module->getOps<CustomOp>().begin();
+    DecomposableOp op = *module->getOps<CustomOp>().begin();
 
+    ASSERT_TRUE(op.isModifiable());
     // Modifiers fold control-outermost
     ASSERT_EQ(op.getGraphOpId(), "1C(Adjoint(RX)){0:[f64]}{wires:1}{}");
 }
 
-TEST(DecomposableGateInterfaceTests, MultiControlledAdjointCustomOp) {
+TEST(DecomposableOpInterfaceTests, MultiControlledAdjointCustomOp) {
     std::string moduleStr = R"mlir(
 module {
   %true = arith.constant true
@@ -144,13 +147,14 @@ module {
     ParserConfig config(&context, /*verifyAfterParse=*/false);
     OwningOpRef<ModuleOp> module = parseSourceString<ModuleOp>(moduleStr, config);
 
-    DecomposableGate op = *module->getOps<CustomOp>().begin();
+    DecomposableOp op = *module->getOps<CustomOp>().begin();
 
+    ASSERT_TRUE(op.isModifiable());
     // Controls + Adjoint folding
     ASSERT_EQ(op.getGraphOpId(), "2C(Adjoint(RX)){0:[f64]}{wires:1}{}");
 }
 
-TEST(DecomposableGateInterfaceTests, MultiRZOp) {
+TEST(DecomposableOpInterfaceTests, MultiRZOp) {
     std::string moduleStr = R"mlir(
 module {
   %angle = arith.constant 3.1 : f64
@@ -168,9 +172,10 @@ module {
     ParserConfig config(&context, /*verifyAfterParse=*/false);
     OwningOpRef<ModuleOp> module = parseSourceString<ModuleOp>(moduleStr, config);
 
-    DecomposableGate multiRZ = *module->getOps<MultiRZOp>().begin();
+    DecomposableOp multiRZ = *module->getOps<MultiRZOp>().begin();
 
     ASSERT_EQ(multiRZ.getOperatorName(), "MultiRZ");
+    ASSERT_TRUE(multiRZ.isModifiable());
 
     catalyst::qref::DynamicShape expectedDynamicShape = {{"theta", {Float64Type::get(&context)}}};
     ASSERT_EQ(multiRZ.getDynamicShape(), expectedDynamicShape);
@@ -183,7 +188,7 @@ module {
     ASSERT_EQ(multiRZ.getGraphOpId(), "MultiRZ{theta:[f64]}{wires:3}{}");
 }
 
-TEST(DecomposableGateInterfaceTests, PauliRotOp) {
+TEST(DecomposableOpInterfaceTests, PauliRotOp) {
     std::string moduleStr = R"mlir(
 module {
   %angle = arith.constant 3.1 : f64
@@ -201,9 +206,10 @@ module {
     ParserConfig config(&context, /*verifyAfterParse=*/false);
     OwningOpRef<ModuleOp> module = parseSourceString<ModuleOp>(moduleStr, config);
 
-    DecomposableGate paulirot = *module->getOps<PauliRotOp>().begin();
+    DecomposableOp paulirot = *module->getOps<PauliRotOp>().begin();
 
     ASSERT_EQ(paulirot.getOperatorName(), "PauliRot");
+    ASSERT_TRUE(paulirot.isModifiable());
 
     catalyst::qref::DynamicShape expectedDynamicShape = {{"theta", {Float64Type::get(&context)}}};
     ASSERT_EQ(paulirot.getDynamicShape(), expectedDynamicShape);
@@ -219,7 +225,7 @@ module {
     ASSERT_EQ(paulirot.getGraphOpId(), "PauliRot{theta:[f64]}{wires:3}{pauli_word = \"XYZ\"}");
 }
 
-TEST(DecomposableGateInterfaceTests, PCPhaseOP) {
+TEST(DecomposableOpInterfaceTests, PCPhaseOP) {
     std::string moduleStr = R"mlir(
 module {
   %theta = arith.constant 3.7 : f64
@@ -237,9 +243,10 @@ module {
     ParserConfig config(&context, /*verifyAfterParse=*/false);
     OwningOpRef<ModuleOp> module = parseSourceString<ModuleOp>(moduleStr, config);
 
-    DecomposableGate pcphase = *module->getOps<PCPhaseOp>().begin();
+    DecomposableOp pcphase = *module->getOps<PCPhaseOp>().begin();
 
     ASSERT_EQ(pcphase.getOperatorName(), "PCPhase");
+    ASSERT_TRUE(pcphase.isModifiable());
 
     catalyst::qref::DynamicShape expectedDynamicShape = {{"phi", {Float64Type::get(&context)}}};
     ASSERT_EQ(pcphase.getDynamicShape(), expectedDynamicShape);
@@ -256,7 +263,7 @@ module {
     ASSERT_EQ(pcphase.getGraphOpId(), "1C(PCPhase){phi:[f64]}{wires:2}{dim = 0 : i64}");
 }
 
-TEST(DecomposableGateInterfaceTests, GlobalPhaseOp) {
+TEST(DecomposableOpInterfaceTests, GlobalPhaseOp) {
     std::string moduleStr = R"mlir(
 module {
   %angle = arith.constant 3.1 : f64
@@ -271,9 +278,10 @@ module {
     ParserConfig config(&context, /*verifyAfterParse=*/false);
     OwningOpRef<ModuleOp> module = parseSourceString<ModuleOp>(moduleStr, config);
 
-    DecomposableGate gphase = *module->getOps<GlobalPhaseOp>().begin();
+    DecomposableOp gphase = *module->getOps<GlobalPhaseOp>().begin();
 
     ASSERT_EQ(gphase.getOperatorName(), "GlobalPhase");
+    ASSERT_TRUE(gphase.isModifiable());
 
     catalyst::qref::DynamicShape expectedDynamicShape = {
         {"phi", {mlir::Float64Type::get(&context)}}};
@@ -287,7 +295,7 @@ module {
     ASSERT_EQ(gphase.getGraphOpId(), "GlobalPhase{phi:[f64]}{}{}");
 }
 
-TEST(DecomposableGateInterfaceTests, ControlledGlobalPhaseOp) {
+TEST(DecomposableOpInterfaceTests, ControlledGlobalPhaseOp) {
     std::string moduleStr = R"mlir(
 module {
   %angle = arith.constant 3.1 : f64
@@ -304,9 +312,10 @@ module {
     ParserConfig config(&context, /*verifyAfterParse=*/false);
     OwningOpRef<ModuleOp> module = parseSourceString<ModuleOp>(moduleStr, config);
 
-    DecomposableGate gphase = *module->getOps<GlobalPhaseOp>().begin();
+    DecomposableOp gphase = *module->getOps<GlobalPhaseOp>().begin();
 
     ASSERT_EQ(gphase.getOperatorName(), "GlobalPhase");
+    ASSERT_TRUE(gphase.isModifiable());
 
     catalyst::qref::DynamicShape expectedDynamicShape = {
         {"phi", {mlir::Float64Type::get(&context)}}};
@@ -321,7 +330,7 @@ module {
     ASSERT_EQ(gphase.getGraphOpId(), "1C(GlobalPhase){phi:[f64]}{}{}");
 }
 
-TEST(DecomposableGateInterfaceTests, QubitUnitaryOp) {
+TEST(DecomposableOpInterfaceTests, QubitUnitaryOp) {
     std::string moduleStr = R"mlir(
 module {
   %matrix = "test.op"() : () -> tensor<4x4xcomplex<f64>>
@@ -340,9 +349,10 @@ module {
     ParserConfig config(&context, /*verifyAfterParse=*/false);
     OwningOpRef<ModuleOp> module = parseSourceString<ModuleOp>(moduleStr, config);
 
-    DecomposableGate unitary = *module->getOps<QubitUnitaryOp>().begin();
+    DecomposableOp unitary = *module->getOps<QubitUnitaryOp>().begin();
 
     ASSERT_EQ(unitary.getOperatorName(), "QubitUnitary");
+    ASSERT_TRUE(unitary.isModifiable());
 
     catalyst::qref::DynamicShape expectedDynamicShape = {
         {"U",
@@ -358,7 +368,7 @@ module {
     ASSERT_EQ(unitary.getGraphOpId(), "1C(QubitUnitary){U:[tensor<4x4xcomplex<f64>>]}{wires:2}{}");
 }
 
-TEST(DecomposableGateInterfaceTests, OperatorOpQubits) {
+TEST(DecomposableOpInterfaceTests, OperatorOpQubits) {
     std::string moduleStr = R"mlir(
 module {
   %angle = arith.constant 3.1 : f64
@@ -378,9 +388,10 @@ module {
     OwningOpRef<ModuleOp> module = parseSourceString<ModuleOp>(moduleStr, config);
 
     auto operators = module->getOps<OperatorOp>();
-    DecomposableGate op = *operators.begin();
+    DecomposableOp op = *operators.begin();
 
     ASSERT_EQ(op.getOperatorName(), "testInterfaceOp");
+    ASSERT_TRUE(op.isModifiable());
 
     catalyst::qref::DynamicShape expectedDynamicShape = {
         {"flag", {mlir::IntegerType::get(&context, 1)}},
@@ -414,7 +425,7 @@ module {
               "myStaticArray = [1, 2, 3], myStaticInt = 4 : i64, myStaticString = \"Test\"}");
 }
 
-TEST(DecomposableGateInterfaceTests, OperatorOpDistinguishesGenericAndControlWorkWires) {
+TEST(DecomposableOpInterfaceTests, OperatorOpDistinguishesGenericAndControlWorkWires) {
     std::string moduleStr = R"mlir(
 module {
   %true = arith.constant true
@@ -437,18 +448,19 @@ module {
     OwningOpRef<ModuleOp> module = parseSourceString<ModuleOp>(moduleStr, config);
 
     auto operatorOp = *module->getOps<OperatorOp>().begin();
-    DecomposableGate op = operatorOp;
+    DecomposableOp op = operatorOp;
     catalyst::qref::WireLens expectedWires = {
         {"wires", 1}, {"work_wires", 1}, {"ctrl_work_wires", 1}};
 
     ASSERT_EQ(op.getWireLens(), expectedWires);
-    ASSERT_EQ(op.getNonCtrlQubitOperands().size(), 3u);
+    ASSERT_EQ(cast<QuantumGate>(op.getOperation()).getNonCtrlQubitOperands().size(), 3u);
+    ASSERT_TRUE(op.isModifiable());
     ASSERT_EQ(op.getGraphOpId(),
               "1C(MultiControlledX){}{ctrl_work_wires:1,wires:1,work_wires:1}{"
               "ctrl_work_wire_type = \"zeroed\", work_wire_type = \"borrowed\"}");
 }
 
-TEST(DecomposableGateInterfaceTests, OperatorOpGOIDTypeConflict) {
+TEST(DecomposableOpInterfaceTests, OperatorOpGOIDTypeConflict) {
     std::string moduleStr = R"mlir(
 module {
   %op0 = "test.op0"() : () -> tensor<f64>
@@ -467,8 +479,8 @@ module {
     ParserConfig config(&context, /*verifyAfterParse=*/false);
     OwningOpRef<ModuleOp> module = parseSourceString<ModuleOp>(moduleStr, config);
 
-    // Obtain DecomposableGate from the two OperatorOps being compared
-    std::array<DecomposableGate, 2> ops;
+    // Obtain DecomposableOp from the two OperatorOps being compared
+    std::array<DecomposableOp, 2> ops;
     int i = 0;
     for (auto op : module->getOps<OperatorOp>()) {
         ops[i] = op;
@@ -476,10 +488,12 @@ module {
     }
 
     // Ensure the two ops do not have the same GOID
+    ASSERT_TRUE(ops[0].isModifiable());
+    ASSERT_TRUE(ops[1].isModifiable());
     ASSERT_NE(ops[0].getGraphOpId(), ops[1].getGraphOpId());
 }
 
-TEST(DecomposableGateInterfaceTests, OperatorOpQureg) {
+TEST(DecomposableOpInterfaceTests, OperatorOpQureg) {
     std::string moduleStr = R"mlir(
 func.func @testfunc(%first : tensor<1xi64>, %secondthird : tensor<2xi64>) {
   %angle = arith.constant 3.1 : f64
@@ -500,10 +514,11 @@ func.func @testfunc(%first : tensor<1xi64>, %secondthird : tensor<2xi64>) {
     ParserConfig config(&context, /*verifyAfterParse=*/false);
     OwningOpRef<ModuleOp> module = parseSourceString<ModuleOp>(moduleStr, config);
 
-    DecomposableGate op;
+    DecomposableOp op;
     module->walk([&](OperatorOp walkOp) { op = walkOp; });
 
     ASSERT_EQ(op.getOperatorName(), "testOperatorQureg");
+    ASSERT_TRUE(op.isModifiable());
 
     catalyst::qref::DynamicShape expectedDynamicShape = {
         {"flag", {mlir::IntegerType::get(&context, 1)}},
@@ -538,7 +553,7 @@ func.func @testfunc(%first : tensor<1xi64>, %secondthird : tensor<2xi64>) {
                                  "myStaticString = \"string\"}");
 }
 
-TEST(DecomposableGateInterfaceTests, OperatorOpUID) {
+TEST(DecomposableOpInterfaceTests, OperatorOpUID) {
     std::string moduleStr = R"mlir(
 func.func @testfunc(%first : tensor<1xi64>, %secondthird : tensor<2xi64>) {
   %angle = arith.constant 3.1 : f64
@@ -560,10 +575,11 @@ func.func @testfunc(%first : tensor<1xi64>, %secondthird : tensor<2xi64>) {
     ParserConfig config(&context, /*verifyAfterParse=*/false);
     OwningOpRef<ModuleOp> module = parseSourceString<ModuleOp>(moduleStr, config);
 
-    DecomposableGate op;
+    DecomposableOp op;
     module->walk([&](OperatorOp walkOp) { op = walkOp; });
 
     ASSERT_EQ(op.getOperatorName(), "testOperatorUID");
+    ASSERT_TRUE(op.isModifiable());
 
     catalyst::qref::DynamicShape expectedDynamicShape = {
         {"flag", {mlir::IntegerType::get(&context, 1)}},
@@ -580,7 +596,7 @@ func.func @testfunc(%first : tensor<1xi64>, %secondthird : tensor<2xi64>) {
               "testOperatorUID{angle:[f64],flag:[i1],index:[i64]}{reg:3}{}[248]");
 }
 
-TEST(DecomposableGateInterfaceTests, OperatorOpMultiIndexedParams) {
+TEST(DecomposableOpInterfaceTests, OperatorOpMultiIndexedParams) {
     std::string moduleStr = R"mlir(
         module {
           %arg1 = arith.constant 1.0 : f64
@@ -600,9 +616,10 @@ TEST(DecomposableGateInterfaceTests, OperatorOpMultiIndexedParams) {
     OwningOpRef<ModuleOp> module = parseSourceString<ModuleOp>(moduleStr, config);
 
     auto operators = module->getOps<OperatorOp>();
-    DecomposableGate op = *operators.begin();
+    DecomposableOp op = *operators.begin();
 
     ASSERT_EQ(op.getOperatorName(), "testInterfaceOp");
+    ASSERT_TRUE(op.isModifiable());
 
     catalyst::qref::DynamicShape expectedDynamicShape = {
         {"multi_index_param",
@@ -619,4 +636,108 @@ TEST(DecomposableGateInterfaceTests, OperatorOpMultiIndexedParams) {
 
     ASSERT_EQ(op.getGraphOpId(),
               "testInterfaceOp{multi_index_param:[f64,tensor<2xi64>,f64]}{wire1:1}{}");
+}
+
+TEST(DecomposableOpInterfaceTests, MeasurementOpQubits) {
+    std::string moduleStr = R"mlir(
+module {
+  %q0 = qref.alloc_qb : !qref.bit
+  %q1 = qref.alloc_qb : !qref.bit
+  %m = qref.measurement "PauliMeasure"() qubits(%q0, %q1)
+      static_data = {pauli_word = "XY"}
+      qubit_map = {wires = [0, 1]}
+      : i1
+}
+    )mlir";
+
+    DialectRegistry registry;
+    registry.insert<QRefDialect>();
+    MLIRContext context(registry);
+    ParserConfig config(&context, /*verifyAfterParse=*/false);
+    OwningOpRef<ModuleOp> module = parseSourceString<ModuleOp>(moduleStr, config);
+
+    DecomposableOp op = *module->getOps<MeasurementOp>().begin();
+
+    ASSERT_EQ(op.getOperatorName(), "PauliMeasure");
+    ASSERT_FALSE(op.isModifiable());
+    ASSERT_EQ(op.getExtraData(), "");
+
+    ASSERT_TRUE(op.getDynamicShape().empty());
+
+    catalyst::qref::WireLens expectedWires = {{"wires", 2}};
+    ASSERT_EQ(op.getWireLens(), expectedWires);
+
+    mlir::NamedAttribute pauliWord(mlir::StringAttr::get(&context, "pauli_word"),
+                                   mlir::StringAttr::get(&context, "XY"));
+    ASSERT_EQ(op.getStaticData(), mlir::DictionaryAttr::get(&context, {pauliWord}));
+
+    ASSERT_EQ(op.getGraphOpId(), "PauliMeasure{}{wires:2}{pauli_word = \"XY\"}");
+}
+
+TEST(DecomposableOpInterfaceTests, MeasurementOpMultiParams) {
+    std::string moduleStr = R"mlir(
+module {
+  %angle = arith.constant 3.1 : f64
+  %flag = arith.constant 0 : i1
+  %index = arith.constant 5 : i64
+  %q0 = qref.alloc_qb : !qref.bit
+  %q1 = qref.alloc_qb : !qref.bit
+  %m = qref.measurement "MeasureMultiParams"(%flag: i1, %angle: f64, %index: i64) qubits(%q0, %q1)
+      param_map = {flag = [0], angle = [1], index = [2]} qubit_map = {wires = [0, 1]}
+      : i1
+}
+    )mlir";
+
+    DialectRegistry registry;
+    registry.insert<mlir::arith::ArithDialect, QRefDialect>();
+    MLIRContext context(registry);
+    ParserConfig config(&context, /*verifyAfterParse=*/false);
+    OwningOpRef<ModuleOp> module = parseSourceString<ModuleOp>(moduleStr, config);
+
+    DecomposableOp op = *module->getOps<MeasurementOp>().begin();
+
+    ASSERT_EQ(op.getOperatorName(), "MeasureMultiParams");
+    ASSERT_FALSE(op.isModifiable());
+
+    catalyst::qref::DynamicShape expectedDynamicShape = {
+        {"flag", {mlir::IntegerType::get(&context, 1)}},
+        {"angle", {mlir::Float64Type::get(&context)}},
+        {"index", {mlir::IntegerType::get(&context, 64)}}};
+    ASSERT_EQ(op.getDynamicShape(), expectedDynamicShape);
+
+    catalyst::qref::WireLens expectedWires = {{"wires", 2}};
+    ASSERT_EQ(op.getWireLens(), expectedWires);
+
+    ASSERT_EQ(op.getGraphOpId(),
+              "MeasureMultiParams{angle:[f64],flag:[i1],index:[i64]}{wires:2}{}");
+}
+
+TEST(DecomposableOpInterfaceTests, MeasurementOpQureg) {
+    std::string moduleStr = R"mlir(
+func.func @testfunc(%wires : tensor<2xi64>) {
+  %reg = qref.alloc(4) : !qref.reg<4>
+  %m = qref.measurement "MeasureQreg"() quregs(%reg : !qref.reg<4>) indices(%wires: tensor<2xi64>)
+      qubit_map = {wires = [0]}
+      : i1
+  return
+}
+    )mlir";
+
+    DialectRegistry registry;
+    registry.insert<mlir::func::FuncDialect, QRefDialect>();
+    MLIRContext context(registry);
+    ParserConfig config(&context, /*verifyAfterParse=*/false);
+    OwningOpRef<ModuleOp> module = parseSourceString<ModuleOp>(moduleStr, config);
+
+    DecomposableOp op;
+    module->walk([&](MeasurementOp walkOp) { op = walkOp; });
+
+    ASSERT_EQ(op.getOperatorName(), "MeasureQreg");
+    ASSERT_FALSE(op.isModifiable());
+    ASSERT_EQ(op.getExtraData(), "");
+
+    catalyst::qref::WireLens expectedWires = {{"wires", 2}};
+    ASSERT_EQ(op.getWireLens(), expectedWires);
+
+    ASSERT_EQ(op.getGraphOpId(), "MeasureQreg{}{wires:2}{}");
 }

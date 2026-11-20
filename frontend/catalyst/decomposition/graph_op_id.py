@@ -238,8 +238,8 @@ class GraphOpID:
     will have different decomposition rules.
 
     Note that this function should not be updated without updating the corresponding methods on the
-    DecomposableGate interface in mlir/lib/quantum/IR/QuantumInterfaces.cpp and the corresponding
-    DecomposableGate interface in mlir/include/QRef/IR/QRefInterfaces.h.
+    DecomposableOp interface in mlir/lib/quantum/IR/QuantumInterfaces.cpp and the corresponding
+    DecomposableOp interface in mlir/include/QRef/IR/QRefInterfaces.h.
     """
 
     def __init__(self, op: qp.core.Operator2):
@@ -389,7 +389,7 @@ class GraphOpID:
         distributed over adjoint. They compose with the modifiers the operator carries itself, so
         an already-symbolic operator spells canonically instead of being wrapped twice.
 
-        NOTE: do not modify this method without also modifying the corresponding DecomposableGate
+        NOTE: do not modify this method without also modifying the corresponding DecomposableOp
         interface in MLIR.
         """
         return self._build_id(modifiers.compose(self.modifiers))
