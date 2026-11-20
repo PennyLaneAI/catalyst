@@ -8,7 +8,7 @@
   cannot be compiled. This option requires program capture and `collect_decomp_rules=True`,
   and defaults to `False`.
  [(#3482)](https://github.com/PennyLaneAI/catalyst/pull/3482)
- 
+
 * Backline can drive a VPK120 whose FPGA carries NVIDIA's Holoscan Sensor Bridge (HSB), through
   the new `hsb_hwhs` controller backend. Its coprocessors stay `cpu_verbs` and `gpu_verbs`,
   set to face HSB with `peer=hsb`.
@@ -1009,10 +1009,8 @@
   `!qref.reg<?>`, and call sites cast registers of static size with the new `qref.cast` operation.
   Decompose lowering casts the registers it passes to rules in the same way. Before, a
   subroutine's register type was copied from its first call site, so a subroutine called with
-  registers of different sizes, such as one shared by a decomposition rule and the copy of the
-  rule made by decompose lowering, failed verification with a `func.call` operand type mismatch.
-  This broke the measurement-based `QROM` decomposition under `qjit(capture=True)`.
-  [(#XXXX)](https://github.com/PennyLaneAI/catalyst/pull/XXXX)
+  registers of different sizes failed with a `func.call` operand type mismatch.
+  [(#3506)](https://github.com/PennyLaneAI/catalyst/pull/3506)
 
 * Buffers returned by internal helper functions, such as the Givens rotation helpers of
   `qp.BasisRotation`, are now deallocated by the caller instead of leaking until the end of
