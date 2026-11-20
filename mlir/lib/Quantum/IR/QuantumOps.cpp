@@ -660,8 +660,7 @@ LogicalResult MeasurementOp::verify() {
     auto isClassical = [](Type type) {
         bool classical = true;
         type.walk([&](Type nested) {
-            if (isa<QubitType, QuregType, ObservableType, catalyst::qref::QubitType,
-                    catalyst::qref::QuregType>(nested)) {
+            if (isa<catalyst::qref::QRefDialect, QuantumDialect>(nested.getDialect())) {
                 classical = false;
             }
         });
@@ -691,6 +690,9 @@ LogicalResult MeasurementOp::verify() {
     }
 
     const size_t numTargets = hasQregMode ? getArrQubitIndices().size() : getInQubits().size();
+    if (numTargets == 0) {
+        return emitOpError("expected at least one target qubit");
+    }
     const char *boundsNoun = hasQregMode ? "index arrays" : "qubits";
     const char *coverageNoun =
         hasQregMode ? "index arrays in register mode" : "qubit values in qubit mode";
@@ -953,12 +955,10 @@ void MeasurementOp::print(OpAsmPrinter &p) {
                              "operandSegmentSizes", "resultSegmentSizes"});
     p << " : ";
 
-    // 7. Result types
-    if (getOperation()->getNumResults() == 0) {
-        p << "()";
-    } else {
-        p << getOperation()->getResultTypes();
-    }
+    // 7. Result types (always parenthesized)
+    p << "(";
+    llvm::interleaveComma(getOperation()->getResultTypes(), p);
+    p << ")";
 }
 
 ParseResult MeasurementOp::parse(OpAsmParser &parser, OperationState &result) {
@@ -1040,13 +1040,9 @@ ParseResult MeasurementOp::parse(OpAsmParser &parser, OperationState &result) {
         return failure();
     }
 
-    // 7. Result types (optional parentheses)
-    if (succeeded(parser.parseOptionalLParen())) {
-        if (failed(parser.parseOptionalRParen()) &&
-            (parser.parseTypeList(resultTypes) || parser.parseRParen())) {
-            return failure();
-        }
-    } else if (parser.parseTypeList(resultTypes)) {
+    // 7. Result types
+    if (parser.parseLParen() || (failed(parser.parseOptionalRParen()) &&
+                                 (parser.parseTypeList(resultTypes) || parser.parseRParen()))) {
         return failure();
     }
 
@@ -1632,6 +1628,9 @@ static llvm::StringRef getObservableName(MLIRContext *ctx, llvm::StringRef baseN
 }
 
 llvm::StringRef MeasurementOp::getResourceName() { return getOpName(); }
+// Note: getResourceNumQubits for MeasurementOp does not consider QReg mode.
+// This is currently consistent with behavior of OperatorOp, and must be updated together if the
+// behavior is to be modifed.
 uint64_t MeasurementOp::getResourceNumQubits() { return getInQubits().size(); }
 uint64_t MeasurementOp::getResourceNumCtrlQubits() { return 0; }
 uint64_t MeasurementOp::getResourceNumParams() { return getParams().size(); }

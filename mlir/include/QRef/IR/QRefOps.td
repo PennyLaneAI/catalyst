@@ -876,9 +876,11 @@ def MeasurementOp : QRef_Op<"measurement", [
 
         Like `qref.operator`, this operation supports explicit qubit references
         or a register reference with index tensors selecting the measured wires.
-        These modes cannot be mixed. The quantum references are updated in
-        place; only classical results are returned, with caller-specified types.
-        The operation has measurement effects even when its results are unused.
+        These modes cannot be mixed, and at least one target qubit or index
+        array is required. The quantum references are updated in place; only
+        classical results are returned, with caller-specified types always
+        written in parentheses. The operation has measurement effects even when
+        its results are unused.
 
         Optional frontend-level metadata:
           * `param_map` — maps frontend argument names to the lowered `params` operand positions
@@ -887,21 +889,23 @@ def MeasurementOp : QRef_Op<"measurement", [
         ```mlir
         %m = qref.measurement "MeasureInBasis"(%angle: f64)
             qubits(%q) static_data = {plane = "XY"}
-            param_map = {angle = [0]} qubit_map = {wires = [0]} : i1
+            param_map = {angle = [0]} qubit_map = {wires = [0]} : (i1)
 
         %bits = qref.measurement "MeasureMany"()
-            : tensor<?xi1>
+            quregs(%reg: !qref.reg<?>) indices(%wires: tensor<?xi64>)
+            : (tensor<?xi1>)
 
         // Note: PPM example shown below is the 1:1 lowering to the corresponding example in PPMeasurementOp.
         %result = qref.measurement "PauliMeasure"()
             qubits(%q0, %q1, %q2)
-            static_data = {pauli_word = "XIZ"} : i1
+            static_data = {pauli_word = "XIZ"} : (i1)
         ```
 
-        An empty result list is written `: ()`. Measurement names and static
-        data are interpreted by downstream lowering passes. This operation
-        implements `quantum::MeasurementProcess`; terminal result extraction uses
-        the observable-based `quantum::TerminalMeasurement` interface.
+        An empty classical result list is written `: ()` when targets are
+        present. Measurement names and static data are interpreted by
+        downstream lowering passes. This operation implements
+        `quantum::MeasurementProcess`; terminal result extraction uses the
+        observable-based `quantum::TerminalMeasurement` interface.
     }];
 
     let arguments = (ins

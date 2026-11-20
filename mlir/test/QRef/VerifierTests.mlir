@@ -591,9 +591,25 @@ func.func @measurement_indices_without_register(%w: tensor<1xi64>) {
 
 // -----
 
+func.func @measurement_register_without_indices(%r: !qref.reg<2>) {
+  // expected-error@+1 {{expected at least one target qubit}}
+  %m = qref.measurement "None"() quregs(%r: !qref.reg<2>) indices() : (i1)
+  return
+}
+
+// -----
+
+func.func @measurement_missing_targets() {
+  // expected-error@+1 {{expected at least one target qubit}}
+  %m = qref.measurement "None"() qubits() : (i1)
+  return
+}
+
+// -----
+
 func.func @measurement_quantum_param(%q: !qref.bit) {
   // expected-error@+1 {{params must have classical types}}
-  %m = qref.measurement "BadParam"(%q: !qref.bit) qubits() : i1
+  %m = qref.measurement "BadParam"(%q: !qref.bit) qubits() : (i1)
   return
 }
 
@@ -601,7 +617,7 @@ func.func @measurement_quantum_param(%q: !qref.bit) {
 
 func.func @measurement_observable_param(%obs: !quantum.obs) {
   // expected-error@+1 {{params must have classical types}}
-  %m = qref.measurement "BadParam"(%obs: !quantum.obs) qubits() : i1
+  %m = qref.measurement "BadParam"(%obs: !quantum.obs) qubits() : (i1)
   return
 }
 
@@ -609,7 +625,7 @@ func.func @measurement_observable_param(%obs: !quantum.obs) {
 
 func.func @measurement_quantum_classical_result() {
   // expected-error@+1 {{mres must have classical types}}
-  %m = qref.measurement "BadResult"() qubits() : !qref.reg<2>
+  %m = qref.measurement "BadResult"() qubits() : (!qref.reg<2>)
   return
 }
 
@@ -617,7 +633,7 @@ func.func @measurement_quantum_classical_result() {
 
 func.func @measurement_nested_quantum_result() {
   // expected-error@+1 {{mres must have classical types}}
-  %m = qref.measurement "BadResult"() qubits() : tuple<!quantum.bit>
+  %m = qref.measurement "BadResult"() qubits() : (tuple<!quantum.bit>)
   return
 }
 
@@ -625,7 +641,7 @@ func.func @measurement_nested_quantum_result() {
 
 func.func @measurement_wrong_index_type(%r: !qref.reg<2>, %w: tensor<1xi32>) {
   // expected-error@+1 {{operand #1 must be variadic of 1D tensor of 64-bit signless integer values}}
-  %m = qref.measurement "BadIndices"() quregs(%r: !qref.reg<2>) indices(%w: tensor<1xi32>) : i1
+  %m = qref.measurement "BadIndices"() quregs(%r: !qref.reg<2>) indices(%w: tensor<1xi32>) : (i1)
   return
 }
 
@@ -643,7 +659,7 @@ func.func @measurement_custom_invalid_param_map_coverage(%p0 : f64, %p1 : i64, %
   // expected-error@+1 {{param_map must cover all params when provided: expected 2, got 1}}
   %m = qref.measurement "custom_bad_param_map"(%p0 : f64, %p1 : i64) qubits(%q0, %q1)
     param_map = {p0 = [0]}
-    : i1
+    : (i1)
   return
 }
 
@@ -654,7 +670,7 @@ func.func @measurement_custom_invalid_qubit_map_coverage(%r : !qref.reg<?>, %idx
   %m = qref.measurement "custom_bad_qubit_map"()
     quregs(%r : !qref.reg<?>) indices(%idx0 : tensor<2xi64>, %idx1 : tensor<1xi64>)
     qubit_map = {qi0 = [0]}
-    : i1
+    : (i1)
   return
 }
 
@@ -664,7 +680,7 @@ func.func @measurement_custom_invalid_qubit_map_sum(%q0 : !qref.bit, %q1 : !qref
   // expected-error@+1 {{qubit_map must cover all qubit values in qubit mode: expected 2, got 1}}
   %m = qref.measurement "custom_bad_qubit_map_sum"() qubits(%q0, %q1)
     qubit_map = {pair = [0]}
-    : i1
+    : (i1)
   return
 }
 
@@ -673,7 +689,7 @@ func.func @measurement_custom_invalid_qubit_map_sum(%q0 : !qref.bit, %q1 : !qref
 func.func @measurement_adjoint(%q: !qref.bit) {
   // expected-error@+1 {{quantum measurements are not allowed in the adjoint regions}}
   qref.adjoint {
-    %m = qref.measurement "Measure"() qubits(%q) : i1
+    %m = qref.measurement "Measure"() qubits(%q) : (i1)
   }
   return
 }
@@ -683,7 +699,7 @@ func.func @measurement_adjoint(%q: !qref.bit) {
 func.func @measurement_ctrl(%q: !qref.bit, %c: !qref.bit, %v: i1) {
   // expected-error@+1 {{quantum measurements are not allowed in the ctrl regions}}
   qref.ctrl(%c) ctrlvals(%v) {
-    %m = qref.measurement "Measure"() qubits(%q) : i1
+    %m = qref.measurement "Measure"() qubits(%q) : (i1)
   }
   return
 }

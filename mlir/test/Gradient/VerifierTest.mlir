@@ -240,7 +240,7 @@ gradient.grad "fd" @foo(%f0) : (f64) -> (f64)
 func.func @measurement(%angle: f64) -> f64 {
   %reg = quantum.alloc(1) : !quantum.reg
   %q = quantum.extract %reg[0] : !quantum.reg -> !quantum.bit
-  %m, %out = quantum.measurement "MidCircuit"(%angle: f64) qubits(%q) : f64, !quantum.bit
+  %m, %out = quantum.measurement "MidCircuit"(%angle: f64) qubits(%q) : (f64, !quantum.bit)
   %out_reg = quantum.insert %reg[0], %out : !quantum.reg, !quantum.bit
   quantum.dealloc %out_reg : !quantum.reg
   return %m : f64
@@ -257,7 +257,7 @@ gradient.grad "auto" @measurement(%angle) : (f64) -> f64
 func.func @measurement(%angle: f64) -> f64 {
   %reg = quantum.alloc(1) : !quantum.reg
   %q = quantum.extract %reg[0] : !quantum.reg -> !quantum.bit
-  %m, %out = quantum.measurement "MidCircuit"(%angle: f64) qubits(%q) : f64, !quantum.bit
+  %m, %out = quantum.measurement "MidCircuit"(%angle: f64) qubits(%q) : (f64, !quantum.bit)
   %out_reg = quantum.insert %reg[0], %out : !quantum.reg, !quantum.bit
   quantum.dealloc %out_reg : !quantum.reg
   return %m : f64
@@ -278,7 +278,7 @@ gradient.grad "auto" @wrapper(%angle) : (f64) -> f64
 // The shared interface also covers generic measurements on quantum references.
 func.func @measurement(%angle: f64) -> f64 {
   %q = qref.alloc_qb : !qref.bit
-  %m = qref.measurement "MidCircuit"(%angle: f64) qubits(%q) : f64
+  %m = qref.measurement "MidCircuit"(%angle: f64) qubits(%q) : (f64)
   qref.dealloc_qb %q : !qref.bit
   return %m : f64
 }
