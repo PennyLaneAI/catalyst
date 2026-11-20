@@ -2879,7 +2879,7 @@ class TestSymbolicRules:
             == "CH{}{wires:2}{}"
         )
 
-    def test_controlled_adjoint_rule_composes_resource_controls(self):
+    def test_controlled_adjoint_rule_composes_resource_controls(self, capture_target):
         """Controls on an adjoint rule combine with controls already on its resources."""
 
         @register_resources({ControlledOp2(qp.S(Wire[1]), Wire[1]): 1})
@@ -2888,20 +2888,21 @@ class TestSymbolicRules:
 
         with local_decomps():
             add_decomps("Adjoint(NoParams)", adjoint_rule)
-            module = compile_registered_symbolic_rules(
-                "NoParams",
-                "NoParams{}{reg:2}{}",
-                {},
-                {"reg": 2},
-                {},
-                op_cls=NoParams,
-                modifiers=ModifierState(adjoint=True, control_count=1),
+            module = capture_target(
+                build_registered_decomp_target_spec(
+                    "NoParams",
+                    "NoParams{}{reg:2}{}",
+                    {},
+                    {"reg": 2},
+                    {},
+                    op_cls=NoParams,
+                    modifiers=ModifierState(adjoint=True, control_count=1),
+                )
             )
 
-        rules = get_rule_strings_from_module(module)
-        assert len(rules) == 1
-        rule = rules[0]
-        assert '"2C(S){}{wires:1}{}" = 1 : i64' in rule
+        mlir = str(module)
+        assert mlir.count("target_gate =") == 1
+        assert '"2C(S){}{wires:1}{}" = 1 : i64' in mlir
 
     def test_no_registered_symbolic_rules(self, capture_target):
         """Test an op with no symbolic rules registered against its adjoint yields no module."""
