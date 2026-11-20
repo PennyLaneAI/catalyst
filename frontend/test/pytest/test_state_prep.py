@@ -165,6 +165,7 @@ class Test2QubitStatePrep:
         assert np.allclose(result_obs, result_exp)
 
 
+@pytest.mark.old_frontend
 class TestTrotterProduct:
     """
     Test state prep and basis state when used with TrotterProduct.
@@ -187,7 +188,7 @@ class TestTrotterProduct:
             )
             return qp.probs(wires=[2])
 
-        assert np.allclose(circ(), qjit(circ)())
+        assert np.allclose(circ(), qjit(circ, capture=False)())
 
     def test_basis_state_trotter(self, backend):
         """
@@ -205,7 +206,7 @@ class TestTrotterProduct:
             )
             return qp.probs(wires=[2])
 
-        assert np.allclose(circ(), qjit(circ)())
+        assert np.allclose(circ(), qjit(circ, capture=False)())
 
 
 if __name__ == "__main__":

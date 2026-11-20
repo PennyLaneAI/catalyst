@@ -32,7 +32,7 @@ namespace catalyst::transport::memcpy {
 class CpuCoprocessorSession : public CoprocessorSession {
   public:
     explicit CpuCoprocessorSession(const std::string &config = {})
-        : pair_key_(parse_pair_key(config)) {}
+        : pair_key_(parse_pair_key(config)), worker_(common::frame::geometry_from_config(config)) {}
     ~CpuCoprocessorSession() override;
 
     // TransportSession
@@ -47,9 +47,6 @@ class CpuCoprocessorSession : public CoprocessorSession {
 
     // CoprocessorSession
     void set_coprocessor_fn(CoprocessorFn fn, void *ctx) override;
-
-    // Invoked inline from the controller's kick(). See MemcpyLink::ProcessMessage.
-    std::size_t process_message(const void *in, std::size_t in_len, void *out, std::size_t out_cap);
 
   private:
     std::string pair_key_;

@@ -12,9 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// RUN: catalyst --tool=opt --pass-pipeline='builtin.module(graph-decomposition{gate-set=C(Hadamard)=1.0 alt-decomps=C(U){}{wires:1}{}=ctrl_u})' %s | FileCheck %s --check-prefixes=ALL,CALL
+// RUN: catalyst --tool=opt --pass-pipeline='builtin.module(graph-decomposition{gate-set=C(Hadamard)=1.0})' %s | FileCheck %s --check-prefixes=ALL,CALL
 
-// RUN: catalyst --tool=opt --pass-pipeline='builtin.module(graph-decomposition{inline-rule-body gate-set=C(Hadamard)=1.0 alt-decomps=C(U){}{wires:1}{}=ctrl_u})' %s | FileCheck %s --check-prefixes=ALL,INLINE
+// RUN: catalyst --tool=opt --pass-pipeline='builtin.module(graph-decomposition{inline-rule-body gate-set=C(Hadamard)=1.0})' %s | FileCheck %s --check-prefixes=ALL,INLINE
 
 // ALL-LABEL: func.func @distribute_region(
 // ALL-SAME:  %[[Q:.*]]: !quantum.bit, %[[C:.*]]: !quantum.bit
@@ -35,8 +35,8 @@ func.func @distribute_region(%ctrl: !quantum.bit, %q: !quantum.bit) -> (!quantum
 // C(U) via distribution: reintroduce the control over the base decomposition of U (H; H).
 func.func private @ctrl_u(%q: !quantum.bit, %ctrl: !quantum.bit, %cv: i1)
     -> (!quantum.bit, !quantum.bit) attributes {
-    target_gate = "C(U){}{wires:1}{}",
-    resources = {operations = {"C(Hadamard){}{wires:1}{}" = 2 : i64}} } {
+    target_gate = "1C(U){}{wires:1}{}",
+    resources = {operations = {"1C(Hadamard){}{wires:1}{}" = 2 : i64}} } {
   %oc, %oq = quantum.ctrl(%ctrl) ctrlvals(%cv) (%q) : !quantum.bit -> !quantum.bit {
   ^bb0(%arg0: !quantum.bit):
     %a = quantum.custom "Hadamard"() %arg0 : !quantum.bit

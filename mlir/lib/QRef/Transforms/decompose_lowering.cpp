@@ -91,17 +91,7 @@ struct DecomposeLoweringPass : impl::DecomposeLoweringPassBase<DecomposeLowering
             }
 
             if (StringRef targetOp = DecompUtils::getTargetGateName(func); !targetOp.empty()) {
-                if (targetOp == "MultiRZ") {
-                    // Create a new target op name with the number of wires
-                    // for MultiRZ, since it has multiple decomposition functions
-                    // based on the number of target qubits
-                    std::string newTargetOpStr =
-                        targetOp.str() + "_" + std::to_string(DecompUtils::getNumWires(func));
-
-                    decompositionRegistry[newTargetOpStr] = func;
-                } else {
-                    decompositionRegistry[targetOp] = func;
-                }
+                decompositionRegistry[targetOp] = func;
             }
             // No need to walk into the function body
             return WalkResult::skip();
@@ -115,6 +105,9 @@ struct DecomposeLoweringPass : impl::DecomposeLoweringPassBase<DecomposeLowering
     // function with the `decomp_gateset` attribute
     void findTargetGateSet(ModuleOp module, llvm::StringSet<llvm::MallocAllocator> &targetGateSet) {
         module.walk([&](func::FuncOp func) {
+            if (func->hasAttr(DecompUtils::target_gate_attr_name)) {
+                return WalkResult::skip();
+            }
             if (auto gate_set_attr =
                     func->getAttrOfType<ArrayAttr>(DecompUtils::decomp_gateset_attr_name)) {
                 for (auto gate : gate_set_attr.getValue()) {

@@ -54,6 +54,7 @@ with Patcher(
     ),
 ):
     from mlir_quantum.dialects.qref import (
+        CtrlOp,
         CustomOp,
         GlobalPhaseOp,
         MultiRZOp,
@@ -201,11 +202,42 @@ def _qref_operator_p_lowering(jax_ctx: mlir.LoweringRuleContext, *args, op_cls, 
     ctx.allow_unregistered_dialects = True
     _general_validation(*args, op_cls=op_cls, **kwargs)
 
+    n_ctrl_work_wires = kwargs.get("n_ctrl_work_wires", 0)
+    if n_ctrl_work_wires:
+        # Use the same qref.ctrl representation as a controlled callable. The compiler therefore
+        # resolves both forms through one path and produces the same quantum.operator wire groups.
+        n_ctrls = kwargs["n_ctrls"]
+        work_qubits = args[-n_ctrl_work_wires:]
+        without_work = args[:-n_ctrl_work_wires]
+        ctrl_qubits = without_work[-2 * n_ctrls : -n_ctrls]
+        ctrl_values = [
+            TensorExtractOp(ir.IntegerType.get_signless(1), val, []).result
+            for val in without_work[-n_ctrls:]
+        ]
+        base_args = without_work[: -2 * n_ctrls]
+        op = CtrlOp(
+            ctrl_qubits=ctrl_qubits,
+            ctrl_values=ctrl_values,
+            work_qubits=work_qubits,
+            work_wire_type=ir.StringAttr.get(kwargs["ctrl_work_wire_type"]),
+        )
+        ctrl_block = op.regions[0].blocks.append()
+        with ir.InsertionPoint(ctrl_block):
+            _qref_operator_p_lowering(
+                jax_ctx,
+                *base_args,
+                op_cls=op_cls,
+                **(kwargs | {"n_ctrls": 0, "n_ctrl_work_wires": 0}),
+            )
+        return []
+
     hybrid_lens = kwargs.pop("hybrid_lens")
     hybrid_trees = kwargs.pop("hybrid_trees")
     forward_mask = kwargs.pop("forward_mask")
     adjoint = kwargs.pop("adjoint")
     n_ctrls = kwargs.pop("n_ctrls")
+    kwargs.pop("n_ctrl_work_wires", 0)
+    kwargs.pop("ctrl_work_wire_type", None)
     wire_lens = kwargs.pop("wire_lens")
 
     repack_static_data = {k: unflatten(*v) for k, v in kwargs.items()}

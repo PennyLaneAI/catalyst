@@ -15,18 +15,23 @@
 /**
  * @file DGSolver.hpp
  *
- * @brief This file defines the DecompositionSolver class, which implements the graph decomp
- * algorithm to find optimal decompositions of quantum operators based on a given decomp graph.
- * The solver uses a recursive approach with memoization to efficiently explore the decomposition
- * rules and find the best decomposition for each operator node in the graph. The result includes
- * the mapping from operator nodes to their chosen decomposition rules, as well as the list of
- * solved root nodes in the graph.
+ * @brief This file defines the DecompositionSolver class, which finds the cheapest decomposition
+ * of every operator in a decomposition graph down to a weighted target gateset.
+ *
+ * The decomposition graph is a directed hypergraph: operators are nodes, and each rule is a
+ * hyperedge from all of its input operators (each with a multiplicity) to its single output
+ * operator. A rule can only be used once every one of its inputs can be decomposed, and its cost is
+ * the multiplicity-weighted sum of its inputs' costs. Finding the cheapest decomposition is the
+ * shortest-hyperpath problem (equivalently, minimum-weight derivations in a weighted context-free
+ * grammar), which the solver handles with Knuth's generalization of Dijkstra's algorithm:
+ *
+ *   D. E. Knuth, "A generalization of Dijkstra's algorithm", Information Processing Letters 6(1),
+ *   1977.
+ *
  */
 
 #pragma once
 
-#include <unordered_map>
-#include <unordered_set>
 #include <vector>
 
 #include "DGBuilder.hpp"
@@ -34,6 +39,49 @@
 
 namespace DecompGraph::Solver {
 
+/**
+ * @brief Solves a decomposition graph for the cheapest rule of every reachable operator.
+ *
+ * Algorithm:
+ *   1. Collect every operator reachable from the root operators by following rule inputs. Target
+ *      gates are leaves: their own rules are never considered.
+ *   2. Seed a priority queue with every reachable target gate (at its gateset cost) and every
+ *      empty rule (at cost 0).
+ *   3. Repeatedly explore the cheapest unexplored operator. A rule becomes usable once all of its
+ *      inputs are explored, and offers its output the multiplicity-weighted sum of their costs.
+ *   4. Every root operator must end up explored; otherwise GraphSolverFailedError is thrown.
+ *
+ * Each operator's result is its unconditional optimum, so the solution does not depend on the order
+ * of the root operators or of the rules. Cyclic rules need no special handling: a rule waits until
+ * its inputs are finalized, and by then its output is either still open or already final at an
+ * equal or lower cost. Following each operator's chosen rule can never loop back to that operator,
+ * since a chosen rule's inputs are always finalized before its output. The solver runs in
+ * O((V + E) log V) for V reachable operators and E rule input terms.
+ *
+ * Limitations:
+ *   - Gateset costs must be non-negative (and not NaN); solve() throws GraphError otherwise. The
+ *     algorithm relies on a rule never costing less than any input it waits on, which a negative
+ *     cost would break.
+ *   - Rule inputs with multiplicity 0 are ignored: they contribute no cost and need not be
+ *     solvable, since the rule does not produce them.
+ *   - Costs are additive and context-free: an operator has one cost wherever it appears, and every
+ *     copy is costed independently. Anything whose cost depends on where an operator appears (e.g.
+ *     the number of work wires available to it, which combine as a maximum rather than a sum) is
+ * not modelled. Supporting it requires folding that context into the operator's identity (e.g. one
+ *     node per (operator, available work wires) pair), which keeps this algorithm exact at the cost
+ *     of more nodes. Costing shared structure once rather than per copy would make the problem
+ *     NP-hard (a Steiner problem on the hypergraph) and cannot be expressed here.
+ *   - Rules have no cost of their own; a rule's cost is exactly the cost of its inputs.
+ *   - Ties in total cost are broken deterministically, preferring an empty rule, then the rule that
+ *     comes first in `DecompositionGraph::getAllRulesFor`. A tied rule is only considered if it
+ *     becomes usable before its output is finalized, which can fail to happen when the tied rule
+ *     depends on an operator of exactly the same cost as its output (e.g. through zero-cost
+ *     inputs). The chosen cost is optimal either way; only which of the tied rules wins can differ.
+ *   - Target gates are always kept as basis gates, even when a rule could replace them more
+ * cheaply.
+ *   - The whole reachable graph is solved, not just the part needed by the roots, so that the
+ *     result covers every reachable solvable operator.
+ */
 class DecompositionSolver {
   public:
     /**
@@ -44,107 +92,50 @@ class DecompositionSolver {
     explicit DecompositionSolver(const DecompositionGraph &_graph) : graph(_graph) {}
 
     /**
-     * @brief Solves the graph decomposition problem for the given decomposition graph
-     * and returns the result.
+     * @brief Solves the decomposition graph and returns the chosen rule for every reachable
+     * operator that can reach the target gateset.
      *
-     * This method initiates the recursive solving process starting from the root operators
-     * in the decomposition graph. It uses memoization to store already solved operators
-     * and their chosen decomposition rules to avoid redundant computations. The result includes
-     * the mapping from operator nodes to their chosen decomposition rules, as well as the list
-     * of solved root nodes.
+     * Successful results are cached, so later calls return them without solving again.
+     * Failed attempts are retried from scratch and never return partial results.
      *
-     * @return Core::GraphResult The result of the graph decomposition, including the optimized
-     * mapping from operator nodes to their chosen decomposition rules and the list of solved
-     * root nodes.
+     * @throws GraphError if a gateset cost is negative or NaN.
+     * @throws GraphSolverFailedError if a root operator cannot reach the target gateset.
+     *
+     * @return Core::GraphResult The mapping from each solved operator to its chosen rule.
      */
     Core::GraphResult solve();
 
   private:
     const DecompositionGraph &graph;
 
-    std::unordered_map<Core::OperatorNode, Core::ChosenDecompRule, Core::OperatorNodeHash>
-        solvedMap{};
-    std::unordered_set<Core::OperatorNode, Core::OperatorNodeHash> visited{};
-    std::vector<Core::OperatorNode> solvingStack{};
-    std::unordered_set<Core::OperatorNode, Core::OperatorNodeHash> unsolvableOps{};
+    Core::GraphResult solvedMap{};
+    bool solveSucceeded{false};
 
     /**
-     * @brief basisRule constructs a ChosenDecompRule for a target gate operator,
-     * which is a valid decomposition rule that represents the operator itself as
-     * a basis gate in the target gateset.
-     *
-     * @param op The operator node to solve for.
-     * @return Core::ChosenDecompRule
+     * @brief Returns every operator reachable from the given operators by following rule inputs,
+     * in discovery order. Target gates are not expanded, and inputs with multiplicity 0 are not
+     * followed.
      */
-    Core::ChosenDecompRule basisRule(const Core::OperatorNode &op);
+    std::vector<Core::OperatorNode>
+    collectReachableOps(const std::vector<Core::OperatorNode> &roots) const;
 
     /**
-     * @brief Evaluates the given decomposition rule and returns the resulting chosen
-     * decomposition rule.
-     *
-     * This method recursively solves for the input operators of the given rule,
-     * calculates the total cost of the decomposition by summing the costs of the input
-     * operators according to the target gateset, and aggregates the basis gate counts
-     * from the input operators. If any of the input operators cannot be solved
-     * (i.e., they do not have a valid decomposition rule), this method returns
-     * an invalid ChosenDecompRule with an empty rule name.
-     *
-     * @param rule The decomposition rule to evaluate.
-     * @return Core::ChosenDecompRule The resulting chosen decomposition rule after evaluating
-     * the given rule.
+     * @brief Returns the basis solution for a target gate: the operator itself, at its gateset
+     * cost.
      */
-    Core::ChosenDecompRule evalRule(const Core::RuleNode &rule);
+    Core::ChosenDecompRule basisRule(const Core::OperatorNode &op) const;
 
     /**
-     * @brief Finds the best decomposition rule for the given operator node by evaluating
-     * all applicable rules and selecting the one with the lowest total cost.
-     *
-     * This method retrieves all decomposition rules that can decompose the given operator node
-     * from the decomposition graph, evaluates each rule using the evalRule method, and keeps
-     * track of the best valid rule (i.e., the one with the lowest total cost
-     * that can successfully decompose the operator). If no valid rules are found, this method
-     * returns an invalid ChosenDecompRule with an empty rule name.
-     *
-     * @param op The operator node to find the best decomposition rule for.
-     * @return Core::ChosenDecompRule The best chosen decomposition rule for the given operator
-     * node, or an invalid ChosenDecompRule if no valid rules are found.
+     * @brief Returns the solution given by applying the rule. Every input with a non-zero
+     * multiplicity must already be in solvedMap.
      */
-    Core::ChosenDecompRule bestRule(const Core::OperatorNode &op);
+    Core::ChosenDecompRule evalRule(const Core::RuleNode &rule) const;
 
     /**
-     * @brief Solves for the given operator node and returns the chosen decomposition rule.
-     *
-     * @param op The operator node to solve for.
-     * @return Core::ChosenDecompRule The chosen decomposition rule for the given operator node
-     * as determined by the graph solver. This includes whether the operator is a basis gate,
-     * the name of the chosen rule, the chosen input operators for the rule,
-     * the total cost of the decomposition, and the counts of basis gates
-     * used in the decomposition.
-     *
+     * @brief Throws GraphSolverFailedError for a root operator that could not be solved, listing
+     * its rules and the operators reachable from it that could not reach the gateset.
      */
-    Core::ChosenDecompRule solveOperator(const Core::OperatorNode &op);
-
-    /**
-     * @brief Returns an invalid ChosenDecompRule for the given operator node, which indicates
-     * that no valid decomposition rule could be found for the operator. This is used as a
-     * sentinel value to indicate failure in finding a valid decomposition rule during the solving
-     * process.
-     *
-     * @param op The operator node for which to return an invalid ChosenDecompRule.
-     * @return Core::ChosenDecompRule An invalid ChosenDecompRule.
-     */
-    [[nodiscard]] inline Core::ChosenDecompRule invalidRule(const Core::OperatorNode &op) {
-        return {op, false, "", {}, 0.0, {}};
-    }
-
-    /**
-     * @brief Checks if the given ChosenDecompRule is invalid, which is determined by whether the
-     * rule name is empty. An invalid ChosenDecompRule indicates that no valid decomposition rule
-     * could be found for the operator during the solving process.
-     */
-    [[nodiscard]] inline bool isInvalidRule(const Core::ChosenDecompRule &rule) const {
-        return rule.ruleName.empty();
-    }
+    [[noreturn]] void throwUnsolved(const Core::OperatorNode &root) const;
 };
 
 } // namespace DecompGraph::Solver

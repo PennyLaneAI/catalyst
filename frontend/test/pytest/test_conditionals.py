@@ -26,7 +26,6 @@ from pennylane import cond
 import catalyst
 from catalyst import api_extensions
 from catalyst import cond as catalyst_cond
-from catalyst import jax_primitives
 from catalyst import measure as catalyst_measure
 from catalyst import qjit
 from catalyst.api_extensions.control_flow import collect_estimated_probabilities
@@ -98,27 +97,29 @@ class TestCondToJaxpr:
         result = circuit.jaxpr
         assert asline(expected) == asline(result)
 
-    @pytest.mark.usefixtures("disable_capture")
     def test_single_estimated_probability(self):
         """Check the JAXPR of a simple conditional function that uses the
-        ``estimated_probability`` resource hint."""
-        # pylint: disable=line-too-long
+        ``branch-prob`` resource hint."""
 
         expected = dedent("""
             { lambda ; a:i64[]. let
                 b:bool[] = eq a 5:i64[]
                 c:i64[] = cond[
-                branch_jaxprs=[{ lambda ; a:i64[] b:i64[]. let c:i64[] = integer_pow[y=2] a in (c,) },
-                                { lambda ; a:i64[] b:i64[]. let c:i64[] = integer_pow[y=3] b in (c,) }]
-                estimated_probabilities=(0.2,)
-                num_implicit_outputs=0
+                args_slice=(3, None, None)
+                consts_slices=((1, 2, None), (2, 3, None))
+                estimated_probabilities=(0.2, 0.8)
+                jaxpr_branches=(
+                    { lambda d:i64[]; . let e:i64[] = integer_pow[y=2] d in (e,) }
+                    { lambda f:i64[]; . let g:i64[] = integer_pow[y=3] f in (g,) }
+                )
                 ] b a a
             in (c,) }
             """)
 
-        @qjit()
+        @qjit
         def circuit(n: int):
-            @catalyst_cond(n == 5, estimated_probability=0.2)
+            @qp.cond(n == 5)
+            @qp.hint({"branch-prob": 0.2})
             def cond_fn():
                 return n**2
 
@@ -137,11 +138,9 @@ class TestCondToJaxpr:
         result = circuit.jaxpr
         assert asline(expected) == asline(result)
 
-    @pytest.mark.usefixtures("disable_capture")
     def test_estimated_probability_with_else_ifs(self):
         """Check the JAXPR of a conditional function with else_ifs that uses the
-        ``estimated_probability`` resource hint."""
-        # pylint: disable=line-too-long
+        ``branch-prob`` resource hint."""
 
         expected = dedent("""
             { lambda ; a:i64[]. let
@@ -149,32 +148,39 @@ class TestCondToJaxpr:
                 c:bool[] = lt a 8:i64[]
                 d:bool[] = gt a 3:i64[]
                 e:i64[] = cond[
-                branch_jaxprs=[{ lambda ; a:i64[] b:i64[] c:i64[] d:i64[]. let e:i64[] = integer_pow[y=2] a in (e,) },
-                                { lambda ; a:i64[] b:i64[] c:i64[] d:i64[]. let e:i64[] = integer_pow[y=4] b in (e,) },
-                                { lambda ; a:i64[] b:i64[] c:i64[] d:i64[]. let e:i64[] = integer_pow[y=5] c in (e,) },
-                                { lambda ; a:i64[] b:i64[] c:i64[] d:i64[]. let e:i64[] = integer_pow[y=3] d in (e,) }]
-                estimated_probabilities=(0.2, 0.6, 0.1)
-                num_implicit_outputs=0
+                args_slice=(7, None, None)
+                consts_slices=((3, 4, None), (4, 5, None), (5, 6, None), (6, 7, None))
+                estimated_probabilities=(0.2, 0.6, 0.1, 0.1)
+                jaxpr_branches=(
+                    { lambda f:i64[]; . let g:i64[] = integer_pow[y=2] f in (g,) }
+                    { lambda h:i64[]; . let i:i64[] = integer_pow[y=4] h in (i,) }
+                    { lambda j:i64[]; . let k:i64[] = integer_pow[y=5] j in (k,) }
+                    { lambda l:i64[]; . let m:i64[] = integer_pow[y=3] l in (m,) }
+                )
                 ] b c d a a a a
             in (e,) }
             """)
 
-        @qjit()
+        @qjit
         def circuit(n: int):
-            @catalyst_cond(n == 5, estimated_probability=0.2)
+            @qp.cond(n == 5)
+            @qp.hint({"branch-prob": 0.2})
             def cond_fn():
                 return n**2
 
-            @cond_fn.else_if(n < 8, estimated_probability=0.6)
-            def cond_fn():
+            @cond_fn.else_if(n < 8)
+            @qp.hint({"branch-prob": 0.6})
+            def first_elif():
                 return n**4
 
-            @cond_fn.else_if(n > 3, estimated_probability=0.1)
-            def cond_fn():
+            @cond_fn.else_if(n > 3)
+            @qp.hint({"branch-prob": 0.1})
+            def second_elif():
                 return n**5
 
             @cond_fn.otherwise
-            def cond_fn():
+            @qp.hint({"branch-prob": 0.1})
+            def otherwise():
                 return n**3
 
             out = cond_fn()
@@ -190,8 +196,7 @@ class TestCondToJaxpr:
 
 
 class TestEstimatedProbabilityValidation:
-    """Validation of the ``estimated_probability`` resource hint, both at the level of the
-    shared ``collect_estimated_probabilities`` helper and through the ``cond`` public API."""
+    """Validate legacy probability collection and captured ``branch-prob`` handling."""
 
     def test_all_none_returns_none(self):
         """When no branch provides a hint, no probabilities are collected."""
@@ -217,79 +222,77 @@ class TestEstimatedProbabilityValidation:
         with pytest.raises(ValueError, match="must sum to at most 1"):
             collect_estimated_probabilities([0.6, 0.6])
 
-    @pytest.mark.usefixtures("disable_capture")
-    def test_partial_probabilities_raise_through_cond(self):
-        """The partial-probability error propagates through the ``cond`` API when only some
-        branches specify ``estimated_probability``."""
+    def test_partial_probabilities_fill_remainder_through_cond(self):
+        """Unhinted branches share the remaining probability through the ``cond`` API."""
 
         @qjit
-        def circuit(n):
-            @catalyst_cond(n == 5, estimated_probability=0.2)
+        def circuit(n: int):
+            @qp.cond(n == 5)
+            @qp.hint({"branch-prob": 0.2})
             def cond_fn():
                 return n**2
 
-            @cond_fn.else_if(n < 3)  # missing estimated_probability
-            def cond_fn():  # pylint: disable=function-redefined
+            @cond_fn.else_if(n < 3)
+            def elif_fn():
                 return n**3
 
             @cond_fn.otherwise
-            def cond_fn():  # pylint: disable=function-redefined
+            def otherwise():
                 return n
 
             return cond_fn()
 
-        with pytest.raises(ValueError, match="must be provided for every non-default branch"):
-            circuit(5)
+        [cond_eqn] = [eqn for eqn in circuit.jaxpr.eqns if eqn.primitive.name == "cond"]
+        assert cond_eqn.params["estimated_probabilities"] == pytest.approx((0.2, 0.4, 0.4))
+        assert circuit(5) == 25
+        assert circuit(2) == 8
+        assert circuit(4) == 4
 
-    @pytest.mark.usefixtures("disable_capture")
-    def test_probabilities_summing_above_one_raise_through_cond(self):
-        """The sum-to-one error propagates through the ``cond`` API."""
+    def test_probabilities_summing_above_one_are_clamped_through_cond(self):
+        """Conditional probabilities are clamped to one during captured ``cond`` lowering."""
 
-        @qjit
-        def circuit(n):
-            @catalyst_cond(n == 5, estimated_probability=0.7)
+        @qjit(target="mlir")
+        def circuit(n: int):
+            @qp.cond(n == 5)
+            @qp.hint({"branch-prob": 0.7})
             def cond_fn():
                 return n**2
 
-            @cond_fn.else_if(n < 3, estimated_probability=0.6)
-            def cond_fn():  # pylint: disable=function-redefined
+            @cond_fn.else_if(n < 3)
+            @qp.hint({"branch-prob": 0.6})
+            def elif_fn():
                 return n**3
 
             @cond_fn.otherwise
-            def cond_fn():  # pylint: disable=function-redefined
+            def otherwise():
                 return n
 
             return cond_fn()
 
-        with pytest.raises(ValueError, match="must sum to at most 1"):
-            circuit(5)
+        [cond_eqn] = [eqn for eqn in circuit.jaxpr.eqns if eqn.primitive.name == "cond"]
+        assert cond_eqn.params["estimated_probabilities"] == pytest.approx((0.7, 0.6, 0.0))
+        probabilities = re.findall(r"catalyst.estimated_probability = ([\d.e+-]+)", circuit.mlir)
+        assert sorted(float(probability) for probability in probabilities) == pytest.approx(
+            (0.7, 1.0)
+        )
 
 
 class TestCaptureCondEstimatedProbabilityLowering:
-    """Lowering of ``estimated_probability`` hints through the program-capture ``cond`` path."""
+    """Lowering of ``branch-prob`` hints through the program-capture ``cond`` path."""
 
-    @pytest.mark.usefixtures("disable_capture")
-    def test_pl_cond_lowering_attaches_probabilities(self, monkeypatch):
-        """The captured-``cond`` lowering annotates each nested ``scf.if`` with a
-        ``catalyst.estimated_probability`` attribute when conditional probabilities are available.
+    def test_pl_cond_lowering_attaches_probabilities(self):
+        """Captured hints annotate each nested ``scf.if`` with a conditional probability."""
 
-        The probabilities are not yet propagated through the program-capture pipeline, so the
-        conditional probabilities that the lowering would receive are injected by patching the
-        conversion helper, until we can actually pass the estimated probabilities in
-        through the PennyLane frontend.
-        """
-        # Monkeypatch with some static estimated probabilities
-        monkeypatch.setattr(
-            jax_primitives,
-            "unconditional_to_conditional_if_probs",
-            lambda _: (0.5, 0.25, 0.1),
-        )
-
-        @qjit(capture=True, target="mlir")
+        @qjit(target="mlir")
         @qp.qnode(qp.device("lightning.qubit", wires=1))
         def circuit(n: int):
             # if (n <= 5) -> X, elif (n <= 8) -> Y, else -> H : two nested scf.if ops
-            qp.cond(n <= 5, qp.X, qp.Hadamard, ((n <= 8, qp.Y),))(wires=0)
+            qp.cond(
+                n <= 5,
+                qp.hint(qp.X, {"branch-prob": 0.5}),
+                qp.Hadamard,
+                ((n <= 8, qp.hint(qp.Y, {"branch-prob": 0.125})),),
+            )(wires=0)
             return qp.probs()
 
         mlir_module = circuit.mlir
@@ -1379,7 +1382,7 @@ class TestStaticConditionalFolding:
 
         @qjit(target="mlir")
         def circuit():
-            @catalyst_cond(predicate)
+            @qp.cond(predicate)
             def branch():
                 return 1
 
@@ -1391,11 +1394,12 @@ class TestStaticConditionalFolding:
 
         assert "cond" not in [eqn.primitive.name for eqn in circuit.jaxpr.eqns]
 
+    @pytest.mark.old_frontend
     def test_static_conditional_not_folded_when_disabled(self):
         """Disabling the toggle keeps the cond primitive even for a constant predicate."""
         catalyst.compile_without_static_conditionals = False
 
-        @qjit(target="mlir")
+        @qjit(target="mlir", capture=False)
         def circuit():
             @catalyst_cond(True)
             def branch():
@@ -1414,7 +1418,7 @@ class TestStaticConditionalFolding:
 
         @qjit(target="mlir")
         def circuit(n: int):
-            @catalyst_cond(n == 5)
+            @qp.cond(n == 5)
             def branch():
                 return n**2
 

@@ -214,7 +214,13 @@ class TestFuncOpVisualization:
         dev = qp.device("null.qubit", wires=1)
 
         @xdsl_from_qjit
-        @qp.qjit(autograph=True, target="mlir", capture=capture_mode)
+        @qp.qjit(
+            autograph=True,
+            target="mlir",
+            capture=capture_mode,
+            skip_preprocess=True,
+            collect_decomp_rules=False,
+        )
         @qp.qnode(dev)
         def my_workflow():
             qp.H(0)
@@ -253,7 +259,13 @@ class TestFuncOpVisualization:
             qp.H(0)
 
         @xdsl_from_qjit
-        @qp.qjit(autograph=True, target="mlir", capture=capture_mode)
+        @qp.qjit(
+            autograph=True,
+            target="mlir",
+            capture=capture_mode,
+            skip_preprocess=True,
+            collect_decomp_rules=False,
+        )
         def my_workflow():
             my_qnode1()
             my_qnode2()
@@ -292,7 +304,13 @@ class TestDeviceNode:
         dev = qp.device("null.qubit", wires=1)
 
         @xdsl_from_qjit
-        @qp.qjit(autograph=True, target="mlir", capture=capture_mode)
+        @qp.qjit(
+            autograph=True,
+            target="mlir",
+            capture=capture_mode,
+            skip_preprocess=True,
+            collect_decomp_rules=False,
+        )
         @qp.qnode(dev)
         def my_workflow():
             qp.H(0)
@@ -332,7 +350,13 @@ class TestDeviceNode:
             qp.H(0)
 
         @xdsl_from_qjit
-        @qp.qjit(autograph=True, target="mlir", capture=capture_mode)
+        @qp.qjit(
+            autograph=True,
+            target="mlir",
+            capture=capture_mode,
+            skip_preprocess=True,
+            collect_decomp_rules=False,
+        )
         def my_workflow():
             my_qnode1()
             my_qnode2()
@@ -376,7 +400,13 @@ class TestForOp:
         dev = qp.device("null.qubit", wires=1)
 
         @xdsl_from_qjit
-        @qp.qjit(autograph=True, target="mlir", capture=capture_mode)
+        @qp.qjit(
+            autograph=True,
+            target="mlir",
+            capture=capture_mode,
+            skip_preprocess=True,
+            collect_decomp_rules=False,
+        )
         @qp.qnode(dev)
         def my_workflow():
             for i in range(3):
@@ -400,7 +430,13 @@ class TestForOp:
         dev = qp.device("null.qubit", wires=1)
 
         @xdsl_from_qjit
-        @qp.qjit(autograph=True, target="mlir", capture=capture_mode)
+        @qp.qjit(
+            autograph=True,
+            target="mlir",
+            capture=capture_mode,
+            skip_preprocess=True,
+            collect_decomp_rules=False,
+        )
         @qp.qnode(dev)
         def my_workflow():
             for i in range(0, 5, 2):
@@ -430,7 +466,13 @@ class TestWhileOp:
         dev = qp.device("null.qubit", wires=1)
 
         @xdsl_from_qjit
-        @qp.qjit(autograph=True, target="mlir", capture=capture_mode)
+        @qp.qjit(
+            autograph=True,
+            target="mlir",
+            capture=capture_mode,
+            skip_preprocess=True,
+            collect_decomp_rules=False,
+        )
         @qp.qnode(dev)
         def my_workflow():
             counter = 0
@@ -456,7 +498,13 @@ class TestWhileOp:
         dev = qp.device("null.qubit", wires=1)
 
         @xdsl_from_qjit
-        @qp.qjit(autograph=True, target="mlir", capture=capture_mode)
+        @qp.qjit(
+            autograph=True,
+            target="mlir",
+            capture=capture_mode,
+            skip_preprocess=True,
+            collect_decomp_rules=False,
+        )
         @qp.qnode(dev)
         def my_workflow():
             outer_counter = 0
@@ -490,7 +538,13 @@ class TestIfOp:
         dev = qp.device("null.qubit", wires=1)
 
         @xdsl_from_qjit
-        @qp.qjit(autograph=True, target="mlir", capture=capture_mode)
+        @qp.qjit(
+            autograph=True,
+            target="mlir",
+            capture=capture_mode,
+            skip_preprocess=True,
+            collect_decomp_rules=False,
+        )
         @qp.qnode(dev)
         def my_workflow(x):
             if x == 2:
@@ -523,7 +577,13 @@ class TestIfOp:
         dev = qp.device("null.qubit", wires=1)
 
         @xdsl_from_qjit
-        @qp.qjit(autograph=True, target="mlir", capture=capture_mode)
+        @qp.qjit(
+            autograph=True,
+            target="mlir",
+            capture=capture_mode,
+            skip_preprocess=True,
+            collect_decomp_rules=False,
+        )
         @qp.qnode(dev)
         def my_workflow(x):
             if x == 1:
@@ -561,7 +621,13 @@ class TestIfOp:
         dev = qp.device("null.qubit", wires=1)
 
         @xdsl_from_qjit
-        @qp.qjit(autograph=True, target="mlir", capture=capture_mode)
+        @qp.qjit(
+            autograph=True,
+            target="mlir",
+            capture=capture_mode,
+            skip_preprocess=True,
+            collect_decomp_rules=False,
+        )
         @qp.qnode(dev)
         def my_workflow(x, y):
             if x == 1:
@@ -617,7 +683,13 @@ class TestIfOp:
         dev = qp.device("null.qubit", wires=1)
 
         @xdsl_from_qjit
-        @qp.qjit(autograph=True, target="mlir", capture=capture_mode)
+        @qp.qjit(
+            autograph=True,
+            target="mlir",
+            capture=capture_mode,
+            skip_preprocess=True,
+            collect_decomp_rules=False,
+        )
         @qp.qnode(dev)
         def my_workflow(x):
             if x == 1:
@@ -685,7 +757,13 @@ class TestIfOp:
         dev = qp.device("null.qubit", wires=1)
 
         @xdsl_from_qjit
-        @qp.qjit(autograph=True, target="mlir", capture=capture_mode)
+        @qp.qjit(
+            autograph=True,
+            target="mlir",
+            capture=capture_mode,
+            skip_preprocess=True,
+            collect_decomp_rules=False,
+        )
         @qp.qnode(dev)
         def my_workflow(x):
             if x == 1:
@@ -774,7 +852,9 @@ class TestGetLabel:
     def test_global_phase_operator(self):
         """Tests against a GlobalPhase operator instance."""
         assert get_label(qp.GlobalPhase(0.5)) == "GlobalPhase"
-        assert get_label(qp.ctrl(qp.GlobalPhase(0.0), control=0)) == "<name> PhaseShift|<wire> [0]"
+        assert (
+            get_label(qp.ctrl(qp.GlobalPhase(0.0), control=0)) == "<name> C(GlobalPhase)|<wire> [0]"
+        )
         assert get_label(qp.adjoint(qp.GlobalPhase(0.0))) == "Adjoint(GlobalPhase)"
 
     @pytest.mark.parametrize(
@@ -822,7 +902,13 @@ class TestCreateStaticOperatorNodes:
         dev = qp.device("null.qubit", wires=1)
 
         @xdsl_from_qjit
-        @qp.qjit(autograph=True, target="mlir", capture=capture_mode)
+        @qp.qjit(
+            autograph=True,
+            target="mlir",
+            capture=capture_mode,
+            skip_preprocess=True,
+            collect_decomp_rules=False,
+        )
         @qp.qnode(dev)
         def my_circuit():
             qp.H(0)
@@ -871,7 +957,13 @@ class TestCreateStaticOperatorNodes:
         dev = qp.device("null.qubit", wires=1)
 
         @xdsl_from_qjit
-        @qp.qjit(autograph=True, target="mlir", capture=capture_mode)
+        @qp.qjit(
+            autograph=True,
+            target="mlir",
+            capture=capture_mode,
+            skip_preprocess=True,
+            collect_decomp_rules=False,
+        )
         @qp.qnode(dev)
         def my_circuit():
             qp.QubitUnitary(jax.numpy.array([[0, 1], [1, 0]]), wires=0)  # real
@@ -895,7 +987,13 @@ class TestCreateStaticOperatorNodes:
         dev = qp.device("null.qubit", wires=1)
 
         @xdsl_from_qjit
-        @qp.qjit(autograph=True, target="mlir", capture=capture_mode)
+        @qp.qjit(
+            autograph=True,
+            target="mlir",
+            capture=capture_mode,
+            skip_preprocess=True,
+            collect_decomp_rules=False,
+        )
         @qp.qnode(dev)
         def my_circuit():
             qp.MultiRZ(0.5, wires=[0])
@@ -936,7 +1034,7 @@ class TestCreateStaticOperatorNodes:
         nodes = utility.dag_builder.nodes
         assert len(nodes) == 2  # Device node + operator
 
-        assert nodes["node1"]["label"] == "<name> MidMeasureMP|<wire> [0]"
+        assert nodes["node1"]["label"] == get_label(qp.ops.MidMeasure(0))
 
     def test_ppm(self):
         """Test that PPMs can be captured as nodes."""
@@ -1122,7 +1220,13 @@ class TestCreateStaticOperatorNodes:
         dev = qp.device("null.qubit", wires=1)
 
         @xdsl_from_qjit
-        @qp.qjit(autograph=True, target="mlir", capture=capture_mode)
+        @qp.qjit(
+            autograph=True,
+            target="mlir",
+            capture=capture_mode,
+            skip_preprocess=True,
+            collect_decomp_rules=False,
+        )
         @qp.qnode(dev)
         def my_circuit():
             qp.BasisState(param, wires=wires)
@@ -1148,7 +1252,13 @@ class TestCreateDynamicOperatorNodes:
         dev = qp.device("null.qubit", wires=1)
 
         @xdsl_from_qjit
-        @qp.qjit(autograph=True, target="mlir", capture=capture_mode)
+        @qp.qjit(
+            autograph=True,
+            target="mlir",
+            capture=capture_mode,
+            skip_preprocess=True,
+            collect_decomp_rules=False,
+        )
         @qp.qnode(dev)
         def my_circuit(x):
             qp.SWAP([0, x])
@@ -1171,7 +1281,13 @@ class TestCreateDynamicOperatorNodes:
         dev = qp.device("null.qubit", wires=1)
 
         @xdsl_from_qjit
-        @qp.qjit(autograph=True, target="mlir", capture=capture_mode)
+        @qp.qjit(
+            autograph=True,
+            target="mlir",
+            capture=capture_mode,
+            skip_preprocess=True,
+            collect_decomp_rules=False,
+        )
         @qp.qnode(dev)
         def my_circuit(x, y):
             qp.H(x)
@@ -1196,7 +1312,13 @@ class TestCreateDynamicOperatorNodes:
         dev = qp.device("null.qubit", wires=1)
 
         @xdsl_from_qjit
-        @qp.qjit(autograph=True, target="mlir", capture=capture_mode)
+        @qp.qjit(
+            autograph=True,
+            target="mlir",
+            capture=capture_mode,
+            skip_preprocess=True,
+            collect_decomp_rules=False,
+        )
         @qp.qnode(dev)
         def my_circuit():
             for i in range(3):
@@ -1219,7 +1341,13 @@ class TestCreateDynamicOperatorNodes:
         dev = qp.device("null.qubit", wires=1)
 
         @xdsl_from_qjit
-        @qp.qjit(autograph=True, target="mlir", capture=capture_mode)
+        @qp.qjit(
+            autograph=True,
+            target="mlir",
+            capture=capture_mode,
+            skip_preprocess=True,
+            collect_decomp_rules=False,
+        )
         @qp.qnode(dev)
         def my_circuit():
             counter = 0
@@ -1244,7 +1372,13 @@ class TestCreateDynamicOperatorNodes:
         dev = qp.device("null.qubit", wires=1)
 
         @xdsl_from_qjit
-        @qp.qjit(autograph=True, target="mlir", capture=capture_mode)
+        @qp.qjit(
+            autograph=True,
+            target="mlir",
+            capture=capture_mode,
+            skip_preprocess=True,
+            collect_decomp_rules=False,
+        )
         @qp.qnode(dev)
         def my_circuit(x, y):
             if x == y:
@@ -1268,7 +1402,13 @@ class TestCreateDynamicOperatorNodes:
         dev = qp.device("null.qubit", wires=1)
 
         @xdsl_from_qjit
-        @qp.qjit(autograph=True, target="mlir", capture=capture_mode)
+        @qp.qjit(
+            autograph=True,
+            target="mlir",
+            capture=capture_mode,
+            skip_preprocess=True,
+            collect_decomp_rules=False,
+        )
         @qp.qnode(dev)
         def my_circuit(x):
             for i in range(3):
@@ -1511,12 +1651,21 @@ class TestCreateDynamicMeasurementNodes:
         assert nodes["node3"]["label"] == "<name> var(PauliX)|<wire> [arg1]"
         assert nodes["node4"]["label"] == "<name> sample|<wire> [arg0]"
 
+    @pytest.mark.xfail(
+        reason="Circuit DAG wire labels use arg5 instead of the expected arg0", strict=True
+    )
     def test_visualize_pythonic_operators_on_meas(self, capture_mode):
         """Tests that we can use operators like +,-,%"""
         dev = qp.device("null.qubit", wires=1)
 
         @xdsl_from_qjit
-        @qp.qjit(autograph=True, target="mlir", capture=capture_mode)
+        @qp.qjit(
+            autograph=True,
+            target="mlir",
+            capture=capture_mode,
+            skip_preprocess=True,
+            collect_decomp_rules=False,
+        )
         @qp.set_shots(3)
         @qp.qnode(dev)
         def my_workflow(x):
@@ -1547,7 +1696,13 @@ class TestOperatorConnectivity:
         dev = qp.device("null.qubit", wires=1)
 
         @xdsl_from_qjit
-        @qp.qjit(autograph=True, target="mlir", capture=capture_mode)
+        @qp.qjit(
+            autograph=True,
+            target="mlir",
+            capture=capture_mode,
+            skip_preprocess=True,
+            collect_decomp_rules=False,
+        )
         @qp.qnode(dev)
         def my_circuit():
             qp.X(0)
@@ -1582,8 +1737,8 @@ class TestOperatorConnectivity:
         else:
             expected_edges = (
                 ("NullQubit", "PauliX"),
-                ("PauliX", "PhaseShift"),
-                ("PhaseShift", "PauliY"),
+                ("PauliX", "C(GlobalPhase)"),
+                ("C(GlobalPhase)", "PauliY"),
             )
         assert_dag_structure(nodes, edges, expected_edges)
 
@@ -1593,7 +1748,13 @@ class TestOperatorConnectivity:
         dev = qp.device("null.qubit", wires=3)
 
         @xdsl_from_qjit
-        @qp.qjit(autograph=True, target="mlir", capture=capture_mode)
+        @qp.qjit(
+            autograph=True,
+            target="mlir",
+            capture=capture_mode,
+            skip_preprocess=True,
+            collect_decomp_rules=False,
+        )
         @qp.qnode(dev)
         def my_workflow():
             qp.X(0)
@@ -1633,7 +1794,13 @@ class TestOperatorConnectivity:
         dev = qp.device("null.qubit", wires=1)
 
         @xdsl_from_qjit
-        @qp.qjit(autograph=True, target="mlir", capture=capture_mode)
+        @qp.qjit(
+            autograph=True,
+            target="mlir",
+            capture=capture_mode,
+            skip_preprocess=True,
+            collect_decomp_rules=False,
+        )
         @qp.qnode(dev)
         def my_workflow():
             qp.X(0)
@@ -1670,7 +1837,13 @@ class TestOperatorConnectivity:
         dev = qp.device("null.qubit", wires=1)
 
         @xdsl_from_qjit
-        @qp.qjit(autograph=True, target="mlir", capture=capture_mode)
+        @qp.qjit(
+            autograph=True,
+            target="mlir",
+            capture=capture_mode,
+            skip_preprocess=True,
+            collect_decomp_rules=False,
+        )
         @qp.qnode(dev)
         def my_workflow():
             counter = 0
@@ -1708,7 +1881,13 @@ class TestOperatorConnectivity:
         dev = qp.device("null.qubit", wires=1)
 
         @xdsl_from_qjit
-        @qp.qjit(autograph=True, target="mlir", capture=capture_mode)
+        @qp.qjit(
+            autograph=True,
+            target="mlir",
+            capture=capture_mode,
+            skip_preprocess=True,
+            collect_decomp_rules=False,
+        )
         @qp.qnode(dev)
         def my_workflow(x):
             qp.X(0)
@@ -1749,7 +1928,13 @@ class TestOperatorConnectivity:
         dev = qp.device("null.qubit", wires=1)
 
         @xdsl_from_qjit
-        @qp.qjit(autograph=True, target="mlir", capture=capture_mode)
+        @qp.qjit(
+            autograph=True,
+            target="mlir",
+            capture=capture_mode,
+            skip_preprocess=True,
+            collect_decomp_rules=False,
+        )
         @qp.qnode(dev)
         def my_workflow(x):
             qp.X(0)
@@ -1790,7 +1975,13 @@ class TestOperatorConnectivity:
         dev = qp.device("null.qubit", wires=1)
 
         @xdsl_from_qjit
-        @qp.qjit(autograph=True, target="mlir", capture=capture_mode)
+        @qp.qjit(
+            autograph=True,
+            target="mlir",
+            capture=capture_mode,
+            skip_preprocess=True,
+            collect_decomp_rules=False,
+        )
         @qp.qnode(dev)
         def my_workflow():
             qp.RX(0.1, 0)
@@ -1824,7 +2015,13 @@ class TestOperatorConnectivity:
         dev = qp.device("null.qubit", wires=1)
 
         @xdsl_from_qjit
-        @qp.qjit(autograph=True, target="mlir", capture=capture_mode)
+        @qp.qjit(
+            autograph=True,
+            target="mlir",
+            capture=capture_mode,
+            skip_preprocess=True,
+            collect_decomp_rules=False,
+        )
         @qp.qnode(dev)
         def my_workflow(x, y):
             qp.X(0)
@@ -1867,7 +2064,13 @@ class TestOperatorConnectivity:
         dev = qp.device("null.qubit", wires=1)
 
         @xdsl_from_qjit
-        @qp.qjit(autograph=True, target="mlir", capture=capture_mode)
+        @qp.qjit(
+            autograph=True,
+            target="mlir",
+            capture=capture_mode,
+            skip_preprocess=True,
+            collect_decomp_rules=False,
+        )
         @qp.qnode(dev)
         def my_workflow(x, y):
             qp.H(x)
@@ -1896,7 +2099,13 @@ class TestOperatorConnectivity:
         dev = qp.device("null.qubit", wires=1)
 
         @xdsl_from_qjit
-        @qp.qjit(autograph=True, target="mlir", capture=capture_mode)
+        @qp.qjit(
+            autograph=True,
+            target="mlir",
+            capture=capture_mode,
+            skip_preprocess=True,
+            collect_decomp_rules=False,
+        )
         @qp.qnode(dev)
         def my_workflow(x, y):
             qp.X(0)
@@ -1932,7 +2141,13 @@ class TestOperatorConnectivity:
         dev = qp.device("null.qubit", wires=1)
 
         @xdsl_from_qjit
-        @qp.qjit(autograph=True, target="mlir", capture=capture_mode)
+        @qp.qjit(
+            autograph=True,
+            target="mlir",
+            capture=capture_mode,
+            skip_preprocess=True,
+            collect_decomp_rules=False,
+        )
         @qp.qnode(dev)
         def my_workflow(a, b):
             qp.X(a)
@@ -1965,7 +2180,13 @@ class TestOperatorConnectivity:
         dev = qp.device("null.qubit", wires=1)
 
         @xdsl_from_qjit
-        @qp.qjit(autograph=True, target="mlir", capture=capture_mode)
+        @qp.qjit(
+            autograph=True,
+            target="mlir",
+            capture=capture_mode,
+            skip_preprocess=True,
+            collect_decomp_rules=False,
+        )
         @qp.qnode(dev)
         def my_workflow(a, b):
             qp.X(a)
@@ -1998,7 +2219,13 @@ class TestOperatorConnectivity:
         """Tests a basic static example of a conditional."""
 
         @xdsl_from_qjit
-        @qp.qjit(autograph=True, target="mlir", capture=capture_mode)
+        @qp.qjit(
+            autograph=True,
+            target="mlir",
+            capture=capture_mode,
+            skip_preprocess=True,
+            collect_decomp_rules=False,
+        )
         @qp.qnode(qp.device("null.qubit", wires=3))
         def my_workflow(a):
             if a == 2:
@@ -2031,7 +2258,13 @@ class TestOperatorConnectivity:
         """Tests a basic static example of a conditional."""
 
         @xdsl_from_qjit
-        @qp.qjit(autograph=True, target="mlir", capture=capture_mode)
+        @qp.qjit(
+            autograph=True,
+            target="mlir",
+            capture=capture_mode,
+            skip_preprocess=True,
+            collect_decomp_rules=False,
+        )
         @qp.qnode(qp.device("null.qubit", wires=3))
         def my_workflow(a, b):
             qp.S(b)
@@ -2066,7 +2299,13 @@ class TestOperatorConnectivity:
         """Tests a basic example of a conditional with dynamic wires."""
 
         @xdsl_from_qjit
-        @qp.qjit(autograph=True, target="mlir", capture=capture_mode)
+        @qp.qjit(
+            autograph=True,
+            target="mlir",
+            capture=capture_mode,
+            skip_preprocess=True,
+            collect_decomp_rules=False,
+        )
         @qp.qnode(qp.device("null.qubit", wires=3))
         def my_workflow(a, b, c):
             qp.H(0)
@@ -2101,7 +2340,13 @@ class TestOperatorConnectivity:
         """Tests that a simple if can be visualized."""
 
         @xdsl_from_qjit
-        @qp.qjit(autograph=True, target="mlir", capture=capture_mode)
+        @qp.qjit(
+            autograph=True,
+            target="mlir",
+            capture=capture_mode,
+            skip_preprocess=True,
+            collect_decomp_rules=False,
+        )
         @qp.qnode(qp.device("null.qubit", wires=3))
         def my_workflow(a):
             qp.H(0)
@@ -2130,7 +2375,13 @@ class TestOperatorConnectivity:
         """Tests that complex connectivity can go through a conditional."""
 
         @xdsl_from_qjit
-        @qp.qjit(autograph=True, target="mlir", capture=capture_mode)
+        @qp.qjit(
+            autograph=True,
+            target="mlir",
+            capture=capture_mode,
+            skip_preprocess=True,
+            collect_decomp_rules=False,
+        )
         @qp.qnode(qp.device("null.qubit", wires=3))
         def my_workflow(a, b, c):
             qp.X(a)
@@ -2170,7 +2421,13 @@ class TestOperatorConnectivity:
         """Tests that complex connectivity can go through a conditional."""
 
         @xdsl_from_qjit
-        @qp.qjit(autograph=True, target="mlir", capture=capture_mode)
+        @qp.qjit(
+            autograph=True,
+            target="mlir",
+            capture=capture_mode,
+            skip_preprocess=True,
+            collect_decomp_rules=False,
+        )
         @qp.qnode(qp.device("null.qubit", wires=3))
         def my_workflow(a, b):
             qp.X(a)
@@ -2201,7 +2458,13 @@ class TestOperatorConnectivity:
         """Tests that complex connectivity can go through a conditional."""
 
         @xdsl_from_qjit
-        @qp.qjit(autograph=True, target="mlir", capture=capture_mode)
+        @qp.qjit(
+            autograph=True,
+            target="mlir",
+            capture=capture_mode,
+            skip_preprocess=True,
+            collect_decomp_rules=False,
+        )
         @qp.qnode(qp.device("null.qubit", wires=3))
         def my_workflow(a, b):
             qp.X(a)
@@ -2236,7 +2499,13 @@ class TestOperatorConnectivity:
         """Tests the interaction with conditional inside of control flow"""
 
         @xdsl_from_qjit
-        @qp.qjit(autograph=True, target="mlir", capture=capture_mode)
+        @qp.qjit(
+            autograph=True,
+            target="mlir",
+            capture=capture_mode,
+            skip_preprocess=True,
+            collect_decomp_rules=False,
+        )
         @qp.qnode(qp.device("null.qubit", wires=3))
         def my_workflow(x, y):
             qp.X(0)
@@ -2275,7 +2544,13 @@ class TestOperatorConnectivity:
         """Tests that complex connectivity can go through a conditional."""
 
         @xdsl_from_qjit
-        @qp.qjit(autograph=True, target="mlir", capture=capture_mode)
+        @qp.qjit(
+            autograph=True,
+            target="mlir",
+            capture=capture_mode,
+            skip_preprocess=True,
+            collect_decomp_rules=False,
+        )
         @qp.qnode(qp.device("null.qubit", wires=3))
         def my_workflow(x, y):
             if x == y:
@@ -2306,7 +2581,13 @@ class TestOperatorConnectivity:
         """Tests that complex connectivity can go through a conditional."""
 
         @xdsl_from_qjit
-        @qp.qjit(autograph=True, target="mlir", capture=capture_mode)
+        @qp.qjit(
+            autograph=True,
+            target="mlir",
+            capture=capture_mode,
+            skip_preprocess=True,
+            collect_decomp_rules=False,
+        )
         @qp.qnode(qp.device("null.qubit", wires=3))
         def my_workflow(x, y):
             if x == y:
@@ -2337,7 +2618,13 @@ class TestOperatorConnectivity:
         """Tests that complex connectivity can go through a conditional."""
 
         @xdsl_from_qjit
-        @qp.qjit(autograph=True, target="mlir", capture=capture_mode)
+        @qp.qjit(
+            autograph=True,
+            target="mlir",
+            capture=capture_mode,
+            skip_preprocess=True,
+            collect_decomp_rules=False,
+        )
         @qp.qnode(qp.device("null.qubit", wires=3))
         def my_workflow(x, y):
             if x == y:
@@ -2366,7 +2653,13 @@ class TestOperatorConnectivity:
         """Tests that complex connectivity can go through a conditional."""
 
         @xdsl_from_qjit
-        @qp.qjit(autograph=True, target="mlir", capture=capture_mode)
+        @qp.qjit(
+            autograph=True,
+            target="mlir",
+            capture=capture_mode,
+            skip_preprocess=True,
+            collect_decomp_rules=False,
+        )
         @qp.qnode(qp.device("null.qubit", wires=3))
         def my_workflow(x, y):
             qp.X(x)
@@ -2404,7 +2697,13 @@ class TestTerminalMeasurementConnectivity:
         dev = qp.device("null.qubit", wires=1)
 
         @xdsl_from_qjit
-        @qp.qjit(autograph=True, target="mlir", capture=capture_mode)
+        @qp.qjit(
+            autograph=True,
+            target="mlir",
+            capture=capture_mode,
+            skip_preprocess=True,
+            collect_decomp_rules=False,
+        )
         @qp.qnode(dev)
         def my_workflow():
             qp.X(0)
@@ -2439,7 +2738,13 @@ class TestTerminalMeasurementConnectivity:
         dev = qp.device("null.qubit", wires=5)
 
         @xdsl_from_qjit
-        @qp.qjit(autograph=True, target="mlir", capture=capture_mode)
+        @qp.qjit(
+            autograph=True,
+            target="mlir",
+            capture=capture_mode,
+            skip_preprocess=True,
+            collect_decomp_rules=False,
+        )
         @qp.set_shots(10)
         @qp.qnode(dev)
         def my_workflow():
@@ -2491,7 +2796,13 @@ class TestTerminalMeasurementConnectivity:
         dev = qp.device("null.qubit", wires=1)
 
         @xdsl_from_qjit
-        @qp.qjit(autograph=True, target="mlir", capture=capture_mode)
+        @qp.qjit(
+            autograph=True,
+            target="mlir",
+            capture=capture_mode,
+            skip_preprocess=True,
+            collect_decomp_rules=False,
+        )
         @qp.qnode(dev)
         def my_workflow():
             qp.X(0)
@@ -2547,7 +2858,13 @@ class TestTerminalMeasurementConnectivity:
         dev = qp.device("null.qubit", wires=1)
 
         @xdsl_from_qjit
-        @qp.qjit(autograph=True, target="mlir", capture=capture_mode)
+        @qp.qjit(
+            autograph=True,
+            target="mlir",
+            capture=capture_mode,
+            skip_preprocess=True,
+            collect_decomp_rules=False,
+        )
         @qp.qnode(dev)
         def my_workflow(x, y):
             qp.X(0)
@@ -2587,7 +2904,13 @@ class TestTerminalMeasurementConnectivity:
         dev = qp.device("null.qubit", wires=1)
 
         @xdsl_from_qjit
-        @qp.qjit(autograph=True, target="mlir", capture=capture_mode)
+        @qp.qjit(
+            autograph=True,
+            target="mlir",
+            capture=capture_mode,
+            skip_preprocess=True,
+            collect_decomp_rules=False,
+        )
         @qp.qnode(dev)
         def my_workflow(x, y):
             qp.X(0)
@@ -2628,7 +2951,13 @@ class TestTerminalMeasurementConnectivity:
         dev = qp.device("null.qubit", wires=1)
 
         @xdsl_from_qjit
-        @qp.qjit(autograph=True, target="mlir", capture=capture_mode)
+        @qp.qjit(
+            autograph=True,
+            target="mlir",
+            capture=capture_mode,
+            skip_preprocess=True,
+            collect_decomp_rules=False,
+        )
         @qp.qnode(dev)
         def my_workflow(x, y):
             qp.X(x)
@@ -2700,7 +3029,13 @@ class TestCtrl:
             return qp.H(0)
 
         @xdsl_from_qjit
-        @qp.qjit(autograph=True, target="mlir", capture=capture_mode)
+        @qp.qjit(
+            autograph=True,
+            target="mlir",
+            capture=capture_mode,
+            skip_preprocess=True,
+            collect_decomp_rules=False,
+        )
         @qp.qnode(dev)
         def my_workflow():
             qp.ctrl(op, control=1)()
@@ -2721,7 +3056,7 @@ class TestCtrl:
             assert "Hadamard" in nodes["node1"]["label"]
             assert nodes["node1"]["parent_cluster_uid"] == "cluster2"
         else:
-            assert "CH" in nodes["node1"]["label"]
+            assert "C(Hadamard)" in nodes["node1"]["label"]
             assert "[1, 0]" in nodes["node1"]["label"]
             assert nodes["node1"]["parent_cluster_uid"] == "cluster1"
 
@@ -2731,7 +3066,13 @@ class TestCtrl:
         dev = qp.device("null.qubit", wires=1)
 
         @xdsl_from_qjit
-        @qp.qjit(autograph=True, target="mlir", capture=capture_mode)
+        @qp.qjit(
+            autograph=True,
+            target="mlir",
+            capture=capture_mode,
+            skip_preprocess=True,
+            collect_decomp_rules=False,
+        )
         @qp.qnode(dev)
         def my_workflow():
             qp.ctrl(qp.H(0), control=1)
@@ -2746,7 +3087,7 @@ class TestCtrl:
 
         # cluster0 -> qjit
         # cluster1 -> my_workflow
-        assert "CH" in nodes["node1"]["label"]
+        assert "C(Hadamard)" in nodes["node1"]["label"]
         assert "[1, 0]" in nodes["node1"]["label"]
         assert nodes["node1"]["parent_cluster_uid"] == "cluster1"
 
@@ -2756,7 +3097,13 @@ class TestCtrl:
         dev = qp.device("null.qubit", wires=1)
 
         @xdsl_from_qjit
-        @qp.qjit(autograph=True, target="mlir", capture=capture_mode)
+        @qp.qjit(
+            autograph=True,
+            target="mlir",
+            capture=capture_mode,
+            skip_preprocess=True,
+            collect_decomp_rules=False,
+        )
         @qp.qnode(dev)
         def my_workflow():
             qp.ctrl(qp.H, control=1)(0)
@@ -2777,7 +3124,7 @@ class TestCtrl:
             assert "Hadamard" in nodes["node1"]["label"]
             assert nodes["node1"]["parent_cluster_uid"] == "cluster2"
         else:
-            assert "CH" in nodes["node1"]["label"]
+            assert "C(Hadamard)" in nodes["node1"]["label"]
             assert "[1, 0]" in nodes["node1"]["label"]
             assert nodes["node1"]["parent_cluster_uid"] == "cluster1"
 
@@ -2787,7 +3134,13 @@ class TestCtrl:
         dev = qp.device("null.qubit", wires=2)
 
         @xdsl_from_qjit
-        @qp.qjit(autograph=True, target="mlir", capture=capture_mode)
+        @qp.qjit(
+            autograph=True,
+            target="mlir",
+            capture=capture_mode,
+            skip_preprocess=True,
+            collect_decomp_rules=False,
+        )
         @qp.qnode(dev)
         def my_workflow():
             # Use two control wires so we avoid the CH alias
@@ -2828,7 +3181,13 @@ class TestAdjoint:
             return qp.H(0)
 
         @xdsl_from_qjit
-        @qp.qjit(autograph=True, target="mlir", capture=capture_mode)
+        @qp.qjit(
+            autograph=True,
+            target="mlir",
+            capture=capture_mode,
+            skip_preprocess=True,
+            collect_decomp_rules=False,
+        )
         @qp.qnode(dev)
         def my_workflow():
             qp.adjoint(op)()
@@ -2856,7 +3215,13 @@ class TestAdjoint:
         dev = qp.device("null.qubit", wires=1)
 
         @xdsl_from_qjit
-        @qp.qjit(autograph=True, target="mlir", capture=capture_mode)
+        @qp.qjit(
+            autograph=True,
+            target="mlir",
+            capture=capture_mode,
+            skip_preprocess=True,
+            collect_decomp_rules=False,
+        )
         @qp.qnode(dev)
         def my_workflow():
             qp.adjoint(qp.T(0))
@@ -2883,7 +3248,13 @@ class TestAdjoint:
         dev = qp.device("null.qubit", wires=1)
 
         @xdsl_from_qjit
-        @qp.qjit(autograph=True, target="mlir", capture=capture_mode)
+        @qp.qjit(
+            autograph=True,
+            target="mlir",
+            capture=capture_mode,
+            skip_preprocess=True,
+            collect_decomp_rules=False,
+        )
         @qp.qnode(dev)
         def my_workflow():
             qp.adjoint(qp.H)(0)

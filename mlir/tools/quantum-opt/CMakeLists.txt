@@ -20,6 +20,7 @@ set(LIBS
     MLIRQRef
     qref-transforms
     MLIRPBC
+    PBCAnalysis
     pbc-transforms
     MLIRGradient
     gradient-transforms

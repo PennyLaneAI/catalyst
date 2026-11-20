@@ -48,7 +48,7 @@ class TestSubroutineHOP:
         def Hadamard0(wire):
             qp.Hadamard(wire)
 
-        @qp.qjit(capture=True, collect_decomp_rules=False)
+        @qp.qjit(capture=True)
         @qp.qnode(qp.device("lightning.qubit", wires=1))
         def subroutine_test(c: int):
             Hadamard0(c)
@@ -64,7 +64,7 @@ class TestSubroutineHOP:
         def Hadamard0(wire):
             qp.Hadamard(wire)
 
-        @qp.qjit(capture=True, collect_decomp_rules=False)
+        @qp.qjit(capture=True)
         @qp.qnode(qp.device("lightning.qubit", wires=1))
         def subroutine_test(c: int):
             Hadamard0(c)
@@ -74,6 +74,32 @@ class TestSubroutineHOP:
         assert np.allclose(
             subroutine_test(0), jax.numpy.array([complex(1.0, 0), complex(0.0, 0.0)], dtype=complex)
         )
+
+    def test_quantum_subroutine_different_constants(self):
+        """Test quantum subroutines with different constants"""
+
+        A = jax.numpy.array([0.1, 0.2])
+        B = jax.numpy.array([1.1, 1.2])
+
+        @subroutine
+        def RotA(wire):
+            qp.RX(A[0], wire)
+            qp.RY(A[1], wire)
+
+        @subroutine
+        def RotB(wire):
+            qp.RX(B[0], wire)
+            qp.RY(B[1], wire)
+
+        @qp.qjit(capture=True)
+        @qp.qnode(qp.device("lightning.qubit", wires=2))
+        def subroutine_test():
+            RotA(0)
+            RotB(1)
+            return qp.expval(qp.Z(0)), qp.expval(qp.Z(1))
+
+        expected = jax.numpy.array([np.cos(0.1) * np.cos(0.2), np.cos(1.1) * np.cos(1.2)])
+        assert np.allclose(subroutine_test(), expected)
 
     def test_quantum_subroutine_error_message(self):
         """Test error message for quantum operations outside of qnode."""
@@ -103,7 +129,7 @@ class TestSubroutineHOP:
 
             qp.cond(wire != 0, true_path, false_path)()
 
-        @qp.qjit(autograph=False, capture=True, collect_decomp_rules=False)
+        @qp.qjit(autograph=False, capture=True)
         @qp.qnode(qp.device("lightning.qubit", wires=1))
         def subroutine_test(c: int):
             Hadamard0(c)
@@ -125,7 +151,7 @@ class TestSubroutineClass:
         def f(x, wires):
             qp.RX(x, wires)
 
-        @qp.qjit(capture=True, collect_decomp_rules=False)
+        @qp.qjit(capture=True)
         @qp.qnode(qp.device("lightning.qubit", wires=3))
         def c(x):
             f(x, 0)
@@ -148,7 +174,7 @@ class TestSubroutineClass:
             else:
                 qp.Z(wires)
 
-        @qp.qjit(capture=True, collect_decomp_rules=False)
+        @qp.qjit(capture=True)
         @qp.qnode(qp.device("lightning.qubit", wires=3))
         def c():
             f(0, "X")
@@ -172,7 +198,7 @@ class TestSubroutineClass:
 
             l()
 
-        @qp.qjit(capture=True, collect_decomp_rules=False)
+        @qp.qjit(capture=True)
         @qp.qnode(qp.device("lightning.qubit", wires=4))
         def c():
             f(register=(0, 1, 3))

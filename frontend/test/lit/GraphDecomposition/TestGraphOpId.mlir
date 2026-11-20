@@ -14,9 +14,9 @@
 
 // Test that graph-decomposition succeeds when using graphOpIds
 
-// RUN: catalyst --tool=opt --pass-pipeline='builtin.module(graph-decomposition{gate-set=testPauliX=1.0 alt-decomps=testHadamard=my_decomp})' %s | FileCheck %s --check-prefixes=ALL,CALL
+// RUN: catalyst --tool=opt --pass-pipeline='builtin.module(graph-decomposition{gate-set=testPauliX=1.0})' %s | FileCheck %s --check-prefixes=ALL,CALL
 
-// RUN: catalyst --tool=opt --pass-pipeline='builtin.module(graph-decomposition{inline-rule-body gate-set=testPauliX=1.0 alt-decomps=testHadamard=my_decomp})' %s | FileCheck %s --check-prefixes=ALL,INLINE
+// RUN: catalyst --tool=opt --pass-pipeline='builtin.module(graph-decomposition{inline-rule-body gate-set=testPauliX=1.0})' %s | FileCheck %s --check-prefixes=ALL,INLINE
 
 func.func @circuit(%q: !quantum.bit) -> !quantum.bit {
   // ALL-NOT: testHadamard

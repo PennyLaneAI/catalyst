@@ -22,7 +22,7 @@
 
 // CHECK-LABEL: @test_ppr
 module @test_ppr {
-    // CHECK: llvm.func @__catalyst__qis__PauliRot(!llvm.ptr, f64, !llvm.ptr, i1, i64, ...)
+    // CHECK: llvm.func @__catalyst__qis__PauliRot(!llvm.ptr, f64, !llvm.ptr, i1 {llvm.zeroext}, i64, ...)
     // CHECK: llvm.mlir.global internal constant @pauli_word_XIZ("XIZ\00")
     func.func @ppr(%q0 : !quantum.bit, %q1 : !quantum.bit, %q2 : !quantum.bit, %pred : i1) -> (!quantum.bit, !quantum.bit, !quantum.bit) {
         // CHECK-DAG: [[ctrue:%.+]] = llvm.mlir.constant(true) : i1
@@ -44,7 +44,7 @@ module @test_ppr {
 
 // CHECK-LABEL: @test_ppr_arbitrary
 module @test_ppr_arbitrary {
-    // CHECK: llvm.func @__catalyst__qis__PauliRot(!llvm.ptr, f64, !llvm.ptr, i1, i64, ...)
+    // CHECK: llvm.func @__catalyst__qis__PauliRot(!llvm.ptr, f64, !llvm.ptr, i1 {llvm.zeroext}, i64, ...)
     // CHECK: llvm.mlir.global internal constant @pauli_word_XZ("XZ\00")
     func.func @ppr_arbitrary(%q0 : !quantum.bit, %q1 : !quantum.bit, %theta : f64, %pred : i1) -> (!quantum.bit, !quantum.bit) {
         // CHECK-DAG: [[ctrue:%.+]] = llvm.mlir.constant(true) : i1
@@ -66,7 +66,7 @@ module @test_ppr_arbitrary {
 
 // CHECK-LABEL: @test_ppm
 module @test_ppm {
-    // CHECK: llvm.func @__catalyst__qis__PauliMeasure(!llvm.ptr, i1, !llvm.ptr, i1, i1, i64, ...) -> !llvm.ptr
+    // CHECK: llvm.func @__catalyst__qis__PauliMeasure(!llvm.ptr, i1 {llvm.zeroext}, !llvm.ptr, i1 {llvm.zeroext}, i1 {llvm.zeroext}, i64, ...) -> !llvm.ptr
     // CHECK: llvm.mlir.global internal constant @pauli_word_XY("XY\00")
     func.func @ppm(%q0 : !quantum.bit, %q1 : !quantum.bit) -> (i1, !quantum.bit, !quantum.bit) {
         // CHECK-DAG: [[ctrue:%.+]] = llvm.mlir.constant(true) : i1
@@ -85,7 +85,7 @@ module @test_ppm {
 
 // CHECK-LABEL: @test_ppm_negative_basis
 module @test_ppm_negative_basis {
-    // CHECK: llvm.func @__catalyst__qis__PauliMeasure(!llvm.ptr, i1, !llvm.ptr, i1, i1, i64, ...) -> !llvm.ptr
+    // CHECK: llvm.func @__catalyst__qis__PauliMeasure(!llvm.ptr, i1 {llvm.zeroext}, !llvm.ptr, i1 {llvm.zeroext}, i1 {llvm.zeroext}, i64, ...) -> !llvm.ptr
     // CHECK: llvm.mlir.global internal constant @pauli_word_XY("XY\00")
     func.func @ppm_negative_basis(%q0 : !quantum.bit, %q1 : !quantum.bit) -> (i1, !quantum.bit, !quantum.bit) {
         // CHECK-DAG: [[neg:%.+]] = llvm.mlir.constant(true) : i1
@@ -104,7 +104,7 @@ module @test_ppm_negative_basis {
 
 // CHECK-LABEL: @test_select_ppm
 module @test_select_ppm {
-    // CHECK: llvm.func @__catalyst__qis__PauliMeasure(!llvm.ptr, i1, !llvm.ptr, i1, i1, i64, ...) -> !llvm.ptr
+    // CHECK: llvm.func @__catalyst__qis__PauliMeasure(!llvm.ptr, i1 {llvm.zeroext}, !llvm.ptr, i1 {llvm.zeroext}, i1 {llvm.zeroext}, i64, ...) -> !llvm.ptr
     // CHECK: llvm.mlir.global internal constant @pauli_word_XY("XY\00")
     func.func @select_ppm(%q0 : !quantum.bit, %q1 : !quantum.bit, %sel : i1) -> (i1, !quantum.bit, !quantum.bit) {
         // CHECK-DAG: [[cfalse:%.+]] = llvm.mlir.constant(false) : i1

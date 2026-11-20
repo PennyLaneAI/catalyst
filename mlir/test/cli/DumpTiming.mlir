@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// RUN: catalyst %s --mlir-timing --verify-diagnostics 2>&1 | FileCheck %s
+// RUN: catalyst --tool=opt-translate %s --mlir-timing --verify-diagnostics 2>&1 | FileCheck %s
 
 func.func @foo() {
     return
@@ -23,4 +23,3 @@ func.func @foo() {
 // CHECK: Parser
 // CHECK: Optimization
 // CHECK: Translate
-// CHECK: llc

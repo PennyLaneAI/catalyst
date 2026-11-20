@@ -14,11 +14,19 @@
 
 #pragma once
 #include <cstdint>
+
+#include "DeviceCopy.hpp"
+
 namespace catalyst::transport::coproc {
 
-// Passthrough self-test: returns the word unchanged.
-__device__ inline std::int64_t echo_decode(std::uint64_t syndrome) {
-    return static_cast<std::int64_t>(syndrome);
+// Passthrough self-test: replies with the request's payload, cut to the reply's capacity.
+__device__ inline std::uint32_t echo_decode(const std::uint8_t *in, std::uint32_t len,
+                                            std::uint32_t /*fn_id*/, std::uint8_t *out,
+                                            std::uint32_t cap, std::uint32_t lane,
+                                            std::uint32_t lanes) {
+    const std::uint32_t n = len < cap ? len : cap;
+    device_copy(out, in, n, lane, lanes);
+    return n;
 }
 
 } // namespace catalyst::transport::coproc

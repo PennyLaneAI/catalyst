@@ -368,7 +368,8 @@ def CustomOp : UnitaryGate_Op<"custom", [ParametrizedGate, AttrSizedOperandSegme
 }
 
 def OperatorOp : UnitaryGate_Op<"operator", [ParametrizedGate, AttrSizedOperandSegments,
-                                             DeclareOpInterfaceMethods<DecomposableGate, ["getExtraData"]>]> {
+                                             DeclareOpInterfaceMethods<DecomposableGate,
+                                                ["getExtraData"]>]> {
     let summary = "A generalized quantum operation with arbitrary input signature.";
     let description = [{
         The `qref.operator` is a generic representation for arbitrary quantum operations
@@ -407,7 +408,9 @@ def OperatorOp : UnitaryGate_Op<"operator", [ParametrizedGate, AttrSizedOperandS
                              just forwarded to decomposition functions after the params list.
         * Optional frontend-level metadata:
           * `param_map` — maps frontend argument names to the lowered `params` operand positions
-          * `qubit_map` — maps frontend argument names to lowered qubit/index-array positions
+          * `qubit_map` — maps frontend argument names to lowered qubit/index-array positions.
+            Entries may share positions when composite arguments use the same qubits; each
+            entry retains its argument's wire order and number of wire occurrences.
 
         Examples:
 
@@ -471,6 +474,8 @@ def OperatorOp : UnitaryGate_Op<"operator", [ParametrizedGate, AttrSizedOperandS
     );
 
     let extraClassDeclaration = extraBaseClassDeclaration # [{
+        bool requiresNonOverlappingNonCtrlQubitOperands();
+
         mlir::ValueRange getAllParams() {
             // the ODS operands must be next to each other
             auto [start, lenParams] = getODSOperandIndexAndLength(/*params=*/0);
@@ -739,6 +744,9 @@ def CtrlOp : Region_Op<"ctrl", [NoTerminator, AttrSizedOperandSegments]> {
         conditioned on a set of control qubits. Each `ctrl_values` entry selects whether the
         matching control qubit activates on the |1> (true) or |0> (false) state.
 
+        Work qubits are optional operands available to controlled operators produced when the
+        region is lowered. They are not controls and do not enter the region body.
+
         Measurements inside a `qref.ctrl` region are rejected.
     }];
 
@@ -746,11 +754,15 @@ def CtrlOp : Region_Op<"ctrl", [NoTerminator, AttrSizedOperandSegments]> {
 
     let arguments = (ins
         Variadic<QubitRefType>:$ctrl_qubits,
-        Variadic<I1>:$ctrl_values
+        Variadic<I1>:$ctrl_values,
+        Variadic<QubitRefType>:$work_qubits,
+        DefaultValuedAttr<StrAttr, "::catalyst::CTRL_WORK_WIRE_TYPE_BORROWED">:$work_wire_type
     );
 
     let assemblyFormat = [{
-        `(` $ctrl_qubits `)` `ctrlvals` `(` $ctrl_values `)` attr-dict-with-keyword $region
+        `(` $ctrl_qubits `)` `ctrlvals` `(` $ctrl_values `)`
+        (`work_wires` `(` $work_qubits^ `)`)?
+        attr-dict-with-keyword $region
     }];
 
     let hasVerifier = 1;
@@ -762,7 +774,7 @@ def CtrlOp : Region_Op<"ctrl", [NoTerminator, AttrSizedOperandSegments]> {
 // Hence they are Pure, i.e. removable if no users
 
 class Observable_Op<string mnemonic, list<Trait> traits = []> :
-        QRef_Op<mnemonic, traits # [Pure]>;
+        QRef_Op<mnemonic, traits # [Pure, Observable]>;
 
 def ComputationalBasisOp : Observable_Op<"compbasis", [AttrSizedOperandSegments]> {
     let summary = "Define a pseudo-observable of the computational basis for use in measurements";

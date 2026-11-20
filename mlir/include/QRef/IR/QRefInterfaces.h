@@ -14,10 +14,13 @@
 
 #pragma once
 
+#include <string>
+#include <utility>
 #include <vector>
 
-#include "llvm/ADT/StringMap.h" // for DecomposableGate interface
+#include "llvm/ADT/SmallVector.h" // for DecomposableGate interface
 #include "mlir/IR/OpDefinition.h"
+#include "mlir/IR/Types.h"
 
 #include "Catalyst/Analysis/ResourceInterfaces.h"
 
@@ -28,9 +31,15 @@
 namespace catalyst {
 namespace qref {
 
+/// The dynamic parameter arguments of a DecomposableGate, in operand order.
+using DynamicShape = llvm::SmallVector<std::pair<std::string, llvm::SmallVector<mlir::Type>>>;
+
+/// Named wire-group lengths, excluding control wires. OperatorOp follows qubit_map order.
+using WireLens = llvm::SmallVector<std::pair<std::string, size_t>>;
+
 std::string defaultGetGraphOpId(mlir::Operation *op);
 
-}
+} // namespace qref
 } // namespace catalyst
 
 #include "QRef/IR/QRefInterfaces.h.inc"

@@ -158,10 +158,6 @@ struct DecomposableGatePattern final : public OpInterfaceRewritePattern<Decompos
             // Didn't find ID match, try matching gate name. Unmodified ops only: a modified op
             // (`Adjoint(Op)`/`C(Op)`) must match its own rule by id and never fall back to a plain
             // base-name rule (that would apply the unmodified decomposition to the modified op).
-            // TODO: remove multirz's special name editing
-            if (isa<qref::MultiRZOp>(op)) {
-                gateName = gateName + "_" + std::to_string(op.getWireLens()["wires"]);
-            }
             auto it_gateName = decompositionRegistry.find(gateName);
             if (it_gateName != decompositionRegistry.end()) {
                 rule = it_gateName->second;

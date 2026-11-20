@@ -591,7 +591,6 @@ class TestDiagonalizeFinalMeasurementsProgramCaptureExecution:
         circuit_compiled = qp.qjit(
             diagonalize_final_measurements_pass(circuit_ref),
             capture=True,
-            collect_decomp_rules=False,
         )
 
         assert np.allclose(expected_res(phi, theta), circuit_compiled(phi, theta))
@@ -809,7 +808,6 @@ class TestDiagonalizeFinalMeasurementsCatalystFrontend:
         circuit_compiled = qp.qjit(
             diagonalize_final_measurements_pass(circuit_ref),
             capture=True,
-            collect_decomp_rules=False,
         )
 
         assert np.allclose(expected_res(phi, theta), circuit_compiled(phi, theta))

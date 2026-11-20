@@ -24,7 +24,7 @@ from jax.tree_util import register_pytree_node_class
 from pennylane import for_loop
 
 from catalyst import debug, qjit, value_and_grad
-from catalyst.compiler import _options_to_cli_flags, to_llvmir, to_mlir_opt
+from catalyst.compiler import _options_to_cli_flags, to_llvm, to_llvm_opt, to_mlir_opt
 from catalyst.debug import compile_executable, get_cmain, get_compilation_stage, replace_ir
 from catalyst.pipelines import CompileOptions
 from catalyst.utils.exceptions import CompileError
@@ -316,15 +316,16 @@ class TestCProgramGeneration:
         assert "main" in template
         assert "buff_0 = 1.0" in template  # argument was automaatically promoted
 
+    @pytest.mark.old_frontend
     def test_raises_error_if_tracing(self):
         """Test errors if c program generation requested during tracing."""
 
-        @qjit
+        @qjit(capture=False)
         def f(x: float):
             """Identity function."""
             return x
 
-        @qjit
+        @qjit(capture=False)
         def error_fn(x: float):
             """Should raise an error as we try to generate the C template during tracing."""
             return get_cmain(f, x)
@@ -409,6 +410,7 @@ class TestCProgramGeneration:
         shutil.rmtree(str(jit_f.workspace), ignore_errors=True)
         assert old_result * data == new_result
 
+    @pytest.mark.old_frontend
     @pytest.mark.parametrize(
         "pass_name",
         [
@@ -429,7 +431,7 @@ class TestCProgramGeneration:
             """Square function."""
             return x**2
 
-        jit_grad_f = qjit(value_and_grad(f), keep_intermediate=True)
+        jit_grad_f = qjit(value_and_grad(f), keep_intermediate=True, capture=False)
         # Create tmp workspaces for intermediates to avoid CI race conditions
         jit_grad_f.use_cwd_for_workspace = False
 
@@ -580,13 +582,8 @@ class TestOptionsToCliFlags:
         flags = _options_to_cli_flags(options)
         assert "--use-nameloc-as-prefix" in flags
 
-    def test_option_not_lower_to_llvm(self):
-        """Test not lower to llvm"""
-        options = CompileOptions(lower_to_llvm=False)
-        flags = _options_to_cli_flags(options)
-        assert ("--tool", "opt") in flags
-
-    def test_no_options_to_llvmir(self):
+    @pytest.mark.parametrize("lower", [to_llvm, to_llvm_opt])
+    def test_no_options_to_llvmir(self, lower):
         """Test that we can lower to llvmir without needing any options"""
         mlir = """
         module {
@@ -595,7 +592,7 @@ class TestOptionsToCliFlags:
             }
         }
         """
-        observed = to_llvmir(stdin=mlir)
+        observed = lower(stdin=mlir)
         # pylint: disable=line-too-long
         expected = textwrap.dedent("""
         define void @foo() {

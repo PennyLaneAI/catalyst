@@ -22,17 +22,18 @@
 #include <cstring>
 
 /**
- * @brief Copy the request's data area straight back as the reply.
+ * @brief Copy the request's payload straight back as the reply.
  *
- * @param in Request frame; its leading bytes are the data area.
+ * @param in The request's payload.
  * @param in_len Bytes readable at @p in.
+ * @param fn_id Unused.
  * @param out Reply data area.
  * @param out_cap Bytes writable at @p out.
  * @param ctx Unused.
  * @return Bytes written, or 0 if either buffer is missing.
  */
-extern "C" std::size_t echo_coprocessor(const void *in, std::size_t in_len, void *out,
-                                        std::size_t out_cap, void * /*ctx*/) {
+extern "C" std::size_t echo_coprocessor(const void *in, std::size_t in_len, std::uint32_t /*fn_id*/,
+                                        void *out, std::size_t out_cap, void * /*ctx*/) {
     if (in == nullptr || out == nullptr || in_len == 0 || out_cap == 0) {
         return 0;
     }

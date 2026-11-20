@@ -710,7 +710,6 @@ def _pl_adjoint_lowering(
     jax_ctx,
     *plxpr_invals,
     jaxpr,
-    lazy,
     n_consts,
 ):
     new_jaxpr = jaxpr.replace(constvars=(), invars=jaxpr.constvars + jaxpr.invars)
@@ -742,22 +741,29 @@ def _pl_ctrl_lowering(
     *plxpr_invals,
     jaxpr,
     n_control,
-    work_wires,
     n_consts,
+    n_work_wires,
     work_wire_type="borrowed",
 ):
     """Lower a `qp.ctrl` transform to a `qref.ctrl` region op."""
-    values_start = len(plxpr_invals) - n_control
+    work_start = len(plxpr_invals) - n_work_wires
+    values_start = work_start - n_control
     controls_start = values_start - n_control
     body_invals = plxpr_invals[:controls_start]
     control_qubits = list(plxpr_invals[controls_start:values_start])
+    work_qubits = list(plxpr_invals[work_start:])
 
     i1 = ir.IntegerType.get_signless(1)
     control_values_i1 = [
-        TensorExtractOp(i1, value, []).result for value in plxpr_invals[values_start:]
+        TensorExtractOp(i1, value, []).result for value in plxpr_invals[values_start:work_start]
     ]
 
-    op = CtrlOp(ctrl_qubits=control_qubits, ctrl_values=control_values_i1)
+    op = CtrlOp(
+        ctrl_qubits=control_qubits,
+        ctrl_values=control_values_i1,
+        work_qubits=work_qubits,
+        work_wire_type=work_wire_type,
+    )
     ctrl_block = op.regions[0].blocks.append()
     with ir.InsertionPoint(ctrl_block):
         source_info_util.extend_name_stack("ctrl")

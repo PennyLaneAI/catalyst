@@ -211,8 +211,35 @@ layout. The backend's library is named ``libcatalyst_transport_<backend>_<role>.
 The built-in backends are:
 
 * ``rdma``: ``cpu_verbs`` on ``cpu``, ``gpu_verbs`` on ``gpu``, and ``hwhs`` on ``fpga``.
-  ``fpga_verbs`` is also available on ``fpga`` when named.
+  ``fpga_verbs``, ``hsb_hwhs`` and ``balboa_hwhs`` are also available on ``fpga`` when named.
 * ``memcpy``: ``memcpy`` on ``cpu`` and ``memcpy_gpu`` on ``gpu``.
+
+A node's backend config is the ``config`` string in its ``init_args``, made of ``key=value``
+pairs separated by ``;``. An RDMA coprocessor names its controller, its **peer**, with ``peer=``
+in that string. The coprocessor backends stay ``cpu_verbs`` and ``gpu_verbs``; the peer picks the
+link they reach it through (``runtime/lib/transport/rdma/common/PeerLink.hpp``):
+
+* ``catalyst``: The default, used when ``peer=`` is left out. For the catalyst controllers
+  (``cpu_verbs``, ``hwhs``, ``fpga_verbs``).
+* ``hsb``: For ``hsb_hwhs``, a controller behind NVIDIA's `Holoscan Sensor Bridge`_.
+* ``balboa``: For ``balboa_hwhs``, a controller behind `BALBOA`_, the RDMA stack of ETH Zurich's
+  Coyote.
+
+A node placed on ``hsb_hwhs`` needs ``peer=hsb`` in its coprocessors' configs, and one on
+``balboa_hwhs`` needs ``peer=balboa``. For example, a GPU coprocessor facing an ``hsb_hwhs``
+controller:
+
+.. code-block:: python
+
+    controller = qp.Controller(..., hardware="fpga", backend="hsb_hwhs")
+    coprocessor = qp.Coprocessor(
+        ...,
+        hardware="gpu",
+        init_args={"config": "dev=mlx5_0;gid=3;peer=hsb"},
+    )
+
+``dev`` and ``gid`` are required by every RDMA coprocessor: the RDMA device and the GID index on
+its port.
 
 A backend is a shared library implementing ``ControllerSession`` or ``CoprocessorSession`` from
 ``runtime/include/Transport.hpp`` and exporting the matching factory symbol declared in
@@ -240,11 +267,16 @@ with later runtimes. A session follows a strict lifecycle:
 ``start`` / ``kick`` / ``collect`` / ``stop``
     Run the engine, fire each round, gather its reply, and shut down.
 
-Each round's request and reply travel as a **frame**. Over RDMA, the sender writes it into a slot
-of a ring in the receiver's registered memory: a ring has 256 slots of 64 B, and round ``n`` uses
-slot ``n mod 256``. The only frame layout implemented so far is the 16 B one, BL16:
+Each round's request and reply travel as a **frame**, written into a slot of a ring on the
+receiving side: over RDMA in the receiver's registered memory, over ``memcpy`` in the
+coprocessor's own memory. A ring has ``frame_slots`` slots, 256 unless a node's backend config sets
+``frame_slots=<n>``, a power of two, which the compiler then passes to every node; FPGA controllers
+are only tested with 256. ``hsb_hwhs`` always uses one slot, so the request after a lost one lands
+where the coprocessor polls. Round ``n`` uses slot ``n mod frame_slots``. Over RDMA, ends whose frame
+configs differ fail to connect. Every transport uses the same two frame layouts, and the compiler picks one per placement from its
+message sizes: the 16 B frame, BL16, when requests and replies fit in 8 B, and BLV otherwise.
 
-.. list-table::
+.. list-table:: BL16, in 64 B slots
     :header-rows: 1
     :widths: 15 85
 
@@ -254,17 +286,85 @@ slot ``n mod 256``. The only frame layout implemented so far is the 16 B one, BL
       - The payload, zero-padded: the staged syndrome, or the coprocessor's reply.
     * - 8–11
       - ``fn_id``: which coprocessor function handles the round, the ``decoder_id`` staged with
-        the payload (see `The transport dialect`_). A reply echoes the request's, except from
-        ``gpu_verbs``, which sends 0.
+        the payload (see `The transport dialect`_). A reply echoes the request's.
     * - 12–15
       - ``seq``: the round's number plus one.
 
-A sender writes the whole frame in one in-order transfer, ``seq`` last, and a receiver reads the
-payload only once the slot's ``seq`` matches the round it expects. A per-message coprocessor
-function is passed the whole request frame and writes the reply's payload. In-tree backends build
-and read frames through ``runtime/lib/transport/common/interface/Frame.hpp``. An out-of-tree
-backend lays them out as above, since that header is not installed. The ``memcpy`` backends carry
-messages over 8 B in a wider frame of the same shape, its payload area grown to fit.
+.. list-table:: BLV, filling a slot of ``stride`` bytes
+    :header-rows: 1
+    :widths: 15 85
+
+    * - Bytes
+      - Field
+    * - 0–31
+      - Header: ``magic`` (``"BLV1"``), ``version`` (1), ``flags`` (0), ``fn_id``, ``seq``,
+        ``round`` (0), ``len`` (payload bytes) and ``t_ptp_ns`` (0), as u32 fields apart from
+        the u16 ``version`` and ``flags`` and the u64 ``t_ptp_ns``.
+    * - 32–
+      - The payload, ``len`` bytes. A reply's payload area is zero-filled past what the
+        coprocessor function wrote.
+    * - last 4
+      - The completion word: ``seq`` again.
+
+A BLV slot's ``stride`` is the smallest power of two of at least 64 B that holds the 32 B header,
+the larger of the placement's request and reply, and the 4 B completion word. The compiler writes
+``frame=blv;frame_payload=<bytes>`` into both ends' backend configs, and every backend derives the
+same ring from them; these keys are reserved, so a node's own config cannot set them. A placement
+whose messages fit in 8 B gets no keys and uses BL16.
+
+A sender writes the whole frame, or the whole slot for BLV, in one in-order transfer, and the word
+a receiver polls (BL16's ``seq``, BLV's completion word) sits at a fixed offset and lands last. A
+receiver reads the payload only once that word matches the round it expects.
+
+A per-message coprocessor function, ``CatalystCoprocessorFn`` in ``runtime/include/TransportABI.h``,
+is called with the payload, its length and the ``fn_id``, whatever the transport and frame layout,
+so one function can serve several decoders without reading frames. In-tree backends build and
+read frames through ``runtime/lib/transport/common/interface/Frame.hpp``. An out-of-tree backend
+lays them out as above, since that header is not installed.
+
+A GPU coprocessor running a persistent kernel hands it both rings through ``CoprocLaunchDesc``
+(``runtime/include/Transport.hpp``): the request ring and a host-mapped reply ring in the same
+layout, with the frame mode and slot stride. The kernel answers each request with a reply frame in
+the same slot, carrying the request's ``fn_id``, which the host side passes on: gpu_verbs sends it
+to the controller, and ``memcpy_gpu`` hands it to the controller's thread directly. A launcher
+built for this layout exports ``<symbol>_info`` reporting
+``CATALYST_COPROCESSOR_LAUNCHER_MIN_ABI_VERSION`` or later; the runtime refuses any other, whose
+kernel would never publish a reply it recognises. A launcher also refuses, when the session starts,
+a layout its kernel cannot read. Catalyst's own GPU kernels take messages of any size, their
+decoders taking the payload, its length and the ``fn_id`` like a per-message function's.
+PennyLane's Triton decoders decode one 8 B word, so their launcher refuses anything but the 16 B
+frame.
+
+``cpu_verbs``, ``gpu_verbs`` and the ``memcpy`` backends set no limit on message size. Over RDMA,
+BLV has been tested up to 1024 B each way on Soft-RoCE, and up to 256 KiB on a ConnectX-7. A frame
+larger than the path MTU spans several packets (a 1024 B payload already fills a 2048 B slot), and
+its completion word landing last then relies on the NIC placing an RDMA write's bytes in order,
+which common NICs do but the RDMA specification does not guarantee. The slot count does not change
+with the stride, so memory grows with message size: a 1 MiB message makes each ring 512 MiB at the
+default 256 slots.
+
+FPGA controllers
+----------------
+
+``hwhs``, ``hsb_hwhs`` and ``balboa_hwhs`` drive an engine in the FPGA of an AMD VPK120, next to
+the network IP core that carries the RDMA traffic. Each one needs the board booted from its own
+image. The controller runs as root on the board and currently supports only BL16 frames.
+
+``hwhs``
+    The ERNIC image, with AMD's ERNIC as the network IP core. The controller opens ``/dev/xib0``
+    and ``/dev/mem``. Its coprocessors use the default, ``peer=catalyst``, and can leave ``peer``
+    out.
+``hsb_hwhs``
+    The HSB image, with NVIDIA's `Holoscan Sensor Bridge`_ as the network IP core.
+    In the coprocessor's config, set ``peer=hsb`` and set ``gid=`` to the RoCE v2 GID of its IPv4
+    address.
+``balboa_hwhs``
+    The BALBOA image, with ETH Zurich's `BALBOA`_ as the network IP core.
+    In the coprocessor's config, set ``peer=balboa`` and set ``gid=`` to the RoCE v2 GID of its
+    IPv4 address.
+
+The `Backline repository <https://github.com/PennyLaneAI/backline>`_ provides more information about the images, with
+steps to build and boot them and to reproduce its measurements.
 
 The transport dialect
 =====================
@@ -492,10 +592,10 @@ platform is built out.
     the ``CATALYST_REMOTE_SLAB_BYTES`` environment variable of the process opening the session sets
     another size in bytes.
 
-**Fixed transport reply region.**
-    A transport session provisions a 16 KB local reply region at ``exchange_keys``. The size is a
-    compile-time constant in ``runtime/lib/transport/TransportCAPI.cpp``. Making it configurable
-    per session would need a runtime entry point to override it.
+**Transport reply region.**
+    A transport session asks its backend for a 16 KB local reply region at ``exchange_keys``. A
+    backend whose peer writes a ring of frames into that region, as ``cpu_verbs`` does, enlarges
+    it to the ring.
 
 **Memref-only data path.**
     Only kernels whose operands and results bufferize cleanly to memrefs are eligible for the
@@ -513,3 +613,5 @@ platform is built out.
 .. _pennylane.backline: https://docs.pennylane.ai/en/latest/code/qp_backline.html
 .. _Placement: https://docs.pennylane.ai/en/latest/code/qp_backline.html
 .. _Backline: https://docs.pennylane.ai/en/latest/code/qp_backline.html
+.. _Holoscan Sensor Bridge: https://github.com/nvidia-holoscan/holoscan-sensor-bridge
+.. _BALBOA: https://github.com/fpgasystems/Coyote

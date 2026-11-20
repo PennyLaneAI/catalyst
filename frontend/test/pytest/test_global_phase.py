@@ -14,6 +14,8 @@
 
 """Unit tests for Global Phase"""
 
+import json
+
 import numpy as np
 import pennylane as qp
 import pytest
@@ -73,6 +75,40 @@ def test_global_phase_control(backend, capture_mode):
     expected = qnn()
     observed = qjit(qnn, capture=capture_mode)()
     assert np.allclose(expected, observed)
+
+
+@pytest.mark.parametrize(
+    "ops, expected_depth",
+    [
+        (lambda: qp.GlobalPhase(0.1), 0),
+        (lambda: (qp.RX(0.1, 0), qp.GlobalPhase(0.1), qp.RX(0.1, 1)), 1),
+        (lambda: (qp.GlobalPhase(0.1), qp.X(0), qp.X(1)), 1),
+        (lambda: (qp.RX(0.1, 0), qp.ctrl(qp.GlobalPhase(0.1), control=0)), 2),
+        (lambda: (qp.RX(0.1, 0), qp.ctrl(qp.GlobalPhase(0.1), control=1)), 1),
+    ],
+)
+def test_global_phase_tracked_depth(ops, expected_depth, capture_mode, tmp_path):
+    """Test that a global phase without control wires does not contribute to the circuit depth
+    tracked by null.qubit, as it commutes with every other operation, and that a controlled global
+    phase is counted on its control wires."""
+    filename = tmp_path / "resources.json"
+    dev = qp.device(
+        "null.qubit",
+        wires=2,
+        track_resources=True,
+        resources_filename=str(filename),
+        compute_depth=True,
+    )
+
+    @qjit(capture=capture_mode)
+    @qp.qnode(dev)
+    def circuit():
+        ops()
+        return qp.state()
+
+    circuit()
+    with filename.open("r", encoding="utf-8") as f:
+        assert json.load(f)["depth"] == expected_depth
 
 
 if __name__ == "__main__":

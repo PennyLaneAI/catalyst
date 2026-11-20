@@ -17,6 +17,7 @@
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
+#include <limits>
 #include <optional>
 #include <sstream>
 #include <string>
@@ -25,7 +26,7 @@
 
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/STLExtras.h"
-#include "llvm/ADT/StringMap.h"
+#include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/StringSet.h"
 #include "llvm/ADT/TypeSwitch.h"
@@ -59,6 +60,8 @@
 #include "Quantum/IR/QuantumDialect.h"
 #include "Quantum/IR/QuantumInterfaces.h"
 #include "Quantum/IR/QuantumTypes.h"
+
+#include "StringConstants.h"
 
 using namespace mlir;
 using namespace catalyst::quantum;
@@ -690,6 +693,12 @@ LogicalResult CtrlOp::verify() {
         return emitOpError("Ctrl op number of control values must be the same as the number of "
                            "control qubits");
     }
+    if (getWorkWireType() != catalyst::CTRL_WORK_WIRE_TYPE_BORROWED &&
+        getWorkWireType() != catalyst::CTRL_WORK_WIRE_TYPE_ZEROED) {
+        return emitOpError("work_wire_type must be either \"")
+               << catalyst::CTRL_WORK_WIRE_TYPE_BORROWED << "\" or \""
+               << catalyst::CTRL_WORK_WIRE_TYPE_ZEROED << "\"";
+    }
 
     Block &b = this->getRegion().front();
     if (b.getNumArguments() != this->getArgs().size()) {
@@ -731,16 +740,15 @@ void OperatorOp::build(OpBuilder &odsBuilder, OperationState &odsState, llvm::St
                        ValueRange in_ctrl_values, ValueRange forward_args, bool adjoint,
                        std::optional<int64_t> UID, DictionaryAttr static_data,
                        DictionaryAttr param_map, DictionaryAttr qubit_map) {
-    SmallVector<Type> resultTypes;
     TypeRange qubitTypes = TypeRange(in_qubits);
     TypeRange ctrlQubitTypes = TypeRange(in_ctrl_qubits);
-    resultTypes.append(qubitTypes.begin(), qubitTypes.end());
-    resultTypes.append(ctrlQubitTypes.begin(), ctrlQubitTypes.end());
 
     IntegerAttr uidAttr = UID ? odsBuilder.getI64IntegerAttr(*UID) : IntegerAttr();
 
     build(odsBuilder, odsState,
-          /*resultTypes=*/resultTypes,
+          /*out_qubits=*/qubitTypes,
+          /*out_ctrl_qubits=*/ctrlQubitTypes,
+          /*out_qreg=*/Type(),
           /*op_name=*/op_name,
           /*params=*/params,
           /*forward_args=*/forward_args,
@@ -763,12 +771,12 @@ void OperatorOp::build(OpBuilder &odsBuilder, OperationState &odsState, llvm::St
                        Value arr_ctrl_indices, Value arr_ctrl_values, ValueRange forward_args,
                        bool adjoint, std::optional<int64_t> UID, DictionaryAttr static_data,
                        DictionaryAttr param_map, DictionaryAttr qubit_map) {
-    SmallVector<Type> resultTypes = {in_qreg.getType()};
-
     IntegerAttr uidAttr = UID ? odsBuilder.getI64IntegerAttr(*UID) : IntegerAttr();
 
     build(odsBuilder, odsState,
-          /*resultTypes=*/resultTypes,
+          /*out_qubits=*/TypeRange(),
+          /*out_ctrl_qubits=*/TypeRange(),
+          /*out_qreg=*/in_qreg.getType(),
           /*op_name=*/op_name,
           /*params=*/params,
           /*forward_args=*/forward_args,
@@ -1186,17 +1194,15 @@ ParseResult OperatorOp::parse(OpAsmParser &parser, OperationState &result) {
 
 std::string CustomOp::getOperatorName() { return getGateName().str(); }
 
-llvm::StringMap<llvm::SmallVector<mlir::Type>> CustomOp::getDynamicShape() {
-    llvm::StringMap<llvm::SmallVector<mlir::Type>> ret;
+DynamicShape CustomOp::getDynamicShape() {
+    DynamicShape ret;
     for (auto [i, param] : llvm::enumerate(getParams())) {
-        ret[std::to_string(i)] = llvm::SmallVector<mlir::Type>({param.getType()});
+        ret.emplace_back(std::to_string(i), llvm::SmallVector<mlir::Type>({param.getType()}));
     }
     return ret;
 }
 
-llvm::StringMap<size_t> CustomOp::getWireLens() {
-    return {{"wires", getNonCtrlQubitOperands().size()}};
-}
+WireLens CustomOp::getWireLens() { return {{"wires", getNonCtrlQubitOperands().size()}}; }
 
 mlir::DictionaryAttr CustomOp::getStaticData() {
     return mlir::DictionaryAttr::get(getContext(), {});
@@ -1206,13 +1212,11 @@ mlir::DictionaryAttr CustomOp::getStaticData() {
 
 std::string MultiRZOp::getOperatorName() { return "MultiRZ"; }
 
-llvm::StringMap<llvm::SmallVector<mlir::Type>> MultiRZOp::getDynamicShape() {
+DynamicShape MultiRZOp::getDynamicShape() {
     return {{"theta", {mlir::Float64Type::get(getContext())}}};
 }
 
-llvm::StringMap<size_t> MultiRZOp::getWireLens() {
-    return {{"wires", getNonCtrlQubitOperands().size()}};
-}
+WireLens MultiRZOp::getWireLens() { return {{"wires", getNonCtrlQubitOperands().size()}}; }
 
 mlir::DictionaryAttr MultiRZOp::getStaticData() {
     return mlir::DictionaryAttr::get(getContext(), {});
@@ -1222,13 +1226,11 @@ mlir::DictionaryAttr MultiRZOp::getStaticData() {
 
 std::string PauliRotOp::getOperatorName() { return "PauliRot"; }
 
-llvm::StringMap<llvm::SmallVector<mlir::Type>> PauliRotOp::getDynamicShape() {
+DynamicShape PauliRotOp::getDynamicShape() {
     return {{"theta", {mlir::Float64Type::get(getContext())}}};
 }
 
-llvm::StringMap<size_t> PauliRotOp::getWireLens() {
-    return {{"wires", getNonCtrlQubitOperands().size()}};
-}
+WireLens PauliRotOp::getWireLens() { return {{"wires", getNonCtrlQubitOperands().size()}}; }
 
 mlir::DictionaryAttr PauliRotOp::getStaticData() {
     mlir::MLIRContext *ctx = getContext();
@@ -1241,13 +1243,11 @@ mlir::DictionaryAttr PauliRotOp::getStaticData() {
 
 std::string PCPhaseOp::getOperatorName() { return "PCPhase"; }
 
-llvm::StringMap<llvm::SmallVector<mlir::Type>> PCPhaseOp::getDynamicShape() {
+DynamicShape PCPhaseOp::getDynamicShape() {
     return {{"phi", {mlir::Float64Type::get(getContext())}}};
 }
 
-llvm::StringMap<size_t> PCPhaseOp::getWireLens() {
-    return {{"wires", getNonCtrlQubitOperands().size()}};
-}
+WireLens PCPhaseOp::getWireLens() { return {{"wires", getNonCtrlQubitOperands().size()}}; }
 
 mlir::DictionaryAttr PCPhaseOp::getStaticData() {
     mlir::MLIRContext *ctx = getContext();
@@ -1260,11 +1260,11 @@ mlir::DictionaryAttr PCPhaseOp::getStaticData() {
 
 std::string GlobalPhaseOp::getOperatorName() { return "GlobalPhase"; }
 
-llvm::StringMap<llvm::SmallVector<mlir::Type>> GlobalPhaseOp::getDynamicShape() {
+DynamicShape GlobalPhaseOp::getDynamicShape() {
     return {{"phi", {mlir::Float64Type::get(getContext())}}};
 }
 
-llvm::StringMap<size_t> GlobalPhaseOp::getWireLens() { return {}; }
+WireLens GlobalPhaseOp::getWireLens() { return {}; }
 
 mlir::DictionaryAttr GlobalPhaseOp::getStaticData() {
     return mlir::DictionaryAttr::get(getContext(), {});
@@ -1274,49 +1274,63 @@ mlir::DictionaryAttr GlobalPhaseOp::getStaticData() {
 
 std::string QubitUnitaryOp::getOperatorName() { return "QubitUnitary"; }
 
-llvm::StringMap<llvm::SmallVector<mlir::Type>> QubitUnitaryOp::getDynamicShape() {
-    return {{"U", {getMatrix().getType()}}};
-}
+DynamicShape QubitUnitaryOp::getDynamicShape() { return {{"U", {getMatrix().getType()}}}; }
 
-llvm::StringMap<size_t> QubitUnitaryOp::getWireLens() {
-    return {{"wires", getNonCtrlQubitOperands().size()}};
-}
+WireLens QubitUnitaryOp::getWireLens() { return {{"wires", getNonCtrlQubitOperands().size()}}; }
 
 mlir::DictionaryAttr QubitUnitaryOp::getStaticData() {
     return mlir::DictionaryAttr::get(getContext(), {});
+}
+
+// Return named parameter groups in operand order, rather than dictionary (name) order.
+// Groups without operands have no position and go last, in name order.
+static llvm::SmallVector<std::pair<llvm::StringRef, llvm::ArrayRef<int64_t>>>
+getEntriesInOperandOrder(mlir::DictionaryAttr map) {
+    llvm::SmallVector<std::pair<llvm::StringRef, llvm::ArrayRef<int64_t>>> entries;
+    if (!map) {
+        return entries;
+    }
+    for (mlir::NamedAttribute entry : map) {
+        entries.emplace_back(entry.getName().getValue(),
+                             cast<mlir::DenseI64ArrayAttr>(entry.getValue()).asArrayRef());
+    }
+    auto position = [](llvm::ArrayRef<int64_t> indices) {
+        return indices.empty() ? std::numeric_limits<int64_t>::max() : indices.front();
+    };
+    llvm::stable_sort(entries, [&](const auto &lhs, const auto &rhs) {
+        return position(lhs.second) < position(rhs.second);
+    });
+    return entries;
 }
 
 // OperatorOp
 
 std::string OperatorOp::getOperatorName() { return getOpName().str(); }
 
-llvm::StringMap<llvm::SmallVector<mlir::Type>> OperatorOp::getDynamicShape() {
-    llvm::StringMap<llvm::SmallVector<mlir::Type>> map;
-
+DynamicShape OperatorOp::getDynamicShape() {
+    DynamicShape dynamicShape;
     auto params = getParams();
 
-    for (mlir::NamedAttribute entry : getParamMap()) {
-        mlir::ArrayRef<int64_t> indices =
-            cast<mlir::DenseI64ArrayAttr>(entry.getValue()).asArrayRef();
+    for (auto [name, indices] : getEntriesInOperandOrder(getParamMap())) {
         llvm::SmallVector<mlir::Type> types;
         for (int64_t index : indices) {
             types.push_back(params[index].getType());
         }
-        map[entry.getName().str()] = std::move(types);
+        dynamicShape.emplace_back(name.str(), std::move(types));
     }
 
-    return map;
+    return dynamicShape;
 }
 
-llvm::StringMap<size_t> OperatorOp::getWireLens() {
-    llvm::StringMap<size_t> wireLens;
+WireLens OperatorOp::getWireLens() {
+    WireLens wireLens;
 
     for (mlir::NamedAttribute entry : getQubitMap()) {
-        auto indices = cast<mlir::DenseI64ArrayAttr>(entry.getValue());
+        auto indices = cast<mlir::DenseI64ArrayAttr>(entry.getValue()).asArrayRef();
         size_t numQubits;
         if (getInQreg()) {
             numQubits = 0;
-            for (int64_t index : indices.asArrayRef()) {
+            for (int64_t index : indices) {
                 auto indexTensorType =
                     cast<mlir::RankedTensorType>(getArrQubitIndices()[index].getType());
                 numQubits += indexTensorType.getDimSize(0);
@@ -1325,7 +1339,7 @@ llvm::StringMap<size_t> OperatorOp::getWireLens() {
             numQubits = indices.size();
         }
 
-        wireLens[entry.getName()] = numQubits;
+        wireLens.emplace_back(entry.getName().getValue().str(), numQubits);
     }
 
     return wireLens;

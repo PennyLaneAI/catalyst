@@ -19,9 +19,9 @@
 // ERROR: for the --method option: Cannot find option named 'unknown'!
 
 // CHECK-DAG: func.func private @__catalyst__rt__random_double() -> f64
-// CHECK-DAG: func.func private @rs_mixed_decomposition_get_size(f64, f64, i1, f64) -> index
-// CHECK-DAG: func.func private @rs_mixed_decomposition_get_gates(memref<?xindex>, f64, f64, i1, f64)
-// CHECK-DAG: func.func private @rs_mixed_decomposition_get_phase(f64, f64, i1, f64) -> f64
+// CHECK-DAG: func.func private @rs_mixed_decomposition_get_size(f64, f64, i1 {llvm.zeroext}, f64) -> index
+// CHECK-DAG: func.func private @rs_mixed_decomposition_get_gates(memref<?xindex>, f64, f64, i1 {llvm.zeroext}, f64)
+// CHECK-DAG: func.func private @rs_mixed_decomposition_get_phase(f64, f64, i1 {llvm.zeroext}, f64) -> f64
 
 // COMMENT: One uniform sample is shared by the three runtime calls.
 
@@ -36,9 +36,9 @@
 // CHECK:          [[PHASE:%.+]] = call @rs_mixed_decomposition_get_phase([[ARG_ANGLE]], [[EPS]], {{%.+}}, [[SAMPLE]])
 // CHECK:          scf.for {{.*}} iter_args({{%.+}} = [[ARG_QBIT]])
 // CHECK:            scf.index_switch {{%.+}} {catalyst.estimated_probabilities = [{{.*}}]}
-// COM: expected T and other entries (1.5346 + 0.0024) * log2(1/0.01) + 0.3606 + 2.5843 (Clifford+T), (1.5346 + 0.7719) * log2(1/0.01) + 0.3606 + 4.6973 (PPR)
+// COM: expected T and other entries (1.5346 + 0.0024) * log2(1/0.01) + 0.3606 + 2.5843 (Clifford+T), 1.5346 * log2(1/0.01) + 0.3606 + 0.0021 (PPR)
 // CLIFFORD:       } {catalyst.estimated_iterations = 13.1{{[0-9]+}} : f64}
-// PPR:            } {catalyst.estimated_iterations = 20.3{{[0-9]+}} : f64}
+// PPR:            } {catalyst.estimated_iterations = 10.5{{[0-9]+}} : f64}
 // CHECK:          quantum.gphase([[PHASE]])
 // CHECK:          return {{%.+}} : !quantum.bit
 

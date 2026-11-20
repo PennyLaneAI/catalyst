@@ -47,7 +47,7 @@ from jaxlib.mlir.dialects.arith import (
     SubIOp,
 )
 from jaxlib.mlir.dialects.builtin import UnrealizedConversionCastOp
-from jaxlib.mlir.dialects.func import FunctionType
+from jaxlib.mlir.dialects.func import FuncOp, FunctionType
 from jaxlib.mlir.dialects.scf import ConditionOp, ForOp, IfOp, IndexSwitchOp, WhileOp, YieldOp
 from jaxlib.mlir.dialects.stablehlo import ConstantOp as StableHLOConstantOp
 from jaxlib.mlir.dialects.stablehlo import ConvertOp as StableHLOConvertOp
@@ -739,32 +739,51 @@ def _decomposition_rule_abstract(*, pyfun, func_jaxpr, is_qreg, num_params):
 
 @decomp_definition_p.def_abstract_eval
 def _decomposition_definition_abstract(
-    *, pyfun, func_jaxpr, target_gate, resources, frontend_name, num_wires
+    *, pyfun, func_jaxpr, target_gate, resources, frontend_name, num_wires, estimate_decomps=False
 ):
     return ()
 
 
 def _decomposition_definition_lowering(
-    ctx, *, pyfun, func_jaxpr, target_gate, resources, frontend_name, num_wires
+    ctx,
+    *,
+    pyfun,
+    func_jaxpr,
+    target_gate,
+    resources,
+    frontend_name,
+    num_wires,
+    estimate_decomps=False,
 ):
-    """Lower a finalized Catalyst decomposition-rule as a function definition."""
+    """Lower a finalized Catalyst decomposition rule as a definition or declaration."""
     # differentiate functions in the lowering cache
-    metadata = (target_gate, resources, frontend_name, num_wires)
-    func_op = lower_callable(ctx, pyfun, func_jaxpr, metadata=metadata)
+    metadata = (target_gate, resources, frontend_name, num_wires, estimate_decomps)
+    if estimate_decomps:
+        key = (pyfun, *metadata)
+        func_op = get_cached(ctx, key)
+        if func_op is None:
+            input_types = [
+                typ for aval in func_jaxpr.in_avals for typ in mlir.aval_to_ir_types(aval)
+            ]
+            output_types = [
+                typ for aval in func_jaxpr.out_avals for typ in mlir.aval_to_ir_types(aval)
+            ]
+            func_op = FuncOp(
+                pyfun.__name__,
+                FunctionType.get(input_types, output_types),
+                ip=ctx.module_context.ip,
+            )
+            ctx.module_context.symbol_table.insert(func_op)
+            cache(ctx, key, func_op)
+    else:
+        func_op = lower_callable(ctx, pyfun, func_jaxpr, metadata=metadata)
 
     func_op.attributes["target_gate"] = get_mlir_attribute_from_pyval(target_gate)
     func_op.attributes["sym_visibility"] = ir.StringAttr.get("private")
+    func_op.attributes["resources"] = get_mlir_attribute_from_pyval({"operations": dict(resources)})
 
-    # TODO: remove extra field/branch with DecompRuleInterpreter removal
-    if resources is not None:
-        func_op.attributes["resources"] = get_mlir_attribute_from_pyval(
-            {"operations": dict(resources)}
-        )
-        assert frontend_name is not None
-        func_op.attributes["frontend_name"] = get_mlir_attribute_from_pyval(frontend_name)
-    else:
-        assert num_wires is not None
-        func_op.attributes["num_wires"] = get_mlir_attribute_from_pyval(num_wires)
+    assert frontend_name is not None
+    func_op.attributes["frontend_name"] = get_mlir_attribute_from_pyval(frontend_name)
 
     return ()
 
@@ -772,6 +791,14 @@ def _decomposition_definition_lowering(
 #
 # grad
 #
+
+
+def _diff_method_attribute(ctx, method: str):
+    return ir.OpaqueAttr.get(
+        "gradient", ("diff_method " + method).encode("utf-8"), ir.NoneType.get(ctx), ctx
+    )
+
+
 @dataclass
 class GradParams:
     """Common gradient parameters. The parameters are expected to be checked before the creation of
@@ -853,7 +880,7 @@ def _grad_lowering(ctx, *args, jaxpr, fn, grad_params):
 
     return GradOp(
         flat_output_types,
-        ir.StringAttr.get(method),
+        _diff_method_attribute(mlir_ctx, method),
         symbol_ref,
         mlir.flatten_ir_values(args_and_consts),
         diffArgIndices=diffArgIndices,
@@ -877,7 +904,7 @@ def _capture_grad_lowering(ctx, *args, argnums, jaxpr, n_consts, method, h, fn, 
 
     return GradOp(
         flat_output_types,
-        ir.StringAttr.get(method),
+        _diff_method_attribute(mlir_ctx, method),
         symbol_ref,
         mlir.flatten_ir_values(args),
         diffArgIndices=diffArgIndices,
@@ -954,7 +981,7 @@ def _value_and_grad_lowering(ctx, *args, jaxpr, fn, grad_params):
     return ValueAndGradOp(
         val_result_types,
         gradient_result_types,
-        ir.StringAttr.get(method),
+        _diff_method_attribute(mlir_ctx, method),
         symbol_ref,
         mlir.flatten_ir_values(func_args),
         diffArgIndices=ir.DenseIntElementsAttr.get(new_argnums),
@@ -982,7 +1009,7 @@ def _capture_value_and_grad_lowering(ctx, *args, jaxpr, fn, h, method, argnums):
     return ValueAndGradOp(
         val_result_types,
         gradient_result_types,
-        ir.StringAttr.get(method),
+        _diff_method_attribute(mlir_ctx, method),
         symbol_ref,
         mlir.flatten_ir_values(args),
         diffArgIndices=ir.DenseIntElementsAttr.get(new_argnums),
@@ -1035,7 +1062,7 @@ def _jvp_lowering(ctx, *args, jaxpr, fn, grad_params):
     return JVPOp(
         flat_output_types[: len(flat_output_types) // 2],
         flat_output_types[len(flat_output_types) // 2 :],
-        ir.StringAttr.get(method),
+        _diff_method_attribute(mlir_ctx, method),
         symbol_ref,
         mlir.flatten_ir_values(func_args),
         mlir.flatten_ir_values(tang_args),
@@ -1069,7 +1096,7 @@ def _capture_jvp_lowering(ctx, *args, jaxpr, fn, method, argnums, h):
     return JVPOp(
         func_result_types,
         jvp_result_types,
-        ir.StringAttr.get(method),
+        _diff_method_attribute(mlir_ctx, method),
         symbol_ref,
         mlir.flatten_ir_values(func_args),
         mlir.flatten_ir_values(d_args),
@@ -1119,7 +1146,7 @@ def _vjp_lowering(ctx, *args, jaxpr, fn, grad_params):
     return VJPOp(
         func_result_types,
         vjp_result_types,
-        ir.StringAttr.get(method),
+        _diff_method_attribute(mlir_ctx, method),
         symbol_ref,
         mlir.flatten_ir_values(func_args),
         mlir.flatten_ir_values(cotang_args),
@@ -1151,7 +1178,7 @@ def _capture_vjp_lowering(ctx, *args, jaxpr, fn, method, argnums, h):
     return VJPOp(
         func_result_types,
         vjp_result_types,
-        ir.StringAttr.get(method),
+        _diff_method_attribute(mlir_ctx, method),
         symbol_ref,
         mlir.flatten_ir_values(func_args),
         mlir.flatten_ir_values(cotang_args),

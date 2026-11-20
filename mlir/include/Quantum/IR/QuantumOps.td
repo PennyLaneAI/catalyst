@@ -570,7 +570,8 @@ def CustomOp : UnitaryGate_Op<"custom", [DifferentiableGate, NoMemoryEffect,
 
 def OperatorOp : UnitaryGate_Op<"operator", [ParametrizedGate, NoMemoryEffect,
                                              AttrSizedOperandSegments, AttrSizedResultSegments,
-                                             DeclareOpInterfaceMethods<DecomposableGate, ["getExtraData"]>]> {
+                                             DeclareOpInterfaceMethods<DecomposableGate,
+                                                ["getExtraData"]>]> {
     let summary = "A generalized quantum operation with arbitrary input signature.";
     let description = [{
         The `quantum.operator` is a generic representation for arbitrary quantum operations
@@ -609,7 +610,9 @@ def OperatorOp : UnitaryGate_Op<"operator", [ParametrizedGate, NoMemoryEffect,
                              just forwarded to decomposition functions after the params list.
         * Optional frontend-level metadata:
           * `param_map` — maps frontend argument names to the lowered `params` operand positions
-          * `qubit_map` — maps frontend argument names to lowered qubit/index-array positions
+          * `qubit_map` — maps frontend argument names to lowered qubit/index-array positions.
+            Entries may share positions when composite arguments use the same qubits; each
+            entry retains its argument's wire order and number of wire occurrences.
 
         Examples:
 
@@ -798,7 +801,7 @@ def GlobalPhaseOp : UnitaryGate_Op<"gphase", [DifferentiableGate, AttrSizedOpera
              CArg<"mlir::ValueRange", "{}">:$in_ctrl_values,
              CArg<"bool", "false">:$adjoint
         ),[{
-            GlobalPhaseOp::build($_builder, $_state, 
+            GlobalPhaseOp::build($_builder, $_state,
                mlir::TypeRange(in_ctrl_qubits), angle, adjoint, in_ctrl_qubits, in_ctrl_values
             );
         }]>
@@ -980,6 +983,7 @@ def AdjointOp : Region_Op<"adjoint", [SingleBlockImplicitTerminator<"YieldOp">, 
 def CtrlOp : Region_Op<"ctrl", [SingleBlockImplicitTerminator<"YieldOp">,
                                 AttrSizedOperandSegments, AttrSizedResultSegments,
                                 AllTypesMatch<["in_ctrl_qubits", "out_ctrl_qubits"]>,
+                                AllTypesMatch<["in_work_qubits", "out_work_qubits"]>,
                                 AllTypesMatch<["args", "results"]>]> {
     let summary = "Apply the enclosed operations controlled on the given control qubits.";
     let description = [{
@@ -989,9 +993,11 @@ def CtrlOp : Region_Op<"ctrl", [SingleBlockImplicitTerminator<"YieldOp">,
 
         The `ctrl-lowering` pass distributes the controls over the region: every gate in the
         region gains the control qubits/values (appended to any controls it already carries),
-        and the control qubits are threaded through the region. Structural ops (extract, insert,
-        alloc, dealloc) are passed through unchanged, and a nested `quantum.ctrl` region has its
-        controls merged. Measurements inside a `quantum.ctrl` region are rejected.
+        and the control and work qubits are threaded through the region. Work qubits become a
+        distinct `ctrl_work_wires` register on each controlled operator. Structural ops (extract,
+        insert, alloc, dealloc) are passed through unchanged, and a nested `quantum.ctrl` region
+        has its controls and work qubits merged. Measurements inside a `quantum.ctrl` region are
+        rejected.
     }];
 
     let regions = (region SizedRegion<1>:$region);
@@ -999,17 +1005,22 @@ def CtrlOp : Region_Op<"ctrl", [SingleBlockImplicitTerminator<"YieldOp">,
     let arguments = (ins
         Variadic<QubitType>:$in_ctrl_qubits,
         Variadic<I1>:$in_ctrl_values,
+        Variadic<QubitType>:$in_work_qubits,
+        DefaultValuedAttr<StrAttr, "::catalyst::CTRL_WORK_WIRE_TYPE_BORROWED">:$work_wire_type,
         Variadic<AnyTypeOf<[QuregType, QubitType]>>:$args
     );
 
     let results = (outs
         Variadic<QubitType>:$out_ctrl_qubits,
+        Variadic<QubitType>:$out_work_qubits,
         Variadic<AnyTypeOf<[QuregType, QubitType]>>:$results
     );
 
     let assemblyFormat = [{
-        `(` $in_ctrl_qubits `)` `ctrlvals` `(` $in_ctrl_values `)` `(` $args `)`
-        attr-dict `:` type($out_ctrl_qubits) `->` type($results) $region
+        `(` $in_ctrl_qubits `)` `ctrlvals` `(` $in_ctrl_values `)`
+        (`work_wires` `(` $in_work_qubits^ `)`)? `(` $args `)`
+        attr-dict `:` type($out_ctrl_qubits)
+        (`work_wires` type($out_work_qubits)^)? (`->` type($results)^)? $region
     }];
 
     let hasVerifier = 1;
@@ -1034,7 +1045,7 @@ def YieldOp : Quantum_Op<"yield", [Pure, ReturnLike, Terminator, ParentOneOf<["A
 // -----
 
 class Observable_Op<string mnemonic, list<Trait> traits = []> :
-        Quantum_Op<mnemonic, traits # [Pure]>;
+        Quantum_Op<mnemonic, traits # [Pure, Observable]>;
 
 def ComputationalBasisOp : Observable_Op<"compbasis", [AttrSizedOperandSegments]> {
     let summary = "Define a pseudo-observable of the computational basis for use in measurements";
