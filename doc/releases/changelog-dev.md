@@ -1028,6 +1028,9 @@
   freed memory.
   [(#3496)](https://github.com/PennyLaneAI/catalyst/pull/3496)
 
+* Fixed incorrect `qjit` results for non-contiguous NumPy inputs, including slices and transposes.
+  [(#3501)](https://github.com/PennyLaneAI/catalyst/pull/3501)
+
 * The `gpu_verbs` coprocessor now supports the NVIDIA GH200 with CUDA 12.4.
   [(#3467)](https://github.com/PennyLaneAI/catalyst/pull/3467)
 
