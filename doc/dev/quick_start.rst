@@ -30,7 +30,7 @@ provided by JAX.
 .. code-block:: python
 
     from catalyst import qjit, measure, cond, for_loop, while_loop, grad
-    import pennylane as qp
+    import pennylane2 as qp
     from jax import numpy as jnp
 
 Constructing the QNode
@@ -58,7 +58,7 @@ Let's start learning more about Catalyst by running a simple circuit.
         qp.CNOT(wires=[0,1])
         return qp.expval(qp.PauliZ(wires=1))
 
-In PennyLane, the :func:`qp.qnode() <pennylane.qnode>` decorator creates a device specific quantum function. For each quantum
+In PennyLane, the :func:`qp.qnode() <pennylane2.qnode>` decorator creates a device specific quantum function. For each quantum
 function, we can specify the number of wires.
 
 The :func:`.qjit` decorator can be used to jit a workflow of quantum functions:
@@ -91,7 +91,7 @@ Operations
 ----------
 Catalyst allows you to use :doc:`quantum operations <introduction/operations>`
 available in PennyLane either via native support by the runtime or PennyLane's decomposition rules.
-The :func:`qp.adjoint() <pennylane.adjoint>` and :func:`qp.ctrl() <pennylane.ctrl>` functions in
+The :func:`qp.adjoint() <pennylane2.adjoint>` and :func:`qp.ctrl() <pennylane2.ctrl>` functions in
 PennyLane are also supported via the decomposition mechanism in Catalyst. For example,
 
 .. code-block:: python
@@ -112,7 +112,7 @@ more complex quantum circuits.
    decompose quite differently).
    However, Catalyst's decomposition logic will differ in the following cases:
 
-   1. For devices without native controlled gates support (e.g., ``lightning.kokkos`` and ``lightning.gpu``), all :class:`qp.Controlled <pennylane.ops.op_math.Controlled>` operations will decompose to :class:`qp.QubitUnitary <pennylane.QubitUnitary>` operations.
+   1. For devices without native controlled gates support (e.g., ``lightning.kokkos`` and ``lightning.gpu``), all :class:`qp.Controlled <pennylane2.ops.op_math.Controlled>` operations will decompose to :class:`qp.QubitUnitary <pennylane2.QubitUnitary>` operations.
    2. The set of operations supported by Catalyst itself can in some instances lead to additional decompositions compared to the device itself.
 
 
@@ -121,7 +121,7 @@ Observables
 The Catalyst has support for :doc:`PennyLane observables <introduction/operations>`.
 
 For example, the following circuit is a QJIT compatible function that calculates the expectation value of
-a tensor product of a :class:`qp.PauliX <pennylane.PauliX>`, :class:`qp.Hadamard <pennylane.Hadamard>` and :class:`qp.Hermitian <pennylane.Hermitian>` observables.
+a tensor product of a :class:`qp.PauliX <pennylane2.PauliX>`, :class:`qp.Hadamard <pennylane2.Hadamard>` and :class:`qp.Hermitian <pennylane2.Hermitian>` observables.
 
 .. code-block:: python
 
@@ -148,22 +148,22 @@ are supported in Catalyst, although not all features are supported for all measu
    :widths: 25 75
    :header-rows: 0
 
-   * - :func:`qp.expval() <pennylane.expval>`
+   * - :func:`qp.expval() <pennylane2.expval>`
      - The expectation value of observables is supported analytically as well as with finite-shots.
-   * - :func:`qp.var() <pennylane.var>`
+   * - :func:`qp.var() <pennylane2.var>`
      - The variance of observables is supported analytically as well as with finite-shots.
-   * - :func:`qp.sample() <pennylane.sample>`
+   * - :func:`qp.sample() <pennylane2.sample>`
      - Samples in the computational basis only are supported.
-   * - :func:`qp.counts() <pennylane.counts>`
+   * - :func:`qp.counts() <pennylane2.counts>`
      - Sample counts in the computational basis only are supported.
-   * - :func:`qp.probs() <pennylane.probs>`
+   * - :func:`qp.probs() <pennylane2.probs>`
      - The probabilities is supported in the computational basis as well as with finite-shots.
-   * - :func:`qp.state() <pennylane.state>`
+   * - :func:`qp.state() <pennylane2.state>`
      - The state in the computational basis only is supported.
    * - :func:`.measure`
      - The projective mid-circuit measurement is supported via its own operation in Catalyst.
 
-For both :func:`qp.sample() <pennylane.sample>` and :func:`qp.counts() <pennylane.counts>` omitting the wires
+For both :func:`qp.sample() <pennylane2.sample>` and :func:`qp.counts() <pennylane2.counts>` omitting the wires
 parameters produces samples on all declared qubits in the same format as in PennyLane.
 
 Counts are returned a bit differently, namely as a pair of arrays representing a dictionary from basis states
@@ -184,7 +184,7 @@ float data type. This way they are compatible with eigenvalue sampling, but this
 {'0': 985, '1': 15}
 
 You can specify the number of shots to be used in sample-based measurements when you create a device.
-:func:`qp.sample() <pennylane.sample>` and :func:`qp.counts() <pennylane.counts>` will
+:func:`qp.sample() <pennylane2.sample>` and :func:`qp.counts() <pennylane2.counts>` will
 automatically use the device's ``shots`` parameter when performing measurements.
 In the following example, the number of shots is set to :math:`500` in the device instantiation.
 
@@ -233,7 +233,7 @@ requires a list of wires that the measurement process acts on.
 
 .. important::
 
-    The :func:`qp.measure() <pennylane.measure>` function is **not** QJIT compatible and :func:`.measure` from Catalyst should be used instead:
+    The :func:`qp.measure() <pennylane2.measure>` function is **not** QJIT compatible and :func:`.measure` from Catalyst should be used instead:
 
     .. code-block:: python
 

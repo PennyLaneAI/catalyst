@@ -20,7 +20,7 @@ This file contains tests for measurement primitives when the return shape is dyn
 from functools import partial
 
 import numpy as np
-import pennylane as qp
+import pennylane2 as qp
 import pytest
 
 import catalyst

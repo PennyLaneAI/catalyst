@@ -26,23 +26,23 @@ import copy
 from typing import Callable
 
 import jax.numpy as jnp
-import pennylane as qp
-import pennylane.numpy as pnp
+import pennylane2 as qp
+import pennylane2.numpy as pnp
 import pytest
 from numpy.testing import assert_allclose
-from pennylane import adjoint as PL_adjoint
-from pennylane import cond
-from pennylane import ctrl as PL_ctrl
-from pennylane import for_loop, qjit, while_loop
-from pennylane.operation import (
+from pennylane2 import adjoint as PL_adjoint
+from pennylane2 import cond
+from pennylane2 import ctrl as PL_ctrl
+from pennylane2 import for_loop, qjit, while_loop
+from pennylane2.operation import (
     DecompositionUndefinedError,
     Operation,
     Operator,
     Operator2,
     Wires,
 )
-from pennylane.ops.op_math.controlled import Controlled
-from pennylane.tape import QuantumTape
+from pennylane2.ops.op_math.controlled import Controlled
+from pennylane2.tape import QuantumTape
 
 from catalyst import adjoint as C_adjoint
 from catalyst import ctrl as C_ctrl

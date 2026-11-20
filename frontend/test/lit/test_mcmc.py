@@ -17,7 +17,7 @@
 Test that mcmc, num_burnin, and kernel_name are set in MLIR
 """
 
-import pennylane as qp
+import pennylane2 as qp
 
 from catalyst import qjit
 

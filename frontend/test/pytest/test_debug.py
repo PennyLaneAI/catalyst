@@ -18,10 +18,10 @@ import textwrap
 
 import jax.numpy as jnp
 import numpy as np
-import pennylane as qp
+import pennylane2 as qp
 import pytest
 from jax.tree_util import register_pytree_node_class
-from pennylane import for_loop
+from pennylane2 import for_loop
 
 from catalyst import debug, qjit, value_and_grad
 from catalyst.compiler import _options_to_cli_flags, to_llvm, to_llvm_opt, to_mlir_opt

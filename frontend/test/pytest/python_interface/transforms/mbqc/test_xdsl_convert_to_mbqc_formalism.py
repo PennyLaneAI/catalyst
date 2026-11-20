@@ -15,9 +15,9 @@
 
 # pylint: disable=line-too-long
 
-import pennylane as qp
+import pennylane2 as qp
 import pytest
-from pennylane.ftqc import RotXZX
+from pennylane2.ftqc import RotXZX
 
 from catalyst.ftqc import mbqc_pipeline
 from catalyst.python_interface.transforms import (

@@ -19,7 +19,7 @@ from inspect import signature
 from types import UnionType
 from typing import ClassVar, Union, get_args, get_origin
 
-from pennylane.transforms.core import Transform
+from pennylane2.transforms.core import Transform
 from xdsl.context import Context
 from xdsl.dialects import builtin
 from xdsl.ir import Operation
@@ -92,7 +92,7 @@ class CompilationPass(ModulePass):
     .. see-also::
 
         `~.compiler_transform` for registering ``CompilationPass`` subclasses to use with
-        :func:`pennylane.qjit` workflows.
+        :func:`pennylane2.qjit` workflows.
 
     A ``CompilationPass`` must specify an :meth:`action <~.CompilationPass.action>` that describes
     how it will transform operations. Please consult the documentation for the

@@ -31,7 +31,7 @@ What this practically means for this test is that if we were to write
 something like the following:
 
   ```python
-  import pennylane as qp
+  import pennylane2 as qp
   from catalyst import qjit
   from pathlib import Path
 
@@ -62,7 +62,7 @@ APIs, like the Compiler and options.
 import platform
 from pathlib import Path
 
-import pennylane as qp
+import pennylane2 as qp
 
 from catalyst import qjit
 from catalyst.compiler import _quantum_opt

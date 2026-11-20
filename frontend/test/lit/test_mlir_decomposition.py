@@ -30,8 +30,8 @@ import platform
 import shutil
 
 import numpy as np
-import pennylane as qp
-from pennylane.devices import NullQubit
+import pennylane2 as qp
+from pennylane2.devices import NullQubit
 from utils import print_jaxpr
 
 import catalyst

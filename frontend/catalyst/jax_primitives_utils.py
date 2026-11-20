@@ -17,7 +17,7 @@ import copy
 import functools
 from collections.abc import Sequence
 
-import pennylane as qp
+import pennylane2 as qp
 from jax._src import core, util
 from jax._src.lib.mlir import ir
 from jax.interpreters import mlir
@@ -25,7 +25,7 @@ from jaxlib.mlir.dialects.builtin import ModuleOp
 from jaxlib.mlir.dialects.func import CallOp
 from mlir_quantum.dialects._transform_ops_gen import ApplyRegisteredPassOp, NamedSequenceOp, YieldOp
 from mlir_quantum.dialects.catalyst import LaunchKernelOp
-from pennylane.transforms.core import BoundTransform
+from pennylane2.transforms.core import BoundTransform
 
 from catalyst.backline import module_attributes
 from catalyst.jax_extras.lowering import get_mlir_attribute_from_pyval

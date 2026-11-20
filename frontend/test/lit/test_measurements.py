@@ -18,7 +18,7 @@
 
 import jax
 import numpy as np
-import pennylane as qp
+import pennylane2 as qp
 
 from catalyst import CompileError, qjit
 from catalyst.jax_primitives import compbasis_p, counts_p, sample_p

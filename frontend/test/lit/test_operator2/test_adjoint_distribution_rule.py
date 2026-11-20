@@ -20,9 +20,9 @@ Test the "distribution" pathway for CQRs.
 
 # pylint: disable = line-too-long,unused-argument,missing-function-docstring
 
-import pennylane as qp
+import pennylane2 as qp
 from operator2_dummy_gates import NoParams, SingleParam
-from pennylane.typing import Float, Wire
+from pennylane2.typing import Float, Wire
 
 
 def test_distribution_rule_synthesized_from_base():

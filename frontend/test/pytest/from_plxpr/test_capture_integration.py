@@ -18,7 +18,7 @@
 from functools import partial
 
 import jax.numpy as jnp
-import pennylane as qp
+import pennylane2 as qp
 import pytest
 
 import catalyst

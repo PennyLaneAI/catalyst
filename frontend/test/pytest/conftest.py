@@ -21,7 +21,7 @@ from tempfile import TemporaryDirectory
 from textwrap import dedent
 from warnings import warn
 
-import pennylane as qp
+import pennylane2 as qp
 import pytest
 
 

@@ -15,9 +15,9 @@
 """Test Pauli rotation and measurement lowering"""
 
 import numpy as np
-import pennylane as qp
+import pennylane2 as qp
 import pytest
-from pennylane.transforms import to_ppr
+from pennylane2.transforms import to_ppr
 
 import catalyst
 from catalyst import qjit

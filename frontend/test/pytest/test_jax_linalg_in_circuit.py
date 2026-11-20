@@ -17,7 +17,7 @@ Test the jax linear algebra functions for full quantum-circuit workflows compile
 """
 
 import numpy as np
-import pennylane as qp
+import pennylane2 as qp
 import pytest
 from jax import numpy as jnp
 from jax import scipy as jsp

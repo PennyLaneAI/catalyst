@@ -20,11 +20,11 @@ from functools import partial
 
 import jax
 import numpy as np
-import pennylane as qp
+import pennylane2 as qp
 import pytest
 from jax import numpy as jnp
 from jax.tree_util import tree_all, tree_flatten, tree_map, tree_structure
-from pennylane import for_loop, grad, jacobian, qjit
+from pennylane2 import for_loop, grad, jacobian, qjit
 
 import catalyst
 import catalyst.utils.calculate_grad_shape as infer

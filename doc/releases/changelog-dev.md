@@ -894,6 +894,10 @@
 
 <h3>Breaking changes 💔</h3>
 
+* Development builds now require PennyLane2. Use `import pennylane2 as qp`;
+  the `catalyst` import and package version scheme remain unchanged.
+  These builds no longer support Classic PennyLane.
+
 * We now have `capture=True` as the default mode for Catalyst `qjit`.
   [(#3414)](https://github.com/PennyLaneAI/catalyst/pull/3414)
 

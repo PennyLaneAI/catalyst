@@ -22,8 +22,8 @@ measurements from PennyLane's ftqc module in Catalyst.
 
 from functools import partial
 
-import pennylane as qp
-import pennylane.ftqc as plft
+import pennylane2 as qp
+import pennylane2.ftqc as plft
 
 from catalyst import qjit
 

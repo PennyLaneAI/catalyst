@@ -23,11 +23,11 @@ from functools import partial
 from unittest.mock import Mock, patch
 
 import numpy as np
-import pennylane as qp
+import pennylane2 as qp
 import pytest
-from pennylane.devices import Device
-from pennylane.devices.capabilities import OperatorProperties
-from pennylane.transforms import split_non_commuting, split_to_single_terms
+from pennylane2.devices import Device
+from pennylane2.devices.capabilities import OperatorProperties
+from pennylane2.transforms import split_non_commuting, split_to_single_terms
 from utils import CONFIG_CUSTOM_DEVICE
 
 from catalyst import qjit

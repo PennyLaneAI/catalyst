@@ -19,7 +19,7 @@ from jax._src.interpreters import mlir
 from jaxlib.mlir.dialects import stablehlo
 from jaxlib.mlir.ir import Context as jaxContext
 from jaxlib.mlir.ir import Module as jaxModule
-from pennylane.typing import Callable
+from pennylane2.typing import Callable
 from xdsl.context import Context as xContext
 from xdsl.dialects.builtin import ArrayAttr, ModuleOp
 from xdsl.dialects.func import FuncOp

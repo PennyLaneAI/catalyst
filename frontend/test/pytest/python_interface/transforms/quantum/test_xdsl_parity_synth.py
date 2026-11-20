@@ -17,10 +17,10 @@ from collections import namedtuple
 from itertools import product
 
 import numpy as np
-import pennylane as qp
+import pennylane2 as qp
 import pytest
 from numpy.testing import assert_allclose, assert_equal
-from pennylane.transforms.intermediate_reps import phase_polynomial
+from pennylane2.transforms.intermediate_reps import phase_polynomial
 
 from catalyst.python_interface.transforms import (
     ParitySynthPass,

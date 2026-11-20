@@ -24,7 +24,7 @@ from typing import Callable, Sequence
 
 import jax
 import jax.numpy as jnp
-import pennylane as qp
+import pennylane2 as qp
 from jax._src.tree_util import tree_flatten
 
 from catalyst.jax_primitives import Folding, func_p, quantum_kernel_p, zne_p
@@ -122,7 +122,7 @@ def mitigate_with_zne(
 
     .. code-block:: python
 
-        import pennylane as qp
+        import pennylane2 as qp
         from catalyst import qjit, for_loop, mitigate_with_zne
 
         # replace "noisy.device" with your noisy device
@@ -158,7 +158,7 @@ def mitigate_with_zne(
 
     .. code-block:: python
 
-        from pennylane.noise import exponential_extrapolate
+        from pennylane2.noise import exponential_extrapolate
 
         dev = qp.device("lightning.qubit", wires=2)
 

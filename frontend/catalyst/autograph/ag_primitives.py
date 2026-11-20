@@ -27,14 +27,14 @@ from typing import Any, Callable, Iterator, SupportsIndex, Tuple, Union
 
 import jax
 import jax.numpy as jnp
-import pennylane as qp
+import pennylane2 as qp
 from malt.core import config as ag_config
 from malt.impl import api as ag_api
 from malt.impl.api import converted_call as ag_converted_call
 from malt.operators import py_builtins as ag_py_builtins
 from malt.operators.variables import Undefined
 from malt.pyct.origin_info import LineLocation
-from pennylane.queuing import AnnotatedQueue
+from pennylane2.queuing import AnnotatedQueue
 
 import catalyst
 from catalyst.jax_extras import DynamicJaxprTracer, ShapedArray
@@ -508,7 +508,7 @@ def get_source_code_info(tb_frame):
 # issues such as always tracing through code that should only be executed conditionally. We might
 # have to be even more restrictive in the future to prevent issues if necessary.
 module_allowlist = (
-    ag_config.DoNotConvert("pennylane"),
+    ag_config.DoNotConvert("pennylane2"),
     ag_config.DoNotConvert("catalyst"),
     ag_config.DoNotConvert("autoray"),
     ag_config.DoNotConvert("numpy"),

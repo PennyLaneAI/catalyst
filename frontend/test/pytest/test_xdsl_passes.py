@@ -23,7 +23,7 @@ import tempfile
 from unittest.mock import Mock
 
 import numpy as np
-import pennylane as qp
+import pennylane2 as qp
 import pytest
 
 from catalyst import qjit

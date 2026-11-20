@@ -18,7 +18,7 @@ from typing import TypeVar
 
 import jax
 import jax.numpy as jnp
-import pennylane as qp
+import pennylane2 as qp
 import pytest
 from jax import jvp as J_jvp
 from jax import vjp as J_vjp

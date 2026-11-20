@@ -2,7 +2,7 @@
 
     from dataclasses import dataclass
 
-    import pennylane as qp
+    import pennylane2 as qp
     from catalyst.python_interface.conversion import xdsl_from_qjit
     from catalyst.python_interface.dialects.quantum import CustomOp, QubitType
 

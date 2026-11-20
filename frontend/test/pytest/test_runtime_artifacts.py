@@ -19,7 +19,7 @@ and their collection into the compile options."""
 from pathlib import Path
 
 import jax.numpy as jnp
-import pennylane as qp
+import pennylane2 as qp
 import pytest
 from jax._src.lib.mlir import ir
 

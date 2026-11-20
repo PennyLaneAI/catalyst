@@ -17,15 +17,15 @@ This module tests the from_plxpr conversion function.
 
 import jax
 import numpy as np
-import pennylane as qp
+import pennylane2 as qp
 import pytest
-from pennylane.capture.primitives import (
+from pennylane2.capture.primitives import (
     adjoint_transform_prim,
     ctrl_transform_prim,
     for_loop_prim,
     while_loop_prim,
 )
-from pennylane.testing import find_eqns
+from pennylane2.testing import find_eqns
 
 import catalyst
 from catalyst.from_plxpr import from_plxpr

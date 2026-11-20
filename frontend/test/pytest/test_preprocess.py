@@ -17,13 +17,13 @@ import platform
 from dataclasses import replace
 
 import numpy as np
-import pennylane as qp
+import pennylane2 as qp
 import pytest
-from pennylane.decomposition import add_decomps, register_resources
-from pennylane.devices import Device, NullQubit
-from pennylane.devices.capabilities import DeviceCapabilities, OperatorProperties
-from pennylane.ops.op_math.adjoint2 import adjoint_rotation as adjoint_rotation2
-from pennylane.tape import QuantumScript
+from pennylane2.decomposition import add_decomps, register_resources
+from pennylane2.devices import Device, NullQubit
+from pennylane2.devices.capabilities import DeviceCapabilities, OperatorProperties
+from pennylane2.ops.op_math.adjoint2 import adjoint_rotation as adjoint_rotation2
+from pennylane2.tape import QuantumScript
 from utils import CONFIG_CUSTOM_DEVICE
 
 from catalyst import CompileError, ctrl, qjit

@@ -18,12 +18,12 @@ from functools import partial
 import jax
 import jax.numpy as jnp
 import numpy as np
-import pennylane as qp
-import pennylane.numpy as pnp
+import pennylane2 as qp
+import pennylane2.numpy as pnp
 import pytest
 from numpy.testing import assert_allclose
-from pennylane import adjoint, cond, for_loop, qjit, while_loop
-from pennylane.ops.op_math.adjoint import Adjoint, AdjointOperation
+from pennylane2 import adjoint, cond, for_loop, qjit, while_loop
+from pennylane2.ops.op_math.adjoint import Adjoint, AdjointOperation
 
 import catalyst
 import catalyst as cat

@@ -58,6 +58,8 @@ ARG PENNYLANE_VERSION=
 ARG LIGHTNING_VERSION=
 
 COPY --from=build /opt/wheel /opt/wheel
+COPY .dep-versions /opt/catalyst/.dep-versions
+COPY bin/install-lightning-kokkos.sh /opt/catalyst/bin/install-lightning-kokkos.sh
 
 RUN pip install --no-cache-dir --extra-index-url https://test.pypi.org/simple \
         /opt/wheel/*.whl
@@ -79,5 +81,8 @@ RUN if [ -n "${LIGHTNING_VERSION}" ]; then \
             pip install --no-cache-dir --no-deps --force-reinstall . \
         && rm -rf /tmp/lightning; \
     fi
+
+# Temporary until the matching Kokkos nightly can be installed directly.
+RUN if [ -z "${LIGHTNING_VERSION}" ]; then bash /opt/catalyst/bin/install-lightning-kokkos.sh; fi
 
 WORKDIR /work

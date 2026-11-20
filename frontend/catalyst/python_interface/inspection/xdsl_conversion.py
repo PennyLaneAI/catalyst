@@ -22,13 +22,13 @@ from collections.abc import Callable
 from itertools import compress
 from typing import TYPE_CHECKING
 
-from pennylane import capture, ops
-from pennylane.ftqc.operations import RotXZX
-from pennylane.measurements import counts, expval, probs, sample, state, var
-from pennylane.operation import Operator
-from pennylane.ops import MidMeasure
-from pennylane.ops import __all__ as ops_all
-from pennylane.ops import measure
+from pennylane2 import capture, ops
+from pennylane2.ftqc.operations import RotXZX
+from pennylane2.measurements import counts, expval, probs, sample, state, var
+from pennylane2.operation import Operator
+from pennylane2.ops import MidMeasure
+from pennylane2.ops import __all__ as ops_all
+from pennylane2.ops import measure
 from xdsl.dialects.builtin import DenseIntOrFPElementsAttr, IntegerAttr, IntegerType
 from xdsl.dialects.scf import ForOp
 from xdsl.dialects.tensor import ExtractOp as TensorExtractOp
@@ -58,8 +58,8 @@ from catalyst.python_interface.dialects.quantum import (
 from catalyst.utils.patching import Patcher
 
 if TYPE_CHECKING:
-    from pennylane.measurements import MeasurementProcess
-    from pennylane.workflow.qnode import QNode
+    from pennylane2.measurements import MeasurementProcess
+    from pennylane2.workflow.qnode import QNode
 
 has_jax = True
 try:

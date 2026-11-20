@@ -20,14 +20,14 @@ from enum import Enum, auto
 from functools import singledispatch, singledispatchmethod
 from typing import Sequence
 
-from pennylane.measurements import (
+from pennylane2.measurements import (
     ExpectationMP,
     MeasurementProcess,
     ProbabilityMP,
     VarianceMP,
 )
-from pennylane.operation import Operator
-from pennylane.ops import GlobalPhase
+from pennylane2.operation import Operator
+from pennylane2.ops import GlobalPhase
 from xdsl.dialects import builtin, func, scf
 from xdsl.ir import Block, Operation, Region
 

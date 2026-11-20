@@ -577,7 +577,7 @@ Inspecting and drawing circuits
 
 A useful tool for debugging quantum algorithms is the ability to draw them. Currently,
 :func:`@qjit <~.qjit>` compiled QNodes can be used as input to
-:func:`qp.draw <pennylane.draw>`, with the following caveats:
+:func:`qp.draw <pennylane2.draw>`, with the following caveats:
 
 - The ``qp.draw()`` function will only accept plain QNodes as input, *or* QNodes that have been qjit-compiled. It will not accept arbitrary hybrid functions (that may contain QNodes).
 
@@ -690,7 +690,7 @@ variables. This includes transforms that generate many circuits,
 
 .. code-block:: python
 
-    import pennylane as qp
+    import pennylane2 as qp
 
     dev = qp.device("lightning.qubit", wires=1)
 
@@ -1239,7 +1239,7 @@ This pattern is currently not supported in Catalyst, and will lead to an error:
         return measure_fn()
 
 >>> circuit(3)
-TypeError: Value sample(wires=[0]) with type <class 'pennylane.measurements.sample.SampleMP'> is not a valid JAX type
+TypeError: Value sample(wires=[0]) with type <class 'pennylane2.measurements.sample.SampleMP'> is not a valid JAX type
 
 It is recommended for now to create separate QNodes if different measurement statistics need to be
 returned, or alternatively using a single return statement with multiple measurements:
@@ -1334,9 +1334,9 @@ Note that ``jax.vmap`` cannot be used within a qjit-compiled function:
 NotImplementedError: Batching rule for 'qinst' not implemented
 
 In addition, shot-vectors are currently only supported in a limited manner;
-shot-vectors work with :func:`qp.sample <pennylane.sample>`, but not other
-measurement processes such as :func:`qp.expval <pennylane.expval>` and
-:func:`qp.probs <pennylane.probs>`.
+shot-vectors work with :func:`qp.sample <pennylane2.sample>`, but not other
+measurement processes such as :func:`qp.expval <pennylane2.expval>` and
+:func:`qp.probs <pennylane2.probs>`.
 
 Functionality differences from PennyLane
 ----------------------------------------
@@ -1349,7 +1349,7 @@ the ``@qjit`` decorator is applied.
 Currently, however, this is not the case for the following functionalities.
 
 - **Graph-based decompositions**: Graph-based decompositions can be enabled via
-  :func:`pennylane.decomposition.enable_graph`. Scenarios can happen in which
+  :func:`pennylane2.decomposition.enable_graph`. Scenarios can happen in which
   the graph may use different solutions non-deterministically if there exist
   intermediate decompositions that have the same overall cost. This phenomenon
   is not an issue, except for in cases where intermediate gates are not
@@ -1362,10 +1362,10 @@ Currently, however, this is not the case for the following functionalities.
   ``qp.transforms.decomopose(..., gate_set={..., qp.PauliRot: 100_000})``).
 
 - **Measurement behaviour**: :func:`catalyst.measure` currently behaves
-  differently from its PennyLane counterpart :func:`pennylane.measure`.
+  differently from its PennyLane counterpart :func:`pennylane2.measure`.
   In particular:
 
-  - Final measurement statistics occurring after :func:`pennylane.measure`
+  - Final measurement statistics occurring after :func:`pennylane2.measure`
     will average over all potential measurements, weighted by their
     likelihood.
 

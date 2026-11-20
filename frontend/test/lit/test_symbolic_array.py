@@ -19,7 +19,7 @@ Tests for using ``symbolic_array`` in a QNode.
 # RUN: %PYTHON %s | FileCheck %s
 
 import numpy as np
-import pennylane as qp
+import pennylane2 as qp
 
 
 @qp.qjit(capture=True, collect_decomp_rules=False, target="mlir")

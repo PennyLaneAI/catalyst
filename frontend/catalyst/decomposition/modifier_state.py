@@ -21,10 +21,10 @@ from collections.abc import Callable
 from dataclasses import dataclass, replace
 from typing import ClassVar
 
-import pennylane as qp
-from pennylane.decomposition.resources import resolve_work_wire_type
-from pennylane.ops.op_math.adjoint2 import Adjoint2
-from pennylane.ops.op_math.controlled2 import ControlledOp2
+import pennylane2 as qp
+from pennylane2.decomposition.resources import resolve_work_wire_type
+from pennylane2.ops.op_math.adjoint2 import Adjoint2
+from pennylane2.ops.op_math.controlled2 import ControlledOp2
 
 from catalyst.decomposition.type_utils import SerializedGraphOpID
 

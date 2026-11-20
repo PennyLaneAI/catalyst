@@ -37,7 +37,7 @@ def mbqc_pipeline() -> PipelineStages:
     .. code-block:: python
 
         import numpy as np
-        import pennylane as qp
+        import pennylane2 as qp
         from catalyst.ftqc import mbqc_pipeline
 
         qp.capture.enable()
@@ -99,7 +99,7 @@ def qec_pipeline() -> PipelineStages:
 
     .. code-block:: python
 
-        import pennylane as qp
+        import pennylane2 as qp
         from catalyst.ftqc import qec_pipeline
 
         qp.capture.enable()

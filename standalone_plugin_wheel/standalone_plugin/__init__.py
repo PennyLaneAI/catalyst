@@ -17,7 +17,7 @@
 import platform
 from pathlib import Path
 
-from pennylane.core import transform
+from pennylane2.core import transform
 
 
 def getStandalonePluginAbsolutePath():

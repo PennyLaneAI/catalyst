@@ -19,9 +19,9 @@ from textwrap import dedent
 import jax
 import jax.numpy as jnp
 import numpy as np
-import pennylane as qp
+import pennylane2 as qp
 import pytest
-from pennylane import cond
+from pennylane2 import cond
 
 import catalyst
 from catalyst import api_extensions

@@ -17,9 +17,9 @@
 import platform
 
 import numpy as np
-import pennylane as qp
+import pennylane2 as qp
 import pytest
-from pennylane.devices.capabilities import DeviceCapabilities, OperatorProperties
+from pennylane2.devices.capabilities import DeviceCapabilities, OperatorProperties
 from utils import CONFIG_CUSTOM_DEVICE
 
 from catalyst import CompileError, ctrl, qjit

@@ -19,7 +19,7 @@ This test suite was introduced following https://github.com/PennyLaneAI/catalyst
 """
 
 import numpy as np
-import pennylane as qp
+import pennylane2 as qp
 import pytest
 
 from catalyst import qjit

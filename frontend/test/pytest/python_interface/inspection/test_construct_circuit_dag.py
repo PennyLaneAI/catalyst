@@ -19,7 +19,7 @@ import re
 from unittest.mock import MagicMock, Mock
 
 import jax
-import pennylane as qp
+import pennylane2 as qp
 import pytest
 from xdsl.dialects import builtin, func, test
 from xdsl.dialects.builtin import ModuleOp

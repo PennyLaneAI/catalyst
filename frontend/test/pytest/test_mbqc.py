@@ -20,8 +20,8 @@ from functools import partial, reduce
 
 import networkx as nx
 import numpy as np
-import pennylane as qp
-import pennylane.ftqc as plft
+import pennylane2 as qp
+import pennylane2.ftqc as plft
 import pytest
 
 from catalyst import qjit

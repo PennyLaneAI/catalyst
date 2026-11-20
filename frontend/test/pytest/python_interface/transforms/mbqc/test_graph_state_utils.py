@@ -14,7 +14,7 @@
 """Unit test module for the graph state utils"""
 
 import pytest
-from pennylane.exceptions import CompileError
+from pennylane2.exceptions import CompileError
 
 from catalyst.python_interface.transforms.mbqc.graph_state_utils import (
     _adj_matrix_generation_helper,

@@ -19,7 +19,7 @@
 # pylint: disable=line-too-long
 
 import numpy as np
-import pennylane as qp
+import pennylane2 as qp
 
 from catalyst import qjit
 from catalyst.passes import (

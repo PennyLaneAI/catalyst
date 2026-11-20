@@ -6,7 +6,7 @@ Simple tutorial for injecting functions into xDSL modules
     from dataclasses import dataclass
     import jax
 
-    import pennylane as qp
+    import pennylane2 as qp
     from catalyst.python_interface.conversion import inline_module, xdsl_from_qjit, xdsl_module
     from catalyst.python_interface.dialects.catalyst import LaunchKernelOp
 

@@ -18,7 +18,7 @@ of quantum operations, measurements, and observables to reference semantics JAXP
 
 from enum import Enum
 
-import pennylane as qp
+import pennylane2 as qp
 from jax._src import source_info_util
 from jax._src.lib.mlir import ir
 from jax.core import AbstractValue, ShapedArray
@@ -30,9 +30,9 @@ from jaxlib.mlir.dialects.arith import (
     ExtUIOp,
 )
 from jaxlib.mlir.dialects.stablehlo import ConvertOp as StableHLOConvertOp
-from pennylane.capture.primitives import adjoint_transform_prim as plxpr_adjoint_transform_prim
-from pennylane.capture.primitives import ctrl_transform_prim as plxpr_ctrl_transform_prim
-from pennylane.wires import AbstractQubit
+from pennylane2.capture.primitives import adjoint_transform_prim as plxpr_adjoint_transform_prim
+from pennylane2.capture.primitives import ctrl_transform_prim as plxpr_ctrl_transform_prim
+from pennylane2.wires import AbstractQubit
 
 # TODO: remove after jax v0.7.2 upgrade
 # Mock _ods_cext.globals.register_traceback_file_exclusion due to API conflicts between

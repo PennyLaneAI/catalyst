@@ -116,7 +116,7 @@ itself calls nested functions. All functions called within the
 qjit-compiled function will also have Python control flow captured
 and converted by AutoGraph.
 
-In addition, built-in functions from ``jax``, ``pennylane``, and ``catalyst``
+In addition, built-in functions from ``jax``, ``pennylane2``, and ``catalyst``
 are automatically *excluded* from the AutoGraph conversion when called
 within the qjit-compiled function.
 
@@ -959,7 +959,7 @@ Adding modules for Autograph conversion
 ---------------------------------------
 
 Library code is not meant to be targeted by Autograph conversion, hence
-``pennylane``, ``catalyst`` and ``jax`` modules have been excluded from it.
+``pennylane2``, ``catalyst`` and ``jax`` modules have been excluded from it.
 But sometimes it might make sense enabling specific submodules from the
 excluded modules for which conversion may be appropriate. For these cases
 one can use the ``autograph_include`` parameter, which provides a list

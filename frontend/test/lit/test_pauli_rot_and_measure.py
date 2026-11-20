@@ -19,8 +19,8 @@
 from functools import partial
 
 import numpy as np
-import pennylane as qp
-from pennylane.transforms import (
+import pennylane2 as qp
+from pennylane2.transforms import (
     commute_ppr,
     merge_ppr_ppm,
     ppm_compilation,

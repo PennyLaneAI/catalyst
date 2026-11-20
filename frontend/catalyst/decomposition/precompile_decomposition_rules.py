@@ -17,7 +17,7 @@
 import json
 from pathlib import Path
 
-import pennylane as qp
+import pennylane2 as qp
 from jax._src.lib.mlir import ir
 
 from catalyst.compiler import _quantum_opt

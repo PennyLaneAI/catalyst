@@ -18,7 +18,7 @@ import math
 from collections.abc import Generator, Sequence
 from typing import TypeAlias
 
-from pennylane.exceptions import CompileError
+from pennylane2.exceptions import CompileError
 
 DenselyPackedAdjMatrix: TypeAlias = Sequence[int] | Sequence[bool]
 

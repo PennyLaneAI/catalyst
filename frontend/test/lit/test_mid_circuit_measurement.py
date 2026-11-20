@@ -14,7 +14,7 @@
 
 # RUN: %PYTHON %s | FileCheck %s
 
-import pennylane as qp
+import pennylane2 as qp
 
 from catalyst import qjit
 from catalyst.passes import merge_rotations

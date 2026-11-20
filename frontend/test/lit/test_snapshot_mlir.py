@@ -19,8 +19,8 @@
 This file performs the lit test checking MLIR output for qp.Snapshot support in Catalyst.
 """
 
-import pennylane as qp
-from pennylane import numpy as np
+import pennylane2 as qp
+from pennylane2 import numpy as np
 
 from catalyst import qjit
 

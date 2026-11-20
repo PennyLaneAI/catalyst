@@ -21,8 +21,8 @@ from collections.abc import Callable
 from functools import wraps
 from shutil import which
 
-from pennylane.tape import QuantumScript
-from pennylane.workflow.qnode import QNode
+from pennylane2.tape import QuantumScript
+from pennylane2.workflow.qnode import QNode
 from xdsl.dialects.builtin import ModuleOp
 
 from catalyst.jit import QJIT
@@ -156,7 +156,7 @@ def draw_graph(qnode: QJIT, *, level: int | None = None) -> Callable:
         Please consult the links provided for installation instructions.
 
         Additionally, it is recommended to use ``draw_graph`` with PennyLane's program capture
-        enabled (see :func:`qp.capture.enable <pennylane.capture.enable>`).
+        enabled (see :func:`qp.capture.enable <pennylane2.capture.enable>`).
 
     .. warning::
 
@@ -169,7 +169,7 @@ def draw_graph(qnode: QJIT, *, level: int | None = None) -> Callable:
         the base state (``level=0``) in this visualization.
 
         Lastly, ``catalyst.draw_graph`` is currently not compatible with dynamic wire allocation.
-        This includes :func:`pennylane.allocation.allocate` and dynamic wire allocation that may
+        This includes :func:`pennylane2.allocation.allocate` and dynamic wire allocation that may
         occur in MLIR directly (via ``quantum.alloc_qb`` instructions).
 
     Args:
@@ -208,7 +208,7 @@ def draw_graph(qnode: QJIT, *, level: int | None = None) -> Callable:
 
     .. code-block::
 
-        import pennylane as qp
+        import pennylane2 as qp
         import catalyst
 
         qp.capture.enable()

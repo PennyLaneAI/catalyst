@@ -25,7 +25,7 @@ for the terminal measurements. There are no gates.
 # pylint: disable=line-too-long
 
 import numpy as np
-import pennylane as qp
+import pennylane2 as qp
 
 
 # CHECK: func.func public @test_state0() -> tensor<8xcomplex<f64>>

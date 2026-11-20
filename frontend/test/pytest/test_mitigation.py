@@ -17,9 +17,9 @@ from functools import partial
 
 import jax
 import numpy as np
-import pennylane as qp
+import pennylane2 as qp
 import pytest
-from pennylane.noise import exponential_extrapolate, poly_extrapolate
+from pennylane2.noise import exponential_extrapolate, poly_extrapolate
 
 import catalyst
 from catalyst.api_extensions.error_mitigation import (

@@ -17,7 +17,7 @@
 """Tests code generation of state prep"""
 
 import jax.numpy as jnp
-import pennylane as qp
+import pennylane2 as qp
 
 from catalyst import qjit
 

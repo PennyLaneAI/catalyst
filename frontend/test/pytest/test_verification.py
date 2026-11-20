@@ -18,11 +18,11 @@ import platform
 from copy import deepcopy
 from unittest.mock import patch
 
-import pennylane as qp
+import pennylane2 as qp
 import pytest
-from pennylane.devices.capabilities import OperatorProperties
-from pennylane.measurements import ExpectationMP, VarianceMP
-from pennylane.ops import Adjoint, Controlled
+from pennylane2.devices.capabilities import OperatorProperties
+from pennylane2.measurements import ExpectationMP, VarianceMP
+from pennylane2.ops import Adjoint, Controlled
 
 from catalyst import (
     CompileError,

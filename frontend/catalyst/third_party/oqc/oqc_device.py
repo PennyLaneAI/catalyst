@@ -18,8 +18,8 @@ import os
 import platform
 from typing import Optional
 
-from pennylane import CompilePipeline
-from pennylane.devices import Device, ExecutionConfig
+from pennylane2 import CompilePipeline
+from pennylane2.devices import Device, ExecutionConfig
 
 try:
     from qcaas_client.client import OQCClient  # pylint: disable=unused-import

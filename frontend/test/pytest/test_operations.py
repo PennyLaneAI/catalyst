@@ -13,9 +13,9 @@
 # limitations under the License.
 
 import numpy as np
-import pennylane as qp
+import pennylane2 as qp
 import pytest
-from pennylane.tape import QuantumTape
+from pennylane2.tape import QuantumTape
 from pennylane_lightning.lightning_qubit.lightning_qubit import OperatorProperties
 from utils import get_custom_qjit_device
 

@@ -16,7 +16,7 @@ import platform
 from copy import deepcopy
 
 import numpy as np
-import pennylane as qp
+import pennylane2 as qp
 import pytest
 from jax import numpy as jnp
 from utils import CONFIG_CUSTOM_DEVICE

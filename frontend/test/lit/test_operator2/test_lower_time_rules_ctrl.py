@@ -21,7 +21,7 @@ Test the ``@graph_decomposition`` decorator on controlled and controlled-adjoint
 # pylint: disable = line-too-long,unused-argument,missing-function-docstring
 
 import numpy as np
-import pennylane as qp
+import pennylane2 as qp
 
 from catalyst import qjit
 from catalyst.passes import graph_decomposition

@@ -17,7 +17,7 @@ This module tests the from_plxpr conversion function.
 
 import jax
 import numpy as np
-import pennylane as qp
+import pennylane2 as qp
 import pytest
 
 from catalyst.from_plxpr import from_plxpr

@@ -17,8 +17,8 @@ which collects and maps PennyLane operations and measurements from xDSL."""
 from functools import singledispatchmethod
 
 import xdsl
-from pennylane.measurements import MeasurementProcess
-from pennylane.operation import Operator
+from pennylane2.measurements import MeasurementProcess
+from pennylane2.operation import Operator
 from xdsl.dialects import builtin, func
 from xdsl.ir import SSAValue
 

@@ -607,6 +607,7 @@ jobs:
         python3 --version | grep ${{ needs.constants.outputs.primary_python_version }}
         python3 -m pip install -r requirements.txt
         make frontend
+        bash bin/install-lightning-kokkos.sh
 
     - name: Run Python Pytest Tests (backend=lightning.kokkos)
       run: |
@@ -615,6 +616,8 @@ jobs:
         python3 -m pytest frontend/test/async_tests --tb=native --backend="lightning.kokkos" -k "lightning.kokkos"
 
   frontend-tests-openqasm-device:
+    # Temporary: the Braket plugin does not yet support PennyLane2.
+    if: ${{ false }}
     name: Frontend Tests (backend="openqasm3")
     needs: [constants, llvm, runtime, quantum, determine_runner]
     runs-on: ${{ needs.determine_runner.outputs.runner_group }}

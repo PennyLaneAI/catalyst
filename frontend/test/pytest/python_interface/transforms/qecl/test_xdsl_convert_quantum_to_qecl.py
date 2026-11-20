@@ -16,7 +16,7 @@
 
 # pylint: disable=too-many-lines
 
-import pennylane as qp
+import pennylane2 as qp
 import pytest
 
 from catalyst.python_interface.transforms import measurements_from_samples_pass

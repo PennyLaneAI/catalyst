@@ -21,7 +21,7 @@ import os
 import pathlib
 import platform
 
-import pennylane as qp
+import pennylane2 as qp
 
 from catalyst.compiler import get_lib_path
 from catalyst.device import get_device_capabilities

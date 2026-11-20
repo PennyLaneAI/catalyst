@@ -29,13 +29,13 @@ from functools import partial
 
 import jax
 import numpy as np
-import pennylane as qp
+import pennylane2 as qp
 import pytest
 import scipy
 from jax import numpy as jnp
 from numpy.testing import assert_allclose
-from pennylane import numpy as pnp
-from pennylane.transforms import _tape_decompose, merge_rotations
+from pennylane2 import numpy as pnp
+from pennylane2.transforms import _tape_decompose, merge_rotations
 
 from catalyst import measure, qjit
 from catalyst.device import QJITDevice

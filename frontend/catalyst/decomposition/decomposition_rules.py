@@ -35,13 +35,13 @@ from enum import Enum, auto
 
 import jax.numpy as jnp
 import numpy as np
-import pennylane as qp
+import pennylane2 as qp
 from jax import Array
 from jax._src.lib.mlir import ir
-from pennylane.core.operator import Operator2, abstractify
-from pennylane.decomposition import DecompositionRule
-from pennylane.decomposition.utils import to_name
-from pennylane.wires import Wires
+from pennylane2.core.operator import Operator2, abstractify
+from pennylane2.decomposition import DecompositionRule
+from pennylane2.decomposition.utils import to_name
+from pennylane2.wires import Wires
 
 from catalyst.compiler import _quantum_opt
 from catalyst.decomposition.capture_session import OpDecompRequest

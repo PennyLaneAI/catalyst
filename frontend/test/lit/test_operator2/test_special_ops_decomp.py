@@ -29,7 +29,7 @@ On top of the above, we also explicitly test the lowering of some operations in 
 
 # pylint: disable = line-too-long,unused-argument
 
-import pennylane as qp
+import pennylane2 as qp
 from jax import numpy as jnp
 
 

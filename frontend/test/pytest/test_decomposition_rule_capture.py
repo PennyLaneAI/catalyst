@@ -19,11 +19,11 @@ import warnings
 
 import jax
 import jax.numpy as jnp
-import pennylane as qp
+import pennylane2 as qp
 import pytest
 from jax._src.lib.mlir import ir
-from pennylane.testing import find_eqns
-from pennylane.typing import Float, Wire
+from pennylane2.testing import find_eqns
+from pennylane2.typing import Float, Wire
 
 from catalyst import QJIT, CompileOptions, qjit
 from catalyst.decomposition.capture_session import OpDecompRequest, RuleIdentity
@@ -962,7 +962,7 @@ def test_distributed_control_carries_work_wires():
 @pytest.mark.parametrize("work_wire_type", ["zeroed", "borrowed"])
 def test_registered_callable_captures_work_wire_operands(work_wire_type):
     """Callable controls in registered rules keep work wires in the rule's JAXPR inputs."""
-    from pennylane.capture.primitives import ctrl_transform_prim
+    from pennylane2.capture.primitives import ctrl_transform_prim
 
     @qp.register_resources(
         {

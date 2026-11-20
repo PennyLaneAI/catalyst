@@ -19,10 +19,10 @@ with the compiler and device.
 
 from typing import Any, Callable, List, Sequence
 
-import pennylane as qp
-from pennylane import transform
-from pennylane.devices.capabilities import DeviceCapabilities, OperatorProperties
-from pennylane.measurements import (
+import pennylane2 as qp
+from pennylane2 import transform
+from pennylane2.devices.capabilities import DeviceCapabilities, OperatorProperties
+from pennylane2.measurements import (
     ExpectationMP,
     MutualInfoMP,
     SampleMeasurement,
@@ -31,9 +31,9 @@ from pennylane.measurements import (
     VarianceMP,
     VnEntropyMP,
 )
-from pennylane.measurements.shots import Shots, ShotsLike
-from pennylane.operation import Operation
-from pennylane.ops import (
+from pennylane2.measurements.shots import Shots, ShotsLike
+from pennylane2.operation import Operation
+from pennylane2.ops import (
     Adjoint,
     BasisState,
     CompositeOp,
@@ -44,7 +44,7 @@ from pennylane.ops import (
     StatePrep,
     SymbolicOp,
 )
-from pennylane.tape import QuantumTape
+from pennylane2.tape import QuantumTape
 
 from catalyst.api_extensions import Cond, ForLoop, HybridAdjoint, HybridCtrl, Switch, WhileLoop
 from catalyst.device.op_support import (

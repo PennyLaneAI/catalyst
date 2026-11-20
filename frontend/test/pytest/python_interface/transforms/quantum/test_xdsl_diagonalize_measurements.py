@@ -16,9 +16,9 @@
 import re
 
 import numpy as np
-import pennylane as qp
+import pennylane2 as qp
 import pytest
-from pennylane.exceptions import CompileError
+from pennylane2.exceptions import CompileError
 
 from catalyst.passes.builtin_passes import diagonalize_measurements
 from catalyst.python_interface.transforms import (
