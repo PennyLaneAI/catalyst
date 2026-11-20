@@ -17,8 +17,8 @@
 // RUN: quantum-opt --convert-to-reference-semantics --split-input-file --verify-diagnostics %s | FileCheck %s
 
 
-// CHECK: func.func @test_qreg_arg(%arg0: f64, %arg1: i64, %arg2: !qref.reg<2>) {
-// CHECK:     [[q:%.+]] = qref.get %arg2[%arg1] : !qref.reg<2>, i64 -> !qref.bit
+// CHECK: func.func @test_qreg_arg(%arg0: f64, %arg1: i64, %arg2: !qref.reg<?>) {
+// CHECK:     [[q:%.+]] = qref.get %arg2[%arg1] : !qref.reg<?>, i64 -> !qref.bit
 // CHECK:     qref.custom "RX"(%arg0) [[q]] : !qref.bit
 // CHECK:     return
 // CHECK: }
@@ -33,8 +33,10 @@ func.func @test_qreg_arg(%arg0: f64, %arg1: i64, %arg2: !quantum.reg) -> !quantu
 // CHECK: func.func @main(%arg0: f64, %arg1: i64) attributes {quantum.node} {
 // CHECK:     [[reg1:%.+]] = qref.alloc( 2) : !qref.reg<2>
 // CHECK:     [[reg2:%.+]] = qref.alloc( 2) : !qref.reg<2>
-// CHECK:     call @test_qreg_arg(%arg0, %arg1, [[reg1]]) : (f64, i64, !qref.reg<2>) -> ()
-// CHECK:     call @test_qreg_arg(%arg0, %arg1, [[reg2]]) : (f64, i64, !qref.reg<2>) -> ()
+// CHECK:     [[reg1_dyn:%.+]] = qref.cast [[reg1]] : !qref.reg<2> to !qref.reg<?>
+// CHECK:     call @test_qreg_arg(%arg0, %arg1, [[reg1_dyn]]) : (f64, i64, !qref.reg<?>) -> ()
+// CHECK:     [[reg2_dyn:%.+]] = qref.cast [[reg2]] : !qref.reg<2> to !qref.reg<?>
+// CHECK:     call @test_qreg_arg(%arg0, %arg1, [[reg2_dyn]]) : (f64, i64, !qref.reg<?>) -> ()
 // CHECK:     qref.dealloc [[reg1]] : !qref.reg<2>
 // CHECK:     qref.dealloc [[reg2]] : !qref.reg<2>
 // CHECK:     return
@@ -54,8 +56,8 @@ func.func @main(%arg0: f64, %arg1: i64) attributes {quantum.node} {
 // -----
 
 
-// CHECK: func.func @test_multi_qreg_arg(%arg0: !qref.reg<2>, %arg1: i64, %arg2: !qref.reg<?>) {
-// CHECK:     [[q0:%.+]] = qref.get %arg0[%arg1] : !qref.reg<2>, i64 -> !qref.bit
+// CHECK: func.func @test_multi_qreg_arg(%arg0: !qref.reg<?>, %arg1: i64, %arg2: !qref.reg<?>) {
+// CHECK:     [[q0:%.+]] = qref.get %arg0[%arg1] : !qref.reg<?>, i64 -> !qref.bit
 // CHECK:     [[q2:%.+]] = qref.get %arg2[%arg1] : !qref.reg<?>, i64 -> !qref.bit
 // CHECK:     qref.custom "gate"() [[q0]], [[q2]] : !qref.bit, !qref.bit
 // CHECK:     return
@@ -73,7 +75,9 @@ func.func @test_multi_qreg_arg(%arg0: !quantum.reg, %arg1: i64, %arg2: !quantum.
 // CHECK: func.func @main(%arg0: i64) attributes {quantum.node} {
 // CHECK:     [[reg2:%.+]] = qref.alloc( 2) : !qref.reg<2>
 // CHECK:     [[reg_dyn:%.+]] = qref.alloc(%arg0) : !qref.reg<?>
-// CHECK:     call @test_multi_qreg_arg([[reg2]], %arg0, [[reg_dyn]]) : (!qref.reg<2>, i64, !qref.reg<?>) -> ()
+// CHECK:     [[reg2_dyn:%.+]] = qref.cast [[reg2]] : !qref.reg<2> to !qref.reg<?>
+// CHECK-NOT: qref.cast
+// CHECK:     call @test_multi_qreg_arg([[reg2_dyn]], %arg0, [[reg_dyn]]) : (!qref.reg<?>, i64, !qref.reg<?>) -> ()
 // CHECK:     qref.dealloc [[reg2]] : !qref.reg<2>
 // CHECK:     qref.dealloc [[reg_dyn]] : !qref.reg<?>
 // CHECK:     return
@@ -187,9 +191,9 @@ func.func @main(%arg0: f64) attributes {quantum.node} {
 // -----
 
 
-// CHECK: func.func @test_mixed_args(%arg0: i64, %arg1: !qref.bit, %arg2: !qref.reg<3>, %arg3: !qref.bit) -> (i1, i1, i1) {
+// CHECK: func.func @test_mixed_args(%arg0: i64, %arg1: !qref.bit, %arg2: !qref.reg<?>, %arg3: !qref.bit) -> (i1, i1, i1) {
 func.func @test_mixed_args(%arg0: i64, %arg1: !quantum.bit, %arg2: !quantum.reg, %arg3: !quantum.bit) -> (i1, i1, i1, !quantum.bit, !quantum.reg, !quantum.bit) {
-    // CHECK: [[q_from_reg:%.+]] = qref.get %arg2[%arg0] : !qref.reg<3>, i64 -> !qref.bit
+    // CHECK: [[q_from_reg:%.+]] = qref.get %arg2[%arg0] : !qref.reg<?>, i64 -> !qref.bit
     // CHECK: qref.custom "gate"() %arg1, [[q_from_reg]], %arg3 : !qref.bit, !qref.bit, !qref.bit
     %0 = quantum.extract %arg2[%arg0] : !quantum.reg -> !quantum.bit
     %out_qubits:3 = quantum.custom "gate"() %arg1, %0, %arg3 : !quantum.bit, !quantum.bit, !quantum.bit
@@ -198,7 +202,7 @@ func.func @test_mixed_args(%arg0: i64, %arg1: !quantum.bit, %arg2: !quantum.reg,
     // CHECK: [[mres1:%.+]] = qref.measure %arg1 : i1
     %mres, %out_qubit = quantum.measure %out_qubits#0 : i1, !quantum.bit
 
-    // CHECK: [[q_from_reg:%.+]] = qref.get %arg2[%arg0] : !qref.reg<3>, i64 -> !qref.bit
+    // CHECK: [[q_from_reg:%.+]] = qref.get %arg2[%arg0] : !qref.reg<?>, i64 -> !qref.bit
     // CHECK: [[mres2:%.+]] = qref.measure [[q_from_reg]] : i1
     %2 = quantum.extract %1[%arg0] : !quantum.reg -> !quantum.bit
     %mres_0, %out_qubit_1 = quantum.measure %2 : i1, !quantum.bit
@@ -221,13 +225,15 @@ func.func @main(%arg0: i64) -> (i1, i1, i1, i1, i1, i1) attributes {quantum.node
     %3 = quantum.alloc( 3) : !quantum.reg
 
     // CHECK: [[q20:%.+]] = qref.get [[reg2]][ 0] : !qref.reg<2> -> !qref.bit
-    // CHECK: [[first_call:%.+]]:3 = call @test_mixed_args(%arg0, [[q20]], [[reg3]], [[q]]) : (i64, !qref.bit, !qref.reg<3>, !qref.bit) -> (i1, i1, i1)
+    // CHECK: [[reg3_dyn:%.+]] = qref.cast [[reg3]] : !qref.reg<3> to !qref.reg<?>
+    // CHECK: [[first_call:%.+]]:3 = call @test_mixed_args(%arg0, [[q20]], [[reg3_dyn]], [[q]]) : (i64, !qref.bit, !qref.reg<?>, !qref.bit) -> (i1, i1, i1)
     %4 = quantum.extract %2[ 0] : !quantum.reg -> !quantum.bit
     %5:6 = call @test_mixed_args(%arg0, %4, %3, %0) : (i64, !quantum.bit, !quantum.reg, !quantum.bit) -> (i1, i1, i1, !quantum.bit, !quantum.reg, !quantum.bit)
     %6 = quantum.insert %2[ 0], %5#3 : !quantum.reg, !quantum.bit
 
     // CHECK: [[q20:%.+]] = qref.get [[reg2]][ 0] : !qref.reg<2> -> !qref.bit
-    // CHECK: [[second_call:%.+]]:3 = call @test_mixed_args(%arg0, [[q20]], [[reg3]], [[q]]) : (i64, !qref.bit, !qref.reg<3>, !qref.bit) -> (i1, i1, i1)
+    // CHECK: [[reg3_dyn:%.+]] = qref.cast [[reg3]] : !qref.reg<3> to !qref.reg<?>
+    // CHECK: [[second_call:%.+]]:3 = call @test_mixed_args(%arg0, [[q20]], [[reg3_dyn]], [[q]]) : (i64, !qref.bit, !qref.reg<?>, !qref.bit) -> (i1, i1, i1)
     %7 = quantum.extract %6[ 0] : !quantum.reg -> !quantum.bit
     %8:6 = call @test_mixed_args(%arg0, %7, %5#4, %5#5) : (i64, !quantum.bit, !quantum.reg, !quantum.bit) -> (i1, i1, i1, !quantum.bit, !quantum.reg, !quantum.bit)
     %9 = quantum.insert %6[ 0], %8#3 : !quantum.reg, !quantum.bit
@@ -442,14 +448,15 @@ func.func @main() attributes {quantum.node} {
 
 // -----
 
-// Subroutines with the same name in different nested modules get the register sizes of their
-// own call sites.
+// Subroutines with the same name in different nested modules resolve to their own module, and
+// each call site casts its own register.
 
 // CHECK: module @m1 {
-// CHECK:     func.func @sub(%arg0: !qref.reg<2>) {
+// CHECK:     func.func @sub(%arg0: !qref.reg<?>) {
 // CHECK:     func.func @main() attributes {quantum.node} {
 // CHECK:         [[reg:%.+]] = qref.alloc( 2) : !qref.reg<2>
-// CHECK:         call @sub([[reg]]) : (!qref.reg<2>) -> ()
+// CHECK:         [[reg_dyn:%.+]] = qref.cast [[reg]] : !qref.reg<2> to !qref.reg<?>
+// CHECK:         call @sub([[reg_dyn]]) : (!qref.reg<?>) -> ()
 module @m1 {
     func.func @sub(%arg0: !quantum.reg) -> !quantum.reg {
         %0 = quantum.extract %arg0[ 0] : !quantum.reg -> !quantum.bit
@@ -467,10 +474,11 @@ module @m1 {
 }
 
 // CHECK: module @m2 {
-// CHECK:     func.func @sub(%arg0: !qref.reg<5>) {
+// CHECK:     func.func @sub(%arg0: !qref.reg<?>) {
 // CHECK:     func.func @main() attributes {quantum.node} {
 // CHECK:         [[reg:%.+]] = qref.alloc( 5) : !qref.reg<5>
-// CHECK:         call @sub([[reg]]) : (!qref.reg<5>) -> ()
+// CHECK:         [[reg_dyn:%.+]] = qref.cast [[reg]] : !qref.reg<5> to !qref.reg<?>
+// CHECK:         call @sub([[reg_dyn]]) : (!qref.reg<?>) -> ()
 module @m2 {
     func.func @sub(%arg0: !quantum.reg) -> !quantum.reg {
         %0 = quantum.extract %arg0[ 0] : !quantum.reg -> !quantum.bit
@@ -485,4 +493,53 @@ module @m2 {
         quantum.dealloc %1 : !quantum.reg
         return
     }
+}
+
+
+// -----
+
+// A subroutine called with registers of different sizes keeps a single dynamic signature, and
+// each call site casts its register of static size. Registers of dynamic size are passed as is,
+// also between subroutines.
+
+// CHECK: func.func @inner(%arg0: !qref.reg<?>) {
+// CHECK:     [[q:%.+]] = qref.get %arg0[ 0] : !qref.reg<?> -> !qref.bit
+// CHECK:     qref.custom "PauliX"() [[q]] : !qref.bit
+// CHECK: func.func @outer(%arg0: !qref.reg<?>) {
+// CHECK-NOT: qref.cast
+// CHECK:     call @inner(%arg0) : (!qref.reg<?>) -> ()
+// CHECK: func.func @main(%arg0: i64) attributes {quantum.node} {
+// CHECK:     [[reg2:%.+]] = qref.alloc( 2) : !qref.reg<2>
+// CHECK:     [[reg5:%.+]] = qref.alloc( 5) : !qref.reg<5>
+// CHECK:     [[reg_dyn:%.+]] = qref.alloc(%arg0) : !qref.reg<?>
+// CHECK:     [[reg2_dyn:%.+]] = qref.cast [[reg2]] : !qref.reg<2> to !qref.reg<?>
+// CHECK:     call @outer([[reg2_dyn]]) : (!qref.reg<?>) -> ()
+// CHECK:     [[reg5_dyn:%.+]] = qref.cast [[reg5]] : !qref.reg<5> to !qref.reg<?>
+// CHECK:     call @outer([[reg5_dyn]]) : (!qref.reg<?>) -> ()
+// CHECK-NOT: qref.cast
+// CHECK:     call @outer([[reg_dyn]]) : (!qref.reg<?>) -> ()
+
+func.func @inner(%arg0: !quantum.reg) -> !quantum.reg {
+    %0 = quantum.extract %arg0[ 0] : !quantum.reg -> !quantum.bit
+    %out_qubits = quantum.custom "PauliX"() %0 : !quantum.bit
+    %1 = quantum.insert %arg0[ 0], %out_qubits : !quantum.reg, !quantum.bit
+    return %1 : !quantum.reg
+}
+
+func.func @outer(%arg0: !quantum.reg) -> !quantum.reg {
+    %0 = call @inner(%arg0) : (!quantum.reg) -> !quantum.reg
+    return %0 : !quantum.reg
+}
+
+func.func @main(%arg0: i64) attributes {quantum.node} {
+    %0 = quantum.alloc( 2) : !quantum.reg
+    %1 = quantum.alloc( 5) : !quantum.reg
+    %2 = quantum.alloc(%arg0) : !quantum.reg
+    %3 = call @outer(%0) : (!quantum.reg) -> !quantum.reg
+    %4 = call @outer(%1) : (!quantum.reg) -> !quantum.reg
+    %5 = call @outer(%2) : (!quantum.reg) -> !quantum.reg
+    quantum.dealloc %3 : !quantum.reg
+    quantum.dealloc %4 : !quantum.reg
+    quantum.dealloc %5 : !quantum.reg
+    return
 }

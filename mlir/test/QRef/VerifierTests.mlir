@@ -620,3 +620,20 @@ func.func @operator_duplicate_controls(%target: !qref.bit, %control: !qref.bit) 
     qubit_map = {compute = [0], target = [1]}
   return
 }
+
+// -----
+
+func.func @cast_static_to_dynamic(%r: !qref.reg<3>, %r_dyn: !qref.reg<?>) {
+  %0 = qref.cast %r : !qref.reg<3> to !qref.reg<?>
+  %1 = qref.cast %r_dyn : !qref.reg<?> to !qref.reg<3>
+  %2 = qref.cast %r : !qref.reg<3> to !qref.reg<3>
+  return
+}
+
+// -----
+
+func.func @cast_between_static_sizes(%r: !qref.reg<3>) {
+  // expected-error@+1 {{cannot cast between registers of different static sizes, '!qref.reg<3>' and '!qref.reg<4>'}}
+  %0 = qref.cast %r : !qref.reg<3> to !qref.reg<4>
+  return
+}

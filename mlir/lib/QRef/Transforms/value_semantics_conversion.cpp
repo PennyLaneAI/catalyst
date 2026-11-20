@@ -2248,6 +2248,14 @@ struct ValueSemanticsConversionPass
         MLIRContext *ctx = mod->getContext();
         IRRewriter builder(ctx);
 
+        // Registers have no size in value semantics, so a cast between register sizes has no
+        // counterpart: its uses refer to the source register instead. The remaining conversion only
+        // tracks registers by value, and every register type converts to `!quantum.reg`.
+        mod->walk([&](qref::CastOp castOp) {
+            builder.replaceAllUsesWith(castOp.getResult(), castOp.getSource());
+            builder.eraseOp(castOp);
+        });
+
         WalkResult getOpVerification = mod->walk([&](qref::GetOp getOp) {
             if (!llvm::all_of(getOp->getUsers(),
                               llvm::IsaPred<REFERENCE_SEMANTICS_GATE_OPS,

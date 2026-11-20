@@ -157,6 +157,43 @@ def GetOp : Memory_Op<"get", [NoMemoryEffect]> {
     let hasFolder = 1;
 }
 
+def CastOp : Memory_Op<"cast", [Pure]> {
+    let summary = "Cast a register reference between static and dynamic sizes.";
+    let description = [{
+        This operation converts a register reference to an equivalent type with a different
+        static size information, e.g. from `!qref.reg<3>` to `!qref.reg<?>`. The result refers
+        to the same register as the source. The source and result types must be compatible: their
+        sizes are equal, or at least one of them is dynamic.
+
+        Subroutines take registers of dynamic size, so call sites cast registers of static size
+        to `!qref.reg<?>` before passing them. A sized register has no counterpart in value
+        semantics, so the conversion to value semantics folds the casts away.
+
+        Example:
+
+        ```mlir
+        %r = qref.alloc( 3) : !qref.reg<3>
+        %dyn = qref.cast %r : !qref.reg<3> to !qref.reg<?>
+        func.call @subroutine(%dyn) : (!qref.reg<?>) -> ()
+        ```
+    }];
+
+    let arguments = (ins
+        QuregRefType:$source
+    );
+
+    let results = (outs
+        QuregRefType:$result
+    );
+
+    let assemblyFormat = [{
+        $source attr-dict `:` qualified(type($source)) `to` qualified(type($result))
+    }];
+
+    let hasVerifier = 1;
+    let hasFolder = 1;
+}
+
 // -----
 
 class Gate_Op<string mnemonic, list<Trait> traits = []> :
