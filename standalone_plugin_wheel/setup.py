@@ -29,7 +29,7 @@ setup(
     packages=["standalone_plugin"],
     entry_points=entry_points,
     include_package_data=True,
-    install_requires=["pennylane", "pennylane_catalyst"],
+    install_requires=["pennylane2>=2.0.0.dev0", "pennylane_catalyst"],
     python_requires=">=3.12",
     classifiers=[
         "Development Status :: 1 - Planning",

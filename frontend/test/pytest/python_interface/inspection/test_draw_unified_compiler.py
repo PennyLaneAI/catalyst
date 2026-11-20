@@ -19,7 +19,7 @@ from importlib.util import find_spec
 from shutil import which
 
 import jax
-import pennylane as qp
+import pennylane2 as qp
 import pytest
 
 from catalyst.python_interface.inspection import draw, draw_graph

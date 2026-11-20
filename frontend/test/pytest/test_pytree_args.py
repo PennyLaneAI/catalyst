@@ -19,10 +19,10 @@ from typing import Iterable
 import jax
 import jax.numpy as jnp
 import numpy as np
-import pennylane as qp
+import pennylane2 as qp
 import pytest
 from jax._src.tree_util import tree_flatten
-from pennylane import adjoint, cond, for_loop, grad, qjit
+from pennylane2 import adjoint, cond, for_loop, grad, qjit
 
 from catalyst import measure
 

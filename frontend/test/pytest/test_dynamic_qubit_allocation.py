@@ -21,10 +21,10 @@ import textwrap
 from types import SimpleNamespace
 
 import numpy as np
-import pennylane as qp
+import pennylane2 as qp
 import pytest
 from jax import numpy as jnp
-from pennylane.capture import subroutine
+from pennylane2.capture import subroutine
 
 from catalyst import qjit
 from catalyst.from_plxpr.qref_jax_primitives import (

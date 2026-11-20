@@ -17,7 +17,7 @@
 # old_frontend: tests ZNE targeting the legacy one-shot wrapper.
 # RUN: %PYTHON %s | FileCheck %s
 
-import pennylane as qp
+import pennylane2 as qp
 
 from catalyst import mitigate_with_zne, qjit
 

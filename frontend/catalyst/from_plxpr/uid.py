@@ -19,9 +19,9 @@ import hashlib
 from functools import singledispatch
 from typing import Any
 
-from pennylane.core import Operator2
-from pennylane.pytrees import PyTreeStructure
-from pennylane.wires import AbstractQubit
+from pennylane2.core import Operator2
+from pennylane2.pytrees import PyTreeStructure
+from pennylane2.wires import AbstractQubit
 
 
 def generate_uid(

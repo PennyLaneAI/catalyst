@@ -21,9 +21,9 @@ Test the lowering of decomposition rules registered against ``Adjoint(Op)`` and 
 
 # pylint: disable = line-too-long,unused-argument,missing-function-docstring
 
-import pennylane as qp
+import pennylane2 as qp
 from operator2_dummy_gates import NoParams, SingleParam
-from pennylane.typing import Float, Wire
+from pennylane2.typing import Float, Wire
 
 from catalyst.decomposition.decomposition_rules import (
     materialize_reachable_rule_strings,

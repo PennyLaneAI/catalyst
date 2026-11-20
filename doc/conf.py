@@ -139,7 +139,8 @@ extensions = [
     "m2r2",
 ]
 
-intersphinx_mapping = {"pennylane": ("https://docs.pennylane.ai/en/stable/", None)}
+# PennyLane2 API links target the development documentation.
+intersphinx_mapping = {"pennylane2": ("https://docs.pennylane.ai/en/latest/", None)}
 
 copybutton_prompt_text = r">>> |\.\.\. |\$ |In \[\d*\]: | {2,5}\.\.\.: | {5,8}: "
 copybutton_prompt_is_regexp = True

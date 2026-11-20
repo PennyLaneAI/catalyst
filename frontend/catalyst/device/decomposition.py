@@ -23,12 +23,12 @@ from functools import partial
 from typing import Union
 
 import jax
-import pennylane as qp
-from pennylane import transform
-from pennylane.devices.capabilities import DeviceCapabilities
-from pennylane.devices.preprocess import decompose
-from pennylane.logging import debug_logger
-from pennylane.measurements import (
+import pennylane2 as qp
+from pennylane2 import transform
+from pennylane2.devices.capabilities import DeviceCapabilities
+from pennylane2.devices.preprocess import decompose
+from pennylane2.logging import debug_logger
+from pennylane2.measurements import (
     CountsMP,
     ExpectationMP,
     MidMeasureMP,
@@ -36,7 +36,7 @@ from pennylane.measurements import (
     SampleMP,
     VarianceMP,
 )
-from pennylane.transforms.decompose import _resolve_gate_set
+from pennylane2.transforms.decompose import _resolve_gate_set
 
 from catalyst.api_extensions import HybridCtrl
 from catalyst.device.op_support import (
@@ -241,7 +241,7 @@ def decompose_ops_to_unitary(tape, convert_to_matrix_ops):
 
     Returns:
         qnode (QNode) or quantum function (Callable) or tuple[List[QuantumTape], function]: The
-        transformed circuit as described in :func:`qp.transform <pennylane.transform>`.
+        transformed circuit as described in :func:`qp.transform <pennylane2.transform>`.
     """
     new_operations = []
 
@@ -307,7 +307,7 @@ def measurements_from_counts(tape, device_wires):
 
     Returns:
         qnode (QNode) or quantum function (Callable) or tuple[List[QuantumTape], function]: The
-        transformed circuit as described in :func:`qp.transform <pennylane.transform>`.
+        transformed circuit as described in :func:`qp.transform <pennylane2.transform>`.
 
     .. note::
 
@@ -378,7 +378,7 @@ def measurements_from_samples(tape, device_wires):
 
     Returns:
         qnode (QNode) or quantum function (Callable) or tuple[List[QuantumTape], function]: The
-        transformed circuit as described in :func:`qp.transform <pennylane.transform>`.
+        transformed circuit as described in :func:`qp.transform <pennylane2.transform>`.
 
     .. note::
 

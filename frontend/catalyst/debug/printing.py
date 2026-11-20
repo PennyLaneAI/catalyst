@@ -18,7 +18,7 @@ import builtins
 from functools import partial
 
 import jax
-from pennylane.capture import enabled as capture_enabled
+from pennylane2.capture import enabled as capture_enabled
 
 from catalyst.debug.callback import callback as debug_callback
 from catalyst.jax_primitives import print_p

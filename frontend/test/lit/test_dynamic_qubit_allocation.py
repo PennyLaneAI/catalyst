@@ -18,7 +18,7 @@ Unit tests for the dynamic qubit allocation.
 
 # RUN: %PYTHON %s | FileCheck %s
 
-import pennylane as qp
+import pennylane2 as qp
 
 from catalyst import qjit
 

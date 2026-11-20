@@ -15,7 +15,7 @@
 # RUN: %PYTHON %s | FileCheck %s
 
 import jax.numpy as jnp
-import pennylane as qp
+import pennylane2 as qp
 
 from catalyst import qjit
 

@@ -23,8 +23,8 @@ trapped-ion quantum computer device.
 import platform
 from typing import Optional
 
-from pennylane import CompilePipeline
-from pennylane.devices import Device, ExecutionConfig
+from pennylane2 import CompilePipeline
+from pennylane2.devices import Device, ExecutionConfig
 
 from catalyst.compiler import get_lib_path
 

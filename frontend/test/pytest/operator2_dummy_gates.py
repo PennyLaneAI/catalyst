@@ -12,13 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""This file hosts a set of mock pennylane.core.Operator2 subclasses to be used for testing."""
+"""This file hosts a set of mock pennylane2.core.Operator2 subclasses to be used for testing."""
 
 # pylint: disable = missing-class-docstring
 
 from collections import Counter
 
-import pennylane as qp
+import pennylane2 as qp
 
 
 class NoParams(qp.core.Operator2):

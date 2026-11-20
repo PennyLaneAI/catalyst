@@ -15,7 +15,7 @@
 """Integration tests for the async execution of QNodes features."""
 
 import numpy as np
-import pennylane as qp
+import pennylane2 as qp
 import pytest
 from jax import numpy as jnp
 

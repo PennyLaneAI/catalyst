@@ -18,7 +18,7 @@
 # RUN: %PYTHON %s | FileCheck %s
 
 import jax.numpy as jnp
-import pennylane as qp
+import pennylane2 as qp
 from jax.core import ShapedArray
 from utils import print_jaxpr, print_mlir
 

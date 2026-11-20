@@ -23,7 +23,7 @@ rules, including precompiled rules, lower time rules, and on-demand rules.
 
 # pylint: disable = missing-class-docstring,line-too-long,unused-argument
 
-import pennylane as qp
+import pennylane2 as qp
 from jax import numpy as jnp
 from operator2_dummy_gates import (
     CompilableData,
@@ -39,8 +39,8 @@ from operator2_dummy_gates import (
     StaticData,
     StaticDataMultiReg,
 )
-from pennylane.core import Operator2
-from pennylane.typing import Complex, Float, Int, Wire
+from pennylane2.core import Operator2
+from pennylane2.typing import Complex, Float, Int, Wire
 
 from catalyst.decomposition.decomposition_rules import (
     compile_decomposition_rules_wrapper,

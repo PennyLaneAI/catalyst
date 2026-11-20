@@ -35,8 +35,8 @@ nbmake
 filecheck
 
 # optional rt/test dependencies
-pennylane-lightning-kokkos
-amazon-braket-pennylane-plugin>1.27.1; python_version < "3.14"
+# Temporary: install compatible Kokkos with bin/install-lightning-kokkos.sh.
+# Braket integration is paused until its plugin supports PennyLane2.
 pydot # Graph visualization backend requirement
 matplotlib # Graph visualization frontend requirement
 graphviz # Graph visualization backend requirement

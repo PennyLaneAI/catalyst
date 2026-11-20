@@ -17,13 +17,13 @@ of quantum operations to reference semantics JAXPR.
 """
 
 # pylint: disable=unused-argument
-import pennylane as qp
+import pennylane2 as qp
 from jax._src.lib.mlir import ir
 from jax.extend.core import Primitive
 from jax.interpreters import mlir
 from jaxlib.mlir._mlir_libs import _mlir as _ods_cext
 from jaxlib.mlir.dialects.stablehlo import ConvertOp as StableHLOConvertOp
-from pennylane.pytrees import unflatten
+from pennylane2.pytrees import unflatten
 
 # TODO: remove after jax v0.7.2 upgrade
 # Mock _ods_cext.globals.register_traceback_file_exclusion due to API conflicts between

@@ -13,11 +13,11 @@
 # limitations under the License.
 """Tests for UID generation for Operator2 lowering."""
 
-import pennylane as qp
+import pennylane2 as qp
 import pytest
-from pennylane.pytrees import flatten
-from pennylane.typing import AbstractArray
-from pennylane.wires import AbstractQubit
+from pennylane2.pytrees import flatten
+from pennylane2.typing import AbstractArray
+from pennylane2.wires import AbstractQubit
 
 from catalyst.decomposition.graph_op_id import GraphOpID
 from catalyst.from_plxpr.uid import _serialize_static, generate_uid

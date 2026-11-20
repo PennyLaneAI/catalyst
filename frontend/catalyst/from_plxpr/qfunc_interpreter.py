@@ -21,27 +21,27 @@ from functools import partial
 
 import jax
 import jax.numpy as jnp
-import pennylane as qp
+import pennylane2 as qp
 from jax._src.sharding_impls import UNSPECIFIED
 from jax.core import take_current_trace
-from pennylane.capture import PlxprInterpreter, pause
-from pennylane.capture.base_interpreter import jaxpr_to_jaxpr
-from pennylane.capture.primitives import adjoint_transform_prim as plxpr_adjoint_transform_prim
-from pennylane.capture.primitives import cond_prim as pl_cond_prim
-from pennylane.capture.primitives import ctrl_transform_prim as plxpr_ctrl_transform_prim
-from pennylane.capture.primitives import measure_prim as plxpr_measure_prim
-from pennylane.capture.primitives import (
+from pennylane2.capture import PlxprInterpreter, pause
+from pennylane2.capture.base_interpreter import jaxpr_to_jaxpr
+from pennylane2.capture.primitives import adjoint_transform_prim as plxpr_adjoint_transform_prim
+from pennylane2.capture.primitives import cond_prim as pl_cond_prim
+from pennylane2.capture.primitives import ctrl_transform_prim as plxpr_ctrl_transform_prim
+from pennylane2.capture.primitives import measure_prim as plxpr_measure_prim
+from pennylane2.capture.primitives import (
     operator_p,
 )
-from pennylane.capture.primitives import pauli_measure_prim as plxpr_pauli_measure_prim
-from pennylane.capture.primitives import (
+from pennylane2.capture.primitives import pauli_measure_prim as plxpr_pauli_measure_prim
+from pennylane2.capture.primitives import (
     quantum_subroutine_prim,
     transform_prim,
 )
-from pennylane.ftqc.primitives import measure_in_basis_prim as plxpr_measure_in_basis_prim
-from pennylane.measurements import CountsMP
-from pennylane.pytrees import flatten, unflatten
-from pennylane.wires import AbstractQubit, Wires, is_abstract_qubit
+from pennylane2.ftqc.primitives import measure_in_basis_prim as plxpr_measure_in_basis_prim
+from pennylane2.measurements import CountsMP
+from pennylane2.pytrees import flatten, unflatten
+from pennylane2.wires import AbstractQubit, Wires, is_abstract_qubit
 
 import catalyst
 from catalyst.decomposition.capture_session import (

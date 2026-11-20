@@ -13,7 +13,7 @@
 # limitations under the License.
 
 import jax.numpy as jnp
-import pennylane as qp
+import pennylane2 as qp
 import pytest
 
 from catalyst import qjit

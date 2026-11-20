@@ -23,10 +23,10 @@ import subprocess
 from pathlib import Path
 
 import numpy as np
-import pennylane as qp
+import pennylane2 as qp
 import pytest
-from pennylane.backline.runtime import runtime_call
-from pennylane.backline.runtime.signature import declare
+from pennylane2.backline.runtime import runtime_call
+from pennylane2.backline.runtime.signature import declare
 
 from catalyst.utils.exceptions import CompileError
 
@@ -48,7 +48,7 @@ def native(tmp_path_factory):
 @pytest.fixture(autouse=True)
 def fresh_declarations(monkeypatch):
     """Clear declarations at the start of each test, as reruns can rebuild ``native`` elsewhere."""
-    monkeypatch.setattr("pennylane.backline.runtime.signature._REGISTRY", {})
+    monkeypatch.setattr("pennylane2.backline.runtime.signature._REGISTRY", {})
 
 
 @pytest.mark.parametrize(

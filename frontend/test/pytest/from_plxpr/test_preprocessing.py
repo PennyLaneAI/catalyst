@@ -18,15 +18,15 @@ Test suite for device preprocessing with program capture.
 from functools import partial
 
 import jax
-import pennylane as qp
+import pennylane2 as qp
 import pytest
-from pennylane.devices import NullQubit
-from pennylane.devices.capabilities import (
+from pennylane2.devices import NullQubit
+from pennylane2.devices.capabilities import (
     DeviceCapabilities,
     ExecutionCondition,
     OperatorProperties,
 )
-from pennylane.testing import find_eqns
+from pennylane2.testing import find_eqns
 
 from catalyst.device.decomposition import measurements_from_counts, measurements_from_samples
 from catalyst.from_plxpr import from_plxpr

@@ -25,13 +25,13 @@ from typing import Any, Callable, List
 
 import jax
 import jax.numpy as jnp
-import pennylane as qp
+import pennylane2 as qp
 from jax._src.source_info_util import current as current_source_info
 from jax._src.tree_util import PyTreeDef, tree_unflatten, treedef_is_leaf
 from jax.api_util import debug_info
 from jax.core import AbstractValue
-from pennylane import QueuingManager
-from pennylane.tape import QuantumTape
+from pennylane2 import QueuingManager
+from pennylane2.tape import QuantumTape
 
 import catalyst
 from catalyst.jax_extras import (
@@ -109,7 +109,7 @@ def cond(pred: DynamicJaxprTracer, *, estimated_probability: float | None = None
 
     .. code-block:: python
 
-        import pennylane as qp
+        import pennylane2 as qp
         from catalyst import qjit, cond
 
         dev = qp.device("lightning.qubit", wires=1)
@@ -334,7 +334,7 @@ def for_loop(
 
     .. code-block:: python
 
-        import pennylane as qp
+        import pennylane2 as qp
         from catalyst import qjit, for_loop
 
         dev = qp.device("lightning.qubit", wires=1)
@@ -501,7 +501,7 @@ def while_loop(
 
     .. code-block:: python
 
-        import pennylane as qp
+        import pennylane2 as qp
         from catalyst import qjit, while_loop
 
         dev = qp.device("lightning.qubit", wires=1)
@@ -622,7 +622,7 @@ def switch(index_var: int):
 
     .. code-block:: python
 
-        import pennylane as qp
+        import pennylane2 as qp
         from catalyst import qjit, switch
 
         dev = qp.device("lightning.qubit", wires=1)
@@ -739,7 +739,7 @@ class CondCallable:
 
     Copyright 2021 The JAX Authors.
 
-    Also provides access to the underlying "Cond" pennylane.Operation object.
+    Also provides access to the underlying "Cond" pennylane2.Operation object.
 
     **Example**
 

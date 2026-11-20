@@ -20,7 +20,7 @@
 
 from functools import partial
 
-import pennylane as qp
+import pennylane2 as qp
 
 
 def test_conditional_capture():

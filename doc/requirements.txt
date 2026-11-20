@@ -30,8 +30,7 @@ sphinx-sitemap
 matplotlib==3.10.0
 lxml_html_clean
 
-# Pre-install PL development wheels
+# Temporary companion branches, matching .dep-versions until the PennyLane2 cutover.
 --extra-index-url https://test.pypi.org/simple/
-pennylane-lightning-kokkos==0.46.0-dev34
-pennylane-lightning==0.46.0-dev34
-pennylane==0.46.0-dev159
+pennylane-lightning @ git+https://github.com/PennyLaneAI/pennylane-lightning.git@chore/update-pennylane-rename
+pennylane2 @ git+https://github.com/PennyLaneAI/pennylane.git@chore/rename-pennylane-module

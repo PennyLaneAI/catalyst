@@ -17,8 +17,8 @@
 # RUN: %PYTHON %s | FileCheck %s
 
 import numpy as np
-import pennylane as qp
-from pennylane.devices.capabilities import OperatorProperties
+import pennylane2 as qp
+from pennylane2.devices.capabilities import OperatorProperties
 from utils import get_custom_qjit_device
 
 from catalyst import qjit

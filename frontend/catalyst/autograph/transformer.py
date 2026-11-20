@@ -26,7 +26,7 @@ import functools
 import inspect
 from contextlib import ContextDecorator
 
-import pennylane as qp
+import pennylane2 as qp
 from malt.core import ag_ctx, config, converter
 from malt.impl.api import PyToPy
 

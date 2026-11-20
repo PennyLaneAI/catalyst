@@ -23,7 +23,7 @@ import re
 import shutil
 import subprocess
 
-from pennylane.logging import debug_logger
+from pennylane2.logging import debug_logger
 
 import catalyst
 from catalyst.compiler import LinkerDriver

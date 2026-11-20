@@ -498,7 +498,7 @@ the “PennyLane integration” section below.
 
   .. code-block:: python
 
-      import pennylane as qp
+      import pennylane2 as qp
       from catalyst.python_interface.conversion import xdsl_from_qjit
 
       dev = qp.device("lightning.qubit", wires=3)
@@ -685,7 +685,7 @@ described below using the following example:
 
 .. code-block:: python
 
-    import pennylane as qp
+    import pennylane2 as qp
 
     qp.capture.enable()
     dev = qp.device("lightning.qubit", wires=1)
@@ -864,7 +864,7 @@ register using ``ExtractOp``. Consider the following example:
 
   .. code-block:: python
 
-      import pennylane as qp
+      import pennylane2 as qp
 
       qp.capture.enable()
 

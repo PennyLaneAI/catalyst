@@ -15,7 +15,7 @@
 """Test cases relating to quantum functions represented via :class:`qp.QNode.`"""
 
 import jax.numpy as jnp
-import pennylane as qp
+import pennylane2 as qp
 import pytest
 
 import catalyst

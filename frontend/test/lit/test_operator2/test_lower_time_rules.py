@@ -21,7 +21,7 @@ gate are also lowered to MLIR.
 
 # pylint: disable = line-too-long,unused-argument
 
-import pennylane as qp
+import pennylane2 as qp
 from jax import numpy as jnp
 from operator2_dummy_gates import (
     CompilableData,
@@ -32,7 +32,7 @@ from operator2_dummy_gates import (
     SingleParamCustomOp,
     TestQubitUnitary,
 )
-from pennylane.typing import Complex, Float, Int, Wire
+from pennylane2.typing import Complex, Float, Int, Wire
 
 
 def test_one_rule():

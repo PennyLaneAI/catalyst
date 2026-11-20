@@ -19,7 +19,7 @@
 # RUN: %PYTHON %s | FileCheck %s
 
 import numpy as np
-import pennylane as qp
+import pennylane2 as qp
 from operator2_dummy_gates import (
     CompilableData,
     HybridNoOpArg,

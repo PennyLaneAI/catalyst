@@ -15,7 +15,7 @@
 """Test module for the convert-qecl-to-qecp dialect-conversion transform."""
 
 import numpy as np
-import pennylane as qp
+import pennylane2 as qp
 import pytest
 
 from catalyst.python_interface.transforms.qecl import (

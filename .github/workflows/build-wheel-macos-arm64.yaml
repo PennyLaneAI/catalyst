@@ -349,6 +349,8 @@ jobs:
         cat $GITHUB_WORKSPACE/runtime-build/_lapacke-accelerate/src/lapacke-accelerate-stamp/*-err.log 2>/dev/null || True
 
     - name: Test Catalyst-Runtime
+      # Temporary: this OpenQASM test installs the Classic Braket plugin.
+      if: ${{ false }}
       run: |
         python${{ matrix.python_version }} -m pip install 'amazon-braket-pennylane-plugin>1.27.1'
         cmake --build $GITHUB_WORKSPACE/runtime-build --target runner_tests_openqasm
@@ -526,8 +528,9 @@ jobs:
 
     - name: Install PennyLane Plugins
       run: |
-        python${{ matrix.python_version }} -m pip install PennyLane-Lightning-Kokkos
-        python${{ matrix.python_version }} -m pip install 'amazon-braket-pennylane-plugin>1.27.1'
+        # Temporary: build Kokkos from the companion branch in .dep-versions.
+        PYTHON=python${{ matrix.python_version }} bash bin/install-lightning-kokkos.sh
+        # Temporary: Braket installation is paused until PennyLane2 support.
 
     - name: Install OQC client
       run: |
@@ -551,7 +554,7 @@ jobs:
         python${{ matrix.python_version }} -m pytest frontend/test/pytest -n auto
         python${{ matrix.python_version }} -m pytest frontend/test/pytest --backend="lightning.kokkos" -n auto -m "not xdsl" -k "lightning.kokkos"
         python${{ matrix.python_version }} -m pytest frontend/test/async_tests
-        python${{ matrix.python_version }} -m pytest frontend/test/pytest --runbraket=LOCAL -n auto -m "not xdsl" || true
+        # Temporary: Braket tests are paused until its plugin supports PennyLane2.
         python${{ matrix.python_version }} -m pytest frontend/test/test_oqc/oqc -n auto
 
     - name: Run Standalone Plugin Tests

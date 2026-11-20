@@ -6,7 +6,7 @@ All utilities we care about are in the
 
 .. code-block:: python
 
-    import pennylane as qp
+    import pennylane2 as qp
 
     from catalyst.python_interface.conversion import (
         inline_jit_to_module,

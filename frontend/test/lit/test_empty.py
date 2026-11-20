@@ -19,7 +19,7 @@ Unit tests for the MLIR 'empty' pass.
 
 from functools import partial
 
-import pennylane as qp
+import pennylane2 as qp
 
 
 def test_empty():

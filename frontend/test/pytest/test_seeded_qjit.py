@@ -14,7 +14,7 @@
 """Tests for seeded qjit runs in Catalyst"""
 
 import numpy as np
-import pennylane as qp
+import pennylane2 as qp
 import pytest
 
 from catalyst import CompileError, qjit

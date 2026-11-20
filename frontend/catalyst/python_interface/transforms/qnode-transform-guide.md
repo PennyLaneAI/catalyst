@@ -29,9 +29,9 @@ quantum passes are applied.
   nested under the root IR module. These nested modules are referred to as *quantum kernels*,
   and clearly separate QNode scopes from the rest of a hybrid workflow (which is purely classical).
   - The quantum kernel maintains the scope originally defined by Python user functions
-    decorated with the `pennylane.qnode` decorator.
+    decorated with the `pennylane2.qnode` decorator.
   - Transformation schedules generated from Python (e.g. when using pass decorators on
-    `pennylane.QNode` objecs) are contained within the quantum kernel, under a special anonymous
+    `pennylane2.QNode` objecs) are contained within the quantum kernel, under a special anonymous
     module with the `transform.with_named_sequence` attribute. Such transformations are thus
     always scoped to the entire quantum kernel.
   - Besides the transform schedule, quantum kernels contain an arbitrary number of both classical

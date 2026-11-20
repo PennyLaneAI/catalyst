@@ -107,15 +107,17 @@ jax_version = dep_versions.get("jax")
 pl_version = dep_versions.get("pennylane")
 lq_version = dep_versions.get("lightning")
 
-pl_min_release = "0.45.0"
-lq_min_release = pl_min_release
+pl_min_release = "2.0.0.dev0"
+lq_min_release = "0.45.0"
 
 if pl_version is not None:
     pennylane_dep = (
-        f"pennylane @ {pl_version}" if pl_version.startswith("git+") else f"pennylane=={pl_version}"
+        f"pennylane2 @ {pl_version}"
+        if pl_version.startswith("git+")
+        else f"pennylane2=={pl_version}"
     )
 else:
-    pennylane_dep = f"pennylane>={pl_min_release}"
+    pennylane_dep = f"pennylane2>={pl_min_release}"
 if lq_version is not None:
     lightning_dep = (
         f"pennylane-lightning @ {lq_version}"
@@ -143,10 +145,10 @@ requirements = [
 ]
 
 entry_points = {
-    "pennylane.plugins": [
+    "pennylane2.plugins": [
         "oqc.cloud = catalyst.third_party.oqc:OQCDevice",
     ],
-    "pennylane.compilers": [
+    "pennylane2.compilers": [
         "catalyst.context = catalyst.tracing.contexts:EvaluationContext",
         "catalyst.ops = catalyst.api_extensions",
         "catalyst.qjit = catalyst:qjit",
@@ -154,7 +156,7 @@ entry_points = {
     "xdsl.universe": [
         "catalyst-xdsl-universe = catalyst.python_interface.xdsl_universe:CATALYST_XDSL_UNIVERSE"
     ],
-    "pennylane.transforms": [
+    "pennylane2.transforms": [
         "to_ppr = catalyst.passes:to_ppr",
         "merge_ppr_ppm = catalyst.passes:merge_ppr_ppm",
         "commute_ppr = catalyst.passes:commute_ppr",
@@ -166,7 +168,7 @@ entry_points = {
         "disentangle_cnot = catalyst.passes:disentangle_cnot",
         "parity_synth = catalyst.passes:parity_synth",
     ],
-    "pennylane.drawer": [
+    "pennylane2.drawer": [
         "draw_graph = catalyst:draw_graph",
     ],
     "console_scripts": [
@@ -389,7 +391,7 @@ ext_modules = [
 
 options = {"bdist_wheel": {"py_limited_api": "cp312"}} if sys.hexversion >= 0x030C0000 else {}
 # For any compiler packages seeking to be registered in PennyLane, it is imperative that they
-# expose the entry_points metadata under the designated group name `pennylane.compilers`, with
+# expose the entry_points metadata under the designated group name `pennylane2.compilers`, with
 # the following entry points:
 # - `context`: Path to the compilation evaluation context manager.
 # - `ops`: Path to the compiler operations module.

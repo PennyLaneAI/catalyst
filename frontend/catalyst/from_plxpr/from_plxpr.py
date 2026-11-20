@@ -23,11 +23,11 @@ from importlib.metadata import entry_points
 from typing import Callable
 
 import jax
-import pennylane as qp
+import pennylane2 as qp
 from jax.extend.core import ClosedJaxpr, Jaxpr
-from pennylane.capture import PlxprInterpreter, qnode_prim
-from pennylane.capture.primitives import transform_prim
-from pennylane.transforms import decompose as pl_decompose
+from pennylane2.capture import PlxprInterpreter, qnode_prim
+from pennylane2.capture.primitives import transform_prim
+from pennylane2.transforms import decompose as pl_decompose
 
 from catalyst.backline import device_pass_pipeline, remote_device_lib
 from catalyst.decomposition.capture_session import DecompositionScope

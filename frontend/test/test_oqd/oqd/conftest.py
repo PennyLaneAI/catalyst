@@ -19,7 +19,7 @@ Pytest configuration file for OQD test suite.
 import os
 from tempfile import TemporaryDirectory
 
-import pennylane as qp
+import pennylane2 as qp
 import pytest
 
 

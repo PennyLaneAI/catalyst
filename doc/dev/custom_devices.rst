@@ -87,7 +87,7 @@ as a string of device specifications and options, represented in Python dictiona
 An example could be some noise parameter or other configurable behaviour: ``"{'noise': 0.5}"``.
 
 Note that these parameters are automatically initialized in the frontend if the library is
-provided as a PennyLane plugin device (see :func:`qp.device() <pennylane.device>`).
+provided as a PennyLane plugin device (see :func:`qp.device() <pennylane2.device>`).
 
 The destructor of ``CustomDevice`` will be automatically called by the runtime.
 

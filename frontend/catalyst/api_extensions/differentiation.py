@@ -24,11 +24,11 @@ import numbers
 from collections.abc import Callable, Sequence
 
 import jax
-import pennylane as qp
+import pennylane2 as qp
 from jax._src.api import _dtype
 from jax._src.tree_util import PyTreeDef, tree_flatten, tree_unflatten
 from jax.api_util import debug_info
-from pennylane import QNode
+from pennylane2 import QNode
 
 import catalyst
 from catalyst.jax_extras import Jaxpr, make_jaxpr2
@@ -103,7 +103,7 @@ def grad(fn=None, *, method=None, h=None, argnums=None):
 
     .. code-block:: python
 
-        import pennylane as qp
+        import pennylane2 as qp
         from catalyst import qjit, grad
 
         dev = qp.device("lightning.qubit", wires=1)
@@ -245,7 +245,7 @@ def value_and_grad(fn=None, *, method=None, h=None, argnums=None):
 
     .. code-block:: python
 
-        import pennylane as qp
+        import pennylane2 as qp
         from catalyst import qjit, value_and_grad
 
         dev = qp.device("lightning.qubit", wires=1)
@@ -352,7 +352,7 @@ def jacobian(fn=None, *, method=None, h=None, argnums=None):
 
     .. code-block:: python
 
-        import pennylane as qp
+        import pennylane2 as qp
         from catalyst import qjit, jacobian
 
         dev = qp.device("lightning.qubit", wires=1)

@@ -19,7 +19,7 @@
 This file tests that the xDSL passes are detected and applied correctly.
 """
 
-import pennylane as qp
+import pennylane2 as qp
 
 from catalyst.python_interface.transforms import merge_rotations_pass
 

@@ -21,7 +21,7 @@ from timeit import default_timer as timer
 
 import jax
 import numpy as np
-import pennylane as qp
+import pennylane2 as qp
 import pytest
 from jax import numpy as jnp
 from numpy import pi

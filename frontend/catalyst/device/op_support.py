@@ -18,9 +18,9 @@ from typing import Union
 
 import jax
 import numpy as np
-import pennylane as qp
-from pennylane.devices.capabilities import DeviceCapabilities, OperatorProperties
-from pennylane.operation import Operation, Operator
+import pennylane2 as qp
+from pennylane2.devices.capabilities import DeviceCapabilities, OperatorProperties
+from pennylane2.operation import Operation, Operator
 
 from catalyst.api_extensions import MidCircuitMeasure, MidCircuitPauliMeasure
 from catalyst.jax_tracer import HybridOp
