@@ -19,12 +19,13 @@
 // CHECK-LABEL: "circuit"
 // CHECK: "quantum_operations"
 // CHECK:   "-1"
-// CHECK:       "testMCM": 2
+// CHECK:       "testMCM": 3
 // CHECK-NOT:   "testOp"
 func.func public @circuit() attributes {quantum.node} {
     %q0 = quantum.alloc_qb : !quantum.bit
     %q1 = quantum.alloc_qb : !quantum.bit
     %out:2 = quantum.custom "testOp"() %q0, %q1 : !quantum.bit, !quantum.bit
+    %m, %out_m:2 = quantum.measurement "testMCM"() qubits(%out#0, %out#1) : (i1, !quantum.bit, !quantum.bit)
     quantum.dealloc_qb %q0 : !quantum.bit
     quantum.dealloc_qb %q1 : !quantum.bit
     return
