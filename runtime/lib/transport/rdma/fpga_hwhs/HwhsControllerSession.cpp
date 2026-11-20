@@ -73,11 +73,6 @@ constexpr int kErrMemory = CATALYST_TRANSPORT_ERR_MEMORY;
 constexpr int kErrTimeout = CATALYST_TRANSPORT_ERR_TIMEOUT;
 constexpr int kErrStuck = CATALYST_TRANSPORT_ERR_STUCK;
 
-// Demo mode only, and deliberately outside the CAPI set: the pacer reached demo_cnt and
-// stopped, which ends a bounded demo run. Callers must not read it as an error -- and must not
-// read it as success either, since nothing upstream translates it. Completion is answered by
-// HH_DEMO_STATUS.done (see demo_report) and by the trace header's entries/full counters.
-constexpr int kDemoComplete = -5;
 constexpr std::uint64_t kCollectTimeoutNs = 5'000'000'000ULL;
 constexpr std::size_t kRttSamplesReserve = 3'000'000; // 24 MB
 
@@ -106,20 +101,20 @@ HwhsControllerSession::HwhsControllerSession(std::string dev, int gid_idx, std::
                                              std::optional<MemKind> data_kind,
                                              std::optional<MemKind> sq_kind,
                                              std::optional<MemKind> reply_kind, bool sw_poll,
-                                             bool kick_ioctl, DemoCfg demo)
+                                             bool kick_ioctl, PacerCfg pacer)
     : dev_(std::move(dev)), gid_idx_(gid_idx), ring_slots_(ring_slots ? ring_slots : 1),
       stride_log2_(stride_log2), stride_((stride_log2 < 32) ? (1u << stride_log2) : 1u),
       data_kind_(data_kind), sq_kind_(sq_kind), reply_kind_(reply_kind), sw_poll_(sw_poll),
-      kick_ioctl_(kick_ioctl), demo_(demo) {
-    if (demo_.enable) {
-        RT_FAIL_IF(demo_.syn_depth == 0 || (demo_.syn_depth % 64u) != 0,
-                   "demo_depth must be a non-zero multiple of 64");
-        RT_FAIL_IF(demo_.cmd_cnt == 0, "demo_cnt must be non-zero");
-        RT_FAIL_IF(demo_.freq_span & (demo_.freq_span + 1u),
-                   "demo_span must be 2^N-1 (all ones), e.g. 0xFFFFF");
-        RT_FAIL_IF(sw_poll_, "demo mode needs reply_poll=hw (the RTT comes from the engine)");
-        RT_FAIL_IF(demo_.trace_pa == 0,
-                   "demo mode needs demo_trace=<pa>: the trace RAM is the only thing that "
+      kick_ioctl_(kick_ioctl), pacer_(pacer) {
+    if (pacer_.enable) {
+        RT_FAIL_IF(pacer_.syn_depth == 0 || (pacer_.syn_depth % 64u) != 0,
+                   "pacer_depth must be a non-zero multiple of 64");
+        RT_FAIL_IF(pacer_.cmd_cnt == 0, "pacer_cnt must be non-zero");
+        RT_FAIL_IF(pacer_.freq_span & (pacer_.freq_span + 1u),
+                   "pacer_span must be 2^N-1 (all ones), e.g. 0xFFFFF");
+        RT_FAIL_IF(sw_poll_, "pacer mode needs reply_poll=hw (the RTT comes from the engine)");
+        RT_FAIL_IF(pacer_.trace_pa == 0,
+                   "pacer mode needs pacer_trace=<pa>: the trace RAM is the only thing that "
                    "records rounds");
     }
 
@@ -437,42 +432,42 @@ void HwhsControllerSession::commit_work_item(std::uint32_t work_item_idx, std::u
     collected_ = 0;
     armed_ = true;
 
-    // Setup the demo mode
-    demo_program();
+    // Setup the pacer mode
+    pacer_program();
 }
 
-// Push the DemoCfg into the engine and clear the demo counters.
-void HwhsControllerSession::demo_program() {
-    if (!demo_.enable) {
+// Push the PacerCfg into the engine and clear the pacer counters.
+void HwhsControllerSession::pacer_program() {
+    if (!pacer_.enable) {
         return;
     }
 
     RT_FAIL_IF(hh_doorbell_ == nullptr,
-               "demo mode needs the mmap'd register window (use kick=mmap)");
+               "pacer mode needs the mmap'd register window (use kick=mmap)");
     *hh_doorbell_ = 0;
 #if defined(__aarch64__)
     asm volatile("dsb st" ::: "memory");
 #endif
 
     hh_demo_cfg dc = {};
-    dc.freq_num = demo_.freq_num;
-    dc.cmd_cnt = demo_.cmd_cnt;
-    dc.syn_depth = demo_.syn_depth;
-    dc.freq_span = demo_.freq_span;
-    dc.lfsr_seed = demo_.lfsr_seed;
+    dc.freq_num = pacer_.freq_num;
+    dc.cmd_cnt = pacer_.cmd_cnt;
+    dc.syn_depth = pacer_.syn_depth;
+    dc.freq_span = pacer_.freq_span;
+    dc.lfsr_seed = pacer_.lfsr_seed;
     RT_FAIL_IF(ioctl(hh_fd_, HH_DEMO_CFG, &dc) != 0, "HH_DEMO_CFG failed");
-    demo_preload();
+    pacer_preload();
 
-    demo_armed_ = false; // armed at the first kick(), see demo_arm()
+    pacer_armed_ = false; // armed by run_paced(), see pacer_arm()
 }
 
 // Start the pacer
-void HwhsControllerSession::demo_arm() {
+void HwhsControllerSession::pacer_arm() {
     // Baseline for the round counter
     hh_status_rd st = {};
     last_round_cnt_ = (ioctl(hh_fd_, HH_READ_STATUS, &st) == 0) ? st.round_cnt : 0u;
     rounds_seen_ = 0;
-    demo_finished_ = false;
+    pacer_finished_ = false;
 
     {
         hh_demo_status ds0 = {};
@@ -492,20 +487,20 @@ void HwhsControllerSession::demo_arm() {
 }
 
 // Fill the BRAM syndrome table transport_demo replays
-void HwhsControllerSession::demo_preload() {
-    const std::uint32_t slots = demo_.syn_depth / 64u;
-    RT_FAIL_IF(slots == 0, "demo_depth must cover at least one 64 B slot");
+void HwhsControllerSession::pacer_preload() {
+    const std::uint32_t slots = pacer_.syn_depth / 64u;
+    RT_FAIL_IF(slots == 0, "pacer_depth must cover at least one 64 B slot");
 
-    const std::size_t table_bytes = static_cast<std::size_t>(demo_.syn_depth) * 2;
+    const std::size_t table_bytes = static_cast<std::size_t>(pacer_.syn_depth) * 2;
     void *base = nullptr;
     std::size_t span = 0;
-    volatile std::uint8_t *tbl = map_pa(mem_fd_, demo_.bram_pa, table_bytes, &base, &span);
+    volatile std::uint8_t *tbl = map_pa(mem_fd_, pacer_.bram_pa, table_bytes, &base, &span);
 
-    if (!demo_.table_path.empty()) {
-        std::FILE *f = std::fopen(demo_.table_path.c_str(), "rb");
+    if (!pacer_.table_path.empty()) {
+        std::FILE *f = std::fopen(pacer_.table_path.c_str(), "rb");
         if (f == nullptr) {
             ::munmap(base, span);
-            RT_FAIL("demo_table: cannot open the table image");
+            RT_FAIL("pacer_table: cannot open the table image");
         }
         std::vector<std::uint8_t> img(table_bytes);
         const std::size_t got = std::fread(img.data(), 1, table_bytes, f);
@@ -513,12 +508,12 @@ void HwhsControllerSession::demo_preload() {
         std::fclose(f);
         if (got != table_bytes || too_long) {
             std::fprintf(stderr,
-                         "[hwhs demo] %s is %zu bytes%s; demo_depth=%u needs exactly %zu "
+                         "[hwhs pacer] %s is %zu bytes%s; pacer_depth=%u needs exactly %zu "
                          "(syndrome half then expected half)\n",
-                         demo_.table_path.c_str(), got, too_long ? "+" : "", demo_.syn_depth,
+                         pacer_.table_path.c_str(), got, too_long ? "+" : "", pacer_.syn_depth,
                          table_bytes);
             ::munmap(base, span);
-            RT_FAIL("demo_table: wrong size for demo_depth");
+            RT_FAIL("pacer_table: wrong size for pacer_depth");
         }
         for (std::size_t b = 0; b < table_bytes; ++b) {
             tbl[b] = img[b];
@@ -527,7 +522,7 @@ void HwhsControllerSession::demo_preload() {
         for (std::uint32_t i = 0; i < slots; ++i) {
             const std::uint64_t value = static_cast<std::uint64_t>(i) + 1;
             for (std::uint32_t half = 0; half < 2; ++half) {
-                volatile std::uint8_t *p = tbl + half * demo_.syn_depth + i * 64u;
+                volatile std::uint8_t *p = tbl + half * pacer_.syn_depth + i * 64u;
                 for (std::size_t b = 0; b < 64; ++b) {
                     p[b] = 0;
                 }
@@ -548,8 +543,8 @@ void HwhsControllerSession::demo_preload() {
 }
 
 // Read the trace RAM out after the run and write it as cycles,ns
-void HwhsControllerSession::demo_dump_trace() const {
-    if (demo_.trace_pa == 0 || demo_.trace_out.empty() || mem_fd_ < 0) {
+void HwhsControllerSession::pacer_dump_trace() const {
+    if (pacer_.trace_pa == 0 || pacer_.trace_out.empty() || mem_fd_ < 0) {
         return;
     }
     hh_trace_status ts = {};
@@ -561,11 +556,11 @@ void HwhsControllerSession::demo_dump_trace() const {
     void *base = nullptr;
     std::size_t span = 0;
     const std::size_t bytes = static_cast<std::size_t>(ts.cnt) * sizeof(std::uint16_t);
-    volatile std::uint8_t *p = map_pa(mem_fd_, demo_.trace_pa, bytes, &base, &span);
+    volatile std::uint8_t *p = map_pa(mem_fd_, pacer_.trace_pa, bytes, &base, &span);
 
-    std::FILE *f = std::fopen(demo_.trace_out.c_str(), "w");
+    std::FILE *f = std::fopen(pacer_.trace_out.c_str(), "w");
     if (f == nullptr) {
-        std::fprintf(stderr, "[hwhs trace] cannot write %s\n", demo_.trace_out.c_str());
+        std::fprintf(stderr, "[hwhs trace] cannot write %s\n", pacer_.trace_out.c_str());
         ::munmap(base, span);
         return;
     }
@@ -586,17 +581,17 @@ void HwhsControllerSession::demo_dump_trace() const {
     if (all_zero) {
         std::fprintf(stderr,
                      "[hwhs trace] every one of %u entries read back as 0 at 0x%llX: either "
-                     "C_TRACE_EN=0 in the bitstream or demo_trace= names the wrong address\n",
-                     ts.cnt, static_cast<unsigned long long>(demo_.trace_pa));
+                     "C_TRACE_EN=0 in the bitstream or pacer_trace= names the wrong address\n",
+                     ts.cnt, static_cast<unsigned long long>(pacer_.trace_pa));
     }
     std::fprintf(stderr, "[hwhs trace] wrote %u round(s) to %s%s%s\n", ts.cnt,
-                 demo_.trace_out.c_str(),
+                 pacer_.trace_out.c_str(),
                  ts.full ? "   <-- buffer filled: rounds after this were not recorded" : "",
                  ts.sat ? "   <-- some entry clamped to 0xFFFF: it is a ceiling, not a value" : "");
 }
 
-void HwhsControllerSession::demo_diff_dump() const {
-    if (!demo_.enable || mem_fd_ < 0 || reply_.view == nullptr) {
+void HwhsControllerSession::pacer_diff_dump() const {
+    if (!pacer_.enable || mem_fd_ < 0 || reply_.view == nullptr) {
         return;
     }
     {
@@ -607,13 +602,13 @@ void HwhsControllerSession::demo_diff_dump() const {
     }
     void *base = nullptr;
     std::size_t span = 0;
-    volatile std::uint8_t *exp = map_pa(mem_fd_, demo_.bram_pa + demo_.syn_depth,
-                                        static_cast<std::size_t>(demo_.syn_depth), &base, &span);
+    volatile std::uint8_t *exp = map_pa(mem_fd_, pacer_.bram_pa + pacer_.syn_depth,
+                                        static_cast<std::size_t>(pacer_.syn_depth), &base, &span);
 
-    std::fprintf(stderr, "[hwhs demo] expected table @0x%llx vs reply ring @0x%llx\n",
-                 static_cast<unsigned long long>(demo_.bram_pa + demo_.syn_depth),
+    std::fprintf(stderr, "[hwhs pacer] expected table @0x%llx vs reply ring @0x%llx\n",
+                 static_cast<unsigned long long>(pacer_.bram_pa + pacer_.syn_depth),
                  static_cast<unsigned long long>(reply_.pa));
-    const std::uint32_t table_slots = demo_.syn_depth / 64u;
+    const std::uint32_t table_slots = pacer_.syn_depth / 64u;
     for (std::uint32_t slot = 0; slot < 3 && slot < ring_slots_; ++slot) {
         const volatile std::uint8_t *r = reply_.view + static_cast<std::size_t>(slot) * stride_;
         const std::uint32_t rseq = *reinterpret_cast<volatile const std::uint32_t *>(
@@ -636,18 +631,18 @@ void HwhsControllerSession::demo_diff_dump() const {
     ::munmap(base, span);
 }
 
-void HwhsControllerSession::demo_dump(const char *why) const {
+void HwhsControllerSession::pacer_dump(const char *why) const {
     static const char *kStates[16] = {"S_IDLE",    "S_WQE_ISS",  "S_WQE_WAIT",   "S_DAT_WAIT",
                                       "S_DAT_ISS", "S_RING_ISS", "S_RING_WAIT",  "S_WAIT_RPL",
                                       "S_NEXT",    "S_DAT_IDLE", "S_DAT_TX_ISS", "S_DAT_TX_WAIT",
                                       "resv12",    "S_POLL_ISS", "S_POLL_WAIT",  "S_JOIN"};
     hh_status_rd st = {};
     if (ioctl(hh_fd_, HH_READ_STATUS, &st) != 0) {
-        std::fprintf(stderr, "[hwhs demo] %s: HH_READ_STATUS failed\n", why);
+        std::fprintf(stderr, "[hwhs pacer] %s: HH_READ_STATUS failed\n", why);
         return;
     }
     std::fprintf(stderr,
-                 "[hwhs demo] %s: STATUS=0x%03x state=%s busy=%u done=%u reply_seen=%u "
+                 "[hwhs pacer] %s: STATUS=0x%03x state=%s busy=%u done=%u reply_seen=%u "
                  "timeout=%u axi_err=%u round_cnt=%u last_rd=0x%08x%s\n",
                  why, st.status, kStates[st.status & HH_ST_STATE_MASK], (st.status >> 4) & 1u,
                  (st.status >> 5) & 1u, (st.status >> 6) & 1u, (st.status >> 7) & 1u,
@@ -657,19 +652,19 @@ void HwhsControllerSession::demo_dump(const char *why) const {
     hh_demo_status ds = {};
     if (ioctl(hh_fd_, HH_DEMO_STATUS, &ds) == 0) {
         std::fprintf(stderr,
-                     "[hwhs demo]   readback CMD_CNT=%u DEMO_DEPTH=%u FREQ=%llu done=%u "
+                     "[hwhs pacer]   readback CMD_CNT=%u DEMO_DEPTH=%u FREQ=%llu done=%u "
                      "cmp_err=%u   (programmed %u / %u / %llu)%s\n",
                      ds.cmd_cnt, ds.syn_depth, static_cast<unsigned long long>(ds.freq_num),
-                     ds.done, ds.err_cnt, demo_.cmd_cnt, demo_.syn_depth,
-                     static_cast<unsigned long long>(demo_.freq_num),
-                     (ds.cmd_cnt != demo_.cmd_cnt || ds.syn_depth != demo_.syn_depth)
+                     ds.done, ds.err_cnt, pacer_.cmd_cnt, pacer_.syn_depth,
+                     static_cast<unsigned long long>(pacer_.freq_num),
+                     (ds.cmd_cnt != pacer_.cmd_cnt || ds.syn_depth != pacer_.syn_depth)
                          ? "   <-- readback disagrees: the engine did not take the config"
                          : "");
     }
 }
 
-void HwhsControllerSession::demo_report() const {
-    if (!demo_.enable || hh_fd_ < 0) {
+void HwhsControllerSession::pacer_report() const {
+    if (!pacer_.enable || hh_fd_ < 0) {
         return;
     }
     hh_demo_status ds = {};
@@ -677,13 +672,14 @@ void HwhsControllerSession::demo_report() const {
         return;
     }
     // rounds_seen_ is what the host watched the engine's counter advance by; the authoritative
-    // per-round record is the trace, and demo_dump_trace() reports its own entry count.
-    std::fprintf(stderr, "[hwhs demo] engine ran %llu round(s)%s\n",
+    // per-round record is the trace, and pacer_dump_trace() reports its own entry count.
+    std::fprintf(stderr, "[hwhs pacer] engine ran %llu round(s)%s\n",
                  static_cast<unsigned long long>(rounds_seen_),
-                 demo_finished_ ? "  [run complete]" : "");
+                 pacer_finished_ ? "  [run complete]" : "");
     const std::uint32_t err_this_run = ds.err_cnt - err_cnt_base_;
     std::fprintf(
-        stderr, "[hwhs demo] cmd_cnt=%u done=%u compare_errors=%u this run (%u since power-on)%s\n",
+        stderr,
+        "[hwhs pacer] cmd_cnt=%u done=%u compare_errors=%u this run (%u since power-on)%s\n",
         ds.cmd_cnt, ds.done, err_this_run, ds.err_cnt, err_this_run ? "   <-- DATA MISMATCH" : "");
 }
 
@@ -697,7 +693,7 @@ void HwhsControllerSession::write_data_slot(const void *src, std::uint64_t bytes
                                             std::uint32_t decoder_id) {
     RT_FAIL_IF(!out_.view, "write_data_slot before establish_channel()");
     RT_FAIL_IF(bytes > common::PAYLOAD_DATA_BYTES, "write_data_slot: bytes exceeds Payload::value");
-    if (demo_.enable) {
+    if (pacer_.enable) {
         return;
     }
     std::uint32_t slot = static_cast<std::uint32_t>(submitted_ % ring_slots_);
@@ -725,6 +721,7 @@ void *HwhsControllerSession::reply_slot() {
 }
 
 int HwhsControllerSession::kick(std::uint32_t work_item_idx) {
+    RT_FAIL_IF(pacer_.enable, "kick: pacer=hw issues its own rounds, use run_paced()");
     RT_FAIL_IF(work_item_idx != 0, "only a single work item (idx 0) is supported");
     RT_FAIL_IF(!committed_[work_item_idx], "kick: work_item not committed");
     RT_FAIL_IF(submitted_ - collected_ >= 1,
@@ -740,15 +737,6 @@ int HwhsControllerSession::kick(std::uint32_t work_item_idx) {
     // Starts the round trip the app is charged for: everything from here to the reply being
     // visible.
     kick_ns_ = now_ns();
-
-    if (demo_.enable) {
-        if (!demo_armed_) {
-            demo_arm(); // both sides are up by now; see demo_arm() for why not earlier
-            demo_armed_ = true;
-        }
-        ++submitted_;
-        return kOk;
-    }
 
     if (hh_doorbell_ != nullptr) {
 #if defined(__aarch64__)
@@ -769,44 +757,55 @@ int HwhsControllerSession::kick(std::uint32_t work_item_idx) {
     return kOk;
 }
 
+// The pacer issues every round from its table; the trace is the only record of them.
+int HwhsControllerSession::run_paced() {
+    RT_FAIL_IF(!pacer_.enable, "run_paced: needs pacer=hw");
+    RT_FAIL_IF(!armed_ || !committed_[0], "run_paced before commit_work_item()");
+    RT_FAIL_IF(pacer_armed_, "run_paced: one run per commit_work_item()");
+
+    if (active_item_ != 0) {
+        std::uint32_t idx = 0;
+        RT_FAIL_IF(ioctl(hh_fd_, HH_SET_WQE_IDX, &idx) != 0, "HH_SET_WQE_IDX failed");
+        active_item_ = 0;
+    }
+    pacer_arm(); // both sides are up by now; see pacer_arm() for why not earlier
+    pacer_armed_ = true;
+
+    hh_demo_status ds = {};
+    hh_status_rd st = {};
+    std::uint32_t last_seen = last_round_cnt_;
+    std::uint64_t stall_deadline = now_ns() + kCollectTimeoutNs;
+    for (;;) {
+        if (ioctl(hh_fd_, HH_READ_STATUS, &st) == 0) {
+            if (st.status & (HH_ST_TIMEOUT | HH_ST_AXI_ERR)) {
+                return (st.status & HH_ST_AXI_ERR) ? kErrMemory : kErrTimeout;
+            }
+            if (st.round_cnt != last_seen) {
+                rounds_seen_ += static_cast<std::uint32_t>(st.round_cnt - last_seen);
+                last_seen = st.round_cnt;
+                stall_deadline = now_ns() + kCollectTimeoutNs;
+            }
+        }
+        // The pacer reached pacer_cnt and stopped; how the run went is in HH_DEMO_STATUS (see
+        // pacer_report) and the trace header's entries/full counters.
+        if (ioctl(hh_fd_, HH_DEMO_STATUS, &ds) == 0 && ds.done) {
+            pacer_finished_ = true;
+            last_round_cnt_ = last_seen;
+            return kOk;
+        }
+        if (now_ns() >= stall_deadline) {
+            pacer_dump("trace run stalled");
+            return kErrStuck;
+        }
+        struct timespec ts = {0, 200'000}; // 0.2 ms; nothing here is latency-critical
+        nanosleep(&ts, nullptr);
+    }
+}
+
 int HwhsControllerSession::collect(void *const *replies, const std::uint64_t * /*replies_bytes*/,
                                    std::size_t n) {
     RT_FAIL_IF(!armed_, "collect before commit_work_item()");
     RT_FAIL_IF(submitted_ == collected_, "collect: nothing in flight");
-
-    if (demo_.enable) { // the trace is the only demo recording path
-        hh_demo_status ds = {};
-        hh_status_rd st = {};
-        std::uint32_t last_seen = last_round_cnt_;
-        std::uint64_t stall_deadline = now_ns() + kCollectTimeoutNs;
-        for (;;) {
-            if (ioctl(hh_fd_, HH_READ_STATUS, &st) == 0) {
-                if (st.status & (HH_ST_TIMEOUT | HH_ST_AXI_ERR)) {
-                    ++collected_;
-                    return (st.status & HH_ST_AXI_ERR) ? kErrMemory : kErrTimeout;
-                }
-                if (st.round_cnt != last_seen) {
-                    rounds_seen_ += static_cast<std::uint32_t>(st.round_cnt - last_seen);
-                    last_seen = st.round_cnt;
-                    stall_deadline = now_ns() + kCollectTimeoutNs;
-                }
-            }
-            if (ioctl(hh_fd_, HH_DEMO_STATUS, &ds) == 0 && ds.done) {
-                demo_finished_ = true;
-                last_round_cnt_ = last_seen;
-                return kDemoComplete;
-            }
-            if (now_ns() >= stall_deadline) {
-                demo_dump("trace run stalled");
-                ++collected_;
-                return kErrStuck;
-            }
-            struct timespec ts = {0, 200'000}; // 0.2 ms; nothing here is latency-critical
-            nanosleep(&ts, nullptr);
-        }
-    }
-
-    RT_FAIL_IF(demo_.enable, "demo mode must be handled by the trace branch above");
 
     RT_FAIL_IF(n == 0 || replies == nullptr || replies[0] == nullptr, "collect: no reply buffer");
     volatile std::uint8_t *slot = static_cast<volatile std::uint8_t *>(replies[0]);
@@ -891,13 +890,13 @@ void HwhsControllerSession::stop() {
     }
     report_rtt();
 
-    if (demo_.enable) {
-        demo_report();
-        demo_diff_dump();
-        demo_dump_trace();
+    if (pacer_.enable) {
+        pacer_report();
+        pacer_diff_dump();
+        pacer_dump_trace();
     }
     if (hh_fd_ >= 0 && armed_) {
-        if (demo_.enable) {
+        if (pacer_.enable) {
             ioctl(hh_fd_, HH_DEMO_STOP_RUN);
         }
         ioctl(hh_fd_, HH_ABORT);

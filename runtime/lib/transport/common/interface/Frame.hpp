@@ -148,6 +148,11 @@ struct FrameView {
     std::uint32_t seq = 0;        // the round's sequence number, cursor + 1
 };
 
+/// Whether `seq` is `expect` or later, across the 32-bit wrap.
+FRAME_HOST_DEVICE inline bool seq_reached(std::uint32_t seq, std::uint32_t expect) {
+    return static_cast<std::int32_t>(seq - expect) >= 0;
+}
+
 namespace detail {
 inline void require_mode(Mode mode) {
     TP_CHECK(mode == Mode::BL16 || mode == Mode::BLV, "frame mode %d is not implemented",

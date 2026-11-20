@@ -11,9 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""
-Sets up the PLxPRToQuantumJaxprInterpreter for converting plxpr to catalyst jaxpr.
-"""
+"""Sets up the PLxPRToQuantumJaxprInterpreter for converting plxpr to catalyst jaxpr."""
 
 # pylint: disable=protected-access
 import textwrap
@@ -45,12 +43,20 @@ from pennylane.measurements import CountsMP
 from pennylane.pytrees import flatten, unflatten
 from pennylane.wires import AbstractQubit, Wires, is_abstract_qubit
 
-from catalyst.decomposition.capture_session import OpDecompRequest, TracedRule
+import catalyst
+from catalyst.decomposition.capture_session import (
+    DecompositionScope,
+    OpDecompRequest,
+    RuleIdentity,
+    TracedRule,
+)
 from catalyst.decomposition.decomposition_rules import (
+    DecompTargetSpec,
     rule_call_operands,
     walk_reachable_decomp_rule_sets,
 )
 from catalyst.decomposition.modifier_state import ModifierState
+from catalyst.decomposition.precompiled_rule_loading import load_precompiled_rule_identities
 from catalyst.decomposition.rule_lowering_warning import RuleLoweringWarning
 from catalyst.from_plxpr.qref_jax_primitives import (
     MeasurementPlane,
@@ -122,7 +128,7 @@ class PLxPRToQuantumJaxprInterpreter(PlxprInterpreter):
         *,
         control_wires=(),
         control_values=(),
-        decomposition_scope=None,
+        decomposition_scope: DecompositionScope | None = None,
     ):
         self.device = device
         self.shots = shots
@@ -431,49 +437,70 @@ def _apply_operator2_gate(
     )
 
 
-def _convert_decomp_target_spec(interpreter, target_spec):
-    """Convert one target specification into Catalyst rule JAXPRs."""
-
+def _convert_decomp_target_spec(
+    interpreter: PLxPRToQuantumJaxprInterpreter,
+    target_spec: DecompTargetSpec,
+    precompiled_rule_identities: frozenset[RuleIdentity] = frozenset(),
+    estimate_decomps: bool = False,
+) -> list[TracedRule]:
+    """Convert rules into Catalyst JAXPRs, retaining only their signatures if requested."""
     with take_current_trace():
         operands = rule_call_operands(target_spec.trace_inputs)
         operands = [jax.ShapeDtypeStruct(operand.shape, operand.dtype) for operand in operands]
     out = []
     for rule in target_spec.rules:
+        if (
+            RuleIdentity(
+                target_spec.target_id,
+                rule.frontend_name,
+                tuple(sorted(rule.resource_counts_by_id.items())),
+            )
+            in precompiled_rule_identities
+        ):
+            continue
+
         prepared_rule_fn = rule.prepared_rule_fn
         if not prepared_rule_fn.__name__.startswith("__builtin_"):
             prepared_rule_fn.__name__ = "__builtin_" + prepared_rule_fn.__name__
 
         with take_current_trace():
-            try:
-                plxpr = jax.make_jaxpr(prepared_rule_fn)(*operands)
-            except Exception as exc:  # pylint: disable=broad-except
-                warnings.warn(
-                    f"Failed to capture the {rule.frontend_name} decomposition rule for "
-                    f"{target_spec.target_id}: {exc}",
-                    category=RuleLoweringWarning,
-                )
-                continue
-            if target_spec.reject_noninvertible and _contains_noninvertible_equation(plxpr):
-                continue
+            if estimate_decomps:
+                converted = jax.make_jaxpr(
+                    lambda *args: catalyst.debug_assert(
+                        False, "rule without implementation for estimation purposes"
+                    )
+                )(QrefQreg(), *operands)
+            else:
+                try:
+                    plxpr = jax.make_jaxpr(prepared_rule_fn)(*operands)
+                except Exception as exc:  # pylint: disable=broad-except
+                    warnings.warn(
+                        f"Failed to capture the {rule.frontend_name} decomposition rule for "
+                        f"{target_spec.target_id}: {exc}",
+                        category=RuleLoweringWarning,
+                    )
+                    continue
+                if target_spec.reject_noninvertible and _contains_noninvertible_equation(plxpr):
+                    continue
 
-            def wrapper(global_qreg, *args):
-                converter = copy(interpreter)
-                converter.init_qreg = global_qreg
-                converter.decomposition_scope = None
-                converter.subroutine_cache = {}
-                converter(plxpr, *args)
+                def wrapper(global_qreg, *args):
+                    converter = copy(interpreter)
+                    converter.init_qreg = global_qreg
+                    converter.decomposition_scope = None
+                    converter.subroutine_cache = {}
+                    converter(plxpr, *args)
 
-            try:
-                converted = jax.make_jaxpr(wrapper)(QrefQreg(), *plxpr.in_avals)
-            except Exception as exc:  # pylint: disable=broad-except
-                if isinstance(exc, CompileError):
-                    raise
-                warnings.warn(
-                    f"Failed to convert the {rule.frontend_name} decomposition rule for "
-                    f"{target_spec.target_id}: {exc}",
-                    category=RuleLoweringWarning,
-                )
-                continue
+                try:
+                    converted = jax.make_jaxpr(wrapper)(QrefQreg(), *plxpr.in_avals)
+                except Exception as exc:  # pylint: disable=broad-except
+                    if isinstance(exc, CompileError):
+                        raise
+                    warnings.warn(
+                        f"Failed to convert the {rule.frontend_name} decomposition rule for "
+                        f"{target_spec.target_id}: {exc}",
+                        category=RuleLoweringWarning,
+                    )
+                    continue
         out.append(
             TracedRule(
                 prepared_rule_fn=prepared_rule_fn,
@@ -486,23 +513,43 @@ def _convert_decomp_target_spec(interpreter, target_spec):
     return out
 
 
-def _capture_scope_rules(interpreter, scope):
-    """Populate one decomposition scope outside the active program trace."""
-
+def _capture_scope_rules(
+    interpreter: PLxPRToQuantumJaxprInterpreter,
+    scope: DecompositionScope,
+    precompiled_rule_identities: frozenset[RuleIdentity] | None = None,
+) -> None:
+    """Populate one scope, loading cached identities unless the caller supplies them."""
+    if scope.estimate_decomps:
+        # Emit every declaration, including rules whose implementations are precompiled.
+        precompiled_rule_identities = frozenset()
+    elif precompiled_rule_identities is None:
+        # default to empty-set - precompiled is an optimization, not required
+        precompiled_rule_identities = frozenset()
+        try:
+            precompiled_rule_identities = load_precompiled_rule_identities()
+        except Exception as e:
+            warnings.warn(f"Failed to load precompiled rules: {e}")
     for target_spec in walk_reachable_decomp_rule_sets(list(scope.roots.values())):
-        for traced_rule in _convert_decomp_target_spec(interpreter, target_spec):
+        for traced_rule in _convert_decomp_target_spec(
+            interpreter,
+            target_spec,
+            precompiled_rule_identities,
+            estimate_decomps=scope.estimate_decomps,
+        ):
             scope.record_definition(traced_rule)
 
 
-def capture_and_bind_kernel_rules(interpreter):
-    """Capture this kernel's reachable rules and append definition equations."""
-
+def capture_and_bind_kernel_rules(
+    interpreter: PLxPRToQuantumJaxprInterpreter,
+    precompiled_rule_identities: frozenset[RuleIdentity] | None = None,
+) -> None:
+    """Capture reachable rules and bind definitions, optionally using supplied cache identities."""
     scope = interpreter.decomposition_scope
     if scope is None:
         return
 
     with take_current_trace():
-        _capture_scope_rules(interpreter, scope)
+        _capture_scope_rules(interpreter, scope, precompiled_rule_identities)
 
     for traced_rule in scope.definitions.values():
         decomp_definition_p.bind(
@@ -512,6 +559,7 @@ def capture_and_bind_kernel_rules(interpreter):
             resources=tuple(sorted(traced_rule.resources.items())),
             frontend_name=traced_rule.frontend_name,
             num_wires=None,
+            estimate_decomps=scope.estimate_decomps,
         )
 
 
@@ -700,7 +748,7 @@ def handle_subroutine(self, *args, **kwargs):
     """
     plxpr = kwargs["jaxpr"]
 
-    cache_key = hash(str(plxpr))
+    cache_key = hash((str(plxpr), tuple(id(const) for const in plxpr.consts)))
     transformed = self.subroutine_cache.get(cache_key)
 
     if not transformed:

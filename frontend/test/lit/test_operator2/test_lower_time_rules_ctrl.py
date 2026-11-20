@@ -53,7 +53,7 @@ def controlled_op():
     return qp.state()
 
 
-# CHECK-DAG: target_gate = "C(S){}{wires:1}{}"
+# CHECK-DAG: target_gate = "1C(S){}{wires:1}{}"
 print(controlled_op.mlir)
 
 
@@ -67,7 +67,7 @@ def controlled_adjoint_op():
     return qp.state()
 
 
-# CHECK-DAG: target_gate = "C(Adjoint(S)){}{wires:1}{}"
+# CHECK-DAG: target_gate = "1C(Adjoint(S)){}{wires:1}{}"
 print(controlled_adjoint_op.mlir)
 
 
@@ -83,5 +83,5 @@ with qp.decomposition.local_decomps():
         qp.ctrl(qp.S(0), control=[1])
         return qp.state()
 
-    # CHECK-DAG: target_gate = "C(S){}{wires:1}{}"
+    # CHECK-DAG: target_gate = "1C(S){}{wires:1}{}"
     print(controlled_op_fixed.mlir)

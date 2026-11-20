@@ -574,3 +574,49 @@ func.func @operator_custom_invalid_ctrl_static_length(%r : !qref.reg<?>, %idx : 
 }
 
 // -----
+
+// -----
+
+func.func @reference_map_out_of_bounds(%q: !qref.bit) {
+  // expected-error@+1 {{qubit_map index is out of bounds}}
+  qref.operator "Composite"() qubits(%q) qubit_map = {compute = [1]}
+  return
+}
+
+// -----
+
+func.func @reference_map_missing_qubit(%q0: !qref.bit, %q1: !qref.bit) {
+  // expected-error@+1 {{qubit_map must cover all qubit values}}
+  qref.operator "Composite"() qubits(%q0, %q1) qubit_map = {compute = [0], target = [0]}
+  return
+}
+
+// -----
+
+func.func @operator_overlapping_targets(%target: !qref.bit, %control: !qref.bit) {
+  %true = arith.constant true
+  qref.operator "Composite"() qubits(%target, %target)
+    ctrls(%control) ctrl_vals(%true) qubit_map = {compute = [0], target = [1]}
+  return
+}
+
+// -----
+
+func.func @operator_control_on_overlapping_targets(%target: !qref.bit) {
+  %true = arith.constant true
+  // expected-error@+1 {{all qubits on a quantum gate must be distinct (including controls)}}
+  qref.operator "Composite"() qubits(%target, %target)
+    ctrls(%target) ctrl_vals(%true) qubit_map = {compute = [0], target = [1]}
+  return
+}
+
+// -----
+
+func.func @operator_duplicate_controls(%target: !qref.bit, %control: !qref.bit) {
+  %true = arith.constant true
+  // expected-error@+1 {{all qubits on a quantum gate must be distinct (including controls)}}
+  qref.operator "Composite"() qubits(%target, %target)
+    ctrls(%control, %control) ctrl_vals(%true, %true)
+    qubit_map = {compute = [0], target = [1]}
+  return
+}
