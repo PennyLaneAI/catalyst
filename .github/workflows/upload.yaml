@@ -1,0 +1,68 @@
+name: Build nightly Catalyst releases for TestPyPI
+
+permissions:
+  contents: read
+  id-token: write
+
+on:
+  release:
+    types: [released]
+
+jobs:
+  setup:
+    name: Setup the release
+    runs-on:
+      group: 'PennyLaneAI-Static-IP-Runners'
+      labels: ['pl-2-core-gh-runner']
+    steps:
+    - name: Checkout Catalyst repo
+      uses: actions/checkout@v4
+
+  linux-x86:
+    name: Build on Linux x86-64
+    needs: [setup]
+    uses: ./.github/workflows/build-wheel-linux-x86_64.yaml
+    with:
+      build_dev_packages: true
+
+  linux-aarch:
+    name: Build on Linux aarch64
+    needs: [setup]
+    uses: ./.github/workflows/build-wheel-linux-arm64.yaml
+
+  macos-arm:
+    name: Build on macOS arm64
+    needs: [setup]
+    uses: ./.github/workflows/build-wheel-macos-arm64.yaml
+    with:
+      build_dev_packages: true
+
+  upload:
+    name: Prepare & Upload wheels to TestPyPI
+    needs: [linux-x86, macos-arm, linux-aarch]
+    runs-on: ubuntu-24.04
+    permissions:
+      id-token: write  # IMPORTANT: mandatory for trusted publishing
+
+    steps:
+    - name: Download wheels
+      uses: actions/download-artifact@v4
+      with:
+        pattern: "*wheel*"
+        merge-multiple: true
+        path: dist
+
+    - name: Install rename
+      run: |
+        sudo apt install rename
+
+    - name: Prepare wheels
+      run: |
+        rename "s/linux/manylinux_2_28/" dist/pennylane_catalyst-*
+        rename "s/macosx_15_0_universal2/macosx_13_0_arm64/" dist/pennylane_catalyst-*
+        rename "s/macosx_15/macosx_13/" dist/pennylane_catalyst-*
+
+    - name: Upload wheels
+      uses: pypa/gh-action-pypi-publish@release/v1
+      with:
+        packages-dir: dist
