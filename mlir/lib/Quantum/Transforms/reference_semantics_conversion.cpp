@@ -499,7 +499,7 @@ void handleCall(IRRewriter &builder, func::CallOp callOp, QubitValueTracker &tra
     // A subroutine takes registers of dynamic size, so a register of static size at the call site,
     // e.g. `!qref.reg<3>`, is cast to the argument type `!qref.reg<?>`. The new call op has the
     // same operands as the old one, in the same order.
-    if (calleeRArgTypes.size() == newCallOp->getNumOperands()) {
+    {
         builder.setInsertionPoint(newCallOp);
         for (OpOperand &operand : newCallOp->getOpOperands()) {
             Type argType = calleeRArgTypes[operand.getOperandNumber()];

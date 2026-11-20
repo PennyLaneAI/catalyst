@@ -58,7 +58,7 @@ namespace qref {
  * inserted at the rewriter's insertion point for each such operand.
  */
 void castQregOperandsToArgTypes(PatternRewriter &rewriter, Location loc,
-                                SmallVectorImpl<Value> &operands, TypeRange argTypes) {
+                                SmallVector<Value> &operands, TypeRange argTypes) {
     if (operands.size() != argTypes.size()) {
         return;
     }
