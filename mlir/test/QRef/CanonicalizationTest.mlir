@@ -234,3 +234,23 @@ func.func @test_canonicalize_no_dce(%arg0: tensor<2xcomplex<f64>>, %arg1 : tenso
 
     return
 }
+
+// -----
+
+// CHECK-LABEL: func.func @test_fold_cast
+func.func @test_fold_cast(%r: !qref.reg<3>) -> (!qref.reg<3>, !qref.reg<3>, !qref.reg<?>) {
+    // A cast to the same type folds to its source.
+    %0 = qref.cast %r : !qref.reg<3> to !qref.reg<3>
+
+    // A chain of casts back to the source type folds to the source.
+    %1 = qref.cast %r : !qref.reg<3> to !qref.reg<?>
+    %2 = qref.cast %1 : !qref.reg<?> to !qref.reg<3>
+
+    // A chain of casts to another type folds to a single cast from the source.
+    // CHECK: [[cast:%.+]] = qref.cast %arg0 : !qref.reg<3> to !qref.reg<?>
+    // CHECK-NOT: qref.cast
+    %3 = qref.cast %2 : !qref.reg<3> to !qref.reg<?>
+
+    // CHECK: return %arg0, %arg0, [[cast]] : !qref.reg<3>, !qref.reg<3>, !qref.reg<?>
+    return %0, %2, %3 : !qref.reg<3>, !qref.reg<3>, !qref.reg<?>
+}

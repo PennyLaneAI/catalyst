@@ -124,6 +124,24 @@ OpFoldResult GetOp::fold(FoldAdaptor adaptor) {
     return nullptr;
 }
 
+OpFoldResult CastOp::fold(FoldAdaptor adaptor) {
+    // A cast to the same type is a no-op.
+    if (getSource().getType() == getType()) {
+        return getSource();
+    }
+    // Fold a chain of casts, e.g. `reg<3> -> reg<?> -> reg<3>`, into a single cast, or into its
+    // source when the chain casts back to the source type.
+    if (auto sourceCast = getSource().getDefiningOp<CastOp>()) {
+        if (sourceCast.getSource().getType() == getType()) {
+            return sourceCast.getSource();
+        }
+        getSourceMutable().assign(sourceCast.getSource());
+        return getResult();
+    }
+    // Returning nullptr tells the caller the op was unchanged.
+    return nullptr;
+}
+
 //===----------------------------------------------------------------------===//
 // QRef op verifiers.
 //===----------------------------------------------------------------------===//
@@ -155,6 +173,17 @@ LogicalResult AllocOp::verify() {
         }
     }
 
+    return success();
+}
+
+LogicalResult CastOp::verify() {
+    QuregType sourceType = getSource().getType();
+    QuregType resultType = getType();
+    if (sourceType.isStatic() && resultType.isStatic() &&
+        sourceType.getSize().getInt() != resultType.getSize().getInt()) {
+        return emitOpError() << "cannot cast between registers of different static sizes, "
+                             << sourceType << " and " << resultType;
+    }
     return success();
 }
 

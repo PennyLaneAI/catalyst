@@ -36,6 +36,7 @@
 #include "mlir/Support/LogicalResult.h"
 
 #include "QRef/IR/QRefInterfaces.h"
+#include "QRef/IR/QRefOps.h"
 #include "QRef/IR/QRefTypes.h"
 #include "QRef/Transforms/Patterns.h"
 
@@ -48,6 +49,26 @@ using namespace mlir;
 
 namespace catalyst {
 namespace qref {
+
+/**
+ * @brief Cast the register operands of a rule call to the register types of the rule arguments.
+ *
+ * Calls must match the signature of their callee, but a register of static size, e.g.
+ * `!qref.reg<3>`, is passed to a rule argument of dynamic size, `!qref.reg<?>`. A `qref.cast` is
+ * inserted at the rewriter's insertion point for each such operand.
+ */
+void castQregOperandsToArgTypes(PatternRewriter &rewriter, Location loc,
+                                SmallVectorImpl<Value> &operands, TypeRange argTypes) {
+    if (operands.size() != argTypes.size()) {
+        return;
+    }
+    for (auto [operand, argType] : llvm::zip_equal(operands, argTypes)) {
+        if (isa<qref::QuregType>(operand.getType()) && isa<qref::QuregType>(argType) &&
+            operand.getType() != argType) {
+            operand = qref::CastOp::create(rewriter, loc, argType, operand);
+        }
+    }
+}
 
 /**
  * @brief
@@ -200,6 +221,10 @@ struct DecomposableGatePattern final : public OpInterfaceRewritePattern<Decompos
         if (!analyzer) {
             return failure();
         }
+
+        // The gate may act on a register of static size, e.g. `!qref.reg<3>`, while rules take
+        // registers of dynamic size.
+        castQregOperandsToArgTypes(rewriter, op.getLoc(), operands, rule.getArgumentTypes());
 
         if (inlineRuleBody) {
             inlineRule(rewriter, rule, operands);

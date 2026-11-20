@@ -470,11 +470,46 @@ void handlePBCQubitProducer(IRRewriter &builder, VOpTy vProducerOp, QubitValueTr
     erasureWorklist.push_back(vProducerOp);
 }
 
+/// The reference semantics type that the callee of `callOp` expects for each operand. Register
+/// arguments of subroutines are dynamic, see `handleSubroutine`.
+SmallVector<Type> getCalleeRArgTypes(func::CallOp callOp) {
+    auto callee =
+        SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(callOp, callOp.getCalleeAttr());
+    if (!callee) {
+        return {};
+    }
+    MLIRContext *ctx = callOp.getContext();
+    Type dynamicQregType = qref::QuregType::get(
+        ctx, IntegerAttr::get(IntegerType::get(ctx, 64), ShapedType::kDynamic));
+    SmallVector<Type> rArgTypes;
+    for (Type t : callee.getFunctionType().getInputs()) {
+        // Callees still in value semantics are converted after their callers.
+        rArgTypes.push_back(isa<quantum::QuregType>(t) ? dynamicQregType : t);
+    }
+    return rArgTypes;
+}
+
 void handleCall(IRRewriter &builder, func::CallOp callOp, QubitValueTracker &tracker,
                 SmallVector<Operation *> &erasureWorklist) {
     OpBuilder::InsertionGuard guard(builder);
 
+    SmallVector<Type> calleeRArgTypes = getCalleeRArgTypes(callOp);
     auto newCallOp = migrateOpToReferenceSemantics<func::CallOp>(builder, callOp, tracker);
+
+    // A subroutine takes registers of dynamic size, so a register of static size at the call site,
+    // e.g. `!qref.reg<3>`, is cast to the argument type `!qref.reg<?>`. The new call op has the
+    // same operands as the old one, in the same order.
+    if (calleeRArgTypes.size() == newCallOp->getNumOperands()) {
+        builder.setInsertionPoint(newCallOp);
+        for (OpOperand &operand : newCallOp->getOpOperands()) {
+            Type argType = calleeRArgTypes[operand.getOperandNumber()];
+            Value rQreg = operand.get();
+            if (isa<qref::QuregType>(rQreg.getType()) && isa<qref::QuregType>(argType) &&
+                rQreg.getType() != argType) {
+                operand.set(qref::CastOp::create(builder, newCallOp.getLoc(), argType, rQreg));
+            }
+        }
+    }
 
     SmallVector<Value> oldClassicalResults;
     for (auto v : callOp.getResults()) {
@@ -986,8 +1021,14 @@ bool funcOpHasValueSemanticsOps(func::FuncOp f) {
     return walkResult.wasInterrupted();
 }
 
-void handleSubroutine(IRRewriter &builder, func::FuncOp f,
-                      const SmallVector<IntegerAttr> &qregSizesAtCallsite) {
+/**
+ * @brief Convert a value semantics subroutine to reference semantics.
+ *
+ * Register arguments become `!qref.reg<?>`: a subroutine can be called with registers of
+ * different sizes, and a function has a single signature. Call sites cast their registers of
+ * static size to `!qref.reg<?>`, see `handleCall`.
+ */
+void handleSubroutine(IRRewriter &builder, func::FuncOp f) {
     MLIRContext *ctx = f.getContext();
     OpBuilder::InsertionGuard guard(builder);
     Location loc = f->getLoc();
@@ -1001,7 +1042,6 @@ void handleSubroutine(IRRewriter &builder, func::FuncOp f,
     SmallVector<unsigned> newRargIndices;
     SmallVector<Value> oldVargs;
     size_t numNewArgsAdded = 0;
-    size_t qregSizeIdx = 0;
     for (auto [i, t] : llvm::enumerate(f.getFunctionType().getInputs())) {
         if (!isa<quantum::QubitType, quantum::QuregType>(t)) {
             continue;
@@ -1012,11 +1052,8 @@ void handleSubroutine(IRRewriter &builder, func::FuncOp f,
             newRargIndices.push_back(i + (numNewArgsAdded++));
             oldVargs.push_back(f.getBody().front().getArgument(i));
         } else if (isa<quantum::QuregType>(t)) {
-            // Fallback to dynamic if there's no size deducible
-            IntegerAttr qregSize = qregSizeIdx < qregSizesAtCallsite.size()
-                                       ? qregSizesAtCallsite[qregSizeIdx++]
-                                       : builder.getI64IntegerAttr(ShapedType::kDynamic);
-            typesToInsertArgs.push_back(qref::QuregType::get(ctx, qregSize));
+            typesToInsertArgs.push_back(
+                qref::QuregType::get(ctx, builder.getI64IntegerAttr(ShapedType::kDynamic)));
             newRargIndices.push_back(i + (numNewArgsAdded++));
             oldVargs.push_back(f.getBody().front().getArgument(i));
         }
@@ -1052,25 +1089,6 @@ void handleSubroutine(IRRewriter &builder, func::FuncOp f,
         eraseArgsIndices[i] = isa<quantum::QuregType, quantum::QubitType>(argType);
     }
     assert(succeeded(f.eraseArguments(eraseArgsIndices)));
-}
-
-SmallVector<IntegerAttr> collectQregSizesAtCallsite(func::FuncOp subroutine, func::FuncOp caller) {
-    SmallVector<IntegerAttr> qregSizesAtCallsite;
-    if (!caller) {
-        return qregSizesAtCallsite;
-    }
-    caller.walk([&](func::CallOp callOp) {
-        if (callOp.getCallee() != subroutine.getSymName()) {
-            return WalkResult::advance();
-        }
-        for (Type t : callOp.getOperandTypes()) {
-            if (auto qrefQuregType = dyn_cast<qref::QuregType>(t)) {
-                qregSizesAtCallsite.push_back(qrefQuregType.getSize());
-            }
-        }
-        return WalkResult::interrupt();
-    });
-    return qregSizesAtCallsite;
 }
 
 } // namespace
@@ -1138,33 +1156,15 @@ struct ReferenceSemanticsConversionPass
             subroutinesPostOrder.push_back(subroutine);
         }
 
-        // Collect the first caller of each subroutine once: a per-subroutine
-        // `SymbolTable::getSymbolUses` walks the whole module, which is quadratic in the number of
-        // subroutines. Callers are recorded instead of call ops (e.g. with a `SymbolUserMap`)
-        // because callers are converted before their callees, which replaces their call ops.
-        SymbolTableCollection symbolTables;
-        llvm::DenseMap<func::FuncOp, func::FuncOp> firstCallerOf;
-        mod->walk([&](func::CallOp callOp) {
-            auto callee =
-                symbolTables.lookupNearestSymbolFrom<func::FuncOp>(callOp, callOp.getCalleeAttr());
-            auto caller = callOp->getParentOfType<func::FuncOp>();
-            if (callee && caller) {
-                firstCallerOf.try_emplace(callee, caller);
-            }
-        });
-
-        // We want to handle the calls before the subroutines, so we know the register sizes on the
-        // subroutine qreg arg type
+        // Handle the callers before the subroutines: a call op looks up the value semantics
+        // signature of its callee to cast its register operands to the dynamic register arguments.
         // By default, scc iterates call graph in post order (callee before caller), so we reverse
         // the visit order.
         for (func::FuncOp subroutine : llvm::reverse(subroutinesPostOrder)) {
             if (failed(ensureNoScfUnsupportedOps(subroutine))) {
                 return signalPassFailure();
             }
-            QubitValueTracker tracker;
-            handleSubroutine(
-                builder, subroutine,
-                collectQregSizesAtCallsite(subroutine, firstCallerOf.lookup(subroutine)));
+            handleSubroutine(builder, subroutine);
             if (failed(ensureNoValueSemanticsOps(subroutine))) {
                 subroutine.emitOpError(
                     "Detected remaining value semantics operations after conversion");
