@@ -59,18 +59,22 @@ def test_on_demand_adjoint_id_routes_to_adjoint_rules():
         qp.add_decomps("Adjoint(NoParams)", _adj_rule())
 
         out = compile_reachable_decomposition_rules_wrapper(
-            "NoParams",
-            "Adjoint(NoParams){}{reg:2}{}",
-            {},
-            {"reg": 2},
-            {},
-            is_custom_op=False,
+            [
+                {
+                    "op_name": "NoParams",
+                    "op_id": "Adjoint(NoParams){}{reg:2}{}",
+                    "dynamic_shape": {},
+                    "wire_lens": {"reg": 2},
+                    "static_data": {},
+                    "is_custom_op": False,
+                }
+            ],
         )
 
         print(out)
 
     # CHECK: module {
-    # CHECK-NOT: __builtin_adj_rule_
+    # CHECK-DAG: func.func private @__builtin_adj_rule{{(_[0-9]+)?}}{{.*}}"SingleParam{{.*}}target_gate = "Adjoint(NoParams){}{reg:2}{}"
     # CHECK-DAG: func.func private @__builtin_base_rule{{(_[0-9]+)?}}{{.*}}"Adjoint(SingleParam{{.*}}target_gate = "Adjoint(NoParams){}{reg:2}{}"
     # CHECK: qref.adjoint
 

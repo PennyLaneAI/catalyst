@@ -12,12 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// On-demand rules use separate JAX contexts and are concatenated without resolving name collisions.
-// XFAIL: *
+// RUN: catalyst --tool=opt --pass-pipeline='builtin.module(graph-decomposition{gate-set=PhaseShift=1.0,GlobalPhase=1.0,CNOT=1.0,PauliX=1.0})' %s | FileCheck %s --check-prefixes=ALL,CALL
 
-// RUN: catalyst --tool=opt --pass-pipeline='builtin.module(graph-decomposition{gate-set=PhaseShift=1.0,GlobalPhase=1.0})' %s | FileCheck %s --check-prefixes=ALL,CALL
-
-// RUN: catalyst --tool=opt --pass-pipeline='builtin.module(graph-decomposition{inline-rule-body gate-set=PhaseShift=1.0,GlobalPhase=1.0})' %s | FileCheck %s --check-prefixes=ALL,INLINE
+// RUN: catalyst --tool=opt --pass-pipeline='builtin.module(graph-decomposition{inline-rule-body gate-set=PhaseShift=1.0,GlobalPhase=1.0,CNOT=1.0,PauliX=1.0})' %s | FileCheck %s --check-prefixes=ALL,INLINE
 
 // PCPhase keeps its `dim` in its static data as an integer attribute, so asking the frontend for its
 // rules on demand only works if that attribute reaches Python as an int (see
@@ -26,19 +23,29 @@
 
 // ALL-LABEL: func.func @circuit
 // ALL-NOT: quantum.pcphase
-// CALL: call @__builtin__decompose_pcphase_{{[0-9_]+}}
+// CALL: call @__builtin__decompose_pcphase{{(_[0-9]+)*}}
+// CALL: call @__builtin__decompose_pcphase{{(_[0-9]+)*}}
 // INLINE: quantum.custom "PhaseShift"
-// INLINE: quantum.gphase
+// INLINE-NOT: quantum.pcphase
+// INLINE: quantum.dealloc
 func.func @circuit(%theta: f64) attributes {quantum.node} {
     %r = quantum.alloc(2) : !quantum.reg
     %q0 = quantum.extract %r[0] : !quantum.reg -> !quantum.bit
     %q1 = quantum.extract %r[1] : !quantum.reg -> !quantum.bit
     %out:2 = quantum.pcphase(%theta, dim : 2) %q0, %q1 : !quantum.bit, !quantum.bit
-    %r0 = quantum.insert %r[0], %out#0 : !quantum.reg, !quantum.bit
-    %r1 = quantum.insert %r0[1], %out#1 : !quantum.reg, !quantum.bit
+    %out2:2 = quantum.pcphase(%theta, dim : 1) %out#0, %out#1 : !quantum.bit, !quantum.bit
+    %r0 = quantum.insert %r[0], %out2#0 : !quantum.reg, !quantum.bit
+    %r1 = quantum.insert %r0[1], %out2#1 : !quantum.reg, !quantum.bit
     quantum.dealloc %r1 : !quantum.reg
     return
 }
 
-// The rule came back keyed on the id the compiler prints for the op, `dim` included.
-// ALL: target_gate = "PCPhase{phi:[f64]}{wires:2}{dim = 2 : i64}"
+// Both roots have the same frontend rule name, but distinct static identities. Their closures
+// share resource rules, and must coexist with this existing symbol without dropping alternatives.
+func.func private @__builtin__decompose_pcphase() {
+    return
+}
+
+// The rules come back keyed on the ids the compiler prints for the ops, `dim` included.
+// ALL-DAG: target_gate = "PCPhase{phi:[f64]}{wires:2}{dim = 2 : i64}"
+// ALL-DAG: target_gate = "PCPhase{phi:[f64]}{wires:2}{dim = 1 : i64}"
