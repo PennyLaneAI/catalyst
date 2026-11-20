@@ -391,6 +391,8 @@ void handleGate(IRRewriter &builder, quantum::QuantumOperation vGateOp, QubitVal
     } else if (auto vSetBasisStateOp = dyn_cast<quantum::SetBasisStateOp>(_vGateOp)) {
         rGateOp = migrateOpToReferenceSemantics<qref::SetBasisStateOp>(builder, vSetBasisStateOp,
                                                                        tracker);
+    } else if (auto vBarrierOp = dyn_cast<quantum::BarrierOp>(_vGateOp)) {
+        rGateOp = migrateOpToReferenceSemantics<qref::BarrierOp>(builder, vBarrierOp, tracker);
     } else if (auto vOperatorOp = dyn_cast<quantum::OperatorOp>(_vGateOp)) {
         auto rGateOp =
             migrateOpToReferenceSemantics<qref::OperatorOp>(builder, vOperatorOp, tracker);

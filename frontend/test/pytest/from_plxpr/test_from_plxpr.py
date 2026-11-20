@@ -21,6 +21,7 @@ import pennylane as qp
 import pytest
 from pennylane.capture.primitives import (
     adjoint_transform_prim,
+    barrier_p,
     ctrl_transform_prim,
     for_loop_prim,
     while_loop_prim,
@@ -33,6 +34,7 @@ from catalyst.from_plxpr.qref_jax_primitives import (
     qref_alloc_p,
     qref_get_p,
     qref_operator_p,
+    qref_qinst_p,
 )
 
 pytestmark = pytest.mark.usefixtures("disable_capture")
@@ -421,6 +423,51 @@ class TestCatalystCompareJaxpr:
         assert converted.out_avals[0].shape == (100, 1)
         [samples] = catalyst_execute_jaxpr(converted)()
         assert qp.math.allclose(samples, np.zeros((100, 1)))
+
+
+@pytest.mark.usefixtures("use_capture")
+class TestBarrierPrimitive:
+    """Convert PennyLane's Barrier primitive through its dedicated handler."""
+
+    @pytest.mark.parametrize("wires", [(), (0,), (0, 1)])
+    def test_barrier_wires(self, wires):
+        """Preserve Barrier wire counts when binding a qref instruction."""
+
+        @qp.qnode(qp.device("lightning.qubit", wires=2))
+        def circuit():
+            qp.Barrier(wires=wires)
+            return qp.state()
+
+        source = jax.make_jaxpr(circuit.func)()
+        [source_eqn] = find_eqns(source, barrier_p)
+        assert len(source_eqn.invars) == len(wires)
+        assert not source_eqn.outvars
+
+        converted = from_plxpr(jax.make_jaxpr(circuit)())()
+        qfunc_xpr = converted.eqns[0].params["call_jaxpr"]
+        [eqn] = find_eqns(qfunc_xpr, qref_qinst_p)
+        assert eqn.params["op"] == "Barrier"
+        assert eqn.params["qubits_len"] == len(wires)
+        assert not find_eqns(qfunc_xpr, qref_operator_p)
+        assert not find_eqns(qfunc_xpr, barrier_p)
+
+    def test_dynamic_wire(self):
+        """Map a traced Barrier wire to a qubit before qref lowering."""
+
+        @qp.qnode(qp.device("lightning.qubit", wires=2))
+        def circuit(wire):
+            qp.Barrier(wires=[0, wire])
+            return qp.state()
+
+        converted = from_plxpr(jax.make_jaxpr(circuit)(1))(1)
+        qfunc_xpr = converted.eqns[0].params["call_jaxpr"]
+        [eqn] = find_eqns(qfunc_xpr, qref_qinst_p)
+        assert eqn.params["op"] == "Barrier"
+        assert eqn.params["qubits_len"] == 2
+        assert all(isinstance(var.aval, qp.wires.AbstractQubit) for var in eqn.invars)
+        gets = find_eqns(qfunc_xpr, qref_get_p)
+        assert eqn.invars[1] == gets[1].outvars[0]
+        assert gets[1].invars[1] == qfunc_xpr.invars[0]
 
 
 class TestAdjointCtrl:
