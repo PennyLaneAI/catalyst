@@ -80,6 +80,20 @@ struct ResourceResult {
     // total qubits (allocated + argument)
     double numQubits() const { return numAllocQubits + numArgQubits; }
 
+    // Qubit liveness. `liveQubits` is the number of qubits allocated and not yet released by
+    // this function at the current point of the analysis, `peakQubits` its maximum, and
+    // `liveQubitsAtCall` its maximum at the calls to each callee, including loop bodies. The
+    // peak of a function with its callees is left to the consumer, since callees are analyzed
+    // after their callers. These are not counts: `multiplyBy` keeps them and `mergeWith` takes
+    // their maximum.
+    double liveQubits = 0;
+    double peakQubits = 0;
+    llvm::StringMap<double> liveQubitsAtCall;
+
+    // Operations that are not decomposable gates (e.g. measurements and PBC ops), keyed like
+    // `operations`. `resource-estimate` keeps them as they are, since they have no graph op id.
+    llvm::StringMap<llvm::DenseMap<std::pair<int, int>, double>> nonGraphOperations;
+
     // from quantum.device op
     std::string deviceName;
 

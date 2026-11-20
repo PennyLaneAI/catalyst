@@ -16,16 +16,24 @@
 
 // RUN: catalyst --tool=opt --pass-pipeline='builtin.module(resource-estimate{output-json gate-set=testRX=1.0,testRZ=1.0 bytecode-rules="%PRECOMPILED_BYTECODE_PATH"})' %s -o /dev/null | FileCheck %s
 
-// CHECK-LABEL: "circuit"
-// CHECK: "num_qubits"
-// CHECK:   "alloc": 1
-// CHECK:   "arg": 0
-// CHECK:   "total": 1
-// CHECK: "quantum_operations"
-// CHECK:   "-1"
-// CHECK:       "testRX": 3
-// CHECK:       "testRZ": 4
-// CHECK-NOT:   "testHadamard"
+// Each decomposed op calls the function of its chosen rule, which counts the basis gates of the rule.
+// CHECK-LABEL: "__builtin_h_to_rz_rx(testHadamard{}{wires:1}{})": {
+// CHECK:       "quantum_operations"
+// CHECK-NEXT:    "1"
+// CHECK-NEXT:      "testRX": 1
+// CHECK-NEXT:      "testRZ": 2
+
+// CHECK-LABEL: "circuit": {
+// CHECK:       "function_calls"
+// CHECK:         "__builtin_h_to_rz_rx(testHadamard{}{wires:1}{})": 2
+// CHECK:       "num_qubits"
+// CHECK:         "alloc": 1
+// CHECK:         "arg": 0
+// CHECK:         "peak": 1
+// CHECK:         "total": 1
+// CHECK:       "quantum_operations"
+// CHECK-NEXT:    "1"
+// CHECK-NEXT:      "testRX": 1
 func.func public @circuit() attributes {quantum.node} {
     %angle = arith.constant 0.5 : f64
     %0 = quantum.alloc( 1) : !quantum.reg

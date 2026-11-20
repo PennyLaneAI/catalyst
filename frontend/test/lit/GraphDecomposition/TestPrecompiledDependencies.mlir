@@ -42,10 +42,14 @@
 // EMPTY-NEXT: }
 
 // Estimation uses the library's resource counts while leaving the circuit and its symbols intact.
-// ESTIMATE-LABEL: "circuit"
+// The gate is counted by the function of its rule, which the circuit calls.
+// ESTIMATE-LABEL: "__builtin_collision(CollisionGate{0:[f64]}{wires:1}{})": {
 // ESTIMATE: "quantum_operations"
 // ESTIMATE: "RX": 1
-// ESTIMATE-NOT: "CollisionGate"
+// ESTIMATE-LABEL: "circuit": {
+// ESTIMATE: "function_calls"
+// ESTIMATE: "__builtin_collision(CollisionGate{0:[f64]}{wires:1}{})": 1
+// ESTIMATE: "quantum_operations": {}
 
 //--- empty.mlir
 func.func @empty_circuit() {

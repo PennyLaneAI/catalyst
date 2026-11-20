@@ -17,6 +17,7 @@
 #include <string>
 
 #include "llvm/ADT/StringMap.h"
+#include "llvm/ADT/StringSwitch.h"
 #include "llvm/Support/FormatVariadic.h"
 #include "llvm/Support/JSON.h"
 #include "llvm/Support/raw_ostream.h"
@@ -92,8 +93,13 @@ struct ResourceEstimatePass : public impl::ResourceEstimatePassBase<ResourceEsti
         const auto &results = analysis.getResults();
 
         llvm::StringMap<ResourceResult> estimates;
+        llvm::StringMap<ResourceResult> ruleFunctions;
         for (const auto &funcEntry : results) {
-            estimates[funcEntry.getKey()] = estimateResources(funcEntry.getValue(), solution);
+            estimates[funcEntry.getKey()] =
+                estimateResources(funcEntry.getValue(), solution, ruleFunctions);
+        }
+        for (auto &ruleEntry : ruleFunctions) {
+            estimates[ruleEntry.getKey()] = std::move(ruleEntry.getValue());
         }
 
         if (outputJson) {
@@ -107,10 +113,13 @@ struct ResourceEstimatePass : public impl::ResourceEstimatePassBase<ResourceEsti
     }
 
   private:
-    /// Replace each op in a function's resources `result` with the basis gates of its chosen
-    /// decomposition rule, scaled by the op's count.
+    /// Replace each op in a function's resources `result` with a call to the function of its
+    /// chosen decomposition rule, added to `ruleFunctions`. Like the decomposition rules after
+    /// `graph-decomposition`, each rule function holds the basis gates of the rule and calls the
+    /// rule functions of the other ops of the rule.
     static ResourceResult estimateResources(const ResourceResult &result,
-                                            const GraphResult &solution) {
+                                            const GraphResult &solution,
+                                            llvm::StringMap<ResourceResult> &ruleFunctions) {
         ResourceResult estimate;
         estimate.measurements = result.measurements;
         estimate.classicalInstructions = result.classicalInstructions;
@@ -118,11 +127,21 @@ struct ResourceEstimatePass : public impl::ResourceEstimatePassBase<ResourceEsti
         estimate.varFunctionCalls = result.varFunctionCalls;
         estimate.numAllocQubits = result.numAllocQubits;
         estimate.numArgQubits = result.numArgQubits;
+        estimate.liveQubits = result.liveQubits;
+        estimate.peakQubits = result.peakQubits;
+        estimate.liveQubitsAtCall = result.liveQubitsAtCall;
         estimate.deviceName = result.deviceName;
         estimate.isQnode = result.isQnode;
         estimate.hasBranches = result.hasBranches;
         estimate.hasDynLoop = result.hasDynLoop;
         estimate.autoQubitManagement = result.autoQubitManagement;
+
+        // Operations that are not decomposable gates have no graph op id, and are kept as they are.
+        for (const auto &opEntry : result.nonGraphOperations) {
+            for (const auto &sizeEntry : opEntry.getValue()) {
+                estimate.operations[opEntry.getKey()][sizeEntry.first] += sizeEntry.second;
+            }
+        }
 
         // Decomposable gates are keyed by their graph op id (GOID).
         for (const auto &opEntry : result.detailedOperations) {
@@ -133,18 +152,78 @@ struct ResourceEstimatePass : public impl::ResourceEstimatePassBase<ResourceEsti
 
             auto graphOp = solution.find(operatorNode);
             if (graphOp == solution.end()) {
-                // this case should not happen, because the graph should be complete
-                // Not a graph operator (e.g. a mid-circuit measurement): count the op itself.
-                estimate.operations[goid][{-1, -1}] += scale;
+                // Not a graph operator: counted from `nonGraphOperations` above.
                 continue;
             }
-            for (const auto &[basisOp, count] : graphOp->second.basisCounts) {
-                // Getting wires and params from GOID is unreliable. The JSON is flattened anyways,
-                // so for qp.estimate this will be enough.
-                estimate.operations[basisOp.name][{-1, -1}] += count * scale;
-            }
+            addDecomposition(estimate, graphOp->second, scale, solution, ruleFunctions);
         }
         return estimate;
+    }
+
+    /// Add `count` ops decomposed with `rule` to `estimate`: a basis gate is counted, and another
+    /// op calls the function of its rule, which is added to `ruleFunctions` if it is not there.
+    static void addDecomposition(ResourceResult &estimate, const ChosenDecompRule &rule,
+                                 double count, const GraphResult &solution,
+                                 llvm::StringMap<ResourceResult> &ruleFunctions) {
+        if (rule.isBasis) {
+            // The number of params cannot be recovered from the GOID.
+            estimate.operations[getResourceName(rule.op.name)][{getNumWires(rule.op.id), -1}] +=
+                count;
+            return;
+        }
+        std::string name = rule.ruleName + "(" + rule.op.id + ")";
+        estimate.functionCalls[name] += count;
+        // Where the op is in the function is not known, so all its qubits may be live
+        double &live = estimate.liveQubitsAtCall[name];
+        live = std::max(live, estimate.peakQubits);
+        if (ruleFunctions.contains(name)) {
+            return;
+        }
+        ruleFunctions[name] = ResourceResult();
+        ResourceResult ruleResult;
+        for (const auto &input : rule.inputs) {
+            if (input.multiplicity > 0) {
+                addDecomposition(ruleResult, solution.at(input.op), input.multiplicity, solution,
+                                 ruleFunctions);
+            }
+        }
+        ruleFunctions[name] = std::move(ruleResult);
+    }
+
+    /// Name under which the resource analysis counts an op of the given graph operator name.
+    static std::string getResourceName(StringRef graphName) {
+        return llvm::StringSwitch<std::string>(graphName)
+            .Case("PauliMeasure", "PPM")
+            .Case("PPR_2", "PPR-pi/2")
+            .Case("PPR_4", "PPR-pi/4")
+            .Case("PPR_8", "PPR-pi/8")
+            .Default(graphName.str());
+    }
+
+    /// Number of wires of an operator, from the wire lengths of its GOID
+    /// (`name{dynamic shape}{wire lengths}{static data}[extra]`), or -1 if they cannot be found.
+    static int getNumWires(StringRef goid) {
+        size_t groupStart = 0;
+        int depth = 0;
+        int groupIndex = 0;
+        for (size_t i = 0; i < goid.size(); ++i) {
+            if (goid[i] == '{' && depth++ == 0) {
+                groupStart = i + 1;
+            } else if (goid[i] == '}' && --depth == 0 && groupIndex++ == 1) {
+                int numWires = 0;
+                SmallVector<StringRef> entries;
+                goid.slice(groupStart, i).split(entries, ',', -1, /*KeepEmpty=*/false);
+                for (StringRef entry : entries) {
+                    int len;
+                    if (entry.rsplit(':').second.getAsInteger(10, len)) {
+                        return -1;
+                    }
+                    numWires += len;
+                }
+                return numWires;
+            }
+        }
+        return -1;
     }
 
     /// Serialize the estimates into a JSON string. The JSON borrows keys from `estimates`, so it

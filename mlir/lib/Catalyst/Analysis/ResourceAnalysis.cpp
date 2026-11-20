@@ -65,6 +65,60 @@ static bool isSkippedOp(Operation *op) {
                ResourceSkipOpInterface>(op);
 }
 
+/// Number of qubits released by a deallocation op, or 0 for any other op. A register is traced
+/// back through `quantum.insert` ops to its allocation.
+static double getReleasedQubits(Operation *op) {
+    if (isa<quantum::DeallocQubitOp, qref::DeallocQubitOp>(op)) {
+        return 1;
+    }
+    Value reg;
+    if (auto dealloc = dyn_cast<quantum::DeallocOp>(op)) {
+        reg = dealloc.getQreg();
+    } else if (auto dealloc = dyn_cast<qref::DeallocOp>(op)) {
+        reg = dealloc.getQreg();
+    } else {
+        return 0;
+    }
+    Operation *def = reg.getDefiningOp();
+    while (auto insert = dyn_cast_or_null<quantum::InsertOp>(def)) {
+        def = insert.getInQreg().getDefiningOp();
+    }
+    if (auto alloc = dyn_cast_or_null<ResourceAllocQubitOpInterface>(def)) {
+        return alloc.getResourceNumAllocQubits();
+    }
+    return 0;
+}
+
+static void addLiveQubits(ResourceResult &result, double numQubits) {
+    result.liveQubits += numQubits;
+    result.peakQubits = std::max(result.peakQubits, result.liveQubits);
+}
+
+static void recordLiveQubitsAtCall(ResourceResult &result, StringRef callee) {
+    double &live = result.liveQubitsAtCall[callee];
+    live = std::max(live, result.liveQubits);
+}
+
+/// Fold the qubit liveness of alternative branches, each analyzed from an empty result, into
+/// `result` at its current point, and clear it from the branches so that merging them into
+/// `result` afterwards does not count it again.
+static void foldBranchLiveness(ResourceResult &result, ArrayRef<ResourceResult *> branches) {
+    double base = result.liveQubits;
+    std::optional<double> net;
+    for (ResourceResult *branch : branches) {
+        result.peakQubits = std::max(result.peakQubits, base + branch->peakQubits);
+        for (const auto &entry : branch->liveQubitsAtCall) {
+            double &live = result.liveQubitsAtCall[entry.getKey()];
+            live = std::max(live, base + entry.getValue());
+        }
+        net = std::max(net.value_or(branch->liveQubits), branch->liveQubits);
+        branch->liveQubits = 0;
+        branch->peakQubits = 0;
+        branch->liveQubitsAtCall.clear();
+    }
+    result.liveQubits = base + net.value_or(0);
+}
+
 /// Check if the operation belongs to one of the tracked quantum dialects.
 static bool isCustomDialectOp(Operation *op) {
     mlir::Dialect *dialect = op->getDialect();
@@ -346,11 +400,15 @@ void ResourceAnalysis::recordLoopBody(Operation *loopOp, ResourceResult bodyResu
                                       ResourceResult &result) {
     if (tripCount) {
         std::string name = makeUniqueSyntheticName(prefix, counter);
+        recordLiveQubitsAtCall(result, name);
+        // A body that does not release what it allocates leaves its qubits live after the loop.
+        addLiveQubits(result, bodyResult.liveQubits * *tripCount);
         funcResults[name] = std::move(bodyResult);
         result.functionCalls[name] = *tripCount;
         return;
     }
     std::string name = makeUniqueSyntheticName(("dyn_" + prefix).str(), dynCounter);
+    recordLiveQubitsAtCall(result, name);
     funcResults[name] = std::move(bodyResult);
     result.varFunctionCalls[name] = static_cast<uint64_t>(llvm::hash_value(loopOp));
     result.hasDynLoop = true;
@@ -405,6 +463,7 @@ void ResourceAnalysis::analyzeIfOp(scf::IfOp ifOp, ResourceResult &result, bool 
             analyzeRegion(ifOp.getElseRegion(), elseResult, isAdjoint, numControlQubits,
                           numWorkWires, isBorrowed);
         }
+        foldBranchLiveness(result, {&thenResult, &elseResult});
 
         thenResult.multiplyBy(pThen);
         elseResult.multiplyBy(pElse);
@@ -417,10 +476,13 @@ void ResourceAnalysis::analyzeIfOp(scf::IfOp ifOp, ResourceResult &result, bool 
     // No hint: fall back to worst-case (max across branches).
     result.hasBranches = true;
 
+    ResourceResult elseResult = makeEmptyResult();
     if (!ifOp.getElseRegion().empty()) {
-        ResourceResult elseResult = makeEmptyResult();
         analyzeRegion(ifOp.getElseRegion(), elseResult, isAdjoint, numControlQubits, numWorkWires,
                       isBorrowed);
+    }
+    foldBranchLiveness(result, {&thenResult, &elseResult});
+    if (!ifOp.getElseRegion().empty()) {
         thenResult.mergeWith(elseResult, ResourceResult::MergeMethod::Max);
     }
     result.mergeWith(thenResult);
@@ -434,15 +496,28 @@ void ResourceAnalysis::analyzeIndexSwitchOp(scf::IndexSwitchOp switchOp, Resourc
     // `catalyst.estimated_probabilities` is an array of floats with one entry per case
     // (excluding the default which is computed automatically).
     auto caseRegions = switchOp.getCaseRegions();
+    std::vector<ResourceResult> caseResults;
+    for (auto &caseRegion : caseRegions) {
+        caseResults.push_back(makeEmptyResult());
+        analyzeRegion(caseRegion, caseResults.back(), isAdjoint, numControlQubits, numWorkWires,
+                      isBorrowed);
+    }
+    ResourceResult defaultResult = makeEmptyResult();
+    analyzeRegion(switchOp.getDefaultRegion(), defaultResult, isAdjoint, numControlQubits,
+                  numWorkWires, isBorrowed);
+
+    SmallVector<ResourceResult *> branches;
+    for (auto &caseResult : caseResults) {
+        branches.push_back(&caseResult);
+    }
+    branches.push_back(&defaultResult);
+    foldBranchLiveness(result, branches);
+
     if (auto probsAttr = switchOp->getAttrOfType<ArrayAttr>(EstimatedProbabilitiesAttrName)) {
         ResourceResult expected = makeEmptyResult();
         double sumProb = 0.0;
 
-        for (auto &&[idx, caseRegion] : llvm::enumerate(caseRegions)) {
-            ResourceResult caseResult = makeEmptyResult();
-            analyzeRegion(caseRegion, caseResult, isAdjoint, numControlQubits, numWorkWires,
-                          isBorrowed);
-
+        for (auto &&[idx, caseResult] : llvm::enumerate(caseResults)) {
             double p = cast<FloatAttr>(probsAttr[idx]).getValueAsDouble();
             sumProb += p;
 
@@ -454,9 +529,6 @@ void ResourceAnalysis::analyzeIndexSwitchOp(scf::IndexSwitchOp switchOp, Resourc
         // of floating-point error.
         double pDefault = std::min(std::max(0.0, 1.0 - sumProb), 1.0);
 
-        ResourceResult defaultResult = makeEmptyResult();
-        analyzeRegion(switchOp.getDefaultRegion(), defaultResult, isAdjoint, numControlQubits,
-                      numWorkWires, isBorrowed);
         defaultResult.multiplyBy(pDefault);
         expected.mergeWith(defaultResult, ResourceResult::MergeMethod::Sum);
 
@@ -470,10 +542,7 @@ void ResourceAnalysis::analyzeIndexSwitchOp(scf::IndexSwitchOp switchOp, Resourc
     ResourceResult maxResult = makeEmptyResult();
     bool first = true;
 
-    for (auto &caseRegion : caseRegions) {
-        ResourceResult caseResult = makeEmptyResult();
-        analyzeRegion(caseRegion, caseResult, isAdjoint, numControlQubits, numWorkWires,
-                      isBorrowed);
+    for (auto &caseResult : caseResults) {
         if (first) {
             maxResult = std::move(caseResult);
             first = false;
@@ -483,9 +552,6 @@ void ResourceAnalysis::analyzeIndexSwitchOp(scf::IndexSwitchOp switchOp, Resourc
     }
 
     // default region
-    ResourceResult defaultResult = makeEmptyResult();
-    analyzeRegion(switchOp.getDefaultRegion(), defaultResult, isAdjoint, numControlQubits,
-                  numWorkWires, isBorrowed);
     maxResult.mergeWith(defaultResult, ResourceResult::MergeMethod::Max);
 
     result.mergeWith(maxResult);
@@ -605,6 +671,8 @@ void ResourceAnalysis::collectOperation(Operation *op, ResourceResult &result, b
         extensionAnalyses[i]->collect(op, *result.extensions[i], isAdjoint);
     }
 
+    result.liveQubits -= getReleasedQubits(op);
+
     // Skipped ops
     if (isSkippedOp(op)) {
         return;
@@ -632,10 +700,14 @@ void ResourceAnalysis::collectOperation(Operation *op, ResourceResult &result, b
         uint64_t nParams = inst.getResourceNumParams();
         uint64_t nQubits = inst.getResourceNumQubits() + nCtrlQubits + numWorkWires;
         result.operations[name][{nQubits, nParams}] += 1;
+        if (!isa<quantum::DecomposableGate>(op)) {
+            result.nonGraphOperations[name][{nQubits, nParams}] += 1;
+        }
 
         // Ops may also allocate (e.g. mbqc.graph_state_prep, pbc.prepare, pbc.fabricate).
         if (auto alloc = dyn_cast<ResourceAllocQubitOpInterface>(op)) {
             result.numAllocQubits += alloc.getResourceNumAllocQubits();
+            addLiveQubits(result, alloc.getResourceNumAllocQubits());
         }
         return;
     }
@@ -649,6 +721,7 @@ void ResourceAnalysis::collectOperation(Operation *op, ResourceResult &result, b
     // Qubit allocations
     if (auto inst = dyn_cast<ResourceAllocQubitOpInterface>(op)) {
         result.numAllocQubits += inst.getResourceNumAllocQubits();
+        addLiveQubits(result, inst.getResourceNumAllocQubits());
         return;
     }
 
@@ -665,6 +738,7 @@ void ResourceAnalysis::collectOperation(Operation *op, ResourceResult &result, b
             if (callerGroup != recursiveFunctionGroups.end() &&
                 calleeGroup != recursiveFunctionGroups.end() &&
                 callerGroup->second == calleeGroup->second) {
+                recordLiveQubitsAtCall(result, modCtxName);
                 result.functionCalls[modCtxName] += 1;
                 result.unexpandedFunctionCalls.insert(modCtxName);
                 return;
@@ -673,6 +747,7 @@ void ResourceAnalysis::collectOperation(Operation *op, ResourceResult &result, b
 
         // No modifiers: just count the function call
         if (!isAdjoint && numControlQubits == 0) {
+            recordLiveQubitsAtCall(result, modCtxName);
             result.functionCalls[modCtxName] += 1;
             return;
         }
@@ -699,6 +774,7 @@ void ResourceAnalysis::collectOperation(Operation *op, ResourceResult &result, b
                 funcResults.try_emplace(modCtxName, makeEmptyResult());
             }
 
+            recordLiveQubitsAtCall(result, modCtxName);
             result.functionCalls[modCtxName] += 1;
         }
 
