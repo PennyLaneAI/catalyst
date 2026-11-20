@@ -666,6 +666,17 @@ class TestGenericUtilities:
         assert str.startswith(GraphOpID(op).getGraphOpId(), id)
 
     @pytest.mark.parametrize(
+        "op, name",
+        [
+            (qp.ops.Prod2((qp.X(0), qp.Z(1))), "Prod2"),
+            (qp.pow(qp.X(0), 2), "Pow2"),
+        ],
+    )
+    def test_graph_op_id_uses_class_name(self, op, name):
+        """Graph IDs use class names, including for display and instance-dependent names."""
+        assert GraphOpID(op).getGraphOpId().partition("{")[0] == name
+
+    @pytest.mark.parametrize(
         "op, expected_adjoint, expected_controls",
         [
             (qp.S(Wire[1]), False, 0),

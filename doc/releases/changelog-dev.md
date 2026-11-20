@@ -2,6 +2,13 @@
 
 <h3>New features since last release</h3>
 
+* The new `CompileOptions(estimate_decomps=True)` setting prepares reachable decomposition rules for
+  resource estimation using their registered resource counts, without tracing or compiling
+  their implementations. `qp.estimate` can use these rules even when their implementations
+  cannot be compiled. This option requires program capture and `collect_decomp_rules=True`,
+  and defaults to `False`.
+ [(#3482)](https://github.com/PennyLaneAI/catalyst/pull/3482)
+ 
 * Backline can drive a VPK120 whose FPGA carries NVIDIA's Holoscan Sensor Bridge (HSB), through
   the new `hsb_hwhs` controller backend. Its coprocessors stay `cpu_verbs` and `gpu_verbs`,
   set to face HSB with `peer=hsb`.
@@ -998,6 +1005,25 @@
 
 <h3>Bug fixes 🐛</h3>
 
+* Buffers returned by internal helper functions, such as the Givens rotation helpers of
+  `qp.BasisRotation`, are now deallocated by the caller instead of leaking until the end of
+  execution.
+  [(#3491)](https://github.com/PennyLaneAI/catalyst/pull/3491)
+
+* Buffers passed to decomposition rules, such as the wire index arrays created by decompose
+  lowering, are now deallocated after the call. Before, `buffer-deallocation` treated them
+  as aliases of the returned `!quantum.reg`, so they leaked until the end of execution.
+  [(#3491)](https://github.com/PennyLaneAI/catalyst/pull/3491)
+
+* With `async_qnodes=True`, buffers passed to a QNode are no longer deallocated before its
+  `async.execute` completes. Their deallocations now come after the final await on the
+  execute's token.
+  [(#3491)](https://github.com/PennyLaneAI/catalyst/pull/3491)
+
+* Subroutines with the same structure that close over different JAX arrays are no longer
+  compiled as the same subroutine.
+  [(#3502)](https://github.com/PennyLaneAI/catalyst/pull/3502)
+
 * The `--convert-to-value-semantics` and `--convert-to-reference-semantics` passes no longer read
   freed memory.
   [(#3496)](https://github.com/PennyLaneAI/catalyst/pull/3496)
@@ -1546,6 +1572,7 @@ Marcus Edwards,
 Lillian Frederiksen,
 Sengthai Heng,
 David Ittah,
+Harshal Janjani,
 JiaRung Jian,
 Jeffrey Kam,
 Jacob Kitchen,
