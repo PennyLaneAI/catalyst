@@ -119,13 +119,7 @@ class MeasurementOp(IRDLOperation):
             properties["static_data"] = static_data
         attributes = parser.parse_optional_attr_dict()
         parser.parse_punctuation(":")
-        if parser.parse_optional_punctuation("("):
-            parser.parse_punctuation(")")
-            result_types = []
-        else:
-            result_types = parser.parse_comma_separated_list(
-                Parser.Delimiter.NONE, parser.parse_type
-            )
+        result_types = parser.parse_comma_separated_list(Parser.Delimiter.PAREN, parser.parse_type)
         num_quantum_results = len(qubits) + (qreg is not None)
         if len(result_types) < num_quantum_results:
             parser.raise_error("Expected a result for each measurement qubit or register.")

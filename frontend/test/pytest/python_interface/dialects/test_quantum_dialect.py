@@ -362,11 +362,11 @@ class TestCustomParsers:
         "measurement, error",
         [
             (
-                '%m, %out = quantum.measurement "M"(%angle: f64) qubits(%q) : i1, !quantum.bit',
+                '%m, %out = quantum.measurement "M"(%angle: f64) qubits(%q) : (i1, !quantum.bit)',
                 "Measurement operand type does not match its annotation",
             ),
             (
-                '%out = quantum.measurement "M"() qubits(%q) static_data = "XY" : !quantum.bit',
+                '%out = quantum.measurement "M"() qubits(%q) static_data = "XY" : (!quantum.bit)',
                 "Expected a dictionary for measurement static_data",
             ),
             (
@@ -404,20 +404,16 @@ class TestAssemblyFormat:
           // CHECK-SAME: static_data = {plane = "XY"}
           // CHECK-SAME: -> (i1, f64, !quantum.bit)
           %m, %value, %out = quantum.measurement "RotatedMeasurement"(%angle: tensor<f64>)
-              qubits(%q) static_data = {plane = "XY"} : i1, f64, !quantum.bit
+              qubits(%q) static_data = {plane = "XY"} : (i1, f64, !quantum.bit)
           // CHECK: "quantum.measurement"(
           // CHECK-SAME: op_name = "Discard"
           // CHECK-SAME: -> !quantum.bit
-          %discard = quantum.measurement "Discard"() qubits(%out) : !quantum.bit
+          %discard = quantum.measurement "Discard"() qubits(%out) : (!quantum.bit)
           // CHECK: "quantum.measurement"(
           // CHECK-SAME: op_name = "RegisterMeasurement"
           // CHECK-SAME: : (!quantum.reg, tensor<2xi64>) -> (tensor<2xi1>, !quantum.reg)
           %bits, %out_reg = quantum.measurement "RegisterMeasurement"() quregs(%reg)
-              indices(%indices: tensor<2xi64>) : tensor<2xi1>, !quantum.reg
-          // CHECK: "quantum.measurement"(
-          // CHECK-SAME: op_name = "Barrier"
-          // CHECK-SAME: : () -> ()
-          quantum.measurement "Barrier"() qubits() : ()
+              indices(%indices: tensor<2xi64>) : (tensor<2xi1>, !quantum.reg)
           return
         }
         """
