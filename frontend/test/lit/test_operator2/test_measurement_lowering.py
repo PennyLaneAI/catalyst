@@ -103,7 +103,7 @@ def pauli_measurements():
     # CHECK: [[q1:%.+]] = qref.get {{%.+}}[ 0]
     # CHECK: [[result:%.+]] = qref.measurement "PauliMeasure"() qubits([[q0]], [[q1]])
     # CHECK-SAME: static_data = {pauli_word = "XZ", postselect = none}
-    # CHECK-SAME: qubit_map = {wires = [0, 1]} : i1
+    # CHECK-SAME: qubit_map = {wires = [0, 1]} : (i1)
     result = qp.pauli_measure("XZ", (1, 0))
     qp.cond(result, qp.X)(0)
     return qp.state()
