@@ -892,7 +892,7 @@ def MeasurementOp : QRef_Op<"measurement", [
             param_map = {angle = [0]} qubit_map = {wires = [0]} : (i1)
 
         %bits = qref.measurement "MeasureMany"()
-            quregs(%reg) indices(%wires: tensor<?xi64>)
+            quregs(%reg: !qref.reg<?>) indices(%wires: tensor<?xi64>)
             : (tensor<?xi1>)
 
         // Note: PPM example shown below is the 1:1 lowering to the corresponding example in PPMeasurementOp.
