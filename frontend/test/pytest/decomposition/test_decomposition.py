@@ -857,9 +857,8 @@ class TestGenericUtilities:
         with pytest.warns(RuleLoweringWarning, match="could not read its work-wire spec"):
             assert not _rule_is_compatible("MockOp", raises_on_spec, wires=Wires([0]))
 
-    def test_collect_resources_unrolls_change_op_basis_for_capture(self):
-        """Resources match the rule body that capture produces, even when resource collection
-        itself happens outside a capture context."""
+    def test_collect_resources_preserves_change_op_basis(self):
+        """Resources retain the captured basis-change node when collected outside capture."""
         kwargs = prepare_dynamic_op_kwargs({"0": ShapedArray((), float)}, {"wires": 1})
 
         with qp.capture.toggle_ctx(False):
@@ -868,15 +867,15 @@ class TestGenericUtilities:
         collected = next(
             rule for rule in collected_rules if rule.source_rule.name == "_rz_to_rx_cliff"
         )
-        assert collected.resource_counts_by_id == {
-            "Hadamard{}{wires:1}{}": 2,
-            "RX{0:[f64]}{wires:1}{}": 1,
-        }
+        basis_change = qp.ops.ChangeOpBasis2(qp.H(Wire[1]), qp.RX(Float, Wire[1]), qp.H(Wire[1]))
+        assert collected.resource_counts_by_op == {basis_change: 1}
+        assert collected.resource_counts_by_id == {GraphOpID(basis_change).getGraphOpId(): 1}
 
-    def test_collect_symbolic_resources_unrolls_change_op_basis_for_capture(self):
-        """Registered symbolic rules use the same capture-time resource representation."""
+    def test_collect_symbolic_resources_preserves_change_op_basis(self):
+        """Registered symbolic rules retain the same basis-change node as the captured body."""
+        basis_change = qp.ops.ChangeOpBasis2(qp.H(Wire[1]), qp.X(Wire[1]), qp.H(Wire[1]))
 
-        @register_resources({qp.ops.ChangeOpBasis2(qp.H(Wire[1]), qp.X(Wire[1]), qp.H(Wire[1])): 1})
+        @register_resources({basis_change: 1})
         def symbolic_rule(base):
             qp.change_op_basis(qp.H(base.wires), qp.X(base.wires), qp.H(base.wires))
 
@@ -893,10 +892,8 @@ class TestGenericUtilities:
 
         (collected,) = collected_rules
         assert collected.source_rule is symbolic_rule
-        assert collected.resource_counts_by_id == {
-            "Hadamard{}{wires:1}{}": 2,
-            "PauliX{}{wires:1}{}": 1,
-        }
+        assert collected.resource_counts_by_op == {basis_change: 1}
+        assert collected.resource_counts_by_id == {GraphOpID(basis_change).getGraphOpId(): 1}
 
 
 class TestCollectedResources:
