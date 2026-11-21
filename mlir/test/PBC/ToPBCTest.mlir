@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// RUN: quantum-opt --to-ppr --split-input-file -verify-diagnostics %s | FileCheck %s
+// RUN: quantum-opt --to-pbc --split-input-file -verify-diagnostics %s | FileCheck %s
 
 func.func @test_clifford_t_to_ppr(%q1 : !quantum.bit, %q2 : !quantum.bit){
     // pi / 4 = 0.78539816
@@ -415,4 +415,92 @@ func.func @test_ppr_operator_missing_static_data(%q0 : !quantum.bit) {
     // expected-error @+1 {{failed to legalize operation 'quantum.operator' that was explicitly marked illegal}}
     %0 = quantum.operator "PPR_8"() qubits(%q0) // expected-error @+0 {{PPR operators require static_data with a string 'pauli_word' and an integer 'sign'}}
     func.return
+}
+
+// -----
+
+// CHECK-LABEL: func.func @test_to_pbc_lowers_adjoint
+func.func @test_to_pbc_lowers_adjoint(%r: !quantum.reg) -> !quantum.reg {
+    // CHECK-NOT: quantum.adjoint
+    // CHECK-NOT: quantum.custom
+    %r_out = quantum.adjoint(%r) : !quantum.reg {
+    ^bb0(%arg0: !quantum.reg):
+        %0 = quantum.extract %arg0[0] : !quantum.reg -> !quantum.bit
+        // CHECK: pbc.ppr ["Z"](-8)
+        // CHECK: pbc.ppr ["Z"](-4)
+        %1 = quantum.custom "S"() %0 : !quantum.bit
+        %2 = quantum.custom "T"() %1 : !quantum.bit
+        %3 = quantum.insert %arg0[0], %2 : !quantum.reg, !quantum.bit
+        quantum.yield %3 : !quantum.reg
+    }
+    return %r_out : !quantum.reg
+}
+
+// -----
+
+// CHECK-LABEL: func.func @test_to_pbc_lowers_adjoint_ppr
+func.func @test_to_pbc_lowers_adjoint_ppr(%r: !quantum.reg) -> !quantum.reg {
+    // CHECK-NOT: quantum.adjoint
+    %r_out = quantum.adjoint(%r) : !quantum.reg {
+    ^bb0(%arg0: !quantum.reg):
+        %0 = quantum.extract %arg0[0] : !quantum.reg -> !quantum.bit
+        // CHECK: pbc.ppr ["Z"](-4)
+        %1 = pbc.ppr ["Z"](4) %0 : !quantum.bit
+        %2 = quantum.insert %arg0[0], %1 : !quantum.reg, !quantum.bit
+        quantum.yield %2 : !quantum.reg
+    }
+    return %r_out : !quantum.reg
+}
+
+// -----
+
+// CHECK-LABEL: func.func @test_to_pbc_lowers_ctrl_region
+func.func @test_to_pbc_lowers_ctrl_region(%ctrl: !quantum.bit, %r: !quantum.reg) -> (!quantum.bit, !quantum.reg) {
+    %true = arith.constant true
+    // CHECK-NOT: quantum.ctrl
+    // CHECK-NOT: quantum.custom
+    %outc, %outr = quantum.ctrl(%ctrl) ctrlvals(%true) (%r) : !quantum.bit -> !quantum.reg {
+    ^bb0(%arg0: !quantum.reg):
+        %q = quantum.extract %arg0[0] : !quantum.reg -> !quantum.bit
+        %r_next = quantum.insert %arg0[0], %q : !quantum.reg, !quantum.bit
+        quantum.yield %r_next : !quantum.reg
+    }
+    // CHECK: pbc.ppr ["Z"](4)
+    %s = quantum.custom "S"() %outc : !quantum.bit
+    return %s, %outr : !quantum.bit, !quantum.reg
+}
+
+// -----
+
+func.func @test_to_pbc_ctrl_region_gate_unsupported(%ctrl: !quantum.bit, %q: !quantum.bit) -> (!quantum.bit, !quantum.bit) {
+    %true = arith.constant true
+    %outc, %outq = quantum.ctrl(%ctrl) ctrlvals(%true) (%q) : !quantum.bit -> !quantum.bit {
+    ^bb0(%arg0: !quantum.bit):
+        // expected-error @+2 {{failed to legalize operation 'quantum.custom' that was explicitly marked illegal}}
+        // expected-error @+1 {{Unsupported controlled gate. Supported gates: }}
+        %s = quantum.custom "S"() %arg0 : !quantum.bit
+        quantum.yield %s : !quantum.bit
+    }
+    return %outc, %outq : !quantum.bit, !quantum.bit
+}
+
+// -----
+
+// Device, observable and measurement-process ops are allowed to remain after the conversion.
+
+// CHECK-LABEL: func.func @test_to_pbc_keeps_device_and_measurements
+func.func @test_to_pbc_keeps_device_and_measurements(%q0 : !quantum.bit) -> f64 {
+    %c1_i64 = arith.constant 1 : i64
+    // CHECK: quantum.device
+    quantum.device shots(%c1_i64) ["../runtime/build/lib/librtd_null_qubit.dylib", "NullQubit", ""]
+    // CHECK-NOT: quantum.custom
+    // CHECK: pbc.ppr ["Z"](4)
+    %0 = quantum.custom "S"() %q0 : !quantum.bit
+    // CHECK: quantum.namedobs
+    %obs = quantum.namedobs %0[PauliZ] : !quantum.obs
+    // CHECK: quantum.expval
+    %ev = quantum.expval %obs : f64
+    // CHECK: quantum.device_release
+    quantum.device_release
+    return %ev : f64
 }

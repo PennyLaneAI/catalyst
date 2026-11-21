@@ -1069,7 +1069,7 @@ class TestCreateStaticOperatorNodes:
         multiplier = -1 if negative_angle else 1
 
         @qp.qjit(pipelines=pipe, target="mlir", capture=True, collect_decomp_rules=False)
-        @qp.transform(pass_name="to-ppr")
+        @qp.transform(pass_name="to-pbc")
         @qp.qnode(qp.device("null.qubit", wires=3))
         def cir():
             qp.PauliRot(multiplier * jax.numpy.pi, pauli_word="YZ", wires=[0, 1])
@@ -1099,7 +1099,7 @@ class TestCreateStaticOperatorNodes:
         pipe = [("pipe", ["quantum-compilation-stage"])]
 
         @qp.qjit(pipelines=pipe, target="mlir", capture=True, collect_decomp_rules=False)
-        @qp.transform(pass_name="to-ppr")
+        @qp.transform(pass_name="to-pbc")
         @qp.qnode(qp.device("null.qubit", wires=3))
         def cir():
             # NOTE: use angle != pi / <something>

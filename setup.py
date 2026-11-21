@@ -155,6 +155,7 @@ entry_points = {
         "catalyst-xdsl-universe = catalyst.python_interface.xdsl_universe:CATALYST_XDSL_UNIVERSE"
     ],
     "pennylane.transforms": [
+        "to_pbc = catalyst.passes:to_pbc",
         "to_ppr = catalyst.passes:to_ppr",
         "merge_ppr_ppm = catalyst.passes:merge_ppr_ppm",
         "commute_ppr = catalyst.passes:commute_ppr",

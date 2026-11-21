@@ -55,6 +55,27 @@ _Convert CliffordT operations to Pauli Product Measurement operations._
 -avoid-y-measure  : Avoid Pauli-Y measurements for Clifford rotations. Rather than performing a Pauli-Y measurement for Clifford rotations (sometimes more costly), a Y state is used instead (requires Y state preparation).
 ```
 
-### `-to-ppr`
+### `-ppr-to-ppm`
+
+_Convert PPRotation operations to Pauli Product Measurement operations._
+
+#### Options
+
+```
+-decompose-method : Decomposition method to use
+-avoid-y-measure  : Avoid Pauli-Y measurements for Clifford rotations. Rather than performing a Pauli-Y measurement for Clifford rotations (sometimes more costly), a Y state is used instead (requires Y state preparation).
+```
+
+### `-to-pbc`
 
 _Convert quantum dialects to the PBC dialect._
+
+Performs a dialect conversion from the Quantum dialect to the PBC
+dialect. Before conversion, unused decomposition rules are removed and
+`modifiers-lowering` is run as a nested pipeline to lower
+`quantum.adjoint` and `quantum.ctrl` modifier regions to op-level
+modifiers. Quantum runtime and device operations, allocation,
+deallocation, register access, uncontrolled global phase, observables,
+and measurement processes may remain in the resulting PBC
+representation; Quantum gates and mid-circuit measurements must be
+converted to PBC operations.

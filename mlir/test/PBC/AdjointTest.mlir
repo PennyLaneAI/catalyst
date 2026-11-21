@@ -12,17 +12,28 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// RUN: quantum-opt --adjoint-lowering --split-input-file -verify-diagnostics %s | FileCheck %s
+// RUN: quantum-opt --adjoint-lowering --split-input-file -verify-diagnostics %s | FileCheck %s --check-prefix=ADJOINT
+// RUN: quantum-opt --to-pbc --split-input-file -verify-diagnostics %s | FileCheck %s --check-prefix=PBC
+// RUN: quantum-opt --to-pbc --ppr-to-ppm --split-input-file -verify-diagnostics %s | FileCheck %s --check-prefix=PPM
 
-// CHECK-LABEL:      @workflow
-func.func private @workflow(%r: !quantum.reg) -> !quantum.reg attributes {} {
-  // CHECK-NOT: quantum.adjoint
+// ADJOINT-LABEL: @workflow
+// PBC-LABEL: @workflow
+// PPM-LABEL: @workflow
+func.func @workflow(%r: !quantum.reg) -> !quantum.reg attributes {} {
+  // ADJOINT-NOT: quantum.adjoint
+  // PBC-NOT: quantum.adjoint
+  // PPM-NOT: quantum.adjoint
   %r_out = quantum.adjoint(%r) : !quantum.reg {
   ^bb0(%arg0: !quantum.reg):
     %0 = quantum.extract %arg0[0] : !quantum.reg -> !quantum.bit
 
-    // CHECK: pbc.ppr ["Y"](4)
-    // CHECK: pbc.ppr ["X"](-2)
+    // ADJOINT: pbc.ppr ["Y"](4)
+    // ADJOINT: pbc.ppr ["X"](-2)
+    // PBC: pbc.ppr ["Y"](4)
+    // PBC: pbc.ppr ["X"](-2)
+    // PPM: pbc.ppm ["Y", "Y"](-)
+    // PPM: pbc.ppm ["X"]
+    // PPM: pbc.ppr ["X"](-2)
     %1 = pbc.ppr ["X"](2) %0 : !quantum.bit
     %2 = pbc.ppr ["Y"](-4) %1 : !quantum.bit
 
@@ -30,4 +41,30 @@ func.func private @workflow(%r: !quantum.reg) -> !quantum.reg attributes {} {
     quantum.yield %3 : !quantum.reg
   }
   return %r_out : !quantum.reg
+}
+
+// -----
+
+// ADJOINT-LABEL: @workflow_adjoint_ppr_to_ppm
+// PBC-LABEL: @workflow_adjoint_ppr_to_ppm
+// PPM-LABEL: @workflow_adjoint_ppr_to_ppm
+func.func @workflow_adjoint_ppr_to_ppm() {
+  %0 = quantum.alloc(1) : !quantum.reg
+  // ADJOINT-NOT: quantum.adjoint
+  // PBC-NOT: quantum.adjoint
+  // PPM-NOT: quantum.adjoint
+  %1 = quantum.adjoint (%0) : !quantum.reg {
+  ^bb0(%arg0: !quantum.reg):
+    %qb = quantum.extract %arg0[0] : !quantum.reg -> !quantum.bit
+    // ADJOINT: pbc.ppr ["Z"](-4)
+    // PBC: pbc.ppr ["Z"](-4)
+    // PPM: pbc.ppm ["Z", "Y"]
+    // PPM: pbc.ppm ["X"]
+    // PPM: pbc.ppr ["Z"](2)
+    %out = pbc.ppr ["Z"](4) %qb : !quantum.bit
+    %inserted = quantum.insert %arg0[0], %out : !quantum.reg, !quantum.bit
+    quantum.yield %inserted : !quantum.reg
+  }
+  quantum.dealloc %1 : !quantum.reg
+  return
 }

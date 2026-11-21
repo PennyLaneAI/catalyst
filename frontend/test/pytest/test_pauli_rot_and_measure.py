@@ -17,10 +17,10 @@
 import numpy as np
 import pennylane as qp
 import pytest
-from pennylane.transforms import to_ppr
 
 import catalyst
 from catalyst import qjit
+from catalyst.passes import to_pbc
 
 
 def test_pauli_rot_lowering():
@@ -42,7 +42,7 @@ def test_pauli_rot_lowering():
 
 def test_pauli_rot_lowering_with_ctrl_qubits():
     """Test that Pauli rotation with control qubits is converted to quantum.paulirot.
-    Note that control PauliRot is currently not supported by the to_ppr pass.
+    Note that control PauliRot is currently not supported by the to_pbc pass.
     """
     pipe = [("pipe", ["quantum-compilation-stage"])]
 
@@ -65,7 +65,7 @@ def test_pauli_rot_to_ppr():
     pipe = [("pipe", ["quantum-compilation-stage"])]
 
     @qjit(pipelines=pipe, target="mlir", capture=True, collect_decomp_rules=False)
-    @to_ppr
+    @to_pbc
     def test_pauli_rot_to_ppr_workflow():
 
         @qp.qnode(qp.device("null.qubit", wires=1))
@@ -83,7 +83,7 @@ PPR_OPS = [(qp.PPR_2, 2), (qp.PPR_4, 4), (qp.PPR_8, 8)]
 
 @pytest.mark.parametrize("op_cls, _", PPR_OPS)
 def test_ppr_operator_capture(op_cls, _):
-    """Test that PPR operators remain generic operators before applying to_ppr."""
+    """Test that PPR operators remain generic operators before applying to_pbc."""
     pipe = [("pipe", ["quantum-compilation-stage"])]
 
     @qjit(pipelines=pipe, target="mlir", capture=True, skip_preprocess=True)
@@ -103,11 +103,11 @@ def test_ppr_operator_capture(op_cls, _):
 @pytest.mark.parametrize("sign", [1, -1])
 @pytest.mark.parametrize("op_cls, denominator", PPR_OPS)
 def test_ppr_operator_to_ppr(op_cls, denominator, sign):
-    """Test that to_ppr converts PPR operators and their adjoints to pbc.ppr."""
+    """Test that to_pbc converts PPR operators and their adjoints to pbc.ppr."""
     pipe = [("pipe", ["quantum-compilation-stage"])]
 
     @qjit(pipelines=pipe, target="mlir", capture=True)
-    @to_ppr
+    @to_pbc
     def test_ppr_operator_to_ppr_workflow():
 
         @qp.qnode(qp.device("null.qubit", wires=2))
@@ -129,7 +129,7 @@ def test_pauli_rot_with_arbitrary_angle_to_ppr():
     pipe = [("pipe", ["quantum-compilation-stage"])]
 
     @qjit(pipelines=pipe, target="mlir", capture=True, collect_decomp_rules=False)
-    @to_ppr
+    @to_pbc
     def test_pauli_rot_with_arbitrary_angle_to_ppr_workflow():
 
         @qp.qnode(qp.device("null.qubit", wires=1))
@@ -147,7 +147,7 @@ def test_pauli_rot_with_dynamic_angle_to_ppr():
     pipe = [("pipe", ["quantum-compilation-stage"])]
 
     @qjit(pipelines=pipe, target="mlir", capture=True, collect_decomp_rules=False)
-    @to_ppr
+    @to_pbc
     def test_pauli_rot_with_dynamic_angle_to_ppr_workflow():
 
         @qp.qnode(qp.device("null.qubit", wires=1))
@@ -165,7 +165,7 @@ def test_pauli_measure_to_ppm():
     pipe = [("pipe", ["quantum-compilation-stage"])]
 
     @qjit(pipelines=pipe, target="mlir", capture=True, collect_decomp_rules=False)
-    @to_ppr
+    @to_pbc
     def test_pauli_measure_to_ppr_workflow():
 
         @qp.qnode(qp.device("null.qubit", wires=1))

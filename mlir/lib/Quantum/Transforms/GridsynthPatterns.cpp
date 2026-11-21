@@ -479,8 +479,8 @@ Value drawUniformSample(PatternRewriter &rewriter, Location loc, func::FuncOp fu
  * @brief Apply CY with control `control` and target `target`.
  *
  * In the PPR basis, CY = (Z ⊗ Y)π/4 · (Z ⊗ 1)−π/4 · (1 ⊗ Y)−π/4 up to a global phase of π/4, which
- * the caller applies. This is the conversion of CY in the `to_ppr` pass (`convertCYGate` in
- * mlir/lib/PBC/Transforms/ToPPR.cpp).
+ * the caller applies. This is the conversion of CY in the `to_pbc` pass (`convertCYGate` in
+ * mlir/lib/PBC/Transforms/ToPBC.cpp).
  * @return The output control and target qubits.
  */
 std::pair<Value, Value> applyCY(PatternRewriter &rewriter, Location loc, Value control,

@@ -86,10 +86,31 @@ def MinOpsForCommutationBasisOption : Option<
 //                               Passes
 //===----------------------------------------------------------------------===//
 
-def ToPPRPass : Pass<"to-ppr"> {
+def ToPBCPass : Pass<"to-pbc"> {
     let summary = "Convert quantum dialects to the PBC dialect.";
 
-    let dependentDialects = [ "catalyst::pbc::PBCDialect" ];
+    let description = [{
+        Performs a dialect conversion from the Quantum dialect to the PBC
+        dialect. Before conversion, unused decomposition rules are removed and
+        `modifiers-lowering` is run as a nested pipeline to lower
+        `quantum.adjoint` and `quantum.ctrl` modifier regions to op-level
+        modifiers. Quantum runtime and device operations, allocation,
+        deallocation, register access, uncontrolled global phase, observables,
+        and measurement processes may remain in the resulting PBC
+        representation; Quantum gates and mid-circuit measurements must be
+        converted to PBC operations.
+    }];
+
+    let dependentDialects = [
+        "arith::ArithDialect",
+        "catalyst::CatalystDialect",
+        "catalyst::pbc::PBCDialect",
+        "complex::ComplexDialect",
+        "index::IndexDialect",
+        "memref::MemRefDialect",
+        "scf::SCFDialect",
+        "tensor::TensorDialect"
+    ];
 }
 
 def CommutePPRPass : Pass<"commute-ppr"> {
