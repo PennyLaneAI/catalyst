@@ -17,6 +17,7 @@
 import copy
 import json
 import os
+import warnings
 from pathlib import Path
 from typing import Iterable
 
@@ -970,9 +971,14 @@ def gridsynth_setup_inputs(epsilon=1e-4, ppr_basis=False, method="deterministic"
 gridsynth = qp.transform(pass_name="gridsynth", setup_inputs=gridsynth_setup_inputs)
 
 
-def to_ppr_setup_inputs():
-    r"""A quantum compilation pass that converts Clifford+T gates into Pauli-product rotations (PPR)
-    and measurements (PPM). Pauli-based operations are also allowed in the input.
+def to_pbc_setup_inputs():
+    r"""A quantum compilation pass that converts Quantum dialect operations into the Pauli-based
+    computation (PBC) dialect, turning Clifford+T gates and Pauli rotations into Pauli-product
+    rotations (PPR) and mid-circuit measurements into Pauli-product measurements (PPM). Pauli-based
+    operations are also allowed in the input.
+
+    Before conversion, unused decomposition rules are removed and ``modifiers-lowering`` lowers
+    ``quantum.adjoint`` and ``quantum.ctrl`` modifier regions to op-level modifiers.
 
     .. note::
 
@@ -995,6 +1001,7 @@ def to_ppr_setup_inputs():
     ``qp.Y``,
     ``qp.Z``,
     ``qp.CNOT``,
+    ``qp.CY``,
     ``qp.CZ``,
     ``qp.RX``,
     ``qp.RY``,
@@ -1033,14 +1040,15 @@ def to_ppr_setup_inputs():
 
     **Example**
 
-    The ``to_ppr`` compilation pass can be applied as a decorator on a QNode:
+    The ``to_pbc`` compilation pass can be applied as a decorator on a QNode:
 
     .. code-block:: python
 
         import pennylane as qp
+        from catalyst.passes import to_pbc
 
         @qp.qjit(capture=True)
-        @qp.transforms.to_ppr
+        @to_pbc
         @qp.qnode(qp.device("lightning.qubit", wires=2))
         def circuit():
             qp.H(0)
@@ -1055,7 +1063,7 @@ def to_ppr_setup_inputs():
     Device: lightning.qubit
     Device wires: 2
     Shots: Shots(total=None)
-    Level: to-ppr
+    Level: to-pbc
     <BLANKLINE>
     Wire allocations: 2
     Total gates: 11
@@ -1075,6 +1083,20 @@ def to_ppr_setup_inputs():
     Note that the mid-circuit measurement (:func:`pennylane.measure`) in the circuit has been
     converted to a Pauli product measurement (PPM), as well.
     """
+    return (), {}
+
+
+to_pbc = qp.transform(pass_name="to-pbc", setup_inputs=to_pbc_setup_inputs)
+
+
+def to_ppr_setup_inputs():
+    r"""Deprecated alias for :func:`~.passes.to_pbc`."""
+    warnings.warn(
+        "catalyst.passes.to_ppr is deprecated and will be removed in a future release. "
+        "Use catalyst.passes.to_pbc instead.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
     return (), {}
 
 
@@ -1619,7 +1641,7 @@ def ppr_to_mbqc_setup_inputs():
     .. note::
 
         This pass expects PPR/PPM operations to be present. In practice, use it
-        after :func:`~.passes.to_ppr`.
+        after :func:`~.passes.to_pbc`.
 
     Args:
         fn (QNode): the QNode to apply the pass to
@@ -1642,7 +1664,7 @@ def ppr_to_mbqc_setup_inputs():
 
         @qp.qjit(pipelines=p, target="mlir", keep_intermediate=True)
         @catalyst.passes.ppr_to_mbqc
-        @catalyst.passes.to_ppr
+        @catalyst.passes.to_pbc
         @qp.qnode(qp.device("null.qubit", wires=2))
         def circuit():
             qp.H(0)
@@ -1949,6 +1971,7 @@ __all__ = [
     "parity_synth",
     "decompose_lowering",
     "ions_decomposition",
+    "to_pbc",
     "to_ppr",
     "gridsynth",
     "commute_ppr",

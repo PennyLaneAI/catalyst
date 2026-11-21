@@ -51,12 +51,14 @@ from catalyst.passes.builtin_passes import (
     ppr_to_mbqc,
     ppr_to_ppm,
     reduce_t_depth,
+    to_pbc,
     to_ppr,
 )
 
 __all__ = (
     "graph_decomposition",
     "gridsynth",
+    "to_pbc",
     "to_ppr",
     "commute_ppr",
     "ppr_to_ppm",

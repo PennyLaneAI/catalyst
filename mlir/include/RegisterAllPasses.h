@@ -42,6 +42,7 @@ inline void registerAllPasses() {
     mitigation::registerMitigationPasses();
     pauli_frame::registerPauliFramePasses();
     pbc::registerPBCPasses();
+    pbc::registerDeprecatedToPPRPass();
     qecp::registerQecPhysicalPasses();
     qref::registerQRefPasses();
     quantum::registerQuantumPasses();

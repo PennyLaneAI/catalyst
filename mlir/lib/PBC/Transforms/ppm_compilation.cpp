@@ -65,7 +65,7 @@ struct PPMCompilationPass : public impl::PPMCompilationPassBase<PPMCompilationPa
             target.addLegalOp<quantum::GlobalPhaseOp>();
 
             RewritePatternSet patterns(ctx);
-            populateToPPRPatterns(patterns);
+            populateToPBCPatterns(patterns);
 
             if (failed(applyPartialConversion(module, target, std::move(patterns)))) {
                 return signalPassFailure();

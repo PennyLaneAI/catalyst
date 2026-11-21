@@ -29,20 +29,20 @@ from catalyst.passes import (
     ppr_to_mbqc,
     ppr_to_ppm,
     reduce_t_depth,
-    to_ppr,
+    to_pbc,
 )
 
 
 def test_convert_clifford_to_ppr():
     """
-    Test the `to_ppr` pass.
+    Test the `to_pbc` pass.
     Check that the original qnode is correctly kept and untransformed.
     """
 
     pipe = [("pipe", ["quantum-compilation-stage"])]
 
     @qjit(pipelines=pipe, target="mlir")
-    @to_ppr
+    @to_pbc
     @qp.qnode(qp.device("null.qubit", wires=2))
     def circuit():
         qp.H(0)
@@ -54,7 +54,7 @@ def test_convert_clifford_to_ppr():
     print(circuit.mlir_opt)
 
 
-# CHECK-NOT: transform.apply_registered_pass "to-ppr"
+# CHECK-NOT: transform.apply_registered_pass "to-pbc"
 # CHECK: pbc.ppr
 # CHECK: pbc.ppm
 test_convert_clifford_to_ppr()
@@ -71,7 +71,7 @@ def test_commute_ppr():
     # CHECK-LABEL: public @cir_commute_ppr
     @qjit(pipelines=pipe, target="mlir")
     @commute_ppr
-    @to_ppr
+    @to_pbc
     @qp.qnode(qp.device("null.qubit", wires=2))
     def cir_commute_ppr():
         # CHECK: [[reg:%.+]] = quantum.alloc( 2)
@@ -107,7 +107,7 @@ def test_commute_ppr_max_pauli_size():
 
     @qjit(pipelines=pipe, target="mlir")
     @commute_ppr(max_pauli_size=2)
-    @to_ppr
+    @to_pbc
     @qp.qnode(qp.device("null.qubit", wires=2))
     def cir_commute_ppr_max_pauli_size():
         qp.CNOT([0, 2])
@@ -139,7 +139,7 @@ def test_merge_ppr_ppm():
 
     @qjit(pipelines=pipe, target="mlir")
     @merge_ppr_ppm
-    @to_ppr
+    @to_pbc
     @qp.qnode(qp.device("null.qubit", wires=2))
     def cir_merge_ppr_ppm():
         qp.H(0)
@@ -168,7 +168,7 @@ def test_merge_ppr_ppm_max_pauli_size():
 
     @qjit(pipelines=pipe, target="mlir")
     @merge_ppr_ppm(max_pauli_size=1)
-    @to_ppr
+    @to_pbc
     @qp.qnode(qp.device("null.qubit", wires=2))
     def cir_merge_ppr_ppm_max_pauli_size():
         qp.CNOT([0, 2])
@@ -202,7 +202,7 @@ def test_ppr_to_ppm():
 
         # CHECK-LABEL: public @cir_default_0
         @ppr_to_ppm
-        @to_ppr
+        @to_pbc
         @qp.qnode(device)
         def cir_default():
             # PPR Z(pi/4) should be decomposed.
@@ -217,7 +217,7 @@ def test_ppr_to_ppm():
 
         # CHECK-LABEL: public @cir_inject_magic_state_0
         @ppr_to_ppm(decompose_method="clifford-corrected", avoid_y_measure=True)
-        @to_ppr
+        @to_pbc
         @qp.qnode(device)
         def cir_inject_magic_state():
             # CHECK: quantum.custom "Hadamard"
@@ -242,7 +242,7 @@ def test_ppr_to_ppm():
 
         # CHECK-LABEL: public @cir_pauli_corrected_0
         @ppr_to_ppm(decompose_method="pauli-corrected")
-        @to_ppr
+        @to_pbc
         @qp.qnode(device)
         def cir_pauli_corrected():
             # CHECK: quantum.custom "Hadamard"
@@ -260,7 +260,7 @@ def test_ppr_to_ppm():
 
         # CHECK-LABEL: public @cir_pauli_corrected_avoid_y_0
         @ppr_to_ppm(decompose_method="pauli-corrected", avoid_y_measure=True)
-        @to_ppr
+        @to_pbc
         @qp.qnode(device)
         def cir_pauli_corrected_avoid_y():
             # CHECK: quantum.custom "Hadamard"
@@ -374,7 +374,7 @@ def test_reduce_t_depth():
     @reduce_t_depth
     @merge_ppr_ppm
     @commute_ppr
-    @to_ppr
+    @to_pbc
     @qp.qnode(qp.device("null.qubit", wires=3))
     def test_reduce_t_depth_workflow():
         # CHECK: pbc.ppr ["X"](8)
@@ -411,7 +411,7 @@ def test_ppr_to_mbqc():
     # CHECK-LABEL: public @test_ppr_to_mbqc_workflow
     @qjit(pipelines=pipe, target="mlir")
     @ppr_to_mbqc
-    @to_ppr
+    @to_pbc
     @qp.qnode(qp.device("null.qubit", wires=2))
     def test_ppr_to_mbqc_workflow():
         # CHECK: quantum.custom "Hadamard"
@@ -447,7 +447,7 @@ def test_decompose_arbitrary_ppr():
     # CHECK-LABEL: public @test_decompose_arbitrary_ppr_workflow
     @qjit(capture=True, pipelines=pipe, target="mlir", collect_decomp_rules=False)
     @qp.transform(pass_name="decompose-arbitrary-ppr")
-    @qp.transform(pass_name="to-ppr")
+    @qp.transform(pass_name="to-pbc")
     @qp.qnode(qp.device("null.qubit", wires=3))
     def test_decompose_arbitrary_ppr_workflow():
         # CHECK: pbc.ppr ["Y"](8)

@@ -572,7 +572,7 @@ struct PBCMeasureLowering : public OpConversionPattern<MeasureOp> {
 namespace catalyst {
 namespace pbc {
 
-void populateToPPRPatterns(RewritePatternSet &patterns) {
+void populateToPBCPatterns(RewritePatternSet &patterns) {
     patterns.add<PBCGateLowering>(patterns.getContext());
     patterns.add<PBCMeasureLowering>(patterns.getContext());
 }

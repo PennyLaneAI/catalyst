@@ -59,14 +59,6 @@ _Convert CliffordT operations to Pauli Product Measurement operations._
 
 _Convert PPRotation operations to Pauli Product Measurement operations._
 
-This pass first invokes `adjoint-lowering` as a nested pipeline so that
-PPRotation operations inside `quantum.adjoint` regions are reversed before
-they are converted to Pauli Product Measurements. Quantum runtime and
-device operations, allocation, deallocation, register access, global
-phase, observables, and measurement processes may remain in the
-resulting PBC representation; other Quantum dialect operations, such as
-gates, must be converted before this pass.
-
 #### Options
 
 ```
@@ -74,6 +66,16 @@ gates, must be converted before this pass.
 -avoid-y-measure  : Avoid Pauli-Y measurements for Clifford rotations. Rather than performing a Pauli-Y measurement for Clifford rotations (sometimes more costly), a Y state is used instead (requires Y state preparation).
 ```
 
-### `-to-ppr`
+### `-to-pbc`
 
 _Convert quantum dialects to the PBC dialect._
+
+Performs a dialect conversion from the Quantum dialect to the PBC
+dialect. Before conversion, unused decomposition rules are removed and
+`modifiers-lowering` is run as a nested pipeline to lower
+`quantum.adjoint` and `quantum.ctrl` modifier regions to op-level
+modifiers. Quantum runtime and device operations, allocation,
+deallocation, register access, uncontrolled global phase, observables,
+and measurement processes may remain in the resulting PBC
+representation; Quantum gates and mid-circuit measurements must be
+converted to PBC operations.

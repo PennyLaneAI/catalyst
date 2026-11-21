@@ -5,8 +5,8 @@ file(GLOB SRC
     UnrollConditionalPPRPPM.cpp
     unroll_conditional_ppr_ppm.cpp
     CollapseConditionalPPR.cpp
-    ToPPR.cpp
-    to_ppr.cpp
+    ToPBC.cpp
+    to_pbc.cpp
     CommutePPR.cpp
     commute_ppr.cpp
     MergePPRIntoPPM.cpp

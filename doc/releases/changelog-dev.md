@@ -880,6 +880,15 @@
 
 <h3>Breaking changes 💔</h3>
 
+* The `to-ppr` pass (`catalyst.passes.to_ppr`) has been renamed to `to-pbc`
+  (`catalyst.passes.to_pbc`) and restructured as a full dialect conversion from the Quantum
+  dialect to the PBC dialect. Before conversion, it runs `symbol-dce` and `modifiers-lowering` to
+  lower `quantum.adjoint` and `quantum.ctrl` modifier regions to op-level modifiers, and only
+  allows Quantum runtime/device operations, qubit/register management, uncontrolled global phase,
+  observables, and measurement processes to remain. `to-ppr` and `catalyst.passes.to_ppr` remain
+  available as deprecated aliases.
+  [(#3020)](https://github.com/PennyLaneAI/catalyst/pull/3020)
+
 * We now have `capture=True` as the default mode for Catalyst `qjit`.
   [(#3414)](https://github.com/PennyLaneAI/catalyst/pull/3414)
 
@@ -997,11 +1006,6 @@
 * The `cpu_verbs` and `gpu_verbs` coprocessors no longer stall after a lost UC request. HSB's
   ring now has one slot, so the next request is served.
   [(#3468)](https://github.com/PennyLaneAI/catalyst/pull/3468)
-
-* The `ppr-to-ppm` pass now supports PPRotation operations inside `quantum.adjoint` regions by
-  invoking `adjoint-lowering` before converting the reversed rotations to Pauli product
-  measurements.
-  [(#2934)](https://github.com/PennyLaneAI/catalyst/pull/2934)
 
 * A `qp.Backline` device with a `qec_code` no longer fails to compile circuits whose gates are
   `Operator2`. The unused decomposition rules captured with the circuit are now removed before

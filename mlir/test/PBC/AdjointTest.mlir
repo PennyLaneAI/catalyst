@@ -13,12 +13,15 @@
 // limitations under the License.
 
 // RUN: quantum-opt --adjoint-lowering --split-input-file -verify-diagnostics %s | FileCheck %s --check-prefix=ADJOINT
-// RUN: quantum-opt --ppr-to-ppm --split-input-file -verify-diagnostics %s | FileCheck %s --check-prefix=PPM
+// RUN: quantum-opt --to-pbc --split-input-file -verify-diagnostics %s | FileCheck %s --check-prefix=PBC
+// RUN: quantum-opt --to-pbc --ppr-to-ppm --split-input-file -verify-diagnostics %s | FileCheck %s --check-prefix=PPM
 
 // ADJOINT-LABEL: @workflow
+// PBC-LABEL: @workflow
 // PPM-LABEL: @workflow
-func.func private @workflow(%r: !quantum.reg) -> !quantum.reg attributes {} {
+func.func @workflow(%r: !quantum.reg) -> !quantum.reg attributes {} {
   // ADJOINT-NOT: quantum.adjoint
+  // PBC-NOT: quantum.adjoint
   // PPM-NOT: quantum.adjoint
   %r_out = quantum.adjoint(%r) : !quantum.reg {
   ^bb0(%arg0: !quantum.reg):
@@ -26,6 +29,8 @@ func.func private @workflow(%r: !quantum.reg) -> !quantum.reg attributes {} {
 
     // ADJOINT: pbc.ppr ["Y"](4)
     // ADJOINT: pbc.ppr ["X"](-2)
+    // PBC: pbc.ppr ["Y"](4)
+    // PBC: pbc.ppr ["X"](-2)
     // PPM: pbc.ppm ["Y", "Y"](-)
     // PPM: pbc.ppm ["X"]
     // PPM: pbc.ppr ["X"](-2)
@@ -40,13 +45,19 @@ func.func private @workflow(%r: !quantum.reg) -> !quantum.reg attributes {} {
 
 // -----
 
+// ADJOINT-LABEL: @workflow_adjoint_ppr_to_ppm
+// PBC-LABEL: @workflow_adjoint_ppr_to_ppm
 // PPM-LABEL: @workflow_adjoint_ppr_to_ppm
 func.func @workflow_adjoint_ppr_to_ppm() {
   %0 = quantum.alloc(1) : !quantum.reg
+  // ADJOINT-NOT: quantum.adjoint
+  // PBC-NOT: quantum.adjoint
   // PPM-NOT: quantum.adjoint
   %1 = quantum.adjoint (%0) : !quantum.reg {
   ^bb0(%arg0: !quantum.reg):
     %qb = quantum.extract %arg0[0] : !quantum.reg -> !quantum.bit
+    // ADJOINT: pbc.ppr ["Z"](-4)
+    // PBC: pbc.ppr ["Z"](-4)
     // PPM: pbc.ppm ["Z", "Y"]
     // PPM: pbc.ppm ["X"]
     // PPM: pbc.ppr ["Z"](2)
