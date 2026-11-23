@@ -1543,6 +1543,9 @@
   the `quantum` and `qref` dialects that support qubit and register modes, as well as static and dynamic data. Terminal circuit
   result extraction operators implement the `TerminalMeasurement` instead.
   [(#3439)](https://github.com/PennyLaneAI/catalyst/pull/3439)
+  - `qp.pauli_measure` and `qp.ops.PauliMeasure` bind to `MeasurementOp`, and `MeasurementOp` lowers
+    into the PBC dialect via `to_ppr` or directly into the `PauliMeasure` QIR instruction.
+    [(#3474)](https://github.com/PennyLaneAI/catalyst/pull/3474)
 
 <h3>Documentation 📝</h3>
 
