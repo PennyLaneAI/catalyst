@@ -34,6 +34,7 @@ from pennylane import adjoint as PL_adjoint
 from pennylane import cond
 from pennylane import ctrl as PL_ctrl
 from pennylane import for_loop, qjit, while_loop
+from pennylane.core.queuing import AnnotatedQueue
 from pennylane.operation import (
     DecompositionUndefinedError,
     Operation,
@@ -1238,7 +1239,7 @@ class TestControlledQueuing:
 
     def test_queuing(self):
         """Test that `catalyst.ctrl` is queued upon initialization and updates base metadata."""
-        with qp.queuing.AnnotatedQueue() as q:
+        with AnnotatedQueue() as q:
             base = qp.Rot(1.234, 2.345, 3.456, wires=2)
             op = C_ctrl(base, (0, 1))
 
@@ -1249,7 +1250,7 @@ class TestControlledQueuing:
         """Test that base isn't added to queue if its defined outside the recording context."""
 
         base = qp.IsingXX(1.234, wires=(0, 1))
-        with qp.queuing.AnnotatedQueue() as q:
+        with AnnotatedQueue() as q:
             op = C_ctrl(base, ("a", "b"))
 
         assert len(q) == 1
