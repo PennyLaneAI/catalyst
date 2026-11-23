@@ -20,57 +20,33 @@ from pennylane.templates.subroutines.select_thc import _select_thc_decomp
 registers = qp.registers(qp.select_thc_wires(M=1, N=4, beth=1))
 registers = {
     name: qp.wires.Wires(
-        [r"$\mu$", r"$\nu$"]
-        if name == "index_wires"
+        [r"$\mu$", r"$\nu$"] if name == "index_wires"
         else [rf"$\mathrm{{{name.removesuffix('_wires')}}}_{{{i}}}$" for i in range(len(wires))]
     )
     for name, wires in registers.items()
 }
-wire_order = qp.wires.Wires.all_wires(
-    [
-        registers[name]
-        for name in (
-            "index_wires",
-            "flag_wires",
-            "gradient_wires",
-            "work_wires",
-            "system_wires",
-        )
-    ]
-)
+wire_order = qp.wires.Wires.all_wires([
+    registers[name] for name in (
+        "index_wires", "flag_wires", "gradient_wires", "work_wires", "system_wires",
+    )
+])
 gate_set = {
-    qp.QROM,
-    "Adjoint(QROM)",
-    qp.CSWAP,
-    "C(SWAP)",
-    qp.Hadamard,
-    qp.CNOT,
-    qp.S,
-    "Adjoint(S)",
-    qp.Z,
-    "C(PauliZ)",
-    "C(MultiX)",
-    qp.SemiAdder,
-    "Adjoint(SemiAdder)",
-    qp.X,
-    "Adjoint(PauliX)",
+    qp.QROM, "Adjoint(QROM)", qp.CSWAP, "C(SWAP)", qp.Hadamard, qp.CNOT,
+    qp.S, "Adjoint(S)", qp.Z, "C(PauliZ)", "C(MultiX)",
+    qp.SemiAdder, "Adjoint(SemiAdder)", qp.X, "Adjoint(PauliX)",
 }
 
 qp.decomposition.enable_graph()
 
 
 @qp.transforms._tape_decompose(
-    gate_set=gate_set,
-    fixed_decomps={qp.SelectTHC: _select_thc_decomp},
+    gate_set=gate_set, fixed_decomps={qp.SelectTHC: _select_thc_decomp},
 )
 @qp.qnode(qp.device("null.qubit"))
 def circuit():
     qp.SelectTHC(
-        chi=((0.6, 0.8),),
-        t_eigenvectors=((0.8, -0.6), (0.6, 0.8)),
-        beth=1,
-        num_batches=1,
-        **registers,
+        chi=((0.6, 0.8),), t_eigenvectors=((0.8, -0.6), (0.6, 0.8)),
+        beth=1, num_batches=1, **registers,
     )
     return qp.state()
 

@@ -2,7 +2,7 @@
 
 filepath = "../pennylane/ops/qubit/non_parametric_ops.py"
 
-with open(filepath, "r") as f:
+with open(filepath, 'r') as f:
     content = f.read()
 
 # All non-parametric ops have __init__(self, wires, id=None)
@@ -40,7 +40,7 @@ for old, new in replacements:
     else:
         print(f"✗ NOT FOUND: {old}")
 
-with open(filepath, "w") as f:
+with open(filepath, 'w') as f:
     f.write(content)
 
 print("\n✅ All changes applied to non_parametric_ops.py")

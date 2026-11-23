@@ -22,18 +22,14 @@ leaf, _ = qp.math.linalg.qr(matrix)
 leaves = qp.math.stack([qp.math.stack([leaf, leaf]), qp.math.stack([leaf.T, leaf.T])])
 hamiltonian = qp.CGFHamiltonian(
     core_tensors=qp.math.reshape(qp.math.arange(72, dtype=float) / 100 + 0.1, (2, 2, 2, 3, 3)),
-    leaf_tensors=leaves,
-    nuc_constant=0.5,
+    leaf_tensors=leaves, nuc_constant=0.5,
 )
 
 
 def circuit():
     _trotter_cgf_decomposition(
-        evolution_time=1.0,
-        num_trotter_steps=1,
-        hamiltonian=hamiltonian,
-        wires=qp.wires.Wires(range(6)),
-        double_phase=False,
+        evolution_time=1.0, num_trotter_steps=1, hamiltonian=hamiltonian,
+        wires=qp.wires.Wires(range(6)), double_phase=False,
     )
 
 

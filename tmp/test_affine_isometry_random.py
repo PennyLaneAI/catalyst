@@ -40,7 +40,9 @@ def apply_circuit(states, circuit, n):
             w0, w1 = data[0]
             m0, m1 = 1 << (n - 1 - w0), 1 << (n - 1 - w1)
             # Swap two bits only when they differ.
-            states = [s ^ m0 ^ m1 if bool(s & m0) != bool(s & m1) else s for s in states]
+            states = [
+                s ^ m0 ^ m1 if bool(s & m0) != bool(s & m1) else s for s in states
+            ]
         else:
             raise AssertionError(op_type)
     return states

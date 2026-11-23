@@ -26,12 +26,8 @@ hamiltonian = qp.CDFHamiltonian(
 
 def circuit():
     _trotter_cdf_decomposition(
-        evolution_time=1.0,
-        num_trotter_steps=1,
-        hamiltonian=hamiltonian,
-        wires=qp.wires.Wires(range(4)),
-        double_phase=False,
-        work_wires=(),
+        evolution_time=1.0, num_trotter_steps=1, hamiltonian=hamiltonian,
+        wires=qp.wires.Wires(range(4)), double_phase=False, work_wires=(),
     )
 
 

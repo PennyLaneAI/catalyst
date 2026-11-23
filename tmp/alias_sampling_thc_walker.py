@@ -18,24 +18,15 @@ import pennylane as qp
 from pennylane.templates.subroutines.alias_sampling_thc import _alias_sampling_thc_decomp
 
 sizes = qp.alias_sampling_thc_wires(M=1, N=2, aleph=1)
-registers = qp.registers(
-    {
-        "mu_wires": sizes["mu_wires"],
-        "nu_wires": sizes["nu_wires"],
-        "edge_flag": 1,
-        "work_wires": sizes["work_wires"],
-    }
-)
+registers = qp.registers({
+    "mu_wires": sizes["mu_wires"], "nu_wires": sizes["nu_wires"],
+    "edge_flag": 1, "work_wires": sizes["work_wires"],
+})
 
 
 def circuit():
     _alias_sampling_thc_decomp(
-        M=1,
-        N=2,
-        zeta=((1.0,),),
-        t_ell=(0.5,),
-        aleph=1,
-        **registers,
+        M=1, N=2, zeta=((1.0,),), t_ell=(0.5,), aleph=1, **registers,
     )
 
 

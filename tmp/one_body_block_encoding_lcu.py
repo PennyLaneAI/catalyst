@@ -22,9 +22,7 @@ registers = qp.registers(qp.one_body_block_encoding_wires(2, alias_sampling_nbit
 
 def circuit():
     _one_body_block_encoding_decomp(
-        op_matrix=((1.0, 2.0), (2.0, 1.0)),
-        alias_sampling_nbits=1,
-        **registers,
+        op_matrix=((1.0, 2.0), (2.0, 1.0)), alias_sampling_nbits=1, **registers,
     )
 
 
