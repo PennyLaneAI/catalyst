@@ -1490,7 +1490,7 @@
   [(#3351)](https://github.com/PennyLaneAI/catalyst/pull/3351)
 
 * A generic mid-circuit measurement operator with classical results: `MeasurementOp` has been added to 
-  the `quantum` dialect that accepts `qubit`/`qureg` and optional static and dynamic data. Terminal circuit
+  the `quantum` and `qref` dialects that support qubit and register modes, as well as static and dynamic data. Terminal circuit
   result extraction operators implement the `TerminalMeasurement` instead.
   [(#3439)](https://github.com/PennyLaneAI/catalyst/pull/3439)
 
