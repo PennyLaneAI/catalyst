@@ -680,7 +680,7 @@ def test_aqft(backend):
 def test_hilbert_schmidt(backend):
     """Test HilbertSchmidt."""
     with qp.QueuingManager.stop_recording():
-        u_tape = qp.tape.QuantumTape([qp.Hadamard(0)])
+        u_tape = qp.core.QuantumScript([qp.Hadamard(0)])
 
     def v_function(params):
         qp.RZ(params[0], wires=1)
@@ -701,7 +701,7 @@ def test_hilbert_schmidt(backend):
 def test_local_hilbert_schmidt(backend):
     """Test LocalHilbertSchmidt."""
     with qp.QueuingManager.stop_recording():
-        u_tape = qp.tape.QuantumTape([qp.CZ(wires=(0, 1))])
+        u_tape = qp.core.QuantumScript([qp.CZ(wires=(0, 1))])
 
     def v_function(params):
         qp.RZ(params[0], wires=2)

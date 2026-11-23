@@ -1231,6 +1231,9 @@
 
 <h3>Internal changes ⚙️</h3>
 
+* Uses `AnnotatedQueue` and `QuantumScript` instead of the to-be-removed `QuantumTape`.
+  [(#3509)](https://github.com/PennyLaneAI/catalyst/pull/3509)
+
 * Updated `pylint` to version 4.1.3 in the development requirements and CI formatting workflow.
   [(#3459)](https://github.com/PennyLaneAI/catalyst/pull/3459)
 
