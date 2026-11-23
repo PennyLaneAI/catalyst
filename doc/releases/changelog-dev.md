@@ -1010,7 +1010,7 @@
   widths, and the name column is wide enough for stage names such as
   `MLIRToLLVMDialectConversion`. The compiler's CPU time was always 0, because its
   nanosecond-to-millisecond scale factor was computed with integer division.
-  [(#PRNUM)](https://github.com/PennyLaneAI/catalyst/pull/PRNUM)
+  [(#3510)](https://github.com/PennyLaneAI/catalyst/pull/3510)
 
 * Subroutines converted by `convert-to-reference-semantics` now take registers of dynamic size,
   `!qref.reg<?>`, and call sites cast registers of static size with the new `qref.cast` operation.
