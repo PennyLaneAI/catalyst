@@ -154,20 +154,8 @@ LogicalResult RemLowering::matchAndRewrite(mitigation::RemOp op, PatternRewriter
     func::FuncOp calleeOp =
         SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(op, op.getCalleeAttr());
     if (!calleeOp) {
-        return rewriter.notifyMatchFailure(op, "cannot resolve callee");
+        return op.emitOpError("cannot resolve callee ") << op.getCalleeAttr();
     }
-
-    // Call the original callee
-    SmallVector<Value> callArgs(op.getArgs().begin(), op.getArgs().end());
-    auto callOp = rewriter.create<func::CallOp>(loc, calleeOp, callArgs);
-
-    auto results = callOp.getResults();
-    // Declare vector of SSA Values representing the total result (callee results + two calibration
-    // circuit results, or zero-tensors if no calibration is present)
-    SmallVector<Value> completeResults;
-    // The type (and shape is part of it) of the return value is known, and we know that we have 3
-    // times as many Value objects (because of zeros and ones calibration circuits)
-    completeResults.reserve(results.size() * 3);
 
     const bool doCalib = runCalibration.getValue();
     if (!doCalib) {
@@ -176,11 +164,13 @@ LogicalResult RemLowering::matchAndRewrite(mitigation::RemOp op, PatternRewriter
                      << "\n";
         // The zeros/ones result groups are empty variadics when doCalib is false,
         // so the op is replaced by only the callee's SSA values.
-        for (Value v : results)
-            completeResults.push_back(v);
-        rewriter.replaceOp(op, completeResults);
+        auto callOp = rewriter.create<func::CallOp>(loc, calleeOp, op.getArgs());
+        rewriter.replaceOp(op, callOp.getResults());
         return success();
     }
+
+    // The checks below emit an error and return before any IR is created: a pattern that fails
+    // must leave the IR unchanged. MitigationLoweringPass then fails because the op is left.
 
     // Determine quantum device information, specifically number of qubits and shots.
     // Get the number of qubits from quantum.alloc operation inside callee function (FuncOp).
@@ -199,7 +189,7 @@ LogicalResult RemLowering::matchAndRewrite(mitigation::RemOp op, PatternRewriter
     // check for MP type: Sample, Probs or Counts
     auto measurementProcesses = calleeOp.getOps<quantum::MeasurementProcess>();
     if (measurementProcesses.empty()) {
-       return op.emitOpError("[mitigation.rem] No valid MP found.\n");
+        return op.emitOpError("no valid MP found in callee ") << op.getCalleeAttr();
     }
     const std::string MPName =
         (*measurementProcesses.begin()).getOperation()->getName().getIdentifier().str();
@@ -213,8 +203,8 @@ LogicalResult RemLowering::matchAndRewrite(mitigation::RemOp op, PatternRewriter
         if (qubitCount >= 63) {
             // in practice, due to exponential memory growth, users will
             // OOM much earlier, at < 30 qubits
-            llvm::errs() << "[mitigation.rem] Qubit count" << qubitCount
-                         << "exceeds maximum simulated register size (62 qubits).\n";
+            return op.emitOpError("qubit count ")
+                   << qubitCount << " exceeds maximum simulated register size (62 qubits)";
         }
         const int64_t calibrationTensorShape = static_cast<int64_t>(1ULL << qubitCount);
         tensorTyF64 = RankedTensorType::get({calibrationTensorShape}, rewriter.getF64Type());
@@ -223,15 +213,12 @@ LogicalResult RemLowering::matchAndRewrite(mitigation::RemOp op, PatternRewriter
     else if (MPName == "quantum.sample"s) {
         // shots must be a compile-time arith.constant with a non-zero value.
         if (shots->getName().getIdentifier() != arith::ConstantOp::getOperationName()) {
-            llvm::errs() << "[mitigation.rem] Dynamic number of shots not supported currently.\n";
-            return failure();
+            return op.emitOpError("dynamic number of shots not supported currently");
         }
         auto shotsAttr = shots->getAttrOfType<IntegerAttr>("value");
         if (!shotsAttr || shotsAttr == 0) {
-            llvm::errs()
-                << "[mitigation.rem] Shots constant missing non-zero integer value. "
-                   "Sample MP not supported for analytic simulation (shots must be > 0).\n";
-            return failure();
+            return op.emitOpError("shots constant missing non-zero integer value, sample MP not "
+                                  "supported for analytic simulation (shots must be > 0)");
         }
         const int64_t shotCount = shotsAttr.getInt();
         llvm::dbgs()
@@ -241,15 +228,26 @@ LogicalResult RemLowering::matchAndRewrite(mitigation::RemOp op, PatternRewriter
         tensorTyF64 = RankedTensorType::get({shotCount, qubitCount}, rewriter.getF64Type());
     }
     else {
-        llvm::errs() << "[mitigation.rem] Supported measurement processes are quantum.counts, "
-                        "quantum.probs and quantum.sample. "
-                     << MPName << " is not supported.\n";
-        return failure();
+        return op.emitOpError("supported measurement processes are quantum.counts, quantum.probs "
+                              "and quantum.sample, ")
+               << MPName << " is not supported";
     }
 
     llvm::dbgs() << "[mitigation.rem] doCalibration == true, start adding all-zeroes and all-ones "
                     "circuits..."
                  << "\n";
+
+    // Call the original callee
+    SmallVector<Value> callArgs(op.getArgs().begin(), op.getArgs().end());
+    auto callOp = rewriter.create<func::CallOp>(loc, calleeOp, callArgs);
+
+    auto results = callOp.getResults();
+    // Declare vector of SSA Values representing the total result (callee results + two calibration
+    // circuit results, or zero-tensors if no calibration is present)
+    SmallVector<Value> completeResults;
+    // The type (and shape is part of it) of the return value is known, and we know that we have 3
+    // times as many Value objects (because of zeros and ones calibration circuits)
+    completeResults.reserve(results.size() * 3);
 
     ValueRange calibratedZeroResult =
         emitCalibrationCircuit(rewriter, loc, calleeOp, tensorTyF64, tensorTyI64,

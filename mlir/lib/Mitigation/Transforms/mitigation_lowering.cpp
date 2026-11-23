@@ -45,6 +45,13 @@ struct MitigationLoweringPass : impl::MitigationLoweringPassBase<MitigationLower
         if (failed(applyPatternsGreedily(getOperation(), std::move(mitigationPatterns)))) {
             return signalPassFailure();
         }
+
+        // RemLowering emits an error and leaves the op in place when it cannot lower it, which
+        // the greedy driver does not count as a failure.
+        WalkResult remaining = getOperation()->walk([](RemOp) { return WalkResult::interrupt(); });
+        if (remaining.wasInterrupted()) {
+            return signalPassFailure();
+        }
     }
 };
 

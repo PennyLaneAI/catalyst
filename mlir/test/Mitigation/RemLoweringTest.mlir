@@ -206,3 +206,91 @@ func.func @remProbsPassthrough() -> tensor<4xf64> {
 // CHECK-NOT:   arith.constant dense<0.000000e+00>
 // CHECK-NOT:   quantum.compbasis
 // CHECK-NOT:   quantum.custom "PauliX"
+
+// -----
+
+// ===================================================================
+// The remaining cases cannot be calibrated: the lowering emits an error
+// on the rem op without creating any IR, and the pass fails.
+// ===================================================================
+
+func.func @expvalCircuit() -> tensor<f64> attributes {qnode} {
+    %shots = arith.constant 0 : i64
+    quantum.device shots(%shots) ["rtd_lightning.so", "LightningQubit", "{}"]
+    %r = quantum.alloc(1) : !quantum.reg
+    %q_0 = quantum.extract %r[ 0] : !quantum.reg -> !quantum.bit
+    %obs = quantum.namedobs %q_0[PauliZ] : !quantum.obs
+    %expval = quantum.expval %obs : f64
+    %res = tensor.from_elements %expval : tensor<f64>
+    %r_0 = quantum.insert %r[ 0], %q_0 : !quantum.reg, !quantum.bit
+    quantum.dealloc %r_0 : !quantum.reg
+    quantum.device_release
+    func.return %res : tensor<f64>
+}
+
+func.func @remUnsupportedMP() -> (tensor<f64>, tensor<f64>, tensor<f64>) {
+    // expected-error@+1 {{supported measurement processes are quantum.counts, quantum.probs and quantum.sample, quantum.expval is not supported}}
+    %out:3 = mitigation.rem @expvalCircuit() runCalibration(true) {resultSegmentSizes = array<i32: 1, 1, 1>} : () -> (tensor<f64>, tensor<f64>, tensor<f64>)
+    func.return %out#0, %out#1, %out#2 : tensor<f64>, tensor<f64>, tensor<f64>
+}
+
+// -----
+
+func.func @noMPCircuit() -> tensor<4xf64> attributes {qnode} {
+    %shots = arith.constant 0 : i64
+    quantum.device shots(%shots) ["rtd_lightning.so", "LightningQubit", "{}"]
+    %r = quantum.alloc(2) : !quantum.reg
+    %res = arith.constant dense<2.500000e-01> : tensor<4xf64>
+    quantum.dealloc %r : !quantum.reg
+    quantum.device_release
+    func.return %res : tensor<4xf64>
+}
+
+func.func @remNoMP() -> (tensor<4xf64>, tensor<4xf64>, tensor<4xf64>) {
+    // expected-error@+1 {{no valid MP found in callee @noMPCircuit}}
+    %out:3 = mitigation.rem @noMPCircuit() runCalibration(true) {resultSegmentSizes = array<i32: 1, 1, 1>} : () -> (tensor<4xf64>, tensor<4xf64>, tensor<4xf64>)
+    func.return %out#0, %out#1, %out#2 : tensor<4xf64>, tensor<4xf64>, tensor<4xf64>
+}
+
+// -----
+
+// The number of shots is extracted from a function argument, as in traced
+// programs, so it is not an arith.constant.
+func.func @dynamicShotsCircuit(%shots_t: tensor<i64>) -> tensor<10x1xf64> attributes {qnode} {
+    %shots = tensor.extract %shots_t[] : tensor<i64>
+    quantum.device shots(%shots) ["rtd_lightning.so", "LightningQubit", "{}"]
+    %r = quantum.alloc(1) : !quantum.reg
+    %obs = quantum.compbasis qreg %r : !quantum.obs
+    %samples = quantum.sample %obs : tensor<10x1xf64>
+    quantum.dealloc %r : !quantum.reg
+    quantum.device_release
+    func.return %samples : tensor<10x1xf64>
+}
+
+func.func @remDynamicShots(%shots_t: tensor<i64>) -> (tensor<10x1xf64>, tensor<10x1xf64>, tensor<10x1xf64>) {
+    // expected-error@+1 {{dynamic number of shots not supported currently}}
+    %out:3 = mitigation.rem @dynamicShotsCircuit(%shots_t) runCalibration(true) {resultSegmentSizes = array<i32: 1, 1, 1>} : (tensor<i64>) -> (tensor<10x1xf64>, tensor<10x1xf64>, tensor<10x1xf64>)
+    func.return %out#0, %out#1, %out#2 : tensor<10x1xf64>, tensor<10x1xf64>, tensor<10x1xf64>
+}
+
+// -----
+
+// 2^63 calibration probabilities do not fit the int64_t tensor shape.
+func.func @largeRegisterCircuit() -> tensor<2xf64> attributes {qnode} {
+    %shots = arith.constant 0 : i64
+    quantum.device shots(%shots) ["rtd_lightning.so", "LightningQubit", "{}"]
+    %r = quantum.alloc(63) : !quantum.reg
+    %q_0 = quantum.extract %r[ 0] : !quantum.reg -> !quantum.bit
+    %obs = quantum.compbasis qubits %q_0 : !quantum.obs
+    %probs = quantum.probs %obs : tensor<2xf64>
+    %r_0 = quantum.insert %r[ 0], %q_0 : !quantum.reg, !quantum.bit
+    quantum.dealloc %r_0 : !quantum.reg
+    quantum.device_release
+    func.return %probs : tensor<2xf64>
+}
+
+func.func @remLargeRegister() -> (tensor<2xf64>, tensor<?xf64>, tensor<?xf64>) {
+    // expected-error@+1 {{qubit count 63 exceeds maximum simulated register size (62 qubits)}}
+    %out:3 = mitigation.rem @largeRegisterCircuit() runCalibration(true) {resultSegmentSizes = array<i32: 1, 1, 1>} : () -> (tensor<2xf64>, tensor<?xf64>, tensor<?xf64>)
+    func.return %out#0, %out#1, %out#2 : tensor<2xf64>, tensor<?xf64>, tensor<?xf64>
+}
