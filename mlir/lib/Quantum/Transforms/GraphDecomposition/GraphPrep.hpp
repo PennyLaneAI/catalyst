@@ -58,6 +58,10 @@ std::unique_ptr<DecompGraph::Solver::DecompositionGraph>
 prepareGraph(mlir::ModuleOp module, llvm::ArrayRef<std::string> opIDs, const PrepOptions &opts,
              mlir::OwningOpRef<mlir::ModuleOp> &ruleLibrary);
 
+/// The name in a graphOpId, with its op-level modifiers, e.g. "2C(RX)" in
+/// "2C(RX){0:[f64]}{wires:1}{}".
+llvm::StringRef getGraphOpName(llvm::StringRef id);
+
 /// Import selected library rules and their transitive function dependencies.
 mlir::LogicalResult materializeSelectedLibraryRules(mlir::ModuleOp module,
                                                     mlir::ModuleOp ruleLibrary,

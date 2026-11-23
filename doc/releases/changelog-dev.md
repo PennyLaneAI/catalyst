@@ -1009,6 +1009,11 @@
 
 <h3>Bug fixes 🐛</h3>
 
+* The `resource-estimate` pass now keeps the number of control qubits in the names of the gates,
+  e.g. `2C(RX)`, as `resource-analysis` does. Gates with different numbers of control qubits were
+  counted together as `C(RX)`.
+  [(#3484)](https://github.com/PennyLaneAI/catalyst/pull/3484)
+
 * Subroutines converted by `convert-to-reference-semantics` now take registers of dynamic size,
   `!qref.reg<?>`, and call sites cast registers of static size with the new `qref.cast` operation.
   Decompose lowering casts the registers it passes to rules in the same way. Before, a
@@ -1234,6 +1239,9 @@
   [(#3409)](https://github.com/PennyLaneAI/catalyst/pull/3409)
 
 <h3>Internal changes ⚙️</h3>
+
+* Uses `AnnotatedQueue` and `QuantumScript` instead of the to-be-removed `QuantumTape`.
+  [(#3509)](https://github.com/PennyLaneAI/catalyst/pull/3509)
 
 * Updated `pylint` to version 4.1.3 in the development requirements and CI formatting workflow.
   [(#3459)](https://github.com/PennyLaneAI/catalyst/pull/3459)

@@ -377,7 +377,7 @@ class QJITDevice(qp.devices.Device):
                 ``catalyst_``.
 
         Returns:
-            CompilePipeline: A compile pipeline that when called returns QuantumTapes that can be
+            CompilePipeline: A compile pipeline that when called returns QuantumScripts that can be
                 compiled for the backend, and a postprocessing function to be called on the results
             ExecutionConfig: configuration with unset specifications filled in if relevant.
 

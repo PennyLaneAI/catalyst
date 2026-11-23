@@ -26,6 +26,7 @@ from typing import Callable, Sequence
 
 import numpy as np
 import pennylane2 as qp
+from pennylane2.core.qscript import QuantumScript
 from utils import print_jaxpr, print_mlir
 
 from catalyst import qjit
@@ -37,10 +38,10 @@ def test_multiple_tape_transforms():
     """
 
     def my_quantum_transform(
-        tape: qp.tape.QuantumTape,
-    ) -> (Sequence[qp.tape.QuantumTape], Callable):
+        tape: QuantumScript,
+    ) -> (Sequence[QuantumScript], Callable):
         tape1 = tape
-        tape2 = qp.tape.QuantumTape(
+        tape2 = QuantumScript(
             [qp.RY(tape1.operations[1].parameters[0] + 0.4, wires=0)], [qp.expval(qp.X(0))]
         )
 

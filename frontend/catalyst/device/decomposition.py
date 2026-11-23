@@ -25,6 +25,7 @@ from typing import Union
 import jax
 import pennylane2 as qp
 from pennylane2 import transform
+from pennylane2.core.qscript import QuantumScript
 from pennylane2.devices.capabilities import DeviceCapabilities
 from pennylane2.devices.preprocess import decompose
 from pennylane2.logging import debug_logger
@@ -112,7 +113,7 @@ def catalyst_decomposer(op, capabilities: DeviceCapabilities, grad_method: Union
 @transform
 @debug_logger
 def catalyst_decompose(
-    tape: qp.tape.QuantumTape,
+    tape: QuantumScript,
     capabilities: DeviceCapabilities,
     grad_method: str = None,
     target_gates=None,
@@ -188,7 +189,7 @@ def catalyst_decompose(
         if has_nested_tapes(op):
             op = _decompose_nested_tapes(op, capabilities, **decompose_kwargs)
         new_ops.append(op)
-    tape = qp.tape.QuantumScript(new_ops, tape.measurements, shots=tape.shots)
+    tape = QuantumScript(new_ops, tape.measurements, shots=tape.shots)
 
     return (tape,), lambda x: x[0]
 
@@ -236,11 +237,11 @@ def decompose_ops_to_unitary(tape, convert_to_matrix_ops):
     r"""Quantum transform that decomposes operations to unitary given a list of operations name.
 
     Args:
-        tape (QNode or QuantumTape or Callable): A quantum circuit.
+        tape (QNode or QuantumScript or Callable): A quantum circuit.
         convert_to_matrix_ops (list[str]): The list of operation names to be converted to unitary.
 
     Returns:
-        qnode (QNode) or quantum function (Callable) or tuple[List[QuantumTape], function]: The
+        qnode (QNode) or quantum function (Callable) or tuple[List[QuantumScript], function]: The
         transformed circuit as described in :func:`qp.transform <pennylane2.transform>`.
     """
     new_operations = []
@@ -260,7 +261,7 @@ def decompose_ops_to_unitary(tape, convert_to_matrix_ops):
 
     def null_postprocessing(results):
         """A postprocesing function returned by a transform that only converts the batch of results
-        into a result for a single ``QuantumTape``.
+        into a result for a single ``QuantumScript``.
         """
         return results[0]
 
@@ -301,12 +302,12 @@ def measurements_from_counts(tape, device_wires):
     functions for each original measurement.
 
     Args:
-        tape (QNode or QuantumTape or Callable): A quantum circuit.
+        tape (QNode or QuantumScript or Callable): A quantum circuit.
         device_wires (Wires): the wires from the device, for assessing what wires to use
             when a measurement applies to all wires.
 
     Returns:
-        qnode (QNode) or quantum function (Callable) or tuple[List[QuantumTape], function]: The
+        qnode (QNode) or quantum function (Callable) or tuple[List[QuantumScript], function]: The
         transformed circuit as described in :func:`qp.transform <pennylane2.transform>`.
 
     .. note::
@@ -374,10 +375,10 @@ def measurements_from_samples(tape, device_wires):
     functions for each original measurement.
 
     Args:
-        tape (QNode or QuantumTape or Callable): A quantum circuit.
+        tape (QNode or QuantumScript or Callable): A quantum circuit.
 
     Returns:
-        qnode (QNode) or quantum function (Callable) or tuple[List[QuantumTape], function]: The
+        qnode (QNode) or quantum function (Callable) or tuple[List[QuantumScript], function]: The
         transformed circuit as described in :func:`qp.transform <pennylane2.transform>`.
 
     .. note::
@@ -431,7 +432,7 @@ def _diagonalize_measurements(tape, device_wires):
     diagonalization and readout in the measurement basis.
 
     Args:
-        tape (QuantumTape): A quantum circuit.
+        tape (QuantumScript): A quantum circuit.
 
     Returns:
         new_operations (list): The original operations, plus the diagonalizing gates for the circuit

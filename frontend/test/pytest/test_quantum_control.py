@@ -34,6 +34,8 @@ from pennylane2 import adjoint as PL_adjoint
 from pennylane2 import cond
 from pennylane2 import ctrl as PL_ctrl
 from pennylane2 import for_loop, qjit, while_loop
+from pennylane2.core.qscript import QuantumScript
+from pennylane2.core.queuing import AnnotatedQueue
 from pennylane2.operation import (
     DecompositionUndefinedError,
     Operation,
@@ -42,7 +44,6 @@ from pennylane2.operation import (
     Wires,
 )
 from pennylane2.ops.op_math.controlled import Controlled
-from pennylane2.tape import QuantumTape
 
 from catalyst import adjoint as C_adjoint
 from catalyst import ctrl as C_ctrl
@@ -536,7 +537,7 @@ class TestCatalystOnlyControlled:
         """Test map wires."""
 
         X = HybridOpRegion(
-            quantum_tape=QuantumTape([qp.X(wires=[1])], []),
+            quantum_tape=QuantumScript([qp.X(wires=[1])], []),
             arg_classical_tracers=[],
             res_classical_tracers=[],
             trace=None,
@@ -1238,7 +1239,7 @@ class TestControlledQueuing:
 
     def test_queuing(self):
         """Test that `catalyst.ctrl` is queued upon initialization and updates base metadata."""
-        with qp.queuing.AnnotatedQueue() as q:
+        with AnnotatedQueue() as q:
             base = qp.Rot(1.234, 2.345, 3.456, wires=2)
             op = C_ctrl(base, (0, 1))
 
@@ -1249,7 +1250,7 @@ class TestControlledQueuing:
         """Test that base isn't added to queue if its defined outside the recording context."""
 
         base = qp.IsingXX(1.234, wires=(0, 1))
-        with qp.queuing.AnnotatedQueue() as q:
+        with AnnotatedQueue() as q:
             op = C_ctrl(base, ("a", "b"))
 
         assert len(q) == 1

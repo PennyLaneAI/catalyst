@@ -35,10 +35,10 @@ def test_split_multiple_tapes():
     dev = qp.device("lightning.qubit", wires=2)
 
     def my_quantum_transform(
-        tape: qp.tape.QuantumTape,
-    ) -> (Sequence[qp.tape.QuantumTape], Callable):
+        tape: qp.core.QuantumScript,
+    ) -> (Sequence[qp.core.QuantumScript], Callable):
         tape1 = tape
-        tape2 = qp.tape.QuantumTape(
+        tape2 = qp.core.QuantumScript(
             [qp.RY(tape1.operations[1].parameters[0] + 0.4, wires=0)], [qp.expval(qp.X(0))]
         )
 

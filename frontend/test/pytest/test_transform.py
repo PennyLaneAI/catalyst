@@ -1449,7 +1449,7 @@ def test_pattern_matching_optimization(backend):
         """Builder"""
 
         ops = [qp.S(0), qp.S(0), qp.Z(0)]
-        pattern = qp.tape.QuantumTape(ops)
+        pattern = qp.core.QuantumScript(ops)
 
         @partial(qp.transforms.pattern_matching_optimization, pattern_tapes=[pattern])
         @qp.qnode(qp.device(device_name, wires=5))

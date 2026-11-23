@@ -36,6 +36,8 @@ from jax._src.source_info_util import current as current_source_info
 from jax.api_util import debug_info as jdb
 from jax.core import Tracer, get_aval
 from pennylane2 import QubitUnitary, QueuingManager
+from pennylane2.core.qscript import QuantumScript
+from pennylane2.core.queuing import AnnotatedQueue
 from pennylane2.devices import QubitDevice
 from pennylane2.logging import debug_logger, debug_logger_init
 from pennylane2.measurements import (
@@ -49,7 +51,6 @@ from pennylane2.measurements import (
 )
 from pennylane2.operation import Operation, Operator, Wires
 from pennylane2.ops import Adjoint, Controlled, ControlledOp, ControlledOp2
-from pennylane2.tape import QuantumTape
 
 import catalyst
 from catalyst.api_extensions.callbacks import MemrefCallable
@@ -470,7 +471,7 @@ class HybridOpRegion:
     """
 
     trace: Optional[DynamicJaxprTrace]
-    quantum_tape: Optional[QuantumTape]
+    quantum_tape: Optional[QuantumScript]
     arg_classical_tracers: List[DynamicJaxprTracer]
     res_classical_tracers: List[DynamicJaxprTracer]
 
@@ -813,7 +814,7 @@ def trace_snapshot_op(
 # pylint: disable=too-many-arguments,too-many-statements
 @debug_logger
 def trace_quantum_operations(
-    quantum_tape: QuantumTape,
+    quantum_tape: QuantumScript,
     device: QubitDevice,
     qreg: DynamicJaxprTracer,
     ctx,
@@ -1491,7 +1492,7 @@ def _get_total_shots(qnode):
 
 
 def _construct_output_with_classical_values(
-    tape: QuantumTape, return_values_flat: List[Any]
+    tape: QuantumScript, return_values_flat: List[Any]
 ) -> Tuple[List[Any], List[int], int]:
     classical_values = []
     classical_return_indices = []
@@ -1530,7 +1531,6 @@ def _trace_classical_phase(
         ClassicalTraceResult: Results for quantum tracing phase
     """
     shots = qnode._shots  # pylint: disable=protected-access
-    quantum_tape = QuantumTape(shots=shots)  # pylint: disable=protected-access
     with EvaluationContext.frame_tracing_context(debug_info=debug_info) as trace:
         wffa, in_avals, keep_inputs, out_tree_promise = deduce_avals(
             f, args, kwargs, static_argnums, debug_info
@@ -1538,10 +1538,11 @@ def _trace_classical_phase(
         in_classical_tracers = _input_type_to_tracers(
             partial(trace.new_arg, source_info=current_source_info()), in_avals
         )
-        with QueuingManager.stop_recording(), quantum_tape:
+        with QueuingManager.stop_recording(), AnnotatedQueue() as queue:
             # Quantum tape transformations happen at the end of tracing
             in_classical_tracers = [t for t, k in zip(in_classical_tracers, keep_inputs) if k]
             return_values_flat = wffa.call_wrapped(*in_classical_tracers)
+        quantum_tape = QuantumScript.from_queue(queue, shots=shots)
         # Ans contains the leaves of the pytree (empty for measurement without
         # data https://github.com/PennyLaneAI/pennylane/pull/4607)
         # Therefore we need to compute the tree with measurements as leaves and it comes

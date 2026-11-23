@@ -23,6 +23,7 @@ import pennylane2.numpy as pnp
 import pytest
 from numpy.testing import assert_allclose
 from pennylane2 import adjoint, cond, for_loop, qjit, while_loop
+from pennylane2.core.queuing import AnnotatedQueue
 from pennylane2.ops.op_math.adjoint import Adjoint, AdjointOperation
 
 import catalyst
@@ -1199,7 +1200,7 @@ class TestQueueing:
         """Test queuing and metadata when both Adjoint and base defined inside a recording
         context."""
 
-        with qp.queuing.AnnotatedQueue() as q:
+        with AnnotatedQueue() as q:
             base = qp.Rot(1.2345, 2.3456, 3.4567, wires="b")
             _ = adjoint(base)
 
@@ -1210,7 +1211,7 @@ class TestQueueing:
         """Test that base isn't added to queue if it's defined outside the recording context."""
 
         base = qp.Rot(1.2345, 2.3456, 3.4567, wires="b")
-        with qp.queuing.AnnotatedQueue() as q:
+        with AnnotatedQueue() as q:
             op = adjoint(base)
 
         assert len(q) == 1
@@ -1428,7 +1429,7 @@ class TestAdjointConstructorPreconstructedOp:
     @pytest.mark.parametrize("base", (qp.IsingXX(1.23, wires=("c", "d")), qp.QFT(wires=(0, 1, 2))))
     def test_single_op(self, base):
         """Test passing a single preconstructed op in a queuing context."""
-        with qp.queuing.AnnotatedQueue() as q:
+        with AnnotatedQueue() as q:
             base.queue()
             out = adjoint(base)
 
@@ -1438,7 +1439,7 @@ class TestAdjointConstructorPreconstructedOp:
     def test_single_observable(self):
         """Test passing a single preconstructed observable in a queuing context."""
 
-        with qp.queuing.AnnotatedQueue() as q:
+        with AnnotatedQueue() as q:
             base = qp.Hermitian([[1, 0], [0, 1]], wires=0)
             out = adjoint(base)
 
@@ -1457,7 +1458,7 @@ class TestAdjointConstructorDifferentCallableTypes:
     def test_adjoint_single_op_function(self):
         """Test the adjoint transform on a single operation."""
 
-        with qp.queuing.AnnotatedQueue() as q:
+        with AnnotatedQueue() as q:
             out = adjoint(qp.RX)(1.234, wires=0)
 
         tape = qp.tape.QuantumScript.from_queue(q)
@@ -1468,7 +1469,7 @@ class TestAdjointConstructorDifferentCallableTypes:
     def test_adjoint_template(self):
         """Test the adjoint transform on a template."""
 
-        with qp.queuing.AnnotatedQueue() as q:
+        with AnnotatedQueue() as q:
             out = adjoint(qp.QFT)(wires=(0, 1, 2))
 
         tape = qp.tape.QuantumScript.from_queue(q)
@@ -1490,7 +1491,7 @@ class TestAdjointConstructorDifferentCallableTypes:
         x = 1.23
         y = 2.34
         z = 3.45
-        with qp.queuing.AnnotatedQueue() as q:
+        with AnnotatedQueue() as q:
             out = adjoint(func)(x, y, z)
 
         tape = qp.tape.QuantumScript.from_queue(q)
@@ -1512,7 +1513,7 @@ class TestAdjointConstructorDifferentCallableTypes:
     def test_nested_adjoint(self):
         """Test the adjoint transform on an adjoint transform."""
         x = 4.321
-        with qp.queuing.AnnotatedQueue() as q:
+        with AnnotatedQueue() as q:
             out = adjoint(adjoint(qp.RX))(x, wires=1)
 
         tape = qp.tape.QuantumScript.from_queue(q)
