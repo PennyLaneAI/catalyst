@@ -1005,6 +1005,11 @@
 
 <h3>Bug fixes 🐛</h3>
 
+* The `resource-estimate` pass now keeps the number of control qubits in the names of the gates,
+  e.g. `2C(RX)`, as `resource-analysis` does. Gates with different numbers of control qubits were
+  counted together as `C(RX)`.
+  [(#3484)](https://github.com/PennyLaneAI/catalyst/pull/3484)
+
 * Subroutines converted by `convert-to-reference-semantics` now take registers of dynamic size,
   `!qref.reg<?>`, and call sites cast registers of static size with the new `qref.cast` operation.
   Decompose lowering casts the registers it passes to rules in the same way. Before, a
