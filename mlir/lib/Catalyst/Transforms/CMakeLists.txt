@@ -1,6 +1,7 @@
 set(LIBRARY_NAME catalyst-transforms)
 
 file(GLOB SRC
+    AnnotateBufferOwnership.cpp
     ApplyTransformSequencePass.cpp
     ArrayListToMemRefPass.cpp
     AsyncUtils.cpp

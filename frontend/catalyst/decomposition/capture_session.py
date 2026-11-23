@@ -132,7 +132,8 @@ class TracedRule:
 
     Attributes:
         prepared_rule_fn: Adapted rule callable retained for naming and lowering the function.
-        closed_jaxpr: Converted Catalyst JAXPR containing the rule body.
+        closed_jaxpr: Converted Catalyst JAXPR containing the rule body, or an empty JAXPR
+            retaining only its signature when body compilation is skipped.
         target_gate: Full GraphOpID of the operation decomposed by the rule.
         resources: GraphOpID-to-multiplicity mapping produced by the rule.
         frontend_name: PennyLane rule name used for fixed and alternative rule selection.
@@ -159,12 +160,14 @@ class DecompositionScope:
     Attributes:
         roots: Map of (base) GraphOpID to a request object and observed modifier states.
         definitions: Map of rule identifiers to traced rules, in first-seen order.
+        estimate_decomps: Whether to prepare rules for resource estimation without tracing bodies.
     """
 
     roots: dict[SerializedGraphOpID, tuple[OpDecompRequest, set[ModifierState]]] = field(
         default_factory=dict
     )
     definitions: dict[RuleIdentity, TracedRule] = field(default_factory=dict)
+    estimate_decomps: bool = False
 
     def record_root(self, request: OpDecompRequest) -> None:
         """Record root nodes for later decomp rule capture, which are explored recursively."""
