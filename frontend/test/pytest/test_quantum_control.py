@@ -34,6 +34,7 @@ from pennylane import adjoint as PL_adjoint
 from pennylane import cond
 from pennylane import ctrl as PL_ctrl
 from pennylane import for_loop, qjit, while_loop
+from pennylane.core.qscript import QuantumScript
 from pennylane.operation import (
     DecompositionUndefinedError,
     Operation,
@@ -42,7 +43,6 @@ from pennylane.operation import (
     Wires,
 )
 from pennylane.ops.op_math.controlled import Controlled
-from pennylane.tape import QuantumTape
 
 from catalyst import adjoint as C_adjoint
 from catalyst import ctrl as C_ctrl
@@ -536,7 +536,7 @@ class TestCatalystOnlyControlled:
         """Test map wires."""
 
         X = HybridOpRegion(
-            quantum_tape=QuantumTape([qp.X(wires=[1])], []),
+            quantum_tape=QuantumScript([qp.X(wires=[1])], []),
             arg_classical_tracers=[],
             res_classical_tracers=[],
             trace=None,

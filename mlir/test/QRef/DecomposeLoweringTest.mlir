@@ -985,3 +985,90 @@ module @test_while_loop {
 
   // CALL: func.func private @"__builtin__t_phaseshift_T{}{wires:1}{}_0"
 }
+
+// -----
+
+// Rule wires follow group-name order, with control work wires last.
+// The physical operand order differs, and q0 belongs to both base groups.
+// ALL-LABEL: func.func @shared_groups
+// CALL-DAG: [[WIRES:%.+]] = arith.constant dense<[0, 1, 2, 0, 4]> : tensor<5xi64>
+// CALL-DAG: [[CONTROLS:%.+]] = arith.constant dense<3> : tensor<1xi64>
+// CALL-DAG: [[VALUES:%.+]] = arith.constant dense<true> : tensor<1xi1>
+// CALL: [[REG:%.+]] = quantum.alloc( 5)
+// CALL-NOT: quantum.operator
+// CALL: [[OUT:%.+]] = call @shared_rule_0([[WIRES]], [[CONTROLS]], [[VALUES]], [[REG]])
+// CALL-NOT: quantum.operator
+// CALL: quantum.dealloc [[OUT]]
+// INLINE: [[TRUE:%.+]] = arith.constant true
+// INLINE: [[REG:%.+]] = quantum.alloc( 5)
+// INLINE-DAG: [[Q0:%.+]] = quantum.extract [[REG]][ 0]
+// INLINE-DAG: [[Q1:%.+]] = quantum.extract [[REG]][ 1]
+// INLINE-DAG: [[WORK:%.+]] = quantum.extract [[REG]][ 4]
+// INLINE-DAG: [[CTRL:%.+]] = quantum.extract [[REG]][ 3]
+// INLINE: [[A_OUT:%.+]]:3, [[A_CTRL:%.+]] = quantum.custom "Terminal"() [[Q0]], [[Q1]], [[WORK]] ctrls([[CTRL]]) ctrlvals([[TRUE]])
+// INLINE: [[Q2:%.+]] = quantum.extract [[REG]][ 2]
+// INLINE: [[R0:%.+]] = quantum.insert [[REG]][ 1], [[A_OUT]]#1
+// INLINE: [[R1:%.+]] = quantum.insert [[R0]][ 4], [[A_OUT]]#2
+// INLINE: [[Z_OUT:%.+]]:2, [[Z_CTRL:%.+]] = quantum.custom "Terminal"() [[Q2]], [[A_OUT]]#0 ctrls([[A_CTRL]]) ctrlvals([[TRUE]])
+// INLINE: [[R2:%.+]] = quantum.insert [[R1]][ 2], [[Z_OUT]]#0
+// INLINE: [[R3:%.+]] = quantum.insert [[R2]][ 0], [[Z_OUT]]#1
+// INLINE: [[R4:%.+]] = quantum.insert [[R3]][ 3], [[Z_CTRL]]
+// INLINE: quantum.dealloc [[R4]]
+func.func @shared_groups() attributes {quantum.node} {
+  %true = arith.constant true
+  %r = quantum.alloc(5) : !quantum.reg
+  %q2 = quantum.extract %r[2] : !quantum.reg -> !quantum.bit
+  %q0 = quantum.extract %r[0] : !quantum.reg -> !quantum.bit
+  %q1 = quantum.extract %r[1] : !quantum.reg -> !quantum.bit
+  %work = quantum.extract %r[4] : !quantum.reg -> !quantum.bit
+  %ctrl = quantum.extract %r[3] : !quantum.reg -> !quantum.bit
+  %out:4, %ctrl_out = quantum.operator "Composite"() qubits(%q2, %q0, %q1, %work)
+    ctrls(%ctrl) ctrl_vals(%true)
+    static_data = {ctrl_work_wire_type = "borrowed"}
+    qubit_map = {a_reg = [1, 2], ctrl_work_wires = [3], empty = [], z_reg = [0, 1]}
+  %r0 = quantum.insert %r[2], %out#0 : !quantum.reg, !quantum.bit
+  %r1 = quantum.insert %r0[0], %out#1 : !quantum.reg, !quantum.bit
+  %r2 = quantum.insert %r1[1], %out#2 : !quantum.reg, !quantum.bit
+  %r3 = quantum.insert %r2[4], %out#3 : !quantum.reg, !quantum.bit
+  %r4 = quantum.insert %r3[3], %ctrl_out : !quantum.reg, !quantum.bit
+  quantum.dealloc %r4 : !quantum.reg
+  return
+}
+
+func.func private @shared_rule(%r: !quantum.reg, %wires: tensor<5xi64>, %ctrls: tensor<1xi64>, %values: tensor<1xi1>) -> !quantum.reg
+    attributes {target_gate = "1C(Composite){}{a_reg:2,ctrl_work_wires:1,empty:0,z_reg:2}{ctrl_work_wire_type = \22borrowed\22}"} {
+  %i0 = arith.constant 0 : index
+  %i1 = arith.constant 1 : index
+  %i2 = arith.constant 2 : index
+  %i3 = arith.constant 3 : index
+  %i4 = arith.constant 4 : index
+  %a0 = tensor.extract %wires[%i0] : tensor<5xi64>
+  %a1 = tensor.extract %wires[%i1] : tensor<5xi64>
+  %z0 = tensor.extract %wires[%i2] : tensor<5xi64>
+  %z1 = tensor.extract %wires[%i3] : tensor<5xi64>
+  %work = tensor.extract %wires[%i4] : tensor<5xi64>
+  %ctrl = tensor.extract %ctrls[%i0] : tensor<1xi64>
+  %value = tensor.extract %values[%i0] : tensor<1xi1>
+
+  %qa0 = quantum.extract %r[%a0] : !quantum.reg -> !quantum.bit
+  %qa1 = quantum.extract %r[%a1] : !quantum.reg -> !quantum.bit
+  %qw = quantum.extract %r[%work] : !quantum.reg -> !quantum.bit
+  %qc = quantum.extract %r[%ctrl] : !quantum.reg -> !quantum.bit
+  %a_out:3, %a_ctrl_out = quantum.custom "Terminal"() %qa0, %qa1, %qw
+    ctrls(%qc) ctrlvals(%value) : !quantum.bit, !quantum.bit, !quantum.bit ctrls !quantum.bit
+  %r0 = quantum.insert %r[%a0], %a_out#0 : !quantum.reg, !quantum.bit
+  %r1 = quantum.insert %r0[%a1], %a_out#1 : !quantum.reg, !quantum.bit
+  %r2 = quantum.insert %r1[%work], %a_out#2 : !quantum.reg, !quantum.bit
+  %r3 = quantum.insert %r2[%ctrl], %a_ctrl_out : !quantum.reg, !quantum.bit
+
+  // The second group must read the shared wire's updated value from the register.
+  %qz0 = quantum.extract %r3[%z0] : !quantum.reg -> !quantum.bit
+  %qz1 = quantum.extract %r3[%z1] : !quantum.reg -> !quantum.bit
+  %qc1 = quantum.extract %r3[%ctrl] : !quantum.reg -> !quantum.bit
+  %z_out:2, %z_ctrl_out = quantum.custom "Terminal"() %qz0, %qz1
+    ctrls(%qc1) ctrlvals(%value) : !quantum.bit, !quantum.bit ctrls !quantum.bit
+  %r4 = quantum.insert %r3[%z0], %z_out#0 : !quantum.reg, !quantum.bit
+  %r5 = quantum.insert %r4[%z1], %z_out#1 : !quantum.reg, !quantum.bit
+  %r6 = quantum.insert %r5[%ctrl], %z_ctrl_out : !quantum.reg, !quantum.bit
+  return %r6 : !quantum.reg
+}
