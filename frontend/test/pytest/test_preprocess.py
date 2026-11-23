@@ -22,7 +22,7 @@ import pytest
 from pennylane.decomposition import add_decomps, register_resources
 from pennylane.devices import Device, NullQubit
 from pennylane.devices.capabilities import DeviceCapabilities, OperatorProperties
-from pennylane.ops.op_math.adjoint2 import _adjoint_negate_angle as adjoint_rotation2
+from pennylane.ops.op_math.adjoint2 import adjoint_rotation as adjoint_rotation2
 from pennylane.tape import QuantumScript
 from utils import CONFIG_CUSTOM_DEVICE
 
