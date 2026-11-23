@@ -871,3 +871,19 @@ module @outer {
 
 // Tools may process a quantum kernel module on its own, so the attribute is also valid there.
 func.func private @kernel_entry() attributes {quantum.kernel_entry_point}
+
+// -----
+
+func.func @value_map_out_of_bounds(%q: !quantum.bit) -> !quantum.bit {
+  // expected-error@+1 {{qubit_map index is out of bounds}}
+  %out = quantum.operator "Composite"() qubits(%q) qubit_map = {compute = [-1]}
+  return %out : !quantum.bit
+}
+
+// -----
+
+func.func @value_map_missing_qubit(%q0: !quantum.bit, %q1: !quantum.bit) -> (!quantum.bit, !quantum.bit) {
+  // expected-error@+1 {{qubit_map must cover all qubit values}}
+  %out:2 = quantum.operator "Composite"() qubits(%q0, %q1) qubit_map = {compute = [0]}
+  return %out#0, %out#1 : !quantum.bit, !quantum.bit
+}

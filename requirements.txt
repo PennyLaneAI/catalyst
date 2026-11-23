@@ -18,7 +18,7 @@ ninja
 
 # formatting/linting
 pre-commit
-black==26.3.1
+black==26.10.1
 clang-format~=20.1
 clang-tidy~=20.1
 pylint~=4.1.3

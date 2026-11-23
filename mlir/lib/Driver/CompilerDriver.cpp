@@ -17,7 +17,6 @@
 #include <algorithm>
 #include <cassert>
 #include <filesystem>
-#include <iostream>
 #include <list>
 #include <memory>
 #include <optional>
@@ -34,6 +33,7 @@
 #include "llvm/Passes/PassBuilder.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/InitLLVM.h"
+#include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/SourceMgr.h"
 #include "llvm/Support/TargetSelect.h"
 #include "llvm/Support/ToolOutputFile.h"
@@ -347,22 +347,14 @@ llvm::LogicalResult catalyst::driver::runEnzymePasses(const CompilerOptions &opt
 }
 
 std::string catalyst::driver::readInputFile(const std::string &filename) {
-    if (filename == "-") {
-        if (llvm::errs().is_displayed()) {
-            llvm::errs() << "(processing input from stdin now, hit ctrl-c/ctrl-d to interrupt)\n";
-        }
-        std::stringstream buffer;
-        std::istreambuf_iterator<char> begin(std::cin), end;
-        buffer << std::string(begin, end);
-        return buffer.str();
+    if (filename == "-" && llvm::errs().is_displayed()) {
+        llvm::errs() << "(processing input from stdin now, hit ctrl-c/ctrl-d to interrupt)\n";
     }
-    std::ifstream file(filename);
-    if (!file.is_open()) {
+    auto buffer = llvm::MemoryBuffer::getFileOrSTDIN(filename);
+    if (!buffer) {
         return "";
     }
-    std::stringstream buffer;
-    buffer << file.rdbuf();
-    return buffer.str();
+    return (*buffer)->getBuffer().str();
 }
 
 [[nodiscard]] llvm::LogicalResult
