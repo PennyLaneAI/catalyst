@@ -906,6 +906,88 @@ def HermitianOp : Observable_Op<"hermitian"> {
 
 // -----
 
+def MeasurementOp : QRef_Op<"measurement", [
+        MeasurementProcess, AttrSizedOperandSegments,
+        DeclareOpInterfaceMethods<ResourceQuantumOpInterface>]> {
+    let summary = "A generic mid-circuit measurement with classical results.";
+    let description = [{
+        Represents a named measurement with arbitrary classical parameters and
+        compilable static inputs in `static_data`. Parameters and classical
+        results may have any non-quantum type, and either list may be empty.
+
+        Like `qref.operator`, this operation supports explicit qubit references
+        or a register reference with index tensors selecting the measured wires.
+        These modes cannot be mixed, and at least one target qubit or index
+        array is required. The quantum references are updated in place; only
+        classical results are returned, with caller-specified types always
+        written in parentheses. The operation has measurement effects even when
+        its results are unused.
+
+        Optional frontend-level metadata:
+          * `param_map` — maps frontend argument names to the lowered `params` operand positions
+          * `qubit_map` — maps frontend argument names to lowered qubit/index-array positions
+
+        ```mlir
+        %m = qref.measurement "MeasureInBasis"(%angle: f64)
+            qubits(%q) static_data = {plane = "XY"}
+            param_map = {angle = [0]} qubit_map = {wires = [0]} : (i1)
+
+        %bits = qref.measurement "MeasureMany"()
+            quregs(%reg: !qref.reg<?>) indices(%wires: tensor<?xi64>)
+            : (tensor<?xi1>)
+
+        // Note: PPM example shown below is the 1:1 lowering to the corresponding example in PPMeasurementOp.
+        %result = qref.measurement "PauliMeasure"()
+            qubits(%q0, %q1, %q2)
+            static_data = {pauli_word = "XIZ"} : (i1)
+        ```
+
+        An empty classical result list is written `: ()` when targets are
+        present. Measurement names and static data are interpreted by
+        downstream lowering passes. This operation implements
+        `quantum::MeasurementProcess`; terminal result extraction uses the
+        observable-based `quantum::TerminalMeasurement` interface.
+    }];
+
+    let arguments = (ins
+        StrAttr:$op_name,
+        Variadic<AnyType>:$params,
+        Variadic<QubitRefType>:$qubits,
+        Optional<QuregRefType>:$qreg,
+        Variadic<1DTensorOf<[I64]>>:$arr_qubit_indices,
+        DefaultValuedOptionalAttr<DictionaryAttr, "{}">:$static_data,
+        DefaultValuedOptionalAttr<I64ArrayDictAttr, "{}">:$param_map,
+        DefaultValuedOptionalAttr<I64ArrayDictAttr, "{}">:$qubit_map
+    );
+
+    let results = (outs Variadic<AnyType>:$mres);
+
+    let builders = [
+        OpBuilder<(ins
+            "mlir::TypeRange":$mres,
+            "llvm::StringRef":$op_name,
+            "mlir::ValueRange":$params,
+            "mlir::ValueRange":$qubits,
+            CArg<"mlir::DictionaryAttr", "nullptr">:$static_data,
+            CArg<"mlir::DictionaryAttr", "nullptr">:$param_map,
+            CArg<"mlir::DictionaryAttr", "nullptr">:$qubit_map
+        )>,
+        OpBuilder<(ins
+            "mlir::TypeRange":$mres,
+            "llvm::StringRef":$op_name,
+            "mlir::ValueRange":$params,
+            "mlir::Value":$qreg,
+            "mlir::ValueRange":$arr_qubit_indices,
+            CArg<"mlir::DictionaryAttr", "nullptr">:$static_data,
+            CArg<"mlir::DictionaryAttr", "nullptr">:$param_map,
+            CArg<"mlir::DictionaryAttr", "nullptr">:$qubit_map
+        )>
+    ];
+
+    let hasVerifier = 1;
+    let hasCustomAssemblyFormat = 1;
+}
+
 def MeasureOp : QRef_Op<"measure", [DeclareOpInterfaceMethods<ResourceQuantumOpInterface>]> {
     let summary = "A single-qubit projective measurement in the computational basis.";
     let description = [{
