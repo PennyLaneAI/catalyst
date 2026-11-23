@@ -24,6 +24,7 @@
 #include <ios>
 #include <iostream>
 #include <ratio>
+#include <sstream>
 #include <string>
 #include <string_view>
 #include <sys/time.h>
@@ -71,9 +72,23 @@ template <IsRatio Duration = std::milli> class CPUTimeInstance {
     timespec t;
 };
 
+/// Width of the stage-name column in the diagnostics console output.
+inline constexpr int DIAGNOSTICS_NAME_WIDTH = 32;
+/// Width of the walltime and cputime value columns in the diagnostics console output.
+inline constexpr int DIAGNOSTICS_VALUE_WIDTH = 12;
+
+/// Format a duration in milliseconds as "<value> ms" with three decimals.
+inline std::string formatMilliseconds(double milliseconds) {
+    std::ostringstream stream;
+    stream << std::fixed << std::setprecision(3) << milliseconds << " ms";
+    return stream.str();
+}
+
 template <IsRatio Duration = std::milli> static inline double getClock() {
     CPUTimeInstance<std::nano> t;
-    return static_cast<double>(t.getTime()) * (Duration::den / std::nano::den);
+    // Scale in floating point: Duration::den / std::nano::den is 0 in integer arithmetic for
+    // any Duration coarser than nanoseconds, which made every CPU time 0.
+    return t.getTime() * (static_cast<double>(Duration::den) / std::nano::den);
 }
 
 /**
@@ -140,14 +155,17 @@ template <IsRatio Duration = std::milli> class Timer {
     void print(const std::string &name, bool add_endl = true) noexcept {
         // Convert nanoseconds (long) to milliseconds (double)
         const auto wall_elapsed = static_cast<double>(elapsed().count()) / 1e6;
-        const auto cpu_elapsed =
-            (stop_cpu_time_ - start_cpu_time_) * (Duration::den / std::nano::den);
+        // getClock() already returns the CPU time in Duration units.
+        const auto cpu_elapsed = stop_cpu_time_ - start_cpu_time_;
 
-        std::cerr << "[DIAGNOSTICS] Running " << std::setw(23) << std::left << name;
-        std::cerr << "\t" << std::fixed << "walltime: " << std::setprecision(3) << wall_elapsed
-                  << std::fixed << " ms";
-        std::cerr << "\t" << std::fixed << "cputime: " << std::setprecision(3) << cpu_elapsed
-                  << std::fixed << " ms";
+        // Same column widths as the frontend's console output (catalyst/debug/instruments.py), so
+        // that the lines of both line up.
+        std::cerr << "[DIAGNOSTICS] Running " << std::setw(DIAGNOSTICS_NAME_WIDTH) << std::left
+                  << name;
+        std::cerr << "\t" << "walltime: " << std::setw(DIAGNOSTICS_VALUE_WIDTH) << std::left
+                  << formatMilliseconds(wall_elapsed);
+        std::cerr << "\t" << "cputime: " << std::setw(DIAGNOSTICS_VALUE_WIDTH) << std::left
+                  << formatMilliseconds(cpu_elapsed);
         if (add_endl) {
             std::cerr << "\n";
         }
@@ -156,8 +174,8 @@ template <IsRatio Duration = std::milli> class Timer {
     void store(const std::string &name, const std::filesystem::path &file_path) {
         // Convert nanoseconds (long) to milliseconds (double)
         const auto wall_elapsed = static_cast<double>(elapsed().count()) / 1e6;
-        const auto cpu_elapsed =
-            (stop_cpu_time_ - start_cpu_time_) * (Duration::den / std::nano::den);
+        // getClock() already returns the CPU time in Duration units.
+        const auto cpu_elapsed = stop_cpu_time_ - start_cpu_time_;
 
         const std::string_view key_padding = "          ";
         const std::string_view val_padding = "              ";

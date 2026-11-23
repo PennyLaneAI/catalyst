@@ -1005,6 +1005,13 @@
 
 <h3>Bug fixes 🐛</h3>
 
+* The `catalyst.debug.instrumentation` console output lines up in columns again, and the compiler
+  now reports CPU times. Lines printed by the frontend and by the compiler use the same column
+  widths, and the name column is wide enough for stage names such as
+  `MLIRToLLVMDialectConversion`. The compiler's CPU time was always 0, because its
+  nanosecond-to-millisecond scale factor was computed with integer division.
+  [(#PRNUM)](https://github.com/PennyLaneAI/catalyst/pull/PRNUM)
+
 * Subroutines converted by `convert-to-reference-semantics` now take registers of dynamic size,
   `!qref.reg<?>`, and call sites cast registers of static size with the new `qref.cast` operation.
   Decompose lowering casts the registers it passes to rules in the same way. Before, a
@@ -1590,6 +1597,7 @@ Rylan Malarchick,
 Mehrdad Malekmohammadi,
 River McCubbin,
 Mudit Pandey,
+Rahul,
 Shuli Shu,
 Nikhil Sreekumar,
 Kalman Szenes,
