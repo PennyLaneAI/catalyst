@@ -139,6 +139,7 @@ jobs:
     - name: Install Catalyst (stable)
       if: ${{ inputs.catalyst == 'stable' }}
       run: |
+        sudo apt-get update
         sudo apt-get install -y graphviz
         pip install pennylane-catalyst
 
@@ -177,6 +178,7 @@ jobs:
         # This is the first for the three rc installs
         # Thus this one shouldn't have no-deps: it needs to pull in all PL dependencies
         # And also this one needs to be --extra-index-url because it needs to see regular PyPI
+        sudo apt-get update
         sudo apt-get install -y graphviz
         pip install --extra-index-url https://test.pypi.org/simple/ pennylane-catalyst'>=0.15.0rc0,<=0.15.0'
 
