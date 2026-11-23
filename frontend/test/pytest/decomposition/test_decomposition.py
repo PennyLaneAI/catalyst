@@ -864,9 +864,7 @@ class TestGenericUtilities:
         with qp.capture.toggle_ctx(False):
             collected_rules = collect_resources_for_op("RZ", kwargs, is_custom_op=True)
 
-        collected = next(
-            rule for rule in collected_rules if rule.source_rule.name == "to_rx_cliff"
-        )
+        collected = next(rule for rule in collected_rules if rule.source_rule.name == "to_rx_cliff")
         basis_change = qp.ops.ChangeOpBasis2(qp.H(Wire[1]), qp.RX(Float, Wire[1]), qp.H(Wire[1]))
         assert collected.resource_counts_by_op == {basis_change: 1}
         assert collected.resource_counts_by_id == {GraphOpID(basis_change).getGraphOpId(): 1}
