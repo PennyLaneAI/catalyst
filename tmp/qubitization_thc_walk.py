@@ -20,9 +20,9 @@ from pennylane.templates.subroutines.qubitization_thc import _qubitization_thc_d
 registers = qp.registers(qp.qubitization_thc_wires(M=1, N=2, aleph=1, beth=1))
 for name, wires in registers.items():
     if name == "prep_garbage_wires":
-        labels = [
-            rf"$\mathrm{{garbage}}_{{{i}}}$" for i in range(len(wires) - 2)
-        ] + [rf"$\mathrm{{spin}}_{{{i}}}$" for i in range(2)]
+        labels = [rf"$\mathrm{{garbage}}_{{{i}}}$" for i in range(len(wires) - 2)] + [
+            rf"$\mathrm{{spin}}_{{{i}}}$" for i in range(2)
+        ]
     else:
         prefix = name.removesuffix("_wires")
         labels = [rf"$\mathrm{{{prefix}}}_{{{i}}}$" for i in range(len(wires))]
@@ -30,22 +30,34 @@ for name, wires in registers.items():
 wire_order = qp.wires.Wires.all_wires(list(registers.values()))
 
 gate_set = {
-    qp.SuperpositionTHC, qp.AliasSamplingTHC, qp.SelectTHC,
-    "Adjoint(SuperpositionTHC)", "Adjoint(AliasSamplingTHC)",
-    qp.Hadamard, qp.Z, qp.FlipSign, qp.GlobalPhase,
+    qp.SuperpositionTHC,
+    qp.AliasSamplingTHC,
+    qp.SelectTHC,
+    "Adjoint(SuperpositionTHC)",
+    "Adjoint(AliasSamplingTHC)",
+    qp.Hadamard,
+    qp.Z,
+    qp.FlipSign,
+    qp.GlobalPhase,
 }
 
 qp.decomposition.enable_graph()
 
 
 @qp.transforms._tape_decompose(
-    gate_set=gate_set, fixed_decomps={qp.QubitizationTHC: _qubitization_thc_decomp},
+    gate_set=gate_set,
+    fixed_decomps={qp.QubitizationTHC: _qubitization_thc_decomp},
 )
 @qp.qnode(qp.device("null.qubit"))
 def circuit():
     qp.QubitizationTHC(
-        zeta=((1.0,),), t_ell=(0.5,), chi=((1.0,),), t_eigenvectors=((1.0,),),
-        aleph=1, beth=1, **registers,
+        zeta=((1.0,),),
+        t_ell=(0.5,),
+        chi=((1.0,),),
+        t_eigenvectors=((1.0,),),
+        aleph=1,
+        beth=1,
+        **registers,
     )
     return qp.state()
 
@@ -53,7 +65,9 @@ def circuit():
 if __name__ == "__main__":
     tape = qp.workflow.construct_tape(circuit, level="user")()
     qp.drawer.tape_mpl(
-        tape.copy(measurements=[]), wire_order=wire_order,
-        show_all_wires=True, style="pennylane",
+        tape.copy(measurements=[]),
+        wire_order=wire_order,
+        show_all_wires=True,
+        style="pennylane",
     )
     plt.show()

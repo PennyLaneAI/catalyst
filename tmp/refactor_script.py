@@ -1,9 +1,10 @@
 """Script to refactor _resources function signatures in parametric_ops_single_qubit.py"""
+
 import re
 
 filepath = "../pennylane/ops/qubit/parametric_ops_single_qubit.py"
 
-with open(filepath, 'r') as f:
+with open(filepath, "r") as f:
     content = f.read()
 
 # Map of function name pattern -> new signature params
@@ -22,21 +23,22 @@ replacements = [
     ("def _rz_to_rx_cliff_resources():", "def _rz_to_rx_cliff_resources(phi, wires):"),
     ("def _rz_to_ry_cliff_resources():", "def _rz_to_ry_cliff_resources(phi, wires):"),
     ("def _rz_to_ppr_resources():", "def _rz_to_ppr_resources(phi, wires):"),
-
     # PhaseShift resources
     ("def _phaseshift_to_rz_gp_resources():", "def _phaseshift_to_rz_gp_resources(phi, wires):"),
-
     # Rot resources
-    ("def _rot_to_rz_ry_rz_resources():", "def _rot_to_rz_ry_rz_resources(phi, theta, omega, wires):"),
-
+    (
+        "def _rot_to_rz_ry_rz_resources():",
+        "def _rot_to_rz_ry_rz_resources(phi, theta, omega, wires):",
+    ),
     # U1 resources
     ("def _u1_phaseshift_resources():", "def _u1_phaseshift_resources(phi, wires):"),
-
     # U2 resources
     ("def _u2_phaseshift_rot_resources():", "def _u2_phaseshift_rot_resources(phi, delta, wires):"),
-
     # U3 resources
-    ("def _u3_phaseshift_rot_resources():", "def _u3_phaseshift_rot_resources(theta, phi, delta, wires):"),
+    (
+        "def _u3_phaseshift_rot_resources():",
+        "def _u3_phaseshift_rot_resources(theta, phi, delta, wires):",
+    ),
 ]
 
 for old, new in replacements:
@@ -72,7 +74,7 @@ content = content.replace(
         return qml.Projector(np.array([1]), wires=self.wires)
 
     def __init__(self, phi: TensorLike, wires: WiresLike, id: str | None = None):
-        super().__init__(phi, wires=wires, id=id)"""
+        super().__init__(phi, wires=wires, id=id)""",
 )
 print("✓ Removed PhaseShift resource_keys and resource_params")
 
@@ -111,7 +113,7 @@ content = content.replace(
         wires: WiresLike,
         id: str | None = None,
     ):
-        super().__init__(phi, theta, omega, wires=wires, id=id)"""
+        super().__init__(phi, theta, omega, wires=wires, id=id)""",
 )
 print("✓ Removed Rot resource_keys and resource_params")
 
@@ -132,7 +134,7 @@ content = content.replace(
         return qml.Projector(np.array([1]), wires=self.wires)
 
     def __init__(self, phi: TensorLike, wires: WiresLike, id: str | None = None):
-        super().__init__(phi, wires=wires, id=id)"""
+        super().__init__(phi, wires=wires, id=id)""",
 )
 print("✓ Removed U1 resource_keys and resource_params")
 
@@ -147,7 +149,7 @@ content = content.replace(
     def resource_params(self) -> dict:
         return {}""",
     """    def __init__(self, phi: TensorLike, delta: TensorLike, wires: WiresLike, id: str | None = None):
-        super().__init__(phi, delta, wires=wires, id=id)"""
+        super().__init__(phi, delta, wires=wires, id=id)""",
 )
 print("✓ Removed U2 resource_keys and resource_params")
 
@@ -178,11 +180,11 @@ content = content.replace(
         wires: WiresLike,
         id: str | None = None,
     ):
-        super().__init__(theta, phi, delta, wires=wires, id=id)"""
+        super().__init__(theta, phi, delta, wires=wires, id=id)""",
 )
 print("✓ Removed U3 resource_keys and resource_params")
 
-with open(filepath, 'w') as f:
+with open(filepath, "w") as f:
     f.write(content)
 
 print("\n✅ All changes applied to parametric_ops_single_qubit.py")

@@ -58,9 +58,31 @@
 # print(len(data[0]))
 # print(data.shape[1])
 
+import numpy as np
+import pennylane
 import pennylane as qml
 import pennylane.math as math
-import numpy as np
+from pennylane import (
+    BBQRAM,
+    BasisEmbedding,
+    ControlledSequence,
+    HybridQRAM,
+    PauliX,
+    PhaseAdder,
+    adjoint,
+    device,
+    inspect_decomps,
+    list_decomps,
+    ops,
+    probs,
+    qjit,
+    qnode,
+    queuing,
+    state,
+)
+from pennylane.transforms import cancel_inverses
+from pennylane.workflow import construct_tape
+from tests.templates.subroutines.test_iqp import local_gates
 
 # @qml.qnode(qml.device('lightning.qubit'))
 # def circuit():
@@ -88,12 +110,6 @@ import numpy as np
 #     lst.append(iters // 2 + 1 - iter)
 # print(lst[: iters // 2])
 
-import pennylane
-from pennylane import device, qnode, BasisEmbedding, BBQRAM, probs, HybridQRAM, qjit, adjoint, PauliX, ops, queuing, \
-    state, ControlledSequence, PhaseAdder, list_decomps, inspect_decomps
-from pennylane.transforms import cancel_inverses
-from pennylane.workflow import construct_tape
-from tests.templates.subroutines.test_iqp import local_gates
 
 dev = qml.device("default.qubit")
 #
@@ -308,6 +324,7 @@ dev = qml.device("default.qubit")
 
 import pennylane as qp
 
+import catalyst
 
 # dev = qml.device("default.qubit", wires=2)
 #
@@ -728,16 +745,16 @@ import pennylane as qp
 
 # from pennylane.templates.subroutines.ffft import FFFT
 # from pennylane import device, draw_mpl, qnode, state
-# 
+#
 # dev = device("default.qubit", wires=(0, 1, 2, 3))
-# 
+#
 # wires = (0, 1, 2, 3)
-# 
+#
 # @qnode(dev)
 # def circuit(wires):
 #     FFFT(wires)
 #     return state()
-# 
+#
 # # print(draw(circuit, level="device")(wires))
 # draw_mpl(circuit, level="device", style="pennylane_sketch")(wires)
 
@@ -956,13 +973,11 @@ import pennylane as qp
 
 # qp.apply
 
-import pennylane as qp
-import catalyst
 
 qp.decomposition.enable_graph()
 
 gate_set = {"RZ", "S", "Adjoint(S)", "Hadamard", "CNOT", "GlobalPhase"}
-fixed = {qp.RY: qp.list_decomps(qp.RY)["_ry_to_rz_cliff"]}   # a rule that already ships with PL
+fixed = {qp.RY: qp.list_decomps(qp.RY)["_ry_to_rz_cliff"]}  # a rule that already ships with PL
 
 
 @qp.qjit(capture=True, target="mlir")
@@ -971,5 +986,6 @@ fixed = {qp.RY: qp.list_decomps(qp.RY)["_ry_to_rz_cliff"]}   # a rule that alrea
 def circuit():
     qp.RY(0.3, wires=0)
     return qp.probs()
+
 
 print(qp.specs(circuit, level="all")())

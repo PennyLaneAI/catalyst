@@ -1,4 +1,6 @@
 from functools import partial
+
+import jax
 import pennylane as qml
 
 # pass-by-pass specs
@@ -280,8 +282,9 @@ import pennylane as qml
 # for key, val in counts.items():
 #     print(f"    {key}: {val/shots*100:4.1f} %")
 
-import jax
+
 dev = qml.device("default.qubit")
+
 
 @qml.qnode(dev, diff_method="hadamard", gradient_kwargs={"mode": "standard"})
 def circuit(params):
@@ -289,5 +292,7 @@ def circuit(params):
     qml.RY(params[1], wires=0)
     qml.RX(params[2], wires=0)
     return qml.expval(qml.Z(0)), qml.probs(wires=0)
+
+
 params = jax.numpy.array([0.1, 0.2, 0.3])
 jax.jacobian(circuit)(params)

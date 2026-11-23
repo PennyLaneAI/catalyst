@@ -13,16 +13,11 @@ circuit = qp.tape.qscript.QuantumScript(
         qp.H("(0, 1)"),
         qp.CNOT(["(1, 0)", "(0, 0)"]),
         qp.X("(1, 1)"),
-        qp.CNOT(["(1, 1)", "(1, 0)"])
+        qp.CNOT(["(1, 1)", "(1, 0)"]),
     ]
 )
 
-circuit = qp.tape.qscript.QuantumScript(
-    [
-    qp.CZ((0, 1)),
-    qp.CZ((0, 2))
-    ]
-)
+circuit = qp.tape.qscript.QuantumScript([qp.CZ((0, 1)), qp.CZ((0, 2))])
 
 circuit = qp.tape.qscript.QuantumScript(
     [
@@ -33,6 +28,7 @@ circuit = qp.tape.qscript.QuantumScript(
         qp.H(2),
     ]
 )
+
 
 def greedy_schedule(circuit):
     dag = qp.commutation_dag(circuit)
@@ -63,7 +59,9 @@ def greedy_schedule(circuit):
             # check that the wires are available in the current moment
             moment_wires = []
             if moments[time]:
-                moment_wires += reduce(lambda acc, next: acc + next, [n.wires for n in moments[time]])
+                moment_wires += reduce(
+                    lambda acc, next: acc + next, [n.wires for n in moments[time]]
+                )
 
             found = False
             for wire in node.wires:
@@ -80,5 +78,6 @@ def greedy_schedule(circuit):
         scheduled_ids += moment_ids
 
     return moments
+
 
 schedule = greedy_schedule(circuit)

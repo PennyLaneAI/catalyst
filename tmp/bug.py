@@ -1,9 +1,10 @@
-import pennylane as qml
 import jax.numpy as jnp
+import pennylane as qml
 
 qml.capture.enable()
 
 dev = qml.device("null.qubit", wires=3)
+
 
 def qfunc():
     qml.Hadamard(0)
@@ -13,6 +14,7 @@ def qfunc():
     ppm = qml.pauli_measure(pauli_word="XY", wires=[0, 2])
     qml.cond(ppm, qml.X)(wires=1)
 
+
 @qml.qjit(target="mlir")
 @qml.transforms.ppm_compilation
 @qml.transforms.gridsynth
@@ -21,6 +23,7 @@ def qfunc():
 def circuit():
     qfunc()
     return qml.expval(qml.Z(0))
+
 
 print(qml.specs(circuit, level="all")())
 # AttributeError: DynamicJaxprTracer has no attribute measurements

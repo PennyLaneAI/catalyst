@@ -22,19 +22,30 @@ from pennylane.templates.subroutines.time_evolution.trotter_vibronic import (
 constant = qp.math.array([[[0.4, 0.0], [0.0, -0.4]]])
 linear = qp.math.reshape(qp.math.array([[[0.2, 0.0], [0.0, -0.2]]]), (1, 2, 2, 1))
 hamiltonian = qp.VibronicHamiltonian(
-    constant=constant, linear=linear, quadratic=qp.math.zeros((1, 2, 2, 1, 1)),
+    constant=constant,
+    linear=linear,
+    quadratic=qp.math.zeros((1, 2, 2, 1, 1)),
     kinetic=qp.math.reshape(0.3 * qp.math.eye(2), (2, 2, 1, 1)),
 )
-registers = qp.registers({
-    "electronic_wires": 1, "vib_wires": 1, "cache_wires": 2,
-    "coefficient_wires": 1, "phase_gradient_wires": 1, "work_wires": 4,
-})
+registers = qp.registers(
+    {
+        "electronic_wires": 1,
+        "vib_wires": 1,
+        "cache_wires": 2,
+        "coefficient_wires": 1,
+        "phase_gradient_wires": 1,
+        "work_wires": 4,
+    }
+)
 
 
 def circuit():
     _trotter_vibronic_decomposition(
-        evolution_time=1.0, num_trotter_steps=1, hamiltonian=hamiltonian,
-        aqft_order=0, **registers,
+        evolution_time=1.0,
+        num_trotter_steps=1,
+        hamiltonian=hamiltonian,
+        aqft_order=0,
+        **registers,
     )
 
 

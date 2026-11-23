@@ -22,8 +22,11 @@ def circuit():
     with qp.QueuingManager.stop_recording():
         base = qp.Rot(0.2, 0.4, 0.6, wires=2)
     _controlled_rot_decomp(
-        base, control_wires=qp.wires.Wires([0, 1]), control_values=[True, True],
-        work_wires=qp.wires.Wires([]), work_wire_type="zeroed",
+        base,
+        control_wires=qp.wires.Wires([0, 1]),
+        control_values=[True, True],
+        work_wires=qp.wires.Wires([]),
+        work_wire_type="zeroed",
     )
 
 
