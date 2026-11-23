@@ -118,8 +118,8 @@ def test_graph_decomposition_hybrid_operator_arg():
         qp.GQSP(qp.X(1), angles=np.ones((3, 1)), control=0)
         return qp.probs(wires=0)
 
-    # CHECK-NOT: tensor<1xi64>) attributes {frontend_name = "_GQSP_decomposition"
-    # CHECK: tensor<2xi64>) attributes {frontend_name = "_GQSP_decomposition"
+    # CHECK-NOT: tensor<1xi64>) attributes {frontend_name = "controlled_unitary_rotations"
+    # CHECK: tensor<2xi64>) attributes {frontend_name = "controlled_unitary_rotations"
     print(circuit.mlir)
 
 

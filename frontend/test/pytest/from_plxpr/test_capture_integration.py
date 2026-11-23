@@ -1292,9 +1292,10 @@ class TestCapture:
             cond_fn()
             return qp.expval(qp.PauliZ(0))
 
+        # non-capture pathway is not actively developed and raises unnecessary warnings (wontfix)
         with pytest.warns(
-            qp.exceptions.DecompositionWarning,
-            match="unable to find a decomposition for .* to the target gate set",
+            (UserWarning, qp.exceptions.DecompositionWarning),
+            match="does not define a decomposition|unable to find a decomposition",
         ):
             non_capture_result = qjit(circuit, capture=False)(1.5, 2.5, 3.5)
 

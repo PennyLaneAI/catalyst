@@ -864,9 +864,7 @@ class TestGenericUtilities:
         with qp.capture.toggle_ctx(False):
             collected_rules = collect_resources_for_op("RZ", kwargs, is_custom_op=True)
 
-        collected = next(
-            rule for rule in collected_rules if rule.source_rule.name == "_rz_to_rx_cliff"
-        )
+        collected = next(rule for rule in collected_rules if rule.source_rule.name == "to_rx_cliff")
         basis_change = qp.ops.ChangeOpBasis2(qp.H(Wire[1]), qp.RX(Float, Wire[1]), qp.H(Wire[1]))
         assert collected.resource_counts_by_op == {basis_change: 1}
         assert collected.resource_counts_by_id == {GraphOpID(basis_change).getGraphOpId(): 1}
@@ -976,16 +974,16 @@ class TestPrecompiled:
 
         bytecode = _quantum_opt("--empty", str(bytecode_path))
         expected_rules = [
-            ("_rz_to_ppr", "RZ{0:[f64]}{wires:1}{}"),
-            ("_rz_to_rot", "RZ{0:[f64]}{wires:1}{}"),
-            ("_multi_rz_decomposition", "MultiRZ{theta:[f64]}{wires:1}{}"),
-            ("_multi_rz_decomposition", "MultiRZ{theta:[f64]}{wires:2}{}"),
+            ("to_paulirot", "RZ{0:[f64]}{wires:1}{}"),
+            ("to_rot", "RZ{0:[f64]}{wires:1}{}"),
+            ("cnot_ladder", "MultiRZ{theta:[f64]}{wires:1}{}"),
+            ("cnot_ladder", "MultiRZ{theta:[f64]}{wires:2}{}"),
             (
-                "_pauli_rot_decomposition",
+                "basis_change_multirz",
                 "PauliRot{theta:[f64]}{wires:1}{pauli_word = \\22Z\\22}",
             ),
             (
-                "_pauli_rot_decomposition",
+                "basis_change_multirz",
                 "PauliRot{theta:[f64]}{wires:2}{pauli_word = \\22XX\\22}",
             ),
         ]
@@ -995,7 +993,7 @@ class TestPrecompiled:
                 f'frontend_name = "{frontend_name}"' in line
                 and f'target_gate = "{target_gate}"' in line
                 for line in bytecode.splitlines()
-            )
+            ), f"Missing precompiled rule {frontend_name!r} for {target_gate!r}"
 
     def test_precompile_writes_hash_to_manifest(self, mocker, tmp_path):
         """The manifest contains the hash of the associated bytecode."""
@@ -2144,7 +2142,7 @@ class TestSymbolicRules:
         (rule,) = [
             rule
             for rule in get_rule_strings_from_module(module)
-            if 'frontend_name = "flip_zero_ctrl_values(_controlled_hadamard)"' in rule
+            if 'frontend_name = "to_mcx"' in rule
         ]
 
         assert f'target_gate = "{target_id}"' in rule

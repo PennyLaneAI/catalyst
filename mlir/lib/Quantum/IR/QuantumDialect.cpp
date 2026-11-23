@@ -14,10 +14,15 @@
 
 #include "Quantum/IR/QuantumDialect.h"
 
+#include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/TypeSwitch.h" // needed for generated type parser
 #include "mlir/Dialect/Bufferization/IR/BufferizableOpInterface.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
+#include "mlir/IR/Attributes.h"
+#include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/DialectImplementation.h" // needed for generated type parser
+#include "mlir/Support/LLVM.h"
+#include "mlir/Support/LogicalResult.h"
 #include "mlir/Transforms/InliningUtils.h"
 
 #include "Quantum/IR/QuantumOps.h"
@@ -105,7 +110,7 @@ LogicalResult QuantumDialect::verifyOperationAttribute(Operation *op, NamedAttri
 
     // Cannot enforce this yet as Catalyst allows QNodes without MPs.
     // auto funcOp = cast<func::FuncOp>(op);
-    // auto measurement = funcOp.walk([&](MeasurementProcess) { return WalkResult::interrupt(); });
+    // auto measurement = funcOp.walk([&](TerminalMeasurement) { return WalkResult::interrupt(); });
     // if (!measurement.wasInterrupted()) {
     //     return op->emitOpError()
     //            << "attribute '" << attrName
