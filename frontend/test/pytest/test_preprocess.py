@@ -528,12 +528,14 @@ class TestPreprocessHybridOp:
         if gate_set_src == "capabilities":
             capabilities = DeviceCapabilities.from_toml_file(request.node.toml_file)
             kwargs = {"capabilities": capabilities}
+            expected_ops = capabilities.operations
         else:
             kwargs = {"target_gates": TARGET_GATES_FROM_CONFIG, "capabilities": None}
+            expected_ops = TARGET_GATES_FROM_CONFIG
 
         (new_tape,), _ = catalyst_decompose(tape, **kwargs)
 
-        assert len(new_tape.operations) == 14
+        assert all(op.name in expected_ops for op in new_tape.operations)
         assert np.allclose(qp.matrix(new_tape, wire_order=[1, 0]), tape.operations[0].matrix())
 
     @pytest.mark.usefixtures("create_temporary_toml_file")

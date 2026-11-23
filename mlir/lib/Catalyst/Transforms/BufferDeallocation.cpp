@@ -74,6 +74,9 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include <utility>
+
+#include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SetOperations.h"
 #include "mlir/Dialect/Bufferization/IR/AllocationOpInterface.h"
 #include "mlir/Dialect/Bufferization/IR/Bufferization.h"
@@ -81,12 +84,19 @@
 #include "mlir/Dialect/Bufferization/Transforms/Passes.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
+#include "mlir/IR/Builders.h"
+#include "mlir/IR/BuiltinTypeInterfaces.h"
+#include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Operation.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 #include "Catalyst/IR/CatalystDialect.h"
+#include "QRef/IR/QRefDialect.h"
+#include "Quantum/IR/QuantumDialect.h"
+
+#include "StringConstants.h"
 
 using namespace mlir;
 using namespace catalyst;
@@ -244,7 +254,41 @@ class BufferDeallocation : public BufferPlacementTransformationBase {
     using AliasAllocationMapT = llvm::DenseMap<Value, bufferization::AllocationOpInterface>;
 
     BufferDeallocation(Operation *op)
-        : BufferPlacementTransformationBase(op), dominators(op), postDominators(op) {}
+        : BufferPlacementTransformationBase(op), dominators(op), postDominators(op) {
+        SetVector<Value> nonAliases;
+        op->walk([&](Operation *operation) {
+            for (Value result : operation->getResults()) {
+                Type t = result.getType();
+                if (isa<catalyst::quantum::QuantumDialect, catalyst::qref::QRefDialect>(
+                        t.getDialect()) ||
+                    isa<IntegerType, FloatType, ComplexType, IndexType>(t)) {
+                    nonAliases.insert(result);
+                }
+            }
+            auto call = dyn_cast<func::CallOp>(operation);
+            auto owned =
+                call ? call->getAttrOfType<DenseI32ArrayAttr>(catalyst::OWNED_BUFFER_RESULTS_ATTR)
+                     : DenseI32ArrayAttr{};
+            if (!owned) {
+                return;
+            }
+            for (int32_t index : owned.asArrayRef()) {
+                Value result = call.getResult(index);
+                // Disconnect conservative operand-to-result aliases for buffers
+                // that the module analysis proved to be fresh.
+                nonAliases.insert(result);
+                auto dealloc = memref::findDealloc(result);
+                if (dealloc) {
+                    ownedCallResults.insert(result);
+                    allocs.registerAlloc({result, *dealloc});
+                }
+            }
+            call->removeAttr(catalyst::OWNED_BUFFER_RESULTS_ATTR);
+        });
+        // Call analysis also connects memrefs to scalar/quantum results. Such
+        // results cannot carry ownership of these classical buffers.
+        aliases.remove(nonAliases);
+    }
 
     /// Checks if all allocation operations either provide an already existing
     /// deallocation operation or implement the AllocationOpInterface. In
@@ -256,6 +300,9 @@ class BufferDeallocation : public BufferPlacementTransformationBase {
             // Get the defining allocation operation.
             Value alloc = std::get<0>(entry);
             auto allocationInterface = alloc.getDefiningOp<bufferization::AllocationOpInterface>();
+            if (ownedCallResults.contains(alloc)) {
+                continue;
+            }
             // If there is no existing deallocation operation and no implementation of
             // the AllocationOpInterface, we cannot apply the BufferDeallocation pass.
             if (!std::get<1>(entry) && !allocationInterface) {
@@ -660,6 +707,9 @@ class BufferDeallocation : public BufferPlacementTransformationBase {
 
     /// Stores already cloned buffers to avoid additional clones of clones.
     ValueSetT clonedValues;
+
+    /// Fresh results whose ownership was established at module scope.
+    DenseSet<Value> ownedCallResults;
 
     /// Maps aliases to their source allocation interfaces (inverse mapping).
     AliasAllocationMapT aliasToAllocations;

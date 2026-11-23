@@ -874,6 +874,22 @@ func.func private @kernel_entry() attributes {quantum.kernel_entry_point}
 
 // -----
 
+func.func @value_map_out_of_bounds(%q: !quantum.bit) -> !quantum.bit {
+  // expected-error@+1 {{qubit_map index is out of bounds}}
+  %out = quantum.operator "Composite"() qubits(%q) qubit_map = {compute = [-1]}
+  return %out : !quantum.bit
+}
+
+// -----
+
+func.func @value_map_missing_qubit(%q0: !quantum.bit, %q1: !quantum.bit) -> (!quantum.bit, !quantum.bit) {
+  // expected-error@+1 {{qubit_map must cover all qubit values}}
+  %out:2 = quantum.operator "Composite"() qubits(%q0, %q1) qubit_map = {compute = [0]}
+  return %out#0, %out#1 : !quantum.bit, !quantum.bit
+}
+
+// -----
+
 func.func @mixed_modes(%q: !quantum.bit, %r: !quantum.reg, %w: tensor<1xi64>) {
   // expected-error@+1 {{must use either qubits or registers, but not both}}
   %m, %oq, %or = "quantum.measurement"(%q, %r, %w) <{op_name = "Mixed", operandSegmentSizes = array<i32: 0, 1, 1, 1>, resultSegmentSizes = array<i32: 1, 1, 1>}> : (!quantum.bit, !quantum.reg, tensor<1xi64>) -> (i1, !quantum.bit, !quantum.reg)

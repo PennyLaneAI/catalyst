@@ -575,6 +575,71 @@ func.func @operator_custom_invalid_ctrl_static_length(%r : !qref.reg<?>, %idx : 
 
 // -----
 
+// -----
+
+func.func @reference_map_out_of_bounds(%q: !qref.bit) {
+  // expected-error@+1 {{qubit_map index is out of bounds}}
+  qref.operator "Composite"() qubits(%q) qubit_map = {compute = [1]}
+  return
+}
+
+// -----
+
+func.func @reference_map_missing_qubit(%q0: !qref.bit, %q1: !qref.bit) {
+  // expected-error@+1 {{qubit_map must cover all qubit values}}
+  qref.operator "Composite"() qubits(%q0, %q1) qubit_map = {compute = [0], target = [0]}
+  return
+}
+
+// -----
+
+func.func @operator_overlapping_targets(%target: !qref.bit, %control: !qref.bit) {
+  %true = arith.constant true
+  qref.operator "Composite"() qubits(%target, %target)
+    ctrls(%control) ctrl_vals(%true) qubit_map = {compute = [0], target = [1]}
+  return
+}
+
+// -----
+
+func.func @operator_control_on_overlapping_targets(%target: !qref.bit) {
+  %true = arith.constant true
+  // expected-error@+1 {{all qubits on a quantum gate must be distinct (including controls)}}
+  qref.operator "Composite"() qubits(%target, %target)
+    ctrls(%target) ctrl_vals(%true) qubit_map = {compute = [0], target = [1]}
+  return
+}
+
+// -----
+
+func.func @operator_duplicate_controls(%target: !qref.bit, %control: !qref.bit) {
+  %true = arith.constant true
+  // expected-error@+1 {{all qubits on a quantum gate must be distinct (including controls)}}
+  qref.operator "Composite"() qubits(%target, %target)
+    ctrls(%control, %control) ctrl_vals(%true, %true)
+    qubit_map = {compute = [0], target = [1]}
+  return
+}
+
+// -----
+
+func.func @cast_static_to_dynamic(%r: !qref.reg<3>, %r_dyn: !qref.reg<?>) {
+  %0 = qref.cast %r : !qref.reg<3> to !qref.reg<?>
+  %1 = qref.cast %r_dyn : !qref.reg<?> to !qref.reg<3>
+  %2 = qref.cast %r : !qref.reg<3> to !qref.reg<3>
+  return
+}
+
+// -----
+
+func.func @cast_between_static_sizes(%r: !qref.reg<3>) {
+  // expected-error@+1 {{cannot cast between registers of different static sizes, '!qref.reg<3>' and '!qref.reg<4>'}}
+  %0 = qref.cast %r : !qref.reg<3> to !qref.reg<4>
+  return
+}
+
+// -----
+
 func.func @measurement_mixed_modes(%q: !qref.bit, %r: !qref.reg<2>, %w: tensor<1xi64>) {
   // expected-error@+1 {{must use either qubits or registers, but not both}}
   %m = "qref.measurement"(%q, %r, %w) <{op_name = "Mixed", operandSegmentSizes = array<i32: 0, 1, 1, 1>}> : (!qref.bit, !qref.reg<2>, tensor<1xi64>) -> i1
@@ -703,3 +768,4 @@ func.func @measurement_ctrl(%q: !qref.bit, %c: !qref.bit, %v: i1) {
   }
   return
 }
+
