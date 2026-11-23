@@ -30,6 +30,7 @@ import pennylane as qp
 from jax.core import eval_jaxpr
 from jax.tree_util import tree_flatten, tree_unflatten
 from pennylane import exceptions
+from pennylane.core.qscript import QuantumScript
 from pennylane.logging import debug_logger
 from pennylane.measurements import CountsMP, ExpectationMP, ProbabilityMP, SampleMP, VarianceMP
 from pennylane.transforms import _tape_decompose
@@ -427,7 +428,7 @@ def _process_terminal_measurements(mcm_method, cpy_tape, out, snapshots, shot_ve
 
 
 def _validate_one_shot_measurements(
-    mcm_config, tape: qp.tape.QuantumTape, user_specified_mcm_method, shot_vector, wires
+    mcm_config, tape: QuantumScript, user_specified_mcm_method, shot_vector, wires
 ) -> None:
     """Validate measurements for one-shot mode.
 
@@ -548,8 +549,8 @@ def dynamic_one_shot(qnode, **kwargs):
 
         @qp.transform
         def dynamic_one_shot_partial(
-            tape: qp.tape.QuantumTape,
-        ) -> tuple[Sequence[qp.tape.QuantumTape], Callable]:
+            tape: QuantumScript,
+        ) -> tuple[Sequence[QuantumScript], Callable]:
             nonlocal cpy_tape
             cpy_tape = tape
 

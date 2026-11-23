@@ -34,7 +34,6 @@ from malt.impl.api import converted_call as ag_converted_call
 from malt.operators import py_builtins as ag_py_builtins
 from malt.operators.variables import Undefined
 from malt.pyct.origin_info import LineLocation
-from pennylane.queuing import AnnotatedQueue
 
 import catalyst
 from catalyst.jax_extras import DynamicJaxprTracer, ShapedArray
@@ -67,10 +66,7 @@ def get_program_length(reference_tracers):
 
     if EvaluationContext.is_quantum_tracing():
         quantum_queue = EvaluationContext.find_quantum_queue()
-        # Using the the class methods directly allows this to work for both
-        # QuantumTape & AnnotatedQueue instances.
-        # pylint: disable=unnecessary-dunder-call
-        num_tape_ops = AnnotatedQueue.__len__(quantum_queue)
+        num_tape_ops = len(quantum_queue)
 
     return num_jaxpr_eqns, num_tape_ops
 
@@ -85,11 +81,8 @@ def reset_program_to_length(reference_tracers, num_jaxpr_eqns, num_tape_ops):
 
     if EvaluationContext.is_quantum_tracing():
         quantum_queue = EvaluationContext.find_quantum_queue()
-        # Using the the class methods directly allows this to work for both
-        # QuantumTape & AnnotatedQueue instances.
-        # pylint: disable=unnecessary-dunder-call
-        while AnnotatedQueue.__len__(quantum_queue) > num_tape_ops:
-            AnnotatedQueue.popitem(quantum_queue)
+        while len(quantum_queue) > num_tape_ops:
+            quantum_queue.popitem()
 
 
 def assert_results(results, var_names):

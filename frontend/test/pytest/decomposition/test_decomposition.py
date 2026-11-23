@@ -29,6 +29,7 @@ from operator2_dummy_gates import (
     CompilableData,
     HybridNoOpArg,
     HybridOpArg,
+    HybridOpArgs,
     HybridWires,
     MultiParams,
     MultiParamsCustom,
@@ -39,6 +40,7 @@ from operator2_dummy_gates import (
     SingleParamCustomOp,
     StaticData,
     TestQubitUnitary,
+    hybrid_op_args_decomp,
 )
 from pennylane import qnode
 from pennylane.core.operator import abstractify
@@ -664,6 +666,17 @@ class TestGenericUtilities:
         assert str.startswith(GraphOpID(op).getGraphOpId(), id)
 
     @pytest.mark.parametrize(
+        "op, name",
+        [
+            (qp.ops.Prod2((qp.X(0), qp.Z(1))), "Prod2"),
+            (qp.pow(qp.X(0), 2), "Pow2"),
+        ],
+    )
+    def test_graph_op_id_uses_class_name(self, op, name):
+        """Graph IDs use class names, including for display and instance-dependent names."""
+        assert GraphOpID(op).getGraphOpId().partition("{")[0] == name
+
+    @pytest.mark.parametrize(
         "op, expected_adjoint, expected_controls",
         [
             (qp.S(Wire[1]), False, 0),
@@ -823,10 +836,7 @@ class TestGenericUtilities:
         assert call_kwargs["b"] == 3.14
         assert call_kwargs["thing"] == "string"
 
-        probe_wires = np.asarray(call_kwargs["wires"])
-        assert probe_wires.shape == (2,)
-        assert np.all(probe_wires < 0)
-        assert len(np.unique(probe_wires)) == 2
+        assert call_kwargs["wires"] == Wire[2]
 
     def test_rule_with_unreadable_work_wire_spec_is_excluded(self):
         """A rule whose work-wire spec cannot be read is excluded, with a warning.
@@ -847,26 +857,23 @@ class TestGenericUtilities:
         with pytest.warns(RuleLoweringWarning, match="could not read its work-wire spec"):
             assert not _rule_is_compatible("MockOp", raises_on_spec, wires=Wires([0]))
 
-    def test_collect_resources_unrolls_change_op_basis_for_capture(self):
-        """Resources match the rule body that capture produces, even when resource collection
-        itself happens outside a capture context."""
+    def test_collect_resources_preserves_change_op_basis(self):
+        """Resources retain the captured basis-change node when collected outside capture."""
         kwargs = prepare_dynamic_op_kwargs({"0": ShapedArray((), float)}, {"wires": 1})
 
         with qp.capture.toggle_ctx(False):
             collected_rules = collect_resources_for_op("RZ", kwargs, is_custom_op=True)
 
-        collected = next(
-            rule for rule in collected_rules if rule.source_rule.name == "_rz_to_rx_cliff"
-        )
-        assert collected.resource_counts_by_id == {
-            "Hadamard{}{wires:1}{}": 2,
-            "RX{0:[f64]}{wires:1}{}": 1,
-        }
+        collected = next(rule for rule in collected_rules if rule.source_rule.name == "to_rx_cliff")
+        basis_change = qp.ops.ChangeOpBasis2(qp.H(Wire[1]), qp.RX(Float, Wire[1]), qp.H(Wire[1]))
+        assert collected.resource_counts_by_op == {basis_change: 1}
+        assert collected.resource_counts_by_id == {GraphOpID(basis_change).getGraphOpId(): 1}
 
-    def test_collect_symbolic_resources_unrolls_change_op_basis_for_capture(self):
-        """Registered symbolic rules use the same capture-time resource representation."""
+    def test_collect_symbolic_resources_preserves_change_op_basis(self):
+        """Registered symbolic rules retain the same basis-change node as the captured body."""
+        basis_change = qp.ops.ChangeOpBasis2(qp.H(Wire[1]), qp.X(Wire[1]), qp.H(Wire[1]))
 
-        @register_resources({qp.ops.ChangeOpBasis2(qp.H(Wire[1]), qp.X(Wire[1]), qp.H(Wire[1])): 1})
+        @register_resources({basis_change: 1})
         def symbolic_rule(base):
             qp.change_op_basis(qp.H(base.wires), qp.X(base.wires), qp.H(base.wires))
 
@@ -883,10 +890,8 @@ class TestGenericUtilities:
 
         (collected,) = collected_rules
         assert collected.source_rule is symbolic_rule
-        assert collected.resource_counts_by_id == {
-            "Hadamard{}{wires:1}{}": 2,
-            "PauliX{}{wires:1}{}": 1,
-        }
+        assert collected.resource_counts_by_op == {basis_change: 1}
+        assert collected.resource_counts_by_id == {GraphOpID(basis_change).getGraphOpId(): 1}
 
 
 class TestCollectedResources:
@@ -969,16 +974,16 @@ class TestPrecompiled:
 
         bytecode = _quantum_opt("--empty", str(bytecode_path))
         expected_rules = [
-            ("_rz_to_ppr", "RZ{0:[f64]}{wires:1}{}"),
-            ("_rz_to_rot", "RZ{0:[f64]}{wires:1}{}"),
-            ("_multi_rz_decomposition", "MultiRZ{theta:[f64]}{wires:1}{}"),
-            ("_multi_rz_decomposition", "MultiRZ{theta:[f64]}{wires:2}{}"),
+            ("to_paulirot", "RZ{0:[f64]}{wires:1}{}"),
+            ("to_rot", "RZ{0:[f64]}{wires:1}{}"),
+            ("cnot_ladder", "MultiRZ{theta:[f64]}{wires:1}{}"),
+            ("cnot_ladder", "MultiRZ{theta:[f64]}{wires:2}{}"),
             (
-                "_pauli_rot_decomposition",
+                "basis_change_multirz",
                 "PauliRot{theta:[f64]}{wires:1}{pauli_word = \\22Z\\22}",
             ),
             (
-                "_pauli_rot_decomposition",
+                "basis_change_multirz",
                 "PauliRot{theta:[f64]}{wires:2}{pauli_word = \\22XX\\22}",
             ),
         ]
@@ -988,7 +993,7 @@ class TestPrecompiled:
                 f'frontend_name = "{frontend_name}"' in line
                 and f'target_gate = "{target_gate}"' in line
                 for line in bytecode.splitlines()
-            )
+            ), f"Missing precompiled rule {frontend_name!r} for {target_gate!r}"
 
     def test_precompile_writes_hash_to_manifest(self, mocker, tmp_path):
         """The manifest contains the hash of the associated bytecode."""
@@ -1569,6 +1574,97 @@ class TestHybridOperatorArgDecomposition:
                 compiled(theta, angles), reference(theta, angles), rtol=1e-7, atol=1e-7
             )
 
+    @pytest.mark.parametrize("modifier", ["plain", "adjoint", "controlled"])
+    @pytest.mark.parametrize("dynamic_wire", [False, True])
+    def test_operator_arguments_share_wire(self, modifier, dynamic_wire):
+        """Operator arguments retain shared wires, parameters, and order under modifiers."""
+
+        with local_decomps():
+            add_decomps(HybridOpArgs, hybrid_op_args_decomp)
+
+            def composite(theta, wire):
+                HybridOpArgs(qp.RX(theta, wire), qp.RY(2 * theta, wire), qp.RZ(3 * theta, wire))
+
+            def expanded(theta, wire):
+                qp.RX(theta, wire)
+                qp.RY(2 * theta, wire)
+                qp.RZ(3 * theta, wire)
+
+            def circuit_body(theta, wire, operation):
+                qp.H(2)
+                if modifier == "controlled":
+                    qp.ctrl(operation, control=2)(theta, wire)
+                elif modifier == "adjoint":
+                    qp.adjoint(operation)(theta, wire)
+                else:
+                    operation(theta, wire)
+
+            @qp.qjit(capture=True)
+            @qp.decompose(gate_set={qp.RX, qp.RY, qp.RZ, qp.H, qp.X, qp.CNOT})
+            @qp.qnode(qp.device("lightning.qubit", wires=3))
+            def compiled(theta, wire):
+                circuit_body(theta, wire if dynamic_wire else 0, composite)
+                return qp.state()
+
+            @qp.qnode(qp.device("default.qubit", wires=3))
+            def reference(theta, wire):
+                circuit_body(theta, wire if dynamic_wire else 0, expanded)
+                return qp.state()
+
+            for theta, wire in [(0.17, 0), (0.49, 1)]:
+                np.testing.assert_allclose(compiled(theta, wire), reference(theta, wire), atol=1e-8)
+            assert 'qref.operator "HybridOpArgs"' in compiled.mlir
+
+    def test_operator_arguments_shared_wire_estimate(self):
+        """Resource estimation counts repeated operator arguments sharing a wire."""
+
+        with local_decomps():
+            add_decomps(HybridOpArgs, hybrid_op_args_decomp)
+
+            @qp.qjit(capture=True, target="mlir", enable_aot_compilation=False)
+            @qp.qnode(qp.device("null.qubit", wires=1))
+            def circuit(theta):
+                HybridOpArgs(qp.H(0), qp.RX(theta, 0), qp.H(0))
+                return qp.probs(wires=0)
+
+            specs = qp.estimate(circuit, target={qp.H, qp.RX})(0.17)
+            assert specs.resources.counts == {"Hadamard": 2, "RX": 1}
+
+    def test_nested_operator_arguments(self):
+        """Nested operator arguments preserve partially overlapping and permuted wires."""
+
+        with local_decomps():
+            add_decomps(HybridOpArgs, hybrid_op_args_decomp)
+
+            @qp.qjit(capture=True)
+            @qp.decompose(gate_set={qp.RX, qp.RY, qp.RZ, qp.H, qp.X, qp.CNOT})
+            @qp.qnode(qp.device("lightning.qubit", wires=3))
+            def compiled(theta):
+                qp.H(0)
+                qp.H(1)
+                HybridOpArgs(
+                    qp.CNOT([2, 0]),
+                    HybridOpArgs(
+                        qp.RX(2 * theta, 1), qp.IsingZZ(3 * theta, [0, 1]), qp.RY(4 * theta, 0)
+                    ),
+                    qp.RZ(5 * theta, 2),
+                )
+                return qp.state()
+
+            @qp.qnode(qp.device("default.qubit", wires=3))
+            def reference(theta):
+                qp.H(0)
+                qp.H(1)
+                qp.CNOT([2, 0])
+                qp.RX(2 * theta, 1)
+                qp.IsingZZ(3 * theta, [0, 1])
+                qp.RY(4 * theta, 0)
+                qp.RZ(5 * theta, 2)
+                return qp.state()
+
+            for theta in (0.17, 0.49):
+                np.testing.assert_allclose(compiled(theta), reference(theta), atol=1e-8)
+
 
 class TestOnDemand:
     """Test the python wrapper functions used for on-demand,
@@ -2046,7 +2142,7 @@ class TestSymbolicRules:
         (rule,) = [
             rule
             for rule in get_rule_strings_from_module(module)
-            if 'frontend_name = "flip_zero_ctrl_values(_controlled_hadamard)"' in rule
+            if 'frontend_name = "to_mcx"' in rule
         ]
 
         assert f'target_gate = "{target_id}"' in rule
@@ -2490,6 +2586,30 @@ class TestSymbolicRules:
             GraphOpID(abstractify(qp.CH(wires=jnp.array([0, 1])))).getGraphOpId()
             == "CH{}{wires:2}{}"
         )
+
+    def test_controlled_adjoint_rule_composes_resource_controls(self):
+        """Controls on an adjoint rule combine with controls already on its resources."""
+
+        @register_resources({ControlledOp2(qp.S(Wire[1]), Wire[1]): 1})
+        def adjoint_rule(base):
+            qp.ctrl(qp.S(base.reg[0]), control=base.reg[1])
+
+        with local_decomps():
+            add_decomps("Adjoint(NoParams)", adjoint_rule)
+            module = compile_registered_symbolic_rules(
+                "NoParams",
+                "NoParams{}{reg:2}{}",
+                {},
+                {"reg": 2},
+                {},
+                op_cls=NoParams,
+                modifiers=ModifierState(adjoint=True, control_count=1),
+            )
+
+        rules = get_rule_strings_from_module(module)
+        assert len(rules) == 1
+        rule = rules[0]
+        assert '"2C(S){}{wires:1}{}" = 1 : i64' in rule
 
     def test_no_registered_symbolic_rules(self):
         """Test an op with no symbolic rules registered against its adjoint yields no module."""
@@ -3190,7 +3310,7 @@ class TestCustomRuleApplication:
 class TestDecomposeAlias:
     """``qp.decompose`` under capture is an alias for ``graph_decomposition`` (same C++ pass)."""
 
-    @pytest.mark.usefixtures("use_capture_dgraph")
+    @pytest.mark.usefixtures("use_capture")
     @pytest.mark.parametrize("clean", [False, None], ids=["false", "none"])
     @pytest.mark.xfail(
         reason="On-demand rules use separate JAX contexts and can produce duplicate symbols.",
@@ -3233,7 +3353,7 @@ class TestDecomposeAlias:
 
     def test_decompose_requires_gate_set(self):
         """qp.decompose without a gate set is rejected with a clear error."""
-        with pytest.raises(ValueError, match="requires an explicit 'gate_set'"):
+        with pytest.raises(TypeError, match=r"The gate_set argument is required\."):
 
             @qjit(capture=True, target="mlir")
             @qp.decompose(gate_set=None)

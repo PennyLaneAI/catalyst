@@ -610,7 +610,9 @@ def OperatorOp : UnitaryGate_Op<"operator", [ParametrizedGate, NoMemoryEffect,
                              just forwarded to decomposition functions after the params list.
         * Optional frontend-level metadata:
           * `param_map` — maps frontend argument names to the lowered `params` operand positions
-          * `qubit_map` — maps frontend argument names to lowered qubit/index-array positions
+          * `qubit_map` — maps frontend argument names to lowered qubit/index-array positions.
+            Entries may share positions when composite arguments use the same qubits; each
+            entry retains its argument's wire order and number of wire occurrences.
 
         Examples:
 
@@ -1248,8 +1250,96 @@ def HamiltonianOp : Observable_Op<"hamiltonian"> {
 // -----
 
 class Measurement_Op<string mnemonic, list<Trait> traits = []> :
-        Quantum_Op<mnemonic, traits # [MeasurementProcess,
+        Quantum_Op<mnemonic, traits # [TerminalMeasurement,
                                         DeclareOpInterfaceMethods<ResourceMeasurementOpInterface>]>;
+
+def MeasurementOp : Quantum_Op<"measurement", [
+        MeasurementProcess, AttrSizedOperandSegments, AttrSizedResultSegments,
+        DeclareOpInterfaceMethods<ResourceQuantumOpInterface>]> {
+    let summary = "A generic mid-circuit measurement with classical results.";
+    let description = [{
+        Represents a named measurement with arbitrary classical parameters and
+        compilable static inputs in `static_data`. Parameters and classical
+        results may have any non-quantum type, and either list may be empty.
+
+        Like `quantum.operator`, this operation supports explicit qubits or a
+        register with index tensors selecting the measured wires. These modes
+        cannot be mixed, and at least one target qubit or index array is
+        required. Classical results precede the updated qubits (in input order)
+        or the updated register. Their types are supplied by the caller and are
+        always written in parentheses. The operation has measurement effects
+        even when its results are unused.
+
+        Optional frontend-level metadata:
+          * `param_map` — maps frontend argument names to the lowered `params` operand positions
+          * `qubit_map` — maps frontend argument names to lowered qubit/index-array positions
+
+        ```mlir
+        %m, %out = quantum.measurement "MeasureInBasis"(%angle: f64)
+            qubits(%q) static_data = {plane = "XY"}
+            param_map = {angle = [0]} qubit_map = {wires = [0]}
+            : (i1, !quantum.bit)
+
+        %bits, %out_reg = quantum.measurement "MeasureMany"()
+            quregs(%reg) indices(%wires: tensor<?xi64>)
+            : (tensor<?xi1>, !quantum.reg)
+
+        // Note: PPM example shown below is the 1:1 lowering to the corresponding example in PPMeasurementOp.
+        %result, %out:3 = quantum.measurement "PauliMeasure"()
+            qubits(%q0, %q1, %q2)
+            static_data = {pauli_word = "XIZ"}
+            : (i1, !quantum.bit, !quantum.bit, !quantum.bit)
+        ```
+
+        Empty classical results are allowed when targets are present, e.g.
+        `: (!quantum.bit)`. Measurement names and static data are interpreted
+        by downstream lowering passes. This operation implements
+        `MeasurementProcess`; terminal result extraction uses the
+        observable-based `TerminalMeasurement` interface.
+    }];
+
+    let arguments = (ins
+        StrAttr:$op_name,
+        Variadic<AnyType>:$params,
+        Variadic<QubitType>:$in_qubits,
+        Optional<QuregType>:$in_qreg,
+        Variadic<1DTensorOf<[I64]>>:$arr_qubit_indices,
+        DefaultValuedOptionalAttr<DictionaryAttr, "{}">:$static_data,
+        DefaultValuedOptionalAttr<I64ArrayDictAttr, "{}">:$param_map,
+        DefaultValuedOptionalAttr<I64ArrayDictAttr, "{}">:$qubit_map
+    );
+
+    let results = (outs
+        Variadic<AnyType>:$mres,
+        Variadic<QubitType>:$out_qubits,
+        Optional<QuregType>:$out_qreg
+    );
+
+    let builders = [
+        OpBuilder<(ins
+            "mlir::TypeRange":$mres,
+            "llvm::StringRef":$op_name,
+            "mlir::ValueRange":$params,
+            "mlir::ValueRange":$in_qubits,
+            CArg<"mlir::DictionaryAttr", "nullptr">:$static_data,
+            CArg<"mlir::DictionaryAttr", "nullptr">:$param_map,
+            CArg<"mlir::DictionaryAttr", "nullptr">:$qubit_map
+        )>,
+        OpBuilder<(ins
+            "mlir::TypeRange":$mres,
+            "llvm::StringRef":$op_name,
+            "mlir::ValueRange":$params,
+            "mlir::Value":$in_qreg,
+            "mlir::ValueRange":$arr_qubit_indices,
+            CArg<"mlir::DictionaryAttr", "nullptr">:$static_data,
+            CArg<"mlir::DictionaryAttr", "nullptr">:$param_map,
+            CArg<"mlir::DictionaryAttr", "nullptr">:$qubit_map
+        )>
+    ];
+
+    let hasVerifier = 1;
+    let hasCustomAssemblyFormat = 1;
+}
 
 def MeasureOp : Quantum_Op<"measure", [DeclareOpInterfaceMethods<ResourceQuantumOpInterface>]> {
     let summary = "A single-qubit projective measurement in the computational basis.";

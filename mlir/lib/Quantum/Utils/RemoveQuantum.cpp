@@ -14,13 +14,22 @@
 
 #include "Quantum/Utils/RemoveQuantum.h"
 
+#include <cassert>
 #include <deque>
 
 #include "llvm/ADT/SmallPtrSet.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
+#include "mlir/IR/BuiltinTypes.h"
+#include "mlir/IR/Operation.h"
 #include "mlir/IR/PatternMatch.h"
+#include "mlir/IR/Value.h"
+#include "mlir/Support/LLVM.h"
+#include "mlir/Support/LogicalResult.h"
+#include "mlir/Support/WalkResult.h"
 
+#include "Quantum/IR/QuantumDialect.h"
 #include "Quantum/IR/QuantumInterfaces.h"
 #include "Quantum/IR/QuantumOps.h"
 
@@ -30,12 +39,12 @@ namespace catalyst {
 namespace quantum {
 
 void removeQuantumMeasurements(func::FuncOp &function, PatternRewriter &rewriter) {
-    // Delete measurement operations.
+    // Delete terminal measurement operations.
     std::deque<Operation *> opsToDelete;
-    function.walk([&](MeasurementProcess op) { opsToDelete.push_back(op); });
+    function.walk([&](TerminalMeasurement op) { opsToDelete.push_back(op); });
     SmallPtrSet<Operation *, 4> visited{opsToDelete.begin(), opsToDelete.end()};
 
-    // Measurement operations are not allowed inside scf dialects.
+    // Terminal measurement operations are not allowed inside scf dialects.
     // This means that we can remove them.
     // But the question then becomes, can we have arbitrary control flow
     // inside after measurements?
@@ -61,7 +70,7 @@ void removeQuantumMeasurements(func::FuncOp &function, PatternRewriter &rewriter
 }
 
 void replaceQuantumMeasurements(func::FuncOp &function, PatternRewriter &rewriter) {
-    function.walk([&](MeasurementProcess op) {
+    function.walk([&](TerminalMeasurement op) {
         auto types = op->getResults().getTypes();
         auto loc = op.getLoc();
         SmallVector<Value> results;
