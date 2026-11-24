@@ -19,6 +19,7 @@ from dataclasses import replace
 import numpy as np
 import pennylane as qp
 import pytest
+from pennylane.core.queuing import AnnotatedQueue
 from pennylane.decomposition import add_decomps, register_resources
 from pennylane.devices import Device, NullQubit
 from pennylane.devices.capabilities import DeviceCapabilities, OperatorProperties
@@ -544,7 +545,7 @@ class TestPreprocessHybridOp:
         """Test that an error is raised in decompose if a PennyLane mid-circuit measurement
         is encountered"""
 
-        with qp.queuing.AnnotatedQueue() as q:
+        with AnnotatedQueue() as q:
             qp.RX(1.23, wires=0)
             qp.measure(0)
 
@@ -564,7 +565,7 @@ class TestPreprocessHybridOp:
         """Test that an error is raised in decompose if a PennyLane mid-circuit measurement
         is encountered"""
 
-        with qp.queuing.AnnotatedQueue() as q:
+        with AnnotatedQueue() as q:
             qp.RX(1.23, wires=0)
             qp.measure(0)
 
