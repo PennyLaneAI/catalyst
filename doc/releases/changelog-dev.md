@@ -1167,11 +1167,11 @@
 
 * `jax.interpreters.partial_eval.DynamicJaxprTrace` objects are now marked invalid when their
   capture context exits, allowing stale tracers to be invalidated.
-  [(#XXXX)](https://github.com/PennyLaneAI/catalyst/pull/XXXX)
+  [(#3517)](https://github.com/PennyLaneAI/catalyst/pull/3517)
 
 * Queuing imports now use `pennylane.core.queuing`, following the removal of the
   `pennylane.queuing` compatibility module.
-  [(#XXXX)](https://github.com/PennyLaneAI/catalyst/pull/XXXX)
+  [(#3517)](https://github.com/PennyLaneAI/catalyst/pull/3517)
 
 * Updated `pylint` to version 4.1.3 in the development requirements and CI formatting workflow.
   [(#3459)](https://github.com/PennyLaneAI/catalyst/pull/3459)
