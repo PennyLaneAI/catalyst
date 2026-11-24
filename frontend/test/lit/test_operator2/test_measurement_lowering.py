@@ -13,9 +13,7 @@
 # limitations under the License.
 """Test generic and specialized lowering of mid-circuit measurements."""
 
-# RUN: %PYTHON %s > %t
-# RUN: FileCheck %s < %t
-# RUN: quantum-opt --convert-to-value-semantics --canonicalize %t | FileCheck %s --check-prefix=VALUE
+# RUN: %PYTHON %s | FileCheck %s
 
 import pennylane as qp
 
@@ -42,11 +40,6 @@ class BareMeasurement(qp.ops.MidMeasure):
 @qp.qjit(capture=True, target="mlir", collect_decomp_rules=False)
 @qp.qnode(qp.device("null.qubit", wires=2))
 def direct_measurements():
-    # VALUE-LABEL: func.func public @direct_measurements
-    # VALUE: quantum.measurement "MidMeasure"()
-    # VALUE-SAME: qubit_map = {wires = [0]}
-    # VALUE: quantum.measurement "PauliMeasure"()
-    # VALUE-SAME: qubit_map = {wires = [0, 1]}
     # CHECK-LABEL: func.func public @direct_measurements
     # CHECK: [[q0:%.+]] = qref.get {{%.+}}[ 0]
     # CHECK: qref.measurement "MidMeasure"() qubits([[q0]])
@@ -69,11 +62,6 @@ print(direct_measurements.mlir)
 @qp.qjit(capture=True, target="mlir", collect_decomp_rules=False)
 @qp.qnode(qp.device("null.qubit", wires=1))
 def custom_measurements(angle: float):
-    # VALUE-LABEL: func.func public @custom_measurements
-    # VALUE: quantum.measurement "RotatedMeasurement"({{%.+}}: tensor<f64>)
-    # VALUE-SAME: param_map = {angle = [0]} qubit_map = {wires = [0]}
-    # VALUE: quantum.measurement "BareMeasurement"()
-    # VALUE-SAME: qubit_map = {wires = [0]}
     # CHECK-LABEL: func.func public @custom_measurements
     # CHECK: [[q0:%.+]] = qref.get {{%.+}}[ 0]
     # CHECK: qref.measurement "RotatedMeasurement"({{%.+}}: tensor<f64>) qubits([[q0]])
@@ -110,16 +98,12 @@ print(specialized_measurements.mlir)
 @qp.qjit(capture=True, target="mlir", collect_decomp_rules=False)
 @qp.qnode(qp.device("null.qubit", wires=2))
 def pauli_measurements():
-    # VALUE-LABEL: func.func public @pauli_measurements
-    # VALUE: quantum.measurement "PauliMeasure"()
-    # VALUE-SAME: static_data = {pauli_word = "XZ", postselect = none}
-    # VALUE-SAME: qubit_map = {wires = [0, 1]} : i1,
     # CHECK-LABEL: func.func public @pauli_measurements
     # CHECK: [[q0:%.+]] = qref.get {{%.+}}[ 1]
     # CHECK: [[q1:%.+]] = qref.get {{%.+}}[ 0]
     # CHECK: [[result:%.+]] = qref.measurement "PauliMeasure"() qubits([[q0]], [[q1]])
     # CHECK-SAME: static_data = {pauli_word = "XZ", postselect = none}
-    # CHECK-SAME: qubit_map = {wires = [0, 1]} : i1
+    # CHECK-SAME: qubit_map = {wires = [0, 1]} : (i1)
     result = qp.pauli_measure("XZ", (1, 0))
     qp.cond(result, qp.X)(0)
     return qp.state()

@@ -14,6 +14,7 @@
 
 #define DEBUG_TYPE "verify-no-quantum-use-after-free"
 
+#include "llvm/ADT/SmallVector.h"
 #include "mlir/IR/Dominance.h"
 #include "mlir/IR/Operation.h"
 #include "mlir/IR/Value.h"
@@ -30,10 +31,21 @@ namespace {
 bool hasUseAfterFree(Value qubit, Operation *gate, DominanceInfo &domInfo) {
     if (auto getOp = qubit.getDefiningOp<qref::GetOp>()) {
         Value qreg = getOp.getQreg();
-        for (Operation *user : qreg.getUsers()) {
-            if (auto deallocOp = dyn_cast<qref::DeallocOp>(user)) {
-                if (domInfo.properlyDominates(deallocOp, gate)) {
-                    return true;
+        // Casts preserve register identity. Start at the source so that deallocations
+        // through any cast alias, including sibling casts, are considered.
+        while (auto castOp = qreg.getDefiningOp<qref::CastOp>()) {
+            qreg = castOp.getSource();
+        }
+        SmallVector<Value> worklist{qreg};
+        while (!worklist.empty()) {
+            Value alias = worklist.pop_back_val();
+            for (Operation *user : alias.getUsers()) {
+                if (auto castOp = dyn_cast<qref::CastOp>(user)) {
+                    worklist.push_back(castOp.getResult());
+                } else if (auto deallocOp = dyn_cast<qref::DeallocOp>(user)) {
+                    if (domInfo.properlyDominates(deallocOp, gate)) {
+                        return true;
+                    }
                 }
             }
         }

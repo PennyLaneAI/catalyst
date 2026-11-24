@@ -660,8 +660,7 @@ LogicalResult MeasurementOp::verify() {
     auto isClassical = [](Type type) {
         bool classical = true;
         type.walk([&](Type nested) {
-            if (isa<QubitType, QuregType, ObservableType, catalyst::qref::QubitType,
-                    catalyst::qref::QuregType>(nested)) {
+            if (isa<catalyst::qref::QRefDialect, QuantumDialect>(nested.getDialect())) {
                 classical = false;
             }
         });
@@ -691,6 +690,9 @@ LogicalResult MeasurementOp::verify() {
     }
 
     const size_t numTargets = hasQregMode ? getArrQubitIndices().size() : getInQubits().size();
+    if (numTargets == 0) {
+        return emitOpError("expected at least one target qubit");
+    }
     const char *boundsNoun = hasQregMode ? "index arrays" : "qubits";
     const char *coverageNoun =
         hasQregMode ? "index arrays in register mode" : "qubit values in qubit mode";
@@ -953,12 +955,10 @@ void MeasurementOp::print(OpAsmPrinter &p) {
                              "operandSegmentSizes", "resultSegmentSizes"});
     p << " : ";
 
-    // 7. Result types
-    if (getOperation()->getNumResults() == 0) {
-        p << "()";
-    } else {
-        p << getOperation()->getResultTypes();
-    }
+    // 7. Result types (always parenthesized)
+    p << "(";
+    llvm::interleaveComma(getOperation()->getResultTypes(), p);
+    p << ")";
 }
 
 ParseResult MeasurementOp::parse(OpAsmParser &parser, OperationState &result) {
@@ -1040,13 +1040,9 @@ ParseResult MeasurementOp::parse(OpAsmParser &parser, OperationState &result) {
         return failure();
     }
 
-    // 7. Result types (optional parentheses)
-    if (succeeded(parser.parseOptionalLParen())) {
-        if (failed(parser.parseOptionalRParen()) &&
-            (parser.parseTypeList(resultTypes) || parser.parseRParen())) {
-            return failure();
-        }
-    } else if (parser.parseTypeList(resultTypes)) {
+    // 7. Result types
+    if (parser.parseLParen() || (failed(parser.parseOptionalRParen()) &&
+                                 (parser.parseTypeList(resultTypes) || parser.parseRParen()))) {
         return failure();
     }
 
@@ -1520,9 +1516,8 @@ mlir::DictionaryAttr QubitUnitaryOp::getStaticData() {
     return mlir::DictionaryAttr::get(getContext(), {});
 }
 
-// Return the entries of a name -> operand-indices map (`param_map`/`qubit_map`) in operand order.
-// The dictionary attribute itself is sorted by name, which is not an operand order. Entries
-// without operands (e.g. an empty wire argument) have no position and go last, in name order.
+// Return named parameter groups in operand order, rather than dictionary (name) order.
+// Groups without operands have no position and go last, in name order.
 static llvm::SmallVector<std::pair<llvm::StringRef, llvm::ArrayRef<int64_t>>>
 getEntriesInOperandOrder(mlir::DictionaryAttr map) {
     llvm::SmallVector<std::pair<llvm::StringRef, llvm::ArrayRef<int64_t>>> entries;
@@ -1560,7 +1555,9 @@ static DynamicShape getDynamicShapeFromParamMap(mlir::ValueRange params,
 static WireLens getWireLensFromQubitMap(mlir::DictionaryAttr qubitMap,
                                         mlir::ValueRange arrQubitIndices, bool hasQreg) {
     WireLens wireLens;
-    for (auto [name, indices] : getEntriesInOperandOrder(qubitMap)) {
+
+    for (mlir::NamedAttribute entry : getQubitMap()) {
+        auto indices = cast<mlir::DenseI64ArrayAttr>(entry.getValue()).asArrayRef();
         size_t numQubits;
         if (hasQreg) {
             numQubits = 0;
@@ -1572,7 +1569,8 @@ static WireLens getWireLensFromQubitMap(mlir::DictionaryAttr qubitMap,
         } else {
             numQubits = indices.size();
         }
-        wireLens.emplace_back(name.str(), numQubits);
+
+        wireLens.emplace_back(entry.getName().getValue().str(), numQubits);
     }
     return wireLens;
 }
@@ -1652,6 +1650,9 @@ static llvm::StringRef getObservableName(MLIRContext *ctx, llvm::StringRef baseN
 }
 
 llvm::StringRef MeasurementOp::getResourceName() { return getOpName(); }
+// Note: getResourceNumQubits for MeasurementOp does not consider QReg mode.
+// This is currently consistent with behavior of OperatorOp, and must be updated together if the
+// behavior is to be modifed.
 uint64_t MeasurementOp::getResourceNumQubits() { return getInQubits().size(); }
 uint64_t MeasurementOp::getResourceNumCtrlQubits() { return 0; }
 uint64_t MeasurementOp::getResourceNumParams() { return getParams().size(); }

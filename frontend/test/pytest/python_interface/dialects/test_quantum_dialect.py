@@ -14,6 +14,7 @@
 """Unit tests for the xDSL Quantum dialect."""
 
 import pytest
+from xdsl.context import Context
 from xdsl.dialects.builtin import (
     ArrayAttr,
     ComplexType,
@@ -28,7 +29,9 @@ from xdsl.dialects.builtin import (
 )
 from xdsl.dialects.test import TestOp
 from xdsl.ir import AttributeCovT, Block, Operation, OpResult, Region
+from xdsl.utils.exceptions import ParseError
 
+from catalyst.python_interface import QuantumParser
 from catalyst.python_interface.dialects import Quantum, quantum
 from catalyst.python_interface.dialects.quantum import (
     CustomOp,
@@ -352,6 +355,38 @@ class TestCustomVerifiers:
             op.verify()
 
 
+class TestCustomParsers:
+    """Unit tests for operations that have custom parsing logic."""
+
+    @pytest.mark.parametrize(
+        "measurement, error",
+        [
+            (
+                '%m, %out = quantum.measurement "M"(%angle: f64) qubits(%q) : (i1, !quantum.bit)',
+                "Measurement operand type does not match its annotation",
+            ),
+            (
+                '%out = quantum.measurement "M"() qubits(%q) static_data = "XY" : (!quantum.bit)',
+                "Expected a dictionary for measurement static_data",
+            ),
+            (
+                'quantum.measurement "M"() qubits(%q) : ()',
+                "Expected a result for each measurement qubit or register",
+            ),
+        ],
+    )
+    def test_invalid_generic_measurement(self, measurement, error):
+        """Test that malformed generic measurements raise a parse error."""
+        program = f"""
+        func.func @measurement(%q: !quantum.bit, %angle: tensor<f64>) {{
+          {measurement}
+          return
+        }}
+        """
+        with pytest.raises(ParseError, match=error):
+            QuantumParser(Context(), program).parse_module()
+
+
 @pytest.mark.parametrize(
     "pretty_print", [pytest.param(True, id="pretty_print"), pytest.param(False, id="generic_print")]
 )
@@ -369,16 +404,16 @@ class TestAssemblyFormat:
           // CHECK-SAME: static_data = {plane = "XY"}
           // CHECK-SAME: -> (i1, f64, !quantum.bit)
           %m, %value, %out = quantum.measurement "RotatedMeasurement"(%angle: tensor<f64>)
-              qubits(%q) static_data = {plane = "XY"} : i1, f64, !quantum.bit
+              qubits(%q) static_data = {plane = "XY"} : (i1, f64, !quantum.bit)
           // CHECK: "quantum.measurement"(
           // CHECK-SAME: op_name = "Discard"
           // CHECK-SAME: -> !quantum.bit
-          %discard = quantum.measurement "Discard"() qubits(%out) : !quantum.bit
+          %discard = quantum.measurement "Discard"() qubits(%out) : (!quantum.bit)
           // CHECK: "quantum.measurement"(
           // CHECK-SAME: op_name = "RegisterMeasurement"
           // CHECK-SAME: : (!quantum.reg, tensor<2xi64>) -> (tensor<2xi1>, !quantum.reg)
           %bits, %out_reg = quantum.measurement "RegisterMeasurement"() quregs(%reg)
-              indices(%indices: tensor<2xi64>) : tensor<2xi1>, !quantum.reg
+              indices(%indices: tensor<2xi64>) : (tensor<2xi1>, !quantum.reg)
           return
         }
         """

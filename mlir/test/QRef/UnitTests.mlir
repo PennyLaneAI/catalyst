@@ -349,7 +349,7 @@ func.func @qubits(%angle: f64, %data: tensor<?xf64>, %q0: !qref.bit, %q1: !qref.
   %m, %data_out = qref.measurement "MeasurePair"(%angle: f64, %data: tensor<?xf64>)
       qubits(%q0, %q1) static_data = {plane = "XY", reset = true}
       param_map = {angle = [0], data = [1]} qubit_map = {wires = [0, 1]} {tag = "preserved"}
-      : i1, tensor<2xf64>
+      : (i1, tensor<2xf64>)
   return %m, %data_out : i1, tensor<2xf64>
 }
 
@@ -358,7 +358,7 @@ func.func @register(%reg: !qref.reg<4>, %wires: tensor<?xi64>, %other: tensor<1x
   %m = qref.measurement "MeasureMany"()
       quregs(%reg: !qref.reg<4>) indices(%wires: tensor<?xi64>, %other: tensor<1xi64>)
       qubit_map = {wires = [0], other = [1]}
-      : tensor<?xi1>
+      : (tensor<?xi1>)
   return %m : tensor<?xi1>
 }
 
@@ -368,7 +368,6 @@ func.func @dynamic_register(%reg: !qref.reg<?>, %wires: tensor<?xi64>) {
 }
 
 func.func @unused_results(%q: !qref.bit) {
-  %m = qref.measurement "Unused"() qubits(%q) : i1
-  qref.measurement "NoResults"() qubits() static_data = {} : ()
+  %m = qref.measurement "Unused"() qubits(%q) : (i1)
   return
 }

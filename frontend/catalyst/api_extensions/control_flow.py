@@ -31,7 +31,8 @@ from jax._src.tree_util import PyTreeDef, tree_unflatten, treedef_is_leaf
 from jax.api_util import debug_info
 from jax.core import AbstractValue
 from pennylane import QueuingManager
-from pennylane.tape import QuantumTape
+from pennylane.core.qscript import QuantumScript
+from pennylane.core.queuing import AnnotatedQueue
 
 import catalyst
 from catalyst.jax_extras import (
@@ -765,7 +766,7 @@ class CondCallable:
             def post_processing_fn(results):
                 return results
 
-            modified_tape = qp.tape.QuantumTape(ops, tape.measurements)
+            modified_tape = qp.tape.QuantumScript(ops, tape.measurements)
             print(res)
             print(modified_tape.operations)
             return [modified_tape], post_processing_fn
@@ -877,7 +878,6 @@ class CondCallable:
         in_sigs, out_sigs = [], []
         # Do the classical tracing of every branch
         for branch_fn in self.branch_fns + [self.otherwise_fn]:
-            quantum_tape = QuantumTape()
             # Cond branches take no arguments
             wfun, in_sig, out_sig = deduce_signatures(
                 branch_fn,
@@ -888,7 +888,7 @@ class CondCallable:
             )
             assert len(in_sig.in_type) == 0
             with EvaluationContext.frame_tracing_context(debug_info=wfun.debug_info) as inner_trace:
-                with QueuingManager.stop_recording(), quantum_tape:
+                with QueuingManager.stop_recording(), AnnotatedQueue() as queue:
                     with Patcher(
                         (
                             jax._src.interpreters.partial_eval,  # pylint: disable=protected-access
@@ -900,6 +900,7 @@ class CondCallable:
                             inner_trace.to_jaxpr_tracer(t, source_info=current_source_info())
                             for t in wfun.call_wrapped()
                         ]
+            quantum_tape = QuantumScript.from_queue(queue)
             explicit_return_tys = collapse(out_sig.out_type(), res_classical_tracers)
             hybridRegion = HybridOpRegion(inner_trace, quantum_tape, [], explicit_return_tys)
             regions.append(hybridRegion)
@@ -1022,7 +1023,7 @@ class ForLoopCallable:
 
             def post_processing_fn(results):
                 return results
-            modified_tape = qp.tape.QuantumTape(ops, tape.measurements)
+            modified_tape = qp.tape.QuantumScript(ops, tape.measurements)
             print(res)
             print(modified_tape.operations)
             return [modified_tape], post_processing_fn
@@ -1077,7 +1078,6 @@ class ForLoopCallable:
         return self._operation
 
     def _call_with_quantum_ctx(self, *init_state):
-        quantum_tape = QuantumTape()
         outer_trace = EvaluationContext.get_current_trace()
         aux_classical_tracers = [
             outer_trace.to_jaxpr_tracer(t, source_info=current_source_info())
@@ -1100,7 +1100,7 @@ class ForLoopCallable:
                 partial(inner_trace.new_arg, source_info=current_source_info()),
                 partial(inner_trace.to_jaxpr_tracer, source_info=current_source_info()),
             )
-            with QueuingManager.stop_recording(), quantum_tape:
+            with QueuingManager.stop_recording(), AnnotatedQueue() as queue:
                 with Patcher(
                     (
                         jax._src.interpreters.partial_eval,  # pylint: disable=protected-access
@@ -1116,6 +1116,7 @@ class ForLoopCallable:
                 out_tree = out_sig.out_tree()
                 out_consts = out_sig.out_consts()
 
+        quantum_tape = QuantumScript.from_queue(queue)
         in_expanded_classical_tracers, in_type2 = expand_args(
             aux_classical_tracers + collapse(in_type, in_sig.in_expanded_args),
             self.expansion_strategy,
@@ -1322,8 +1323,6 @@ class SwitchCallable:
         in_sigs, out_sigs = [], []
         # Do the classical tracing of every branch
         for branch in branches:
-            quantum_tape = QuantumTape()
-
             # branches are argless
             wfun, in_sig, out_sig = deduce_signatures(
                 branch,
@@ -1334,7 +1333,7 @@ class SwitchCallable:
             )
             assert len(in_sig.in_type) == 0
             with EvaluationContext.frame_tracing_context(debug_info=wfun.debug_info) as inner_trace:
-                with QueuingManager.stop_recording(), quantum_tape:
+                with QueuingManager.stop_recording(), AnnotatedQueue() as queue:
                     with Patcher(
                         (
                             jax._src.interpreters.partial_eval,  # pylint: disable=protected-access
@@ -1346,6 +1345,7 @@ class SwitchCallable:
                             inner_trace.to_jaxpr_tracer(t, source_info=current_source_info())
                             for t in wfun.call_wrapped()
                         ]
+            quantum_tape = QuantumScript.from_queue(queue)
             explicit_return_tys = collapse(out_sig.out_type(), res_classical_tracers)
             hybridRegion = HybridOpRegion(inner_trace, quantum_tape, [], explicit_return_tys)
             regions.append(hybridRegion)
@@ -1485,7 +1485,7 @@ class WhileLoopCallable:
             def post_processing_fn(results):
                 return results
 
-            modified_tape = qp.tape.QuantumTape(ops, tape.measurements)
+            modified_tape = qp.tape.QuantumScript(ops, tape.measurements)
             print(res)
             print(modified_tape.operations)
             return [modified_tape], post_processing_fn
@@ -1587,8 +1587,7 @@ class WhileLoopCallable:
                 partial(body_trace.to_jaxpr_tracer, source_info=current_source_info()),
             )
 
-            quantum_tape = QuantumTape()
-            with QueuingManager.stop_recording(), quantum_tape:
+            with QueuingManager.stop_recording(), AnnotatedQueue() as queue:
                 with Patcher(
                     (
                         jax._src.interpreters.partial_eval,  # pylint: disable=protected-access
@@ -1601,6 +1600,7 @@ class WhileLoopCallable:
                         for t in body_wffa.call_wrapped(*arg_classical_tracers)
                     ]
 
+            quantum_tape = QuantumScript.from_queue(queue)
             out_type = out_sig.out_type()
             out_tree = out_sig.out_tree()
             out_body_consts = out_sig.out_consts()

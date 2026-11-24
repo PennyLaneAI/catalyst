@@ -205,7 +205,8 @@ def DecomposableOp : OpInterface<"DecomposableOp"> {
             "::catalyst::quantum::DynamicShape", "getDynamicShape"
         >,
         InterfaceMethod<
-            "Return the frontend wire argument names with their number of wires (excluding control wires), in operand order.",
+            "Return the frontend wire argument names with their number of wires (excluding control wires). "
+            "OperatorOp follows qubit_map order.",
             "::catalyst::quantum::WireLens", "getWireLens"
         >,
         InterfaceMethod<

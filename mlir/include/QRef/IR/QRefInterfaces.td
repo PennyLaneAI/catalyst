@@ -79,11 +79,16 @@ def QuantumGate : OpInterface<"QuantumGate", [QuantumOperation]> {
         InterfaceMethod<
             "Set adjoint flag.",
             "void", "setAdjointFlag", (ins "bool":$adjoint)
+        >,
+        InterfaceMethod<
+            "Return true if non-control qubit operands must not overlap.",
+            "bool", "requiresNonOverlappingNonCtrlQubitOperands", (ins), [{}],
+            [{ return true; }]
         >
     ];
 
     let verify = [{
-        auto gate = mlir::cast<ConcreteOp>($_op);
+        auto gate = mlir::cast<::catalyst::qref::QuantumGate>($_op);
 
         if (gate.getCtrlValueOperands().size() != gate.getCtrlQubitOperands().size()) {
             return $_op->emitError() <<
@@ -95,7 +100,14 @@ def QuantumGate : OpInterface<"QuantumGate", [QuantumOperation]> {
         }
 
         llvm::SmallPtrSet<mlir::Value, 4> seenQubits;
-        for (mlir::Value qubit : gate.getQubitOperands()) {
+        for (mlir::Value qubit : gate.getNonCtrlQubitOperands()) {
+            if (!seenQubits.insert(qubit).second &&
+                gate.requiresNonOverlappingNonCtrlQubitOperands()) {
+                return $_op->emitError() <<
+                    "all qubits on a quantum gate must be distinct (including controls)";
+            }
+        }
+        for (mlir::Value qubit : gate.getCtrlQubitOperands()) {
             if (!seenQubits.insert(qubit).second) {
                 return $_op->emitError() <<
                     "all qubits on a quantum gate must be distinct (including controls)";
@@ -162,7 +174,8 @@ def DecomposableOp : OpInterface<"DecomposableOp"> {
             "::catalyst::qref::DynamicShape", "getDynamicShape"
         >,
         InterfaceMethod<
-            "Return the frontend wire argument names with their number of wires (excluding control wires), in operand order.",
+            "Return the frontend wire argument names with their number of wires (excluding control wires). "
+            "OperatorOp follows qubit_map order.",
             "::catalyst::qref::WireLens", "getWireLens"
         >,
         InterfaceMethod<
