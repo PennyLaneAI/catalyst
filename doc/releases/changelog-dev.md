@@ -894,6 +894,11 @@
 
 <h3>Breaking changes 💔</h3>
 
+* Catalyst no longer installs PennyLane or Lightning automatically. Use a compatible PennyLane
+  release that includes Catalyst and an execution backend. For development, `make frontend`
+  installs the versions pinned in `.dep-versions` alongside the Catalyst checkout. The current
+  Python frontend still requires PennyLane.
+
 * We now have `capture=True` as the default mode for Catalyst `qjit`.
   [(#3414)](https://github.com/PennyLaneAI/catalyst/pull/3414)
 

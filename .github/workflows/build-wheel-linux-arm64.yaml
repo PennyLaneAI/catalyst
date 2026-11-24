@@ -492,7 +492,7 @@ jobs:
 
     - name: Install Catalyst
       run: |
-        python${{ matrix.python_version }} -m pip install dist/*.whl --extra-index-url https://test.pypi.org/simple
+        make install-frontend PYTHON=python${{ matrix.python_version }} CATALYST_PACKAGE="dist/*.whl"
 
     - name: Install Standalone Plugin
       # Run only on Thursday at the given time

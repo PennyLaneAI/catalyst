@@ -53,86 +53,16 @@ with open(os.path.join("frontend", "catalyst", "_revision.py"), "w", encoding="u
 
 
 def parse_dep_versions():
-    """Parse the version strings of the Catalyst package dependencies based on the values found in
-    the .dep-versions file.
-
-    Search patterns must be added manually; this function will not automatically parse patterns like
-
-        <package>=x.y.z
-
-    Example
-    -------
-
-    If the .dep-versions file is
-
-        jax=0.4.28
-        pennylane=0.40.0
-        # lightning=0.40.0
-
-    The version strings for jax and pennylane will be returned, but the version string for lightning
-    is omitted because it has been commented out:
-
-        >>> parse_dep_version()
-        {"jax": "0.4.28", "pennylane": "0.40.0"}
-
-    Returns:
-        dict: Dictionary of dependency versions
-    """
-    results = {}
-    pattern_jax = re.compile(r"^jax=(\S+)", re.MULTILINE)
-    pattern_pl = re.compile(r"^pennylane=(\S+)", re.MULTILINE)
-    pattern_lq = re.compile(r"^lightning=(\S+)", re.MULTILINE)
-
+    """Read the JAX runtime dependency version from .dep-versions."""
     with open(".dep-versions", encoding="utf-8") as fin:
-        lines = fin.read()
-
-        match_jax = pattern_jax.search(lines)
-        match_pl = pattern_pl.search(lines)
-        match_lq = pattern_lq.search(lines)
-
-        if match_jax is not None:
-            results["jax"] = match_jax.group(1)
-
-        if match_pl is not None:
-            results["pennylane"] = match_pl.group(1)
-
-        if match_lq is not None:
-            results["lightning"] = match_lq.group(1)
-
-    return results
+        match = re.search(r"^jax=(\S+)", fin.read(), re.MULTILINE)
+    return {"jax": match.group(1)} if match is not None else {}
 
 
 dep_versions = parse_dep_versions()
 jax_version = dep_versions.get("jax")
-pl_version = dep_versions.get("pennylane")
-lq_version = dep_versions.get("lightning")
-
-pl_min_release = "0.45.0"
-lq_min_release = pl_min_release
-
-if pl_version is not None:
-    pennylane_dep = (
-        f"pennylane @ {pl_version}" if pl_version.startswith("git+") else f"pennylane=={pl_version}"
-    )
-else:
-    pennylane_dep = f"pennylane>={pl_min_release}"
-if lq_version is not None:
-    lightning_dep = (
-        f"pennylane-lightning @ {lq_version}"
-        if lq_version.startswith("git+")
-        else f"pennylane-lightning=={lq_version}"
-    )
-    kokkos_dep = (
-        "" if lq_version.startswith("git+") else f"pennylane-lightning-kokkos=={lq_version}"
-    )
-else:
-    lightning_dep = f"pennylane-lightning>={lq_min_release}"
-    kokkos_dep = ""
 
 requirements = [
-    pennylane_dep,
-    lightning_dep,
-    kokkos_dep,
     f"jax=={jax_version}",
     f"jaxlib=={jax_version}",
     "numpy>2.0.0",

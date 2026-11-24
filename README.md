@@ -74,11 +74,16 @@ In addition, we also provide a Python frontend for [PennyLane](https://pennylane
 
 Catalyst is officially supported on Linux (x86_64, aarch64) and macOS (arm64) platforms,
 and pre-built binaries are being distributed via the Python Package Index (PyPI) for Python versions 3.12 and
-higher. To install it, simply run the following ``pip`` command:
+higher. Install through a compatible PennyLane release that includes Catalyst and an execution backend:
 
 ```console
-pip install pennylane-catalyst
+pip install pennylane
 ```
+
+Installing `pennylane-catalyst` alone no longer installs PennyLane or Lightning. The current
+Python frontend still needs PennyLane, and executing quantum programs needs an appropriate backend.
+Until a PennyLane release includes Catalyst, use the source installation instructions below
+to install a matched development environment.
 
 Catalyst no longer supports macOS with x86_64 architecture after 0.11.0. This includes Macs running on Intel processors.
 If you would like to use Catalyst on these systems, please install Catalyst version 0.11.0, PennyLane version 0.41.0, PennyLane-Lightning

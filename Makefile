@@ -147,13 +147,28 @@ $(error No Enzyme build found in $(MAIN_MLIR_DIR)/Enzyme/build; run make all in 
 endif
 endif
 
+# Install the candidate and its test dependencies together so PennyLane cannot replace it.
+CATALYST_PACKAGE ?= -e .
+PENNYLANE_TEST_VERSION = $(call dependency-version,pennylane,$(MK_DIR))
+LIGHTNING_TEST_VERSION = $(call dependency-version,lightning,$(MK_DIR))
+
+.PHONY: install-frontend
+install-frontend:
+	$(if $(PENNYLANE_TEST_VERSION),,$(error Set pennylane in .dep-versions for frontend tests))
+	$(if $(LIGHTNING_TEST_VERSION),,$(error Set lightning in .dep-versions for frontend tests))
+	$(PYTHON) -m pip install $(CATALYST_PACKAGE) \
+		"pennylane$(if $(filter git+%,$(PENNYLANE_TEST_VERSION)), @ ,==)$(PENNYLANE_TEST_VERSION)" \
+		"pennylane-lightning$(if $(filter git+%,$(LIGHTNING_TEST_VERSION)), @ ,==)$(LIGHTNING_TEST_VERSION)" \
+		$(if $(filter-out git+%,$(LIGHTNING_TEST_VERSION)),"pennylane-lightning-kokkos==$(LIGHTNING_TEST_VERSION)") \
+		--extra-index-url https://test.pypi.org/simple $(PIP_VERBOSE_FLAG)
+
 .PHONY: frontend
 frontend:
 	@echo "install Catalyst Frontend"
 	# Uninstall pennylane before updating Catalyst, since pip will not replace two development
 	# versions of a package with the same version tag (e.g. 0.38-dev0).
 	$(PYTHON) -m pip uninstall -y pennylane
-	$(PYTHON) -m pip install -e . --extra-index-url https://test.pypi.org/simple $(PIP_VERBOSE_FLAG)
+	$(MAKE) install-frontend
 	$(PYTHON) -m catalyst.decomposition.precompile_decomposition_rules
 	rm -r frontend/pennylane_catalyst.egg-info
 
@@ -307,7 +322,7 @@ wheel:
 	    done' sh {} +
 
 	$(PYTHON) -m pip wheel --no-deps . -w bootstrap_dist
-	$(PYTHON) -m pip install bootstrap_dist/*.whl --extra-index-url https://test.pypi.org/simple
+	$(MAKE) install-frontend CATALYST_PACKAGE="bootstrap_dist/*.whl"
 
 	$(PYTHON) -m catalyst.decomposition.precompile_decomposition_rules
 
