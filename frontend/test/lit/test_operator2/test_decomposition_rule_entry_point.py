@@ -40,7 +40,7 @@ from pennylane.core import Operator2
 from pennylane.typing import Complex, Float, Int, Wire
 
 from catalyst.decomposition.decomposition_rules import (
-    compile_reachable_decomposition_rules_wrapper,
+    compile_on_demand_decomposition_rules,
 )
 
 
@@ -63,7 +63,7 @@ def test_to_dynamic_argnames():
 
     with qp.decomposition.local_decomps():
         qp.add_decomps(NoParams, rule)
-        result = compile_reachable_decomposition_rules_wrapper(
+        result = compile_on_demand_decomposition_rules(
             [
                 {
                     "op_name": "NoParams",
@@ -99,7 +99,7 @@ def test_from_dynamic_argnames():
 
     with qp.decomposition.local_decomps():
         qp.add_decomps(SingleParam, rule)
-        result = compile_reachable_decomposition_rules_wrapper(
+        result = compile_on_demand_decomposition_rules(
             [
                 {
                     "op_name": "SingleParam",
@@ -135,7 +135,7 @@ def test_to_multiple_dynamic_argnames():
 
     with qp.decomposition.local_decomps():
         qp.add_decomps(NoParams, rule)
-        result = compile_reachable_decomposition_rules_wrapper(
+        result = compile_on_demand_decomposition_rules(
             [
                 {
                     "op_name": "NoParams",
@@ -170,7 +170,7 @@ def test_from_multiple_dynamic_argnames():
 
     with qp.decomposition.local_decomps():
         qp.add_decomps(MultiParams, rule)
-        result = compile_reachable_decomposition_rules_wrapper(
+        result = compile_on_demand_decomposition_rules(
             [
                 {
                     "op_name": "MultiParams",
@@ -206,7 +206,7 @@ def test_to_multiple_wire_argnames():
 
     with qp.decomposition.local_decomps():
         qp.add_decomps(NoParams, rule)
-        result = compile_reachable_decomposition_rules_wrapper(
+        result = compile_on_demand_decomposition_rules(
             [
                 {
                     "op_name": "NoParams",
@@ -242,7 +242,7 @@ def test_from_multiple_wire_argnames():
 
     with qp.decomposition.local_decomps():
         qp.add_decomps(MultipleRegisters, rule)
-        result = compile_reachable_decomposition_rules_wrapper(
+        result = compile_on_demand_decomposition_rules(
             [
                 {
                     "op_name": "MultipleRegisters",
@@ -286,7 +286,7 @@ def test_to_compilable_data():
 
     with qp.decomposition.local_decomps():
         qp.add_decomps(NoParams, rule)
-        result = compile_reachable_decomposition_rules_wrapper(
+        result = compile_on_demand_decomposition_rules(
             [
                 {
                     "op_name": "NoParams",
@@ -325,7 +325,7 @@ def test_from_compilable_data():
 
     with qp.decomposition.local_decomps():
         qp.add_decomps(CompilableData, rule)
-        result_a1 = compile_reachable_decomposition_rules_wrapper(
+        result_a1 = compile_on_demand_decomposition_rules(
             [
                 {
                     "op_name": "CompilableData",
@@ -338,7 +338,7 @@ def test_from_compilable_data():
         )
         print(result_a1)
 
-        result_a10 = compile_reachable_decomposition_rules_wrapper(
+        result_a10 = compile_on_demand_decomposition_rules(
             [
                 {
                     "op_name": "CompilableData",
@@ -385,7 +385,7 @@ def test_to_static_data():
 
     with qp.decomposition.local_decomps():
         qp.add_decomps(NoParams, rule)
-        result = compile_reachable_decomposition_rules_wrapper(
+        result = compile_on_demand_decomposition_rules(
             [
                 {
                     "op_name": "NoParams",
@@ -433,7 +433,7 @@ def test_from_static_data():
 
     with qp.decomposition.local_decomps():
         qp.add_decomps(StaticData, rule)
-        result_1234 = compile_reachable_decomposition_rules_wrapper(
+        result_1234 = compile_on_demand_decomposition_rules(
             [
                 {
                     "op_name": "StaticData",
@@ -447,7 +447,7 @@ def test_from_static_data():
         )
         print(result_1234)
 
-        result_4321 = compile_reachable_decomposition_rules_wrapper(
+        result_4321 = compile_on_demand_decomposition_rules(
             [
                 {
                     "op_name": "StaticData",
@@ -496,7 +496,7 @@ def test_to_hybrid_wires():
 
     with qp.decomposition.local_decomps():
         qp.add_decomps(NoParams, rule)
-        result = compile_reachable_decomposition_rules_wrapper(
+        result = compile_on_demand_decomposition_rules(
             [
                 {
                     "op_name": "NoParams",
@@ -542,7 +542,7 @@ def test_from_hybrid_wires():
 
     with qp.decomposition.local_decomps():
         qp.add_decomps(HybridWires, rule)
-        result = compile_reachable_decomposition_rules_wrapper(
+        result = compile_on_demand_decomposition_rules(
             [
                 {
                     "op_name": "HybridWires",
@@ -610,7 +610,7 @@ def test_to_hybrid_op():
 
     with qp.decomposition.local_decomps():
         qp.add_decomps(NoParams, rule)
-        result = compile_reachable_decomposition_rules_wrapper(
+        result = compile_on_demand_decomposition_rules(
             [
                 {
                     "op_name": "NoParams",
@@ -655,7 +655,7 @@ def test_from_hybrid_op():
 
     with qp.decomposition.local_decomps():
         qp.add_decomps(HybridOpArg, rule)
-        result = compile_reachable_decomposition_rules_wrapper(
+        result = compile_on_demand_decomposition_rules(
             [
                 {
                     "op_name": "HybridOpArg",
@@ -719,7 +719,7 @@ def test_to_hybrid_op_nested():
 
     with qp.decomposition.local_decomps():
         qp.add_decomps(NoParams, rule)
-        result = compile_reachable_decomposition_rules_wrapper(
+        result = compile_on_demand_decomposition_rules(
             [
                 {
                     "op_name": "NoParams",
@@ -758,7 +758,7 @@ def test_from_hybrid_op_nested():
 
     with qp.decomposition.local_decomps():
         qp.add_decomps(HybridOpArg, rule)
-        result = compile_reachable_decomposition_rules_wrapper(
+        result = compile_on_demand_decomposition_rules(
             [
                 {
                     "op_name": "HybridOpArg",
@@ -845,7 +845,7 @@ def test_to_multiple_full_args_op():
 
     with qp.decomposition.local_decomps():
         qp.add_decomps(NoParams, rule)
-        result = compile_reachable_decomposition_rules_wrapper(
+        result = compile_on_demand_decomposition_rules(
             [
                 {
                     "op_name": "NoParams",
@@ -889,7 +889,7 @@ def test_from_multiple_full_args_op():
 
     with qp.decomposition.local_decomps():
         qp.add_decomps(MultipleFullArgs, rule)
-        result = compile_reachable_decomposition_rules_wrapper(
+        result = compile_on_demand_decomposition_rules(
             [
                 {
                     "op_name": "MultipleFullArgs",
@@ -959,7 +959,7 @@ def test_multiple_rules():
     with qp.decomposition.local_decomps():
         qp.add_decomps(NoParams, rule1)
         qp.add_decomps(NoParams, rule2)
-        result = compile_reachable_decomposition_rules_wrapper(
+        result = compile_on_demand_decomposition_rules(
             [
                 {
                     "op_name": "NoParams",
@@ -1010,7 +1010,7 @@ def test_for_loop():
     with qp.decomposition.local_decomps():
         qp.add_decomps(LayerRX, test_rule)
 
-        result = compile_reachable_decomposition_rules_wrapper(
+        result = compile_on_demand_decomposition_rules(
             [
                 {
                     "op_name": "LayerRX",
@@ -1051,7 +1051,7 @@ def test_if():
     qp.add_decomps(TestOp, if_decomp)
 
     print(
-        compile_reachable_decomposition_rules_wrapper(
+        compile_on_demand_decomposition_rules(
             [
                 {
                     "op_name": "TestOp",
@@ -1093,7 +1093,7 @@ def test_while_loop():
     qp.add_decomps(WhileOp, while_decomp)
 
     print(
-        compile_reachable_decomposition_rules_wrapper(
+        compile_on_demand_decomposition_rules(
             [
                 {
                     "op_name": "WhileOp",
@@ -1121,7 +1121,7 @@ def test_custom_op_numbered_args():
     that they are parsed into args and used correctly to call the decomposition rules.
     """
     print(
-        compile_reachable_decomposition_rules_wrapper(
+        compile_on_demand_decomposition_rules(
             [
                 {
                     "op_name": "RZ",
@@ -1154,7 +1154,7 @@ def test_rule_with_helper_functions():
 
     with qp.decomposition.local_decomps():
         qp.add_decomps(NoParams, rule)
-        result = compile_reachable_decomposition_rules_wrapper(
+        result = compile_on_demand_decomposition_rules(
             [
                 {
                     "op_name": "NoParams",
@@ -1189,7 +1189,7 @@ def test_frontend_name_attr():
     with qp.decomposition.local_decomps():
         qp.add_decomps(NoParams, frontend_rule)
         print(
-            compile_reachable_decomposition_rules_wrapper(
+            compile_on_demand_decomposition_rules(
                 [
                     {
                         "op_name": "NoParams",

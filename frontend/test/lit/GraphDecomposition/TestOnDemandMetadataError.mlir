@@ -15,7 +15,7 @@
 // RUN: not catalyst --tool=opt --pass-pipeline='builtin.module(graph-decomposition{gate-set=PhaseShift=1.0})' %s 2>&1 | FileCheck %s
 
 // Metadata conversion failures in a batch retain the offending graph ID.
-// CHECK: error: failed to load decomposition rules:
+// CHECK: error: Failed to load on-demand decomposition rules:
 // CHECK-SAME: with args S{}{wires:1}{unsupported = @unused}
 // CHECK-SAME: Cannot convert the MLIR attribute @unused
 // CHECK-SAME: unknown attribute type

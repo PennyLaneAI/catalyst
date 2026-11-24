@@ -23,7 +23,7 @@ from operator2_dummy_gates import NoParams, SingleParam
 from pennylane.typing import Float, Wire
 
 from catalyst.decomposition.decomposition_rules import (
-    compile_reachable_decomposition_rules_wrapper,
+    compile_on_demand_decomposition_rules,
 )
 
 
@@ -58,7 +58,7 @@ def test_on_demand_adjoint_id_routes_to_adjoint_rules():
         qp.add_decomps(NoParams, _base_rule())
         qp.add_decomps("Adjoint(NoParams)", _adj_rule())
 
-        out = compile_reachable_decomposition_rules_wrapper(
+        out = compile_on_demand_decomposition_rules(
             [
                 {
                     "op_name": "NoParams",

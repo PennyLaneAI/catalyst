@@ -26,7 +26,7 @@ from operator2_dummy_gates import NoParams, SingleParam
 from pennylane.typing import Float, Wire
 
 from catalyst.decomposition.decomposition_rules import (
-    compile_reachable_decomposition_rules_wrapper,
+    compile_on_demand_decomposition_rules,
 )
 
 
@@ -60,7 +60,7 @@ def test_registered_self_adjoint_rule_targets_the_adjoint_op():
         qp.add_decomps("Adjoint(NoParams)", _self_adjoint_rule())
 
         print(
-            compile_reachable_decomposition_rules_wrapper(
+            compile_on_demand_decomposition_rules(
                 [
                     {
                         "op_name": "NoParams",
@@ -92,7 +92,7 @@ def test_registered_symbolic_rule_accepts_mcm():
         qp.add_decomps("Adjoint(NoParams)", rule_with_mcm)
 
         print(
-            compile_reachable_decomposition_rules_wrapper(
+            compile_on_demand_decomposition_rules(
                 [
                     {
                         "op_name": "NoParams",
@@ -131,7 +131,7 @@ def test_registered_control_rule_targets_the_controlled_op():
         qp.add_decomps("C(NoParams)", _controlled_rule())
 
         print(
-            compile_reachable_decomposition_rules_wrapper(
+            compile_on_demand_decomposition_rules(
                 [
                     {
                         "op_name": "NoParams",

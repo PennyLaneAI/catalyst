@@ -35,9 +35,11 @@
 #include "mlir/AsmParser/AsmParser.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/AsmState.h"
+#include "mlir/IR/Attributes.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/MLIRContext.h"
+#include "mlir/IR/OperationSupport.h"
 #include "mlir/IR/OwningOpRef.h"
 #include "mlir/IR/SymbolTable.h"
 #include "mlir/Parser/Parser.h"
@@ -228,7 +230,7 @@ LogicalResult addRuleNode(func::FuncOp rule, std::vector<RuleNode> &ruleNodes) {
     return success();
 }
 
-// Prepare either a precompiled or captured library before graph construction. Resolve names
+// Prepare an external decomposition rule library before graph construction. Resolve names
 // in the source so calls retain their dependencies when selected rules are imported later.
 LogicalResult prepareRuleLibrary(ModuleOp module, ModuleOp library,
                                  SymbolTable *reservedSymbols = nullptr) {
@@ -293,7 +295,8 @@ LogicalResult prepareRuleLibrary(ModuleOp module, ModuleOp library,
                 ? librarySymbols.renameToUnique(function, {&symbolTable, reservedSymbols})
                 : librarySymbols.renameToUnique(function, {&symbolTable});
         if (failed(renamed)) {
-            return function.emitError("cannot rename a decomposition rule dependency");
+            return function.emitError(
+                "Failed to produce a unique name for an externally loaded decomposition rule.");
         }
     }
     for (auto function : llvm::make_early_inc_range(library.getOps<func::FuncOp>())) {
@@ -382,6 +385,7 @@ LogicalResult loadPythonDecomps(ModuleOp module, ModuleOp ruleLibrary, ArrayRef<
     SymbolTable librarySymbols(ruleLibrary);
 
     llvm::StringSet<> handledOpIds;
+    llvm::SmallVector<DictionaryAttr> availableRules;
     // Add IDs from existing decomposable ops with decomposition rules
     // NOTE: we assume in general that if one decomposition rule for an op is available,
     // then all decomposition rules for that op are available. No system should introduce a
@@ -390,6 +394,23 @@ LogicalResult loadPythonDecomps(ModuleOp module, ModuleOp ruleLibrary, ArrayRef<
         source.walk([&](func::FuncOp func) {
             if (auto target = func->getAttrOfType<StringAttr>("target_gate")) {
                 handledOpIds.insert(target.getValue());
+                auto name = func->getAttrOfType<StringAttr>("frontend_name");
+                auto resources = func->getAttrOfType<DictionaryAttr>("resources");
+                auto operations =
+                    resources ? dyn_cast_or_null<DictionaryAttr>(resources.get("operations"))
+                              : DictionaryAttr{};
+                // Incomplete identities cannot safely suppress a rule's body tracing.
+                if (!name || !operations || !llvm::all_of(operations, [](NamedAttribute entry) {
+                        auto count = dyn_cast<IntegerAttr>(entry.getValue());
+                        return count && !count.getType().isInteger(1);
+                    })) {
+                    return;
+                }
+                NamedAttrList entry;
+                entry.set("target_gate", target);
+                entry.set("frontend_name", name);
+                entry.set("resources", operations);
+                availableRules.push_back(entry.getDictionary(context));
             }
         });
     }
@@ -416,19 +437,21 @@ LogicalResult loadPythonDecomps(ModuleOp module, ModuleOp ruleLibrary, ArrayRef<
     // Resolve Python only when gates need rules. Capture all missing roots together so shared
     // dependencies are discovered and traced once.
     if (!loadQPD(libQPDPath.str(), libpythonPath.str())) {
-        return module.emitError("failed to load the Python decomposition callback");
+        return module.emitError("Failed to load the on-demand decomposition system.");
     }
 
     std::string mlirText;
     std::string errorMessage;
-    if (!pythonRuleLowering(decomposableOps, requestedIds, mlirText, errorMessage)) {
-        return module.emitError() << "failed to load decomposition rules: " << errorMessage;
+    if (!pythonRuleLowering(decomposableOps, requestedIds, availableRules, mlirText,
+                            errorMessage)) {
+        return module.emitError() << "Failed to load on-demand decomposition rules: "
+                                  << errorMessage;
     }
 
     mlir::ParserConfig config(context);
     auto moduleOp = mlir::parseSourceString<ModuleOp>(llvm::StringRef(mlirText), config);
     if (!moduleOp) {
-        return module.emitError("failed to parse MLIR from python-decomposition");
+        return module.emitError("Failed to parse MLIR from on-demand rule lowering.");
     }
 
     // Shared tracing emits reference semantics. Convert before inserting the rules so
@@ -436,16 +459,12 @@ LogicalResult loadPythonDecomps(ModuleOp module, ModuleOp ruleLibrary, ArrayRef<
     PassManager rulesPm(context);
     rulesPm.addPass(catalyst::qref::createValueSemanticsConversionPass());
     if (failed(rulesPm.run(*moduleOp))) {
-        return module.emitError("failed to prepare decomposition rules");
+        return module.emitError(
+            "Failed to convert on-demand decomposition rules to value semantics.");
     }
 
-    // Keep candidates alongside precompiled rules; import only selected rules and their helpers.
-    for (auto func : llvm::make_early_inc_range(moduleOp->getOps<func::FuncOp>())) {
-        auto targetGate = func->getAttrOfType<StringAttr>("target_gate");
-        if (targetGate && handledOpIds.contains(targetGate.getValue())) {
-            func.erase();
-        }
-    }
+    // Python skips exact available identities. Retain other alternatives for the same target
+    // alongside precompiled rules; import only selected rules and their helpers.
     if (failed(prepareRuleLibrary(ruleLibrary, *moduleOp, &circuitSymbols))) {
         return failure();
     }

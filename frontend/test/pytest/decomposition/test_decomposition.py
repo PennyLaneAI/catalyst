@@ -68,7 +68,7 @@ from catalyst.decomposition.decomposition_rules import (
     build_registered_decomp_target_spec,
     collect_resources_for_op,
     collect_symbolic_resources,
-    compile_reachable_decomposition_rules_wrapper,
+    compile_on_demand_decomposition_rules,
     flatten_hybrid_args,
     ordered_kwarg_names,
     prepare_dynamic_op_kwargs,
@@ -801,7 +801,7 @@ class TestGenericUtilities:
         mocker.patch("pennylane.decomposition.list_decomps", return_value=[mock_decomp])
 
         with pytest.warns(RuleLoweringWarning, match="Failed to get resources"):
-            res = compile_reachable_decomposition_rules_wrapper(
+            res = compile_on_demand_decomposition_rules(
                 [
                     {
                         "op_name": "NoParams",
@@ -826,7 +826,7 @@ class TestGenericUtilities:
 
         mocker.patch("pennylane.decomposition.list_decomps", return_value=[mock_decomp])
 
-        res = compile_reachable_decomposition_rules_wrapper(
+        res = compile_on_demand_decomposition_rules(
             [
                 {
                     "op_name": "CompilableData",
@@ -1217,7 +1217,7 @@ class TestPrecompiled:
             precompile_decomp_rules(bytecode_path)
 
         mocker.patch(
-            "catalyst.decomposition.decomposition_rules.compile_reachable_decomposition_rules_wrapper",
+            "catalyst.decomposition.decomposition_rules.compile_on_demand_decomposition_rules",
             side_effect=AssertionError(
                 "on-demand rules were used when precompiled rules should provide the necessary decompositions."
             ),
@@ -1734,7 +1734,7 @@ class TestOnDemand:
         """The on-demand wrapper captures the closure reachable from a plain operator."""
 
         op_id = "S{}{wires:1}{}"
-        module_str = compile_reachable_decomposition_rules_wrapper(
+        module_str = compile_on_demand_decomposition_rules(
             [
                 {
                     "op_name": "S",
@@ -1762,7 +1762,7 @@ class TestOnDemand:
         op_id = modifiers.wrap_id("NoParams{}{reg:1}{}")
         with local_decomps():
             add_decomps(symbolic_op_name("NoParams", kind), symbolic_rule)
-            module_str = compile_reachable_decomposition_rules_wrapper(
+            module_str = compile_on_demand_decomposition_rules(
                 [
                     {
                         "op_name": "NoParams",
@@ -1800,7 +1800,7 @@ class TestOnDemand:
         with local_decomps():
             add_decomps(NoParams, root_rule)
             add_decomps(SingleParam, leaf_rule)
-            module_str = compile_reachable_decomposition_rules_wrapper(
+            module_str = compile_on_demand_decomposition_rules(
                 [
                     {
                         "op_name": "NoParams",
@@ -1830,6 +1830,71 @@ class TestOnDemand:
         assert "catalyst.launch_kernel" not in module_str
         assert "qref.alloc" not in module_str
 
+    @pytest.mark.parametrize(
+        "available", ["none", "root", "leaf", "wrong_name", "wrong_resources", "wrong_target"]
+    )
+    def test_on_demand_skips_only_available_rule_identities(self, mocker, available):
+        """Loaded identities suppress bodies while discovery continues through cached roots."""
+        root_calls = mocker.Mock()
+        leaf_calls = mocker.Mock()
+
+        @register_resources({SingleParam(x=Float, reg=Wire[1]): 1}, name="on_demand_root")
+        def root_rule(reg):
+            root_calls()
+            SingleParam(0.37, reg=reg)
+
+        @register_resources({}, name="on_demand_leaf")
+        def leaf_rule(x, reg):
+            leaf_calls()
+            del x, reg
+
+        root_id = "NoParams{}{reg:1}{}"
+        leaf_id = "SingleParam{x:[tensor<f64>]}{reg:1}{}"
+        entries = []
+        if available == "root":
+            entries = [
+                {
+                    "target_gate": root_id,
+                    "frontend_name": "on_demand_root",
+                    "resources": {leaf_id: 1},
+                }
+            ]
+        elif available != "none":
+            entries = [
+                {
+                    "target_gate": leaf_id if available != "wrong_target" else root_id,
+                    "frontend_name": (
+                        "on_demand_leaf" if available != "wrong_name" else "another_leaf"
+                    ),
+                    "resources": {} if available != "wrong_resources" else {root_id: 1},
+                }
+            ]
+        load_manifest = mocker.patch(
+            "catalyst.from_plxpr.qfunc_interpreter.load_precompiled_rule_identities",
+            side_effect=AssertionError("On-demand capture must use the compiler's loaded rules"),
+        )
+        with local_decomps():
+            add_decomps(NoParams, root_rule)
+            add_decomps(SingleParam, leaf_rule)
+            module_str = compile_on_demand_decomposition_rules(
+                [
+                    {
+                        "op_name": "NoParams",
+                        "op_id": root_id,
+                        "dynamic_shape": {},
+                        "wire_lens": {"reg": 1},
+                        "static_data": {},
+                    }
+                ],
+                entries,
+            )
+
+        load_manifest.assert_not_called()
+        assert root_calls.call_count == int(available != "root")
+        assert leaf_calls.call_count == int(available != "leaf")
+        assert ('frontend_name = "on_demand_root"' in module_str) == (available != "root")
+        assert ('frontend_name = "on_demand_leaf"' in module_str) == (available != "leaf")
+
     def test_reachable_wrapper_merges_modifier_states(self, mocker):
         """Plain, adjoint and controlled roots share a base request without losing variants."""
         from catalyst.decomposition import precompile_decomposition_rules
@@ -1853,7 +1918,7 @@ class TestOnDemand:
         capture = mocker.spy(precompile_decomposition_rules, "_capture_rule_module")
         with local_decomps():
             add_decomps(NoParams, empty_rule)
-            module_str = compile_reachable_decomposition_rules_wrapper([*requests, requests[0]])
+            module_str = compile_on_demand_decomposition_rules([*requests, requests[0]])
 
         capture.assert_called_once()
         scope = capture.call_args.args[0]
@@ -1882,7 +1947,7 @@ class TestOnDemand:
             for name in ["OnDemandUnregisteredClass", "S"]
         ]
         with pytest.warns(RuleLoweringWarning, match="OnDemandUnregisteredClass"):
-            module_str = compile_reachable_decomposition_rules_wrapper(requests)
+            module_str = compile_on_demand_decomposition_rules(requests)
         assert 'target_gate = "S{}{wires:1}{}"' in module_str
 
     def test_reachable_wrapper_empty_batch(self, mocker):
@@ -1890,7 +1955,7 @@ class TestOnDemand:
         from catalyst.decomposition import precompile_decomposition_rules
 
         capture = mocker.spy(precompile_decomposition_rules, "_capture_rule_module")
-        assert compile_reachable_decomposition_rules_wrapper([]) == "module {}"
+        assert compile_on_demand_decomposition_rules([]) == "module {}"
         capture.assert_not_called()
 
     def test_compiler_loads_multiple_missing_roots(self):
@@ -1930,7 +1995,7 @@ class TestOnDemand:
         with local_decomps():
             add_decomps(NoParams, failing_rule, valid_rule)
             with pytest.warns(RuleLoweringWarning, match="Failed to capture.*body failure"):
-                module_str = compile_reachable_decomposition_rules_wrapper(
+                module_str = compile_on_demand_decomposition_rules(
                     [
                         {
                             "op_name": "NoParams",
@@ -1949,7 +2014,7 @@ class TestOnDemand:
     def test_reachable_wrapper_controlled_op(self, op_id):
         """The on-demand wrapper preserves the requested control count."""
 
-        module_str = compile_reachable_decomposition_rules_wrapper(
+        module_str = compile_on_demand_decomposition_rules(
             [
                 {
                     "op_name": "S",
@@ -1978,7 +2043,7 @@ class TestOnDemand:
         wire_lens = {"ctrl_work_wires": 1, "wires": 2}
         static_data = {"ctrl_work_wire_type": work_wire_type, "pauli_word": "XY"}
 
-        module_str = compile_reachable_decomposition_rules_wrapper(
+        module_str = compile_on_demand_decomposition_rules(
             [
                 {
                     "op_name": "PauliRot",
@@ -2085,7 +2150,7 @@ class TestOnDemand:
 
             add_decomps(NoParams, two_controlled_s)
 
-            module_str = compile_reachable_decomposition_rules_wrapper(
+            module_str = compile_on_demand_decomposition_rules(
                 [
                     {
                         "op_name": "NoParams",
@@ -2114,7 +2179,7 @@ class TestOnDemand:
             CompileError,
             match="Failed to generate the precompiled decomposition-rule module",
         ):
-            dr.compile_reachable_decomposition_rules_wrapper(
+            dr.compile_on_demand_decomposition_rules(
                 [
                     {
                         "op_name": "S",
@@ -2791,7 +2856,7 @@ class TestSymbolicRules:
 
             add_decomps(NoParams, h_rule)
 
-            module_str = compile_reachable_decomposition_rules_wrapper(
+            module_str = compile_on_demand_decomposition_rules(
                 [
                     {
                         "op_name": "NoParams",
@@ -3040,7 +3105,7 @@ class TestApplicabilityFilterOrdering:
     def _compile(self, *rules):
         with local_decomps():
             add_decomps(SingleParam, *rules)
-            return compile_reachable_decomposition_rules_wrapper(
+            return compile_on_demand_decomposition_rules(
                 [
                     {
                         "op_name": "SingleParam",

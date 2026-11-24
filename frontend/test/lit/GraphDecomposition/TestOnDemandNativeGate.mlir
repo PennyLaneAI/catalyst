@@ -21,7 +21,7 @@
 // CHECK-LABEL: func.func @circuit
 // CHECK: quantum.custom "RX"
 
-// ERROR: error: failed to load the Python decomposition callback
+// ERROR: error: Failed to load the on-demand decomposition system.
 func.func @circuit(%theta: f64, %qubit: !quantum.bit) -> !quantum.bit attributes {quantum.node} {
     %out = quantum.custom "RX"(%theta) %qubit : !quantum.bit
     return %out : !quantum.bit

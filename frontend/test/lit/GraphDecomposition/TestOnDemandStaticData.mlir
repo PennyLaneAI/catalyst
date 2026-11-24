@@ -23,8 +23,8 @@
 
 // ALL-LABEL: func.func @circuit
 // ALL-NOT: quantum.pcphase
-// CALL: call @__builtin__decompose_pcphase{{(_[0-9]+)*}}
-// CALL: call @__builtin__decompose_pcphase{{(_[0-9]+)*}}
+// CALL: call @__builtin_controlled_phase_shifts{{(_[0-9]+)*}}
+// CALL: call @__builtin_controlled_phase_shifts{{(_[0-9]+)*}}
 // INLINE: quantum.custom "PhaseShift"
 // INLINE-NOT: quantum.pcphase
 // INLINE: quantum.dealloc
@@ -42,7 +42,7 @@ func.func @circuit(%theta: f64) attributes {quantum.node} {
 
 // Both roots have the same frontend rule name, but distinct static identities. Their closures
 // share resource rules, and must coexist with this existing symbol without dropping alternatives.
-func.func private @__builtin__decompose_pcphase() {
+func.func private @__builtin_controlled_phase_shifts() {
     return
 }
 

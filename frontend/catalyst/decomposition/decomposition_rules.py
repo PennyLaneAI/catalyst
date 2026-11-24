@@ -49,6 +49,7 @@ from catalyst.decomposition.graph_op_id import (
     GraphOpID,
 )
 from catalyst.decomposition.modifier_state import ModifierState
+from catalyst.decomposition.precompiled_rule_loading import _RuleEntry, _validate_rule_entry
 from catalyst.decomposition.rule_lowering_warning import RuleLoweringWarning
 from catalyst.decomposition.type_utils import (
     SerializedGraphOpID,
@@ -1233,7 +1234,9 @@ def walk_reachable_decomp_rule_sets(
     return target_specs
 
 
-def compile_reachable_decomposition_rules_wrapper(requests: list[dict]) -> str:
+def compile_on_demand_decomposition_rules(
+    requests: list[dict], available_rules: list[_RuleEntry] | None = None
+) -> str:
     """Return one MLIR module with the combined reachable closure of the requested operators.
 
     Resolve each class through PennyLane's OperatorRegistry and seed one DecompositionScope.
@@ -1244,6 +1247,9 @@ def compile_reachable_decomposition_rules_wrapper(requests: list[dict]) -> str:
         requests (list[dict]): Each request supplies ``op_name``, the full ``op_id``,
             ``dynamic_shape``, ``wire_lens`` and ``static_data`` in operand order.
             Optional ``extra_data`` defaults to an empty dict, and ``is_custom_op`` to False.
+        available_rules (list[dict]): Identities of rules actually loaded by the compiler,
+            using the precompiled manifest's entry format. These rules are not retraced;
+            discovery still follows their dependencies. Defaults to no available rules.
 
     Returns:
         str: a module holding the combined reachable rule closure
@@ -1295,4 +1301,5 @@ def compile_reachable_decomposition_rules_wrapper(requests: list[dict]) -> str:
         _capture_rule_module,
     )
 
-    return str(_capture_rule_module(scope))
+    identities = frozenset(_validate_rule_entry(entry) for entry in available_rules or ())
+    return str(_capture_rule_module(scope, precompiled_rule_identities=identities))

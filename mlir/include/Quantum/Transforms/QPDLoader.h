@@ -17,6 +17,7 @@
 #include <string>
 
 #include "llvm/ADT/ArrayRef.h"
+#include "mlir/IR/BuiltinAttributes.h"
 
 #include "Quantum/IR/QuantumInterfaces.h"
 
@@ -25,6 +26,7 @@ namespace catalyst::quantum {
 // Keep Python exceptions inside the plugin: compiler passes are built without exception support.
 using PythonRuleLoweringFn = bool (*)(llvm::ArrayRef<DecomposableOp> ops,
                                       llvm::ArrayRef<std::string> requestedIds,
+                                      llvm::ArrayRef<mlir::DictionaryAttr> availableRules,
                                       std::string &mlirText, std::string &errorMessage);
 
 extern PythonRuleLoweringFn pythonRuleLowering;
