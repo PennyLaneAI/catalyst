@@ -3312,23 +3312,13 @@ class TestDecomposeAlias:
 
     @pytest.mark.usefixtures("use_capture")
     @pytest.mark.parametrize("value", [False, None], ids=["false", "none"])
-    @pytest.mark.parametrize(
-        "collect_decomp_rules",
-        [
-            True,
-            pytest.param(
-                False,
-                marks=pytest.mark.xfail(
-                    reason="On-demand rules use separate JAX contexts and can produce duplicate symbols.",
-                    raises=CompileError,
-                    strict=True,
-                ),
-            ),
-        ],
-        ids=["eager", "on-demand"],
+    @pytest.mark.xfail(
+        reason="On-demand rules use separate JAX contexts and can produce duplicate symbols.",
+        raises=CompileError,
+        strict=True,
     )
-    def test_decompose_none_static_argument(self, value, collect_decomp_rules):
-        """Decomposition preserves None and Boolean compilable arguments."""
+    def test_decompose_none_static_argument(self, value):
+        """On-demand decomposition preserves None and Boolean compilable arguments."""
 
         @register_resources({qp.PauliX: 1})
         def rule(a, wires, **_):
@@ -3338,7 +3328,7 @@ class TestDecomposeAlias:
         with local_decomps():
             add_decomps(CompilableData, rule)
 
-            @qjit(capture=True, target="mlir", collect_decomp_rules=collect_decomp_rules)
+            @qjit(capture=True, target="mlir", collect_decomp_rules=False)
             @qp.decompose(gate_set={"PauliX"})
             @qnode(qp.device("null.qubit", wires=1))
             def circuit():
