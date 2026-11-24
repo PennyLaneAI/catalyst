@@ -3311,25 +3311,34 @@ class TestDecomposeAlias:
     """``qp.decompose`` under capture is an alias for ``graph_decomposition`` (same C++ pass)."""
 
     @pytest.mark.usefixtures("use_capture")
-    @pytest.mark.parametrize("clean", [False, None], ids=["false", "none"])
+    @pytest.mark.parametrize("value", [False, None], ids=["false", "none"])
     @pytest.mark.xfail(
         reason="On-demand rules use separate JAX contexts and can produce duplicate symbols.",
         raises=CompileError,
         strict=True,
     )
-    def test_decompose_none_static_argument_on_demand(self, clean):
-        """The Python fallback accepts a None-valued static argument."""
+    def test_decompose_none_static_argument(self, value):
+        """On-demand decomposition preserves None and Boolean compilable arguments."""
 
-        @qjit(capture=True, target="mlir", collect_decomp_rules=False)
-        @qp.decompose(gate_set={"PauliX", "CNOT", "Toffoli"})
-        @qnode(qp.device("null.qubit", wires=2))
-        def circuit():
-            qp.QROM(Bool[2, 1], control_wires=[0], target_wires=[1], work_wires=[], clean=clean)
-            return qp.probs()
+        @register_resources({qp.PauliX: 1})
+        def rule(a, wires, **_):
+            assert a is value
+            qp.PauliX(wires[0])
 
-        resources = qp.analyze(circuit, level=1)().resources
-        # A two-entry, one-bit table needs at most one X and one controlled X.
-        assert resources.quantum_operations == {"PauliX": 1, "1C(PauliX)": 1}
+        with local_decomps():
+            add_decomps(CompilableData, rule)
+
+            @qjit(capture=True, target="mlir", collect_decomp_rules=False)
+            @qp.decompose(gate_set={"PauliX"})
+            @qnode(qp.device("null.qubit", wires=1))
+            def circuit():
+                CompilableData(a=value, b=0, thing="test", wires=[0])
+                return qp.probs()
+
+            assert f"a = {str(value).lower()}" in circuit.mlir
+            resources = qp.analyze(circuit, level=1)().resources
+
+        assert resources.quantum_operations == {"PauliX": 1}
 
     def test_decompose_matches_graph_decomposition(self):
         """``qp.decompose`` compiles to the exact same MLIR as ``graph_decomposition``."""
