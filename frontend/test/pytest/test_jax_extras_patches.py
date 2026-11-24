@@ -13,7 +13,100 @@
 # limitations under the License.
 """Tests for the jax_extras.patches module"""
 
-from catalyst.jax_extras.patches import mock_attributes
+from functools import partial
+
+import jax
+import pytest
+from jax._src import core
+
+from catalyst.jax_extras import transient_jax_config
+from catalyst.jax_extras.patches import get_jax_patches, mock_attributes
+from catalyst.utils.patching import Patcher
+
+
+@pytest.mark.parametrize("check_leaks", [False, True])
+def test_dynamic_trace_invalidation(check_leaks):
+    """Test that capture invalidates dynamic jaxpr traces and preserves the resulting Jaxpr."""
+    traces = []
+    original_trace = core.trace_ctx.trace
+    original_exit = core.set_current_trace.__exit__
+
+    def fn(value):
+        traces.append(core.trace_ctx.trace)
+        return jax.lax.add(value, 1.0)
+
+    with (
+        transient_jax_config({"jax_dynamic_shapes": True}),
+        jax.check_tracer_leaks(check_leaks),
+        Patcher(*get_jax_patches()),
+    ):
+        jaxpr = jax.make_jaxpr(fn)(2.0)
+
+    assert traces
+    assert all(not trace.is_valid() for trace in traces)
+    assert core.trace_ctx.trace is original_trace
+    assert original_trace.is_valid()
+    assert core.set_current_trace.__exit__ is original_exit
+    assert jax.core.eval_jaxpr(jaxpr.jaxpr, jaxpr.consts, 2.0) == [3.0]
+
+
+@pytest.mark.parametrize("check_leaks", [False, True])
+def test_dynamic_trace_invalidation_on_error(check_leaks):
+    """Test that a capture error invalidates dynamic jaxpr traces and restores the previous context."""
+    traces = []
+    original_trace = core.trace_ctx.trace
+    original_exit = core.set_current_trace.__exit__
+
+    def fn():
+        traces.append(core.trace_ctx.trace)
+        raise ValueError("capture failed")
+
+    with (
+        transient_jax_config({"jax_dynamic_shapes": True}),
+        jax.check_tracer_leaks(check_leaks),
+        Patcher(*get_jax_patches()),
+        pytest.raises(ValueError, match="capture failed"),
+    ):
+        jax.make_jaxpr(fn)()
+
+    assert traces
+    assert all(not trace.is_valid() for trace in traces)
+    assert core.trace_ctx.trace is original_trace
+    assert original_trace.is_valid()
+    assert core.set_current_trace.__exit__ is original_exit
+
+
+def test_inline_jit_preserves_enclosing_trace():
+    """Test that an inlined JIT call leaves the enclosing trace valid for subsequent operations."""
+
+    @partial(jax.jit, inline=True)
+    def inner(value):
+        return jax.lax.mul(value, 2.0)
+
+    def fn(value):
+        trace = core.trace_ctx.trace
+        result = inner(value)
+        assert core.trace_ctx.trace is trace
+        assert trace.is_valid()
+        return jax.lax.add(result, 1.0)
+
+    with transient_jax_config({"jax_dynamic_shapes": True}), Patcher(*get_jax_patches()):
+        jaxpr = jax.make_jaxpr(fn)(3.0)
+
+    assert jax.core.eval_jaxpr(jaxpr.jaxpr, jaxpr.consts, 3.0) == [7.0]
+
+
+def test_exit_preserves_non_dynamic_jaxpr_trace():
+    """Test that the exit patch restores the previous context without invalidating other traces."""
+    trace = core.Trace()
+    original_trace = core.trace_ctx.trace
+
+    with Patcher(*get_jax_patches()):
+        with core.set_current_trace(trace):
+            assert core.trace_ctx.trace is trace
+
+        assert trace.is_valid()
+        assert core.trace_ctx.trace is original_trace
 
 
 # pylint: disable=missing-class-docstring,missing-function-docstring

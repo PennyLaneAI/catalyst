@@ -56,6 +56,19 @@ def catalyst_execute_jaxpr(jaxpr):
 
 
 @pytest.mark.usefixtures("use_capture")
+def test_standalone_conversion_preserves_jaxpr():
+    """Test that standalone conversion preserves the equations needed to evaluate its result."""
+
+    def fn(value):
+        return value * 2 + 1
+
+    plxpr = jax.make_jaxpr(fn)(3.0)
+    jaxpr = from_plxpr(plxpr)(3.0)
+
+    assert jax.core.eval_jaxpr(jaxpr.jaxpr, jaxpr.consts, 3.0) == [7.0]
+
+
+@pytest.mark.usefixtures("use_capture")
 class TestErrors:
     """Test that errors are raised in unsupported situations."""
 

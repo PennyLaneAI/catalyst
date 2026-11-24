@@ -383,7 +383,15 @@ def patched_pjit_staging_rule(trace, source_info, *args, **params):
             # Inline jaxpr doesn't handle dynamic shapes when inlining. If dynamic
             # shapes are enabled, use eval_jaxpr, which uses the tracing machinery,
             # but redundantly performs abstract evaluation again.
-            with core.set_current_trace(trace):
+
+            # Inlining temporarily reuses the enclosing trace; it does not finish that trace.
+            # Using set_current_trace here would invoke our patched __exit__ and invalidate
+            # the trace as soon as this JIT call is inlined. Subsequent operations in the
+            # enclosing function would then raise UnexpectedTracerError.
+            # Save and restore the current context with take_current_trace instead, leaving
+            # the enclosing capture context responsible for invalidating this trace.
+            with core.take_current_trace():
+                core.trace_ctx.set_trace(trace)
                 out = core.eval_jaxpr(jaxpr.jaxpr, jaxpr.consts, *args, propagate_source_info=False)
         else:
             out = pe.inline_jaxpr_into_trace(trace, source_info, jaxpr.jaxpr, jaxpr.consts, *args)
@@ -419,6 +427,17 @@ def patched_pjit_staging_rule(trace, source_info, *args, **params):
     return out_tracers
 
 
+original_set_trace_exit = core.set_current_trace.__exit__
+
+
+def patched_exit(self, *exc_info):
+    if isinstance(self.trace, DynamicJaxprTrace):
+        # Mark the trace invalid. Use `Trace.invalidate(trace)` instead of `trace.invalidate()`
+        # to ensure that the jaxpr trace's frames aren't cleared prematurely
+        core.Trace.invalidate(self.trace)
+    return original_set_trace_exit(self, *exc_info)
+
+
 def get_jax_patches():
     """Returns all the necessary patches for jax v0.7.2.
     Should be used together with catalyst.utils.patching.Patcher.
@@ -434,4 +453,5 @@ def get_jax_patches():
         ),
         (DictPatchWrapper(pe.custom_staging_rules, jit_p), "value", patched_pjit_staging_rule),
         (pe, "get_aval", get_aval2),
+        (core.set_current_trace, "__exit__", patched_exit),
     )

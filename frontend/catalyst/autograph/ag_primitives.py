@@ -34,7 +34,7 @@ from malt.impl.api import converted_call as ag_converted_call
 from malt.operators import py_builtins as ag_py_builtins
 from malt.operators.variables import Undefined
 from malt.pyct.origin_info import LineLocation
-from pennylane.queuing import AnnotatedQueue
+from pennylane.core.queuing import AnnotatedQueue
 
 import catalyst
 from catalyst.jax_extras import DynamicJaxprTracer, ShapedArray

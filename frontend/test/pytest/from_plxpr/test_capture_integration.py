@@ -17,12 +17,17 @@
 
 from functools import partial
 
+import jax
 import jax.numpy as jnp
 import pennylane as qp
 import pytest
+from jax._src import core
+from pennylane.testing import find_eqns
 
 import catalyst
 from catalyst import qjit
+from catalyst.from_plxpr.from_plxpr import trace_from_pennylane
+from catalyst.from_plxpr.qref_jax_primitives import qref_namedobs_p
 
 pytestmark = pytest.mark.usefixtures("disable_capture")
 
@@ -74,6 +79,83 @@ def test_transforms_must_have_pass_name():
 
     with pytest.raises(ValueError, match="<transform: some_transform> does not have a pass_name"):
         qp.qjit(c, capture=True, collect_decomp_rules=False)()
+
+
+@pytest.mark.usefixtures("use_capture")
+class TestTraceInvalidation:
+    """Test that capture preserves results while invalidating completed traces."""
+
+    def test_inline_jit_capture(self):
+        """Test that capture can continue after inlining a JIT call into the enclosing trace."""
+
+        @partial(jax.jit, inline=True)
+        def inner(value):
+            return jax.lax.mul(value, 2.0)
+
+        def fn(value):
+            return inner(value) + 1
+
+        debug_info = jax.api_util.debug_info("test_inline_jit_capture", fn, (3.0,), {})
+        jaxpr, _, _, _ = trace_from_pennylane(fn, (3.0,), {}, (), None, debug_info=debug_info)
+
+        assert jax.core.eval_jaxpr(jaxpr.jaxpr, jaxpr.consts, 3.0) == [7.0]
+
+    def test_capture_error_restores_context(self):
+        """Test that a capture error invalidates its trace and restores the original context."""
+        traces = []
+        original_trace = core.trace_ctx.trace
+        original_exit = core.set_current_trace.__exit__
+
+        def fn():
+            traces.append(core.trace_ctx.trace)
+            raise ValueError("capture failed")
+
+        debug_info = jax.api_util.debug_info("test_capture_error", fn, (), {})
+        with pytest.raises(ValueError, match="capture failed"):
+            trace_from_pennylane(fn, (), {}, (), None, debug_info=debug_info)
+
+        assert traces
+        assert all(not trace.is_valid() for trace in traces)
+        assert core.trace_ctx.trace is original_trace
+        assert original_trace.is_valid()
+        assert core.set_current_trace.__exit__ is original_exit
+
+    def test_shared_observable_across_qjitted_qnodes(self):
+        """Test that separately compiled QNodes can share an observable."""
+        dev = qp.device("lightning.qubit", wires=2)
+        observable = qp.Z(0)
+
+        @qp.qjit
+        @qp.qnode(dev)
+        def c1():
+            return qp.expval(observable)
+
+        @qp.qjit
+        @qp.qnode(dev)
+        def c2():
+            return qp.expval(observable)
+
+        assert jnp.allclose(c1(), 1.0)
+        assert jnp.allclose(c2(), 1.0)
+
+    def test_retrace_observable(self):
+        """Test that an observable is recaptured after its previous capture trace is invalidated."""
+        observable = qp.X(0)
+
+        @qp.qnode(qp.device("lightning.qubit", wires=1))
+        def circuit():
+            return qp.expval(observable)
+
+        debug_info = jax.api_util.debug_info("test_retrace_observable", circuit, (), {})
+        for _ in range(2):
+            jaxpr, _, _, _ = trace_from_pennylane(
+                circuit, (), {}, (), None, collect_decomp_rules=False, debug_info=debug_info
+            )
+            assert observable.tracer is not None
+            assert not observable.has_tracer
+            qfunc_jaxpr = jaxpr.eqns[0].params["call_jaxpr"]
+            [eqn] = find_eqns(qfunc_jaxpr, qref_namedobs_p)
+            assert eqn.params["kind"] == "PauliX"
 
 
 # pylint: disable=too-many-public-methods
