@@ -16,9 +16,10 @@
 import pennylane2 as qp
 import pytest
 from jaxlib.mlir._mlir_libs._mlir.ir import Module
+from xdsl.dialects.test import TestOp
 
 from catalyst.python_interface.conversion import parse_generic_to_xdsl_module
-from catalyst.python_interface.dialects.quantum import CtrlOp
+from catalyst.python_interface.dialects.quantum import CtrlOp, QubitType
 from catalyst.python_interface.inspection.xdsl_conversion import (
     get_mlir_module,
     resolve_constant_wire,
@@ -128,3 +129,10 @@ class TestResolveConstantWire:
 
         # A target `results[j]` adds to `args[j]`, past the control and work results.
         assert resolve_constant_wire(ctrl.outs[0]) == 0
+
+    def test_unsupported_op_raises_error(self):
+        """Tests that resolving a wire produced by an unsupported operation raises an error."""
+        op = TestOp(result_types=[QubitType()])
+
+        with pytest.raises(NotImplementedError, match="Cannot resolve wire for op"):
+            resolve_constant_wire(op.results[0])
