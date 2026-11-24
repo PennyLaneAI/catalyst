@@ -1014,7 +1014,7 @@ def test_registered_callable_captures_work_wire_operands(work_wire_type):
 def test_registry_lookup_uses_operator_class(mocker):
     """An Operator2 whose graph name is shared with an Operator1 uses its own registry rules."""
 
-    from pennylane.ops.op_math.prod2 import Prod2
+    from pennylane2.ops.op_math.prod2 import Prod2
 
     lookup = mocker.spy(qp.decomposition, "list_decomps")
 
