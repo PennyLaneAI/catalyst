@@ -56,8 +56,10 @@ func.func @remProbsCalibrate() -> (tensor<4xf64>, tensor<4xf64>, tensor<4xf64>) 
 // CHECK:       quantum.alloc(%{{.*}}) : !quantum.reg
 // CHECK:       quantum.custom "PauliX"
 // CHECK:       quantum.custom "PauliX"
+// CHECK:       [[ONES_REG:%.+]] = quantum.insert
 // CHECK:       quantum.compbasis
 // CHECK:       quantum.probs {{.*}} : tensor<4xf64>
+// CHECK:       quantum.dealloc [[ONES_REG]]
 // CHECK:       quantum.device_release
 
 // -----

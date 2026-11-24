@@ -126,7 +126,7 @@ ValueRange emitCalibrationCircuit(PatternRewriter &rewriter, Location loc, func:
         calibratedResult = insertedMP->getResults();
     }
 
-    auto dealloc = rewriter.create<quantum::DeallocOp>(loc, qreg);
+    auto dealloc = rewriter.create<quantum::DeallocOp>(loc, currentQreg);
     llvm::dbgs() << "[mitigation.rem] quantum.dealloc " << tag << " addition OK, op=" << dealloc
                  << "\n";
     auto deinit = rewriter.create<quantum::DeviceReleaseOp>(loc);
