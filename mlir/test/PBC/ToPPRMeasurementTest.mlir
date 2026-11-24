@@ -15,9 +15,10 @@
 // RUN: quantum-opt --to-ppr %s | FileCheck %s
 
 // CHECK-LABEL: @pauli_measurement
+// CHECK-SAME: ([[Q0:%.+]]: !quantum.bit, [[Q1:%.+]]: !quantum.bit)
 func.func @pauli_measurement(%q0: !quantum.bit, %q1: !quantum.bit)
     -> (i1, !quantum.bit, !quantum.bit) {
-  // CHECK: [[M:%.+]], [[Q:%.+]]:2 = pbc.ppm ["X", "Z"]
+  // CHECK: [[M:%.+]], [[Q:%.+]]:2 = pbc.ppm ["X", "Z"] [[Q0]], [[Q1]]
   %m, %out0, %out1 = quantum.measurement "PauliMeasure"() qubits(%q0, %q1)
       static_data = {pauli_word = "XZ", postselect = none}
       : (i1, !quantum.bit, !quantum.bit)
@@ -26,8 +27,9 @@ func.func @pauli_measurement(%q0: !quantum.bit, %q1: !quantum.bit)
 }
 
 // CHECK-LABEL: @discarded_measurement_result
+// CHECK-SAME: ([[Q0:%.+]]: !quantum.bit)
 func.func @discarded_measurement_result(%q0: !quantum.bit) -> !quantum.bit {
-  // CHECK: {{%.+}}, [[Q:%.+]] = pbc.ppm ["Y"]
+  // CHECK: {{%.+}}, [[Q:%.+]] = pbc.ppm ["Y"] [[Q0]]
   %out = quantum.measurement "PauliMeasure"() qubits(%q0)
       static_data = {pauli_word = "Y", meas_uid = "direct"}
       : (!quantum.bit)
