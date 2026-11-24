@@ -31,11 +31,12 @@ from jax._src.tree_util import tree_flatten
 from jax.api_util import debug_info
 from jax.core import get_aval
 from pennylane import QueuingManager
+from pennylane.core.qscript import QuantumScript
+from pennylane.core.queuing import AnnotatedQueue
 from pennylane.decomposition.resources import resolve_work_wire_type
 from pennylane.operation import Operator, Operator2
 from pennylane.ops.op_math.adjoint import create_adjoint_op
 from pennylane.ops.op_math.controlled import create_controlled_op, create_controlled_op2
-from pennylane.tape import QuantumTape
 
 from catalyst.api_extensions.control_flow import cond
 from catalyst.jax_extras import (
@@ -515,10 +516,10 @@ class AdjointCallable:
         # Allow the creation of HybridAdjoint instances outside of any contexts.
         # Don't create a JAX context here as otherwise we could be dealing with escaped tracers.
         if not EvaluationContext.is_tracing():
-            # QuantumTapes can themselves appear in queuing records.
-            with QueuingManager.stop_recording(), QuantumTape() as quantum_tape:
+            with QueuingManager.stop_recording(), AnnotatedQueue() as queue:
                 self.target(*args, **kwargs)
 
+            quantum_tape = QuantumScript.from_queue(queue)
             adjoint_region = HybridOpRegion(None, quantum_tape, [], [])
 
             return [], [], [adjoint_region], dbg
@@ -530,7 +531,7 @@ class AdjointCallable:
             arg_classical_tracers = _input_type_to_tracers(
                 partial(inner_trace.new_arg, source_info=current_source_info()), in_avals
             )
-            with QueuingManager.stop_recording(), QuantumTape() as quantum_tape:
+            with QueuingManager.stop_recording(), AnnotatedQueue() as queue:
                 # FIXME: move all to_jaxpr_tracer calls into a separate function
                 res_classical_tracers = [
                     inner_trace.to_jaxpr_tracer(t, source_info=current_source_info())
@@ -538,6 +539,7 @@ class AdjointCallable:
                     if isinstance(t, DynamicJaxprTracer)
                 ]
 
+            quantum_tape = QuantumScript.from_queue(queue)
             _check_no_measurements(quantum_tape)
 
             adjoint_region = HybridOpRegion(
@@ -671,18 +673,19 @@ class CtrlCallable:
         # Allow the creation of HybridCtrl instances outside of any contexts.
         # Don't create a JAX context here as otherwise we could be dealing with escaped tracers.
         if not EvaluationContext.is_tracing():
-            # QuantumTapes can themselves appear in queuing records.
-            with QueuingManager.stop_recording(), QuantumTape() as quantum_tape:
+            with QueuingManager.stop_recording(), AnnotatedQueue() as queue:
                 self.target(*args, **kwargs)
 
+            quantum_tape = QuantumScript.from_queue(queue)
             ctrl_region = HybridOpRegion(None, quantum_tape, [], [])
 
             return [], [], [ctrl_region]
 
         # Create a nested jaxpr scope for the body of the adjoint.
         in_classical_tracers, _ = tree_flatten((args, kwargs))
-        with QueuingManager.stop_recording(), QuantumTape() as quantum_tape:
+        with QueuingManager.stop_recording(), AnnotatedQueue() as queue:
             res = self.target(*args, **kwargs)
+        quantum_tape = QuantumScript.from_queue(queue)
         out_classical_tracers, _ = tree_flatten(res)
 
         _check_no_measurements(quantum_tape)
@@ -769,19 +772,19 @@ class HybridCtrl(HybridOp):
         new_ops = []
         for op in self.regions[0].quantum_tape.operations:
             new_ops.append(op.map_wires(wire_map))
-        self.regions[0].quantum_tape = QuantumTape(new_ops, [])
+        self.regions[0].quantum_tape = QuantumScript(new_ops, [])
         self._control_wires = [wire_map.get(wire, wire) for wire in self._control_wires]
         self._work_wires = [wire_map.get(wire, wire) for wire in self._work_wires]
         return self
 
 
 def ctrl_distribute(
-    tape: QuantumTape,
+    tape: QuantumScript,
     control_wires: List[Any],
     control_values: List[Any],
     work_wires: Optional[List[Any]] = None,
     work_wire_type: str = "borrowed",
-) -> QuantumTape:
+) -> QuantumScript:
     """Distribute the quantum control operation, described by ``control_wires`` and
     ``control_values``, over all the operations on the nested quantum tape.
     """
@@ -836,7 +839,7 @@ def ctrl_distribute(
                             work_wires,
                             work_wire_type,
                         )
-                        region.quantum_tape = QuantumTape(
+                        region.quantum_tape = QuantumScript(
                             nested_ops, region.quantum_tape.measurements
                         )
                 new_ops.append(op)
@@ -872,7 +875,7 @@ def ctrl_distribute(
 
 
 ## PRIVATE ##
-def _check_no_measurements(tape: QuantumTape) -> None:
+def _check_no_measurements(tape: QuantumScript) -> None:
     """Check the nested quantum tape for the absense of quantum measurements of any kind"""
 
     if len(tape.measurements) > 0:

@@ -165,9 +165,7 @@ OperatorNode parseOperator(llvm::StringRef id) {
     OperatorNode node;
 
     node.id = id.str();
-    node.name = id.take_until([](char c) { return c == '[' || c == '{'; }).drop_until([](char c) {
-        return !llvm::isDigit(c);
-    });
+    node.name = GraphPrep::getGraphOpName(id).drop_until([](char c) { return !llvm::isDigit(c); });
 
     return node;
 }
@@ -491,6 +489,10 @@ LogicalResult getRuleNodes(ModuleOp module, llvm::StringRef filename,
 namespace catalyst {
 namespace quantum {
 namespace GraphPrep {
+
+llvm::StringRef getGraphOpName(llvm::StringRef id) {
+    return id.take_until([](char c) { return c == '[' || c == '{'; });
+}
 
 LogicalResult materializeSelectedLibraryRules(ModuleOp module, ModuleOp ruleLibrary,
                                               const llvm::StringSet<> &selectedRules) {
