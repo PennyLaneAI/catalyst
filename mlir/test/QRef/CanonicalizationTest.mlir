@@ -234,3 +234,12 @@ func.func @test_canonicalize_no_dce(%arg0: tensor<2xcomplex<f64>>, %arg1 : tenso
 
     return
 }
+
+// -----
+
+// CHECK-LABEL: func.func @test_fold_cast
+func.func @test_fold_cast(%r: !qref.reg<3>) -> (!qref.reg<3>) {
+    %0 = qref.cast %r : !qref.reg<3> to !qref.reg<3>
+    // CHECK: return %arg0 : !qref.reg<3>
+    return %0 : !qref.reg<3>
+}

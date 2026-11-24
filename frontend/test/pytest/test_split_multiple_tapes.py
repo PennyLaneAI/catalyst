@@ -25,6 +25,8 @@ import pytest
 
 from catalyst import qjit
 
+pytestmark = pytest.mark.old_frontend
+
 
 def test_split_multiple_tapes():
     """
@@ -33,10 +35,10 @@ def test_split_multiple_tapes():
     dev = qp.device("lightning.qubit", wires=2)
 
     def my_quantum_transform(
-        tape: qp.tape.QuantumTape,
-    ) -> (Sequence[qp.tape.QuantumTape], Callable):
+        tape: qp.core.QuantumScript,
+    ) -> (Sequence[qp.core.QuantumScript], Callable):
         tape1 = tape
-        tape2 = qp.tape.QuantumTape(
+        tape2 = qp.core.QuantumScript(
             [qp.RY(tape1.operations[1].parameters[0] + 0.4, wires=0)], [qp.expval(qp.X(0))]
         )
 
@@ -56,7 +58,7 @@ def test_split_multiple_tapes():
 
     expected = circuit([0.1, 0.2])
 
-    circuit = qjit(circuit)
+    circuit = qjit(circuit, capture=False)
     qjit_results = circuit([0.1, 0.2])
 
     assert np.allclose(expected, qjit_results)

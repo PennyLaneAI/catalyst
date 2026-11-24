@@ -839,3 +839,81 @@ func.func @test_operator_register(%idx0: tensor<2xi64>, %idx1: tensor<1xi64>, %c
     qref.dealloc %a : !qref.reg<4>
     return
 }
+
+// -----
+
+// Named wire groups index the unique operands after compaction.
+// CHECK-LABEL: func.func @overlapping_groups
+// CHECK: [[REG:%.+]] = quantum.alloc( 3)
+// CHECK: [[Q2:%.+]] = quantum.extract [[REG]][ 2]
+// CHECK: [[Q0:%.+]] = quantum.extract [[REG]][ 0]
+// CHECK-NOT: quantum.extract
+// CHECK: [[OUT:%.+]]:2 = quantum.operator "Composite"() qubits([[Q2]], [[Q0]])
+// CHECK: qubit_map = {compute = [0], target = [1], uncompute = [0]}
+// CHECK: quantum.insert {{%.+}}[ 2], [[OUT]]#0
+// CHECK: quantum.insert {{%.+}}[ 0], [[OUT]]#1
+func.func @overlapping_groups() attributes {quantum.node} {
+  %r = qref.alloc(3) : !qref.reg<3>
+  %q2 = qref.get %r[2] : !qref.reg<3> -> !qref.bit
+  %q0 = qref.get %r[0] : !qref.reg<3> -> !qref.bit
+  %alias = qref.get %r[2] : !qref.reg<3> -> !qref.bit
+  qref.operator "Composite"() qubits(%q2, %q0, %alias)
+    qubit_map = {compute = [0], target = [1], uncompute = [2]}
+  qref.dealloc %r : !qref.reg<3>
+  return
+}
+
+// -----
+
+// CHECK-LABEL: func.func @dynamic_alias
+// CHECK: [[REG:%.+]] = quantum.alloc( 3)
+// CHECK: [[Q:%.+]] = quantum.extract [[REG]][%arg0]
+// CHECK-NOT: quantum.extract
+// CHECK: quantum.operator "Composite"() qubits([[Q]])
+// CHECK: qubit_map = {compute = [0], target = [0]}
+func.func @dynamic_alias(%wire: i64) attributes {quantum.node} {
+  %r = qref.alloc(3) : !qref.reg<3>
+  %first = qref.get %r[%wire] : !qref.reg<3>, i64 -> !qref.bit
+  %second = qref.get %r[%wire] : !qref.reg<3>, i64 -> !qref.bit
+  qref.operator "Composite"() qubits(%first, %second)
+    qubit_map = {compute = [0], target = [1]}
+  qref.dealloc %r : !qref.reg<3>
+  return
+}
+
+// -----
+
+// Folding or inlining may expose aliases in an already compacted operator.
+// CHECK-LABEL: func.func @compose_maps
+// CHECK: [[Q:%.+]] = quantum.extract {{%.+}}[ 0]
+// CHECK-NOT: quantum.extract
+// CHECK: quantum.operator "Composite"() qubits([[Q]])
+// CHECK: qubit_map = {compute = [0], target = [0], uncompute = [0]}
+func.func @compose_maps() attributes {quantum.node} {
+  %r = qref.alloc(1) : !qref.reg<1>
+  %first = qref.get %r[0] : !qref.reg<1> -> !qref.bit
+  %second = qref.get %r[0] : !qref.reg<1> -> !qref.bit
+  qref.operator "Composite"() qubits(%first, %second)
+    qubit_map = {compute = [0], target = [1], uncompute = [0]}
+  qref.dealloc %r : !qref.reg<1>
+  return
+}
+
+// -----
+
+// CHECK-LABEL: func.func @permuted_overlapping_groups
+// CHECK: [[Q2:%.+]] = quantum.extract {{%.+}}[ 2]
+// CHECK: [[Q0:%.+]] = quantum.extract {{%.+}}[ 0]
+// CHECK: [[Q1:%.+]] = quantum.extract {{%.+}}[ 1]
+// CHECK: quantum.operator "Composite"() qubits([[Q2]], [[Q0]], [[Q1]])
+// CHECK: qubit_map = {a_reg = [1, 2], empty = [], z_reg = [0, 1]}
+func.func @permuted_overlapping_groups() attributes {quantum.node} {
+  %r = qref.alloc(3) : !qref.reg<3>
+  %q2 = qref.get %r[2] : !qref.reg<3> -> !qref.bit
+  %q0 = qref.get %r[0] : !qref.reg<3> -> !qref.bit
+  %q1 = qref.get %r[1] : !qref.reg<3> -> !qref.bit
+  qref.operator "Composite"() qubits(%q2, %q0, %q0, %q1)
+    qubit_map = {a_reg = [2, 3], empty = [], z_reg = [0, 1]}
+  qref.dealloc %r : !qref.reg<3>
+  return
+}

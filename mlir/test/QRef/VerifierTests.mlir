@@ -574,3 +574,198 @@ func.func @operator_custom_invalid_ctrl_static_length(%r : !qref.reg<?>, %idx : 
 }
 
 // -----
+
+// -----
+
+func.func @reference_map_out_of_bounds(%q: !qref.bit) {
+  // expected-error@+1 {{qubit_map index is out of bounds}}
+  qref.operator "Composite"() qubits(%q) qubit_map = {compute = [1]}
+  return
+}
+
+// -----
+
+func.func @reference_map_missing_qubit(%q0: !qref.bit, %q1: !qref.bit) {
+  // expected-error@+1 {{qubit_map must cover all qubit values}}
+  qref.operator "Composite"() qubits(%q0, %q1) qubit_map = {compute = [0], target = [0]}
+  return
+}
+
+// -----
+
+func.func @operator_overlapping_targets(%target: !qref.bit, %control: !qref.bit) {
+  %true = arith.constant true
+  qref.operator "Composite"() qubits(%target, %target)
+    ctrls(%control) ctrl_vals(%true) qubit_map = {compute = [0], target = [1]}
+  return
+}
+
+// -----
+
+func.func @operator_control_on_overlapping_targets(%target: !qref.bit) {
+  %true = arith.constant true
+  // expected-error@+1 {{all qubits on a quantum gate must be distinct (including controls)}}
+  qref.operator "Composite"() qubits(%target, %target)
+    ctrls(%target) ctrl_vals(%true) qubit_map = {compute = [0], target = [1]}
+  return
+}
+
+// -----
+
+func.func @operator_duplicate_controls(%target: !qref.bit, %control: !qref.bit) {
+  %true = arith.constant true
+  // expected-error@+1 {{all qubits on a quantum gate must be distinct (including controls)}}
+  qref.operator "Composite"() qubits(%target, %target)
+    ctrls(%control, %control) ctrl_vals(%true, %true)
+    qubit_map = {compute = [0], target = [1]}
+  return
+}
+
+// -----
+
+func.func @cast_static_to_dynamic(%r: !qref.reg<3>, %r_dyn: !qref.reg<?>) {
+  %0 = qref.cast %r : !qref.reg<3> to !qref.reg<?>
+  %1 = qref.cast %r_dyn : !qref.reg<?> to !qref.reg<3>
+  %2 = qref.cast %r : !qref.reg<3> to !qref.reg<3>
+  return
+}
+
+// -----
+
+func.func @cast_between_static_sizes(%r: !qref.reg<3>) {
+  // expected-error@+1 {{cannot cast between registers of different static sizes, '!qref.reg<3>' and '!qref.reg<4>'}}
+  %0 = qref.cast %r : !qref.reg<3> to !qref.reg<4>
+  return
+}
+
+// -----
+
+func.func @measurement_mixed_modes(%q: !qref.bit, %r: !qref.reg<2>, %w: tensor<1xi64>) {
+  // expected-error@+1 {{must use either qubits or registers, but not both}}
+  %m = "qref.measurement"(%q, %r, %w) <{op_name = "Mixed", operandSegmentSizes = array<i32: 0, 1, 1, 1>}> : (!qref.bit, !qref.reg<2>, tensor<1xi64>) -> i1
+  return
+}
+
+// -----
+
+func.func @measurement_indices_without_register(%w: tensor<1xi64>) {
+  // expected-error@+1 {{index arrays require a register}}
+  %m = "qref.measurement"(%w) <{op_name = "Indices", operandSegmentSizes = array<i32: 0, 0, 0, 1>}> : (tensor<1xi64>) -> i1
+  return
+}
+
+// -----
+
+func.func @measurement_register_without_indices(%r: !qref.reg<2>) {
+  // expected-error@+1 {{expected at least one target qubit}}
+  %m = qref.measurement "None"() quregs(%r: !qref.reg<2>) indices() : (i1)
+  return
+}
+
+// -----
+
+func.func @measurement_missing_targets() {
+  // expected-error@+1 {{expected at least one target qubit}}
+  %m = qref.measurement "None"() qubits() : (i1)
+  return
+}
+
+// -----
+
+func.func @measurement_quantum_param(%q: !qref.bit) {
+  // expected-error@+1 {{params must have classical types}}
+  %m = qref.measurement "BadParam"(%q: !qref.bit) qubits() : (i1)
+  return
+}
+
+// -----
+
+func.func @measurement_observable_param(%obs: !quantum.obs) {
+  // expected-error@+1 {{params must have classical types}}
+  %m = qref.measurement "BadParam"(%obs: !quantum.obs) qubits() : (i1)
+  return
+}
+
+// -----
+
+func.func @measurement_quantum_classical_result() {
+  // expected-error@+1 {{mres must have classical types}}
+  %m = qref.measurement "BadResult"() qubits() : (!qref.reg<2>)
+  return
+}
+
+// -----
+
+func.func @measurement_nested_quantum_result() {
+  // expected-error@+1 {{mres must have classical types}}
+  %m = qref.measurement "BadResult"() qubits() : (tuple<!quantum.bit>)
+  return
+}
+
+// -----
+
+func.func @measurement_wrong_index_type(%r: !qref.reg<2>, %w: tensor<1xi32>) {
+  // expected-error@+1 {{operand #1 must be variadic of 1D tensor of 64-bit signless integer values}}
+  %m = qref.measurement "BadIndices"() quregs(%r: !qref.reg<2>) indices(%w: tensor<1xi32>) : (i1)
+  return
+}
+
+// -----
+
+func.func @measurement_static_data_type() {
+  // expected-error@+1 {{Invalid attribute `static_data` in property conversion}}
+  %m = "qref.measurement"() <{op_name = "BadData", static_data = "XY", operandSegmentSizes = array<i32: 0, 0, 0, 0>}> : () -> i1
+  return
+}
+
+// -----
+
+func.func @measurement_custom_invalid_param_map_coverage(%p0 : f64, %p1 : i64, %q0 : !qref.bit, %q1 : !qref.bit) {
+  // expected-error@+1 {{param_map must cover all params when provided: expected 2, got 1}}
+  %m = qref.measurement "custom_bad_param_map"(%p0 : f64, %p1 : i64) qubits(%q0, %q1)
+    param_map = {p0 = [0]}
+    : (i1)
+  return
+}
+
+// -----
+
+func.func @measurement_custom_invalid_qubit_map_coverage(%r : !qref.reg<?>, %idx0 : tensor<2xi64>, %idx1 : tensor<1xi64>) {
+  // expected-error@+1 {{qubit_map must cover all index arrays in register mode: expected 2, got 1}}
+  %m = qref.measurement "custom_bad_qubit_map"()
+    quregs(%r : !qref.reg<?>) indices(%idx0 : tensor<2xi64>, %idx1 : tensor<1xi64>)
+    qubit_map = {qi0 = [0]}
+    : (i1)
+  return
+}
+
+// -----
+
+func.func @measurement_custom_invalid_qubit_map_sum(%q0 : !qref.bit, %q1 : !qref.bit) {
+  // expected-error@+1 {{qubit_map must cover all qubit values in qubit mode: expected 2, got 1}}
+  %m = qref.measurement "custom_bad_qubit_map_sum"() qubits(%q0, %q1)
+    qubit_map = {pair = [0]}
+    : (i1)
+  return
+}
+
+// -----
+
+func.func @measurement_adjoint(%q: !qref.bit) {
+  // expected-error@+1 {{quantum measurements are not allowed in the adjoint regions}}
+  qref.adjoint {
+    %m = qref.measurement "Measure"() qubits(%q) : (i1)
+  }
+  return
+}
+
+// -----
+
+func.func @measurement_ctrl(%q: !qref.bit, %c: !qref.bit, %v: i1) {
+  // expected-error@+1 {{quantum measurements are not allowed in the ctrl regions}}
+  qref.ctrl(%c) ctrlvals(%v) {
+    %m = qref.measurement "Measure"() qubits(%q) : (i1)
+  }
+  return
+}
+

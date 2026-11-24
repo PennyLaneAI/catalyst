@@ -116,6 +116,8 @@ _REGISTRY: list[TransportBackend] = [
     ),
     TransportBackend("hwhs", "rdma", "fpga", ("controller",)),
     TransportBackend("fpga_verbs", "rdma", "fpga", ("controller",), default=False),
+    TransportBackend("hsb_hwhs", "rdma", "fpga", ("controller",), default=False),
+    TransportBackend("balboa_hwhs", "rdma", "fpga", ("controller",), default=False),
     TransportBackend(
         "memcpy",
         "memcpy",
@@ -1054,6 +1056,8 @@ def _qec_pass_specs(code):
     """
     params = _QEC_CODES[code]
     return (
+        # Drops the unused decomposition rules captured with the circuit
+        ("symbol-dce", {}),
         ("convert-quantum-to-qecl", {"k": params.k}),
         ("symbol-dce", {}),
         ("inject-noise-to-qecl", {}),

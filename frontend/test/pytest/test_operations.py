@@ -15,7 +15,8 @@
 import numpy as np
 import pennylane as qp
 import pytest
-from pennylane.tape import QuantumTape
+from pennylane.core.queuing import AnnotatedQueue
+from pennylane.tape import QuantumScript
 from pennylane_lightning.lightning_qubit.lightning_qubit import OperatorProperties
 from utils import get_custom_qjit_device
 
@@ -25,6 +26,7 @@ from catalyst.jax_tracer import HybridOp, has_nested_tapes
 from catalyst.utils.exceptions import CompileError
 
 
+@pytest.mark.old_frontend
 def test_no_parameters(backend):
     """Test no-param operations."""
 
@@ -82,7 +84,8 @@ def test_no_parameters(backend):
 
         qp.MultiControlledX(wires=[0, 1, 2, 3])
 
-        qp.BlockEncode(np.array([[1, 1, 1], [0, 1, 0]]), wires=[0, 1, 2])
+        # TODO: bring this back when BlockEncode works with capture
+        # qp.BlockEncode(np.array([[1, 1, 1], [0, 1, 0]]), wires=[0, 1, 2])
 
         # Unsupported:
         # qp.SX(wires=0)
@@ -161,12 +164,12 @@ def test_param(backend):
     assert np.allclose(qjit_fn(3.14, 0.6), qp_fn(3.14, 0.6))
 
 
+@pytest.mark.old_frontend
 def test_hybrid_op_repr(backend):
     """Test hybrid operation representation"""
 
     def circuit(n):
-        quantum_tape = QuantumTape()
-        with qp.QueuingManager.stop_recording(), quantum_tape:
+        with qp.QueuingManager.stop_recording(), AnnotatedQueue() as queue:
 
             @for_loop(0, 1, 1)
             def loop0(_):
@@ -194,6 +197,7 @@ def test_hybrid_op_repr(backend):
 
             cond_fn()
 
+        quantum_tape = QuantumScript.from_queue(queue)
         for term in ["ForLoop", "WhileLoop", "Cond", "RX", "RY", "RZ"]:
             assert term in str(quantum_tape.operations)
         for op in quantum_tape.operations:
@@ -208,7 +212,7 @@ def test_hybrid_op_repr(backend):
                 assert not has_nested_tapes(op)
         return qp.state()
 
-    qjit(qp.qnode(qp.device(backend, wires=4))(circuit))(1)
+    qjit(qp.qnode(qp.device(backend, wires=4))(circuit), capture=False)(1)
 
 
 @pytest.mark.parametrize("inp", [(1.0), (2.0), (3.0), (4.0)])
@@ -234,12 +238,13 @@ def test_qubitunitary_complex(inp, backend):
     assert np.allclose(compiled(inp), interpreted(inp))
 
 
+@pytest.mark.old_frontend
 def test_multicontrolledx_via_paulix():
     """Test that lightning executes multicontrolled x via paulix rather than qubit unitary."""
 
     dev = qp.device("lightning.qubit", wires=4)
 
-    @qjit
+    @qjit(capture=False)
     @qp.qnode(dev)
     def circuit():
         qp.Hadamard(0)

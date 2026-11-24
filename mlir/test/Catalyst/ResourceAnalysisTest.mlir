@@ -1909,6 +1909,30 @@ func.func @measurement_ops() {
 
 // -----
 
+// Generic measurements count as quantum operations.
+
+// CHECK-LABEL: "reference_measurement"
+// CHECK: "measurement_processes": {}
+// CHECK: "quantum_operations"
+// CHECK: "1"
+// CHECK: "MeasureInBasis": 1
+func.func @reference_measurement(%q: !qref.bit, %angle: f64) -> i1 {
+  %m = qref.measurement "MeasureInBasis"(%angle: f64) qubits(%q) static_data = {plane = "XY"} : (i1)
+  return %m : i1
+}
+
+// CHECK-LABEL: "value_measurement"
+// CHECK: "measurement_processes": {}
+// CHECK: "quantum_operations"
+// CHECK: "2"
+// CHECK: "MeasurePair": 1
+func.func @value_measurement(%q0: !quantum.bit, %q1: !quantum.bit) -> (i1, !quantum.bit, !quantum.bit) {
+  %m, %out:2 = quantum.measurement "MeasurePair"() qubits(%q0, %q1) : (i1, !quantum.bit, !quantum.bit)
+  return %m, %out#0, %out#1 : i1, !quantum.bit, !quantum.bit
+}
+
+// -----
+
 // Observable-based measurements
 
 // CHECK-LABEL: "observable_measurements"
@@ -2536,7 +2560,7 @@ module @nested_resource_module {
 // CHECK:   "Adjoint(T)": 1
 // CHECK:   "PauliX": 1
 // CHECK: "2"
-// CHECK:   "C(Adjoint(S))": 1
+// CHECK:   "1C(Adjoint(S))": 1
 // CHECK:   "CY": 1
 // CHECK: "3"
 // CHECK:   "2C(S)": 1
@@ -2573,8 +2597,8 @@ func.func public @test_ops_with_ctrl() -> tensor<8xf64> {
 // CHECK:   "Adjoint(T)": 1
 // CHECK:   "PauliX": 1
 // CHECK: "2"
-// CHECK:   "C(Adjoint(S))": 1
-// CHECK:   "C(PauliY)": 1
+// CHECK:   "1C(Adjoint(S))": 1
+// CHECK:   "1C(PauliY)": 1
 // CHECK: "3"
 // CHECK:   "2C(S)": 1
 
@@ -2622,7 +2646,7 @@ func.func public @test_ops_with_ctrl_region() -> tensor<8xf64> {
 // CHECK:   "Adjoint(T)": 1
 // CHECK:   "PauliX": 1
 // CHECK: "2"
-// CHECK:   "C(S)": 1
+// CHECK:   "1C(S)": 1
 // CHECK:   "CY": 1
 // CHECK: "3"
 // CHECK:   "2C(S)": 1
@@ -2713,7 +2737,7 @@ func.func @pbc_prepare_fabricate() {
 // CHECK: "1"
 // CHECK:   "Adjoint(MyOpD)": 1
 // CHECK: "2"
-// CHECK:   "C(MyOpB)": 1
+// CHECK:   "1C(MyOpB)": 1
 // CHECK:   "MyOpA": 1
 // CHECK: "3"
 // CHECK:   "2C(MyOpC)": 1
@@ -2769,7 +2793,7 @@ func.func @same_name_different_params(%q: !quantum.bit, %theta: f64) -> !quantum
 // CHECK: "1"
 // CHECK:   "Adjoint(MyOpD)": 1
 // CHECK: "2"
-// CHECK:   "C(MyOpB)": 1
+// CHECK:   "1C(MyOpB)": 1
 // CHECK:   "MyOpA": 1
 // CHECK: "3"
 // CHECK:   "2C(MyOpC)": 1
