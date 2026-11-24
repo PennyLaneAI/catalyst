@@ -1556,7 +1556,7 @@ static WireLens getWireLensFromQubitMap(mlir::DictionaryAttr qubitMap,
                                         mlir::ValueRange arrQubitIndices, bool hasQreg) {
     WireLens wireLens;
 
-    for (mlir::NamedAttribute entry : getQubitMap()) {
+    for (mlir::NamedAttribute entry : qubitMap) {
         auto indices = cast<mlir::DenseI64ArrayAttr>(entry.getValue()).asArrayRef();
         size_t numQubits;
         if (hasQreg) {

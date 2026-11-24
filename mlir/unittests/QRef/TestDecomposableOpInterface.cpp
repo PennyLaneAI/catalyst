@@ -647,7 +647,7 @@ module {
   %m = qref.measurement "PauliMeasure"() qubits(%q0, %q1)
       static_data = {pauli_word = "XY"}
       qubit_map = {wires = [0, 1]}
-      : i1
+      : (i1)
 }
     )mlir";
 
@@ -685,7 +685,7 @@ module {
   %q1 = qref.alloc_qb : !qref.bit
   %m = qref.measurement "MeasureMultiParams"(%flag: i1, %angle: f64, %index: i64) qubits(%q0, %q1)
       param_map = {flag = [0], angle = [1], index = [2]} qubit_map = {wires = [0, 1]}
-      : i1
+      : (i1)
 }
     )mlir";
 
@@ -719,7 +719,7 @@ func.func @testfunc(%wires : tensor<2xi64>) {
   %reg = qref.alloc(4) : !qref.reg<4>
   %m = qref.measurement "MeasureQreg"() quregs(%reg : !qref.reg<4>) indices(%wires: tensor<2xi64>)
       qubit_map = {wires = [0]}
-      : i1
+      : (i1)
   return
 }
     )mlir";

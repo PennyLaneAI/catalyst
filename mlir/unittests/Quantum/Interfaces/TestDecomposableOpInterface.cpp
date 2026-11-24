@@ -608,7 +608,7 @@ module {
   %m, %out:2 = quantum.measurement "PauliMeasure"() qubits(%q0, %q1)
       static_data = {pauli_word = "XY"}
       qubit_map = {wires = [0, 1]}
-      : i1, !quantum.bit, !quantum.bit
+      : (i1, !quantum.bit, !quantum.bit)
 }
     )mlir";
 
@@ -646,7 +646,7 @@ module {
   %q1 = quantum.alloc_qb : !quantum.bit
   %m, %out:2 = quantum.measurement "MeasureMultiParams"(%flag: i1, %angle: f64, %index: i64) qubits(%q0, %q1)
       param_map = {flag = [0], angle = [1], index = [2]} qubit_map = {wires = [0, 1]}
-      : i1, !quantum.bit, !quantum.bit
+      : (i1, !quantum.bit, !quantum.bit)
 }
     )mlir";
 
@@ -680,7 +680,7 @@ func.func @testfunc(%wires : tensor<2xi64>) {
   %reg = quantum.alloc(4) : !quantum.reg
   %m, %out = quantum.measurement "MeasureQreg"() quregs(%reg) indices(%wires: tensor<2xi64>)
       qubit_map = {wires = [0]}
-      : i1, !quantum.reg
+      : (i1, !quantum.reg)
   return
 }
     )mlir";

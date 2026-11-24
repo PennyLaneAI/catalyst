@@ -1192,15 +1192,12 @@ bool OperatorOp::requiresNonOverlappingNonCtrlQubitOperands() {
     return false;
 }
 
-std::string OperatorOp::getOperatorName() { return getOpName().str(); }
-
-
 // Build WireLens from a qubit_map; in register mode, lengths come from index-tensor dims.
 static WireLens getWireLensFromQubitMap(mlir::DictionaryAttr qubitMap,
                                         mlir::ValueRange arrQubitIndices, bool hasQreg) {
     WireLens wireLens;
 
-    for (mlir::NamedAttribute entry : getQubitMap()) {
+    for (mlir::NamedAttribute entry : qubitMap) {
         auto indices = cast<mlir::DenseI64ArrayAttr>(entry.getValue()).asArrayRef();
         size_t numQubits;
         if (hasQreg) {
