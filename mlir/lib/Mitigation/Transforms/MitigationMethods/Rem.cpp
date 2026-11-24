@@ -65,14 +65,15 @@ ValueRange emitCalibrationCircuit(PatternRewriter &rewriter, Location loc, func:
     rewriter.insert(shotsLocal);
     auto devInit =
         rewriter.create<quantum::DeviceInitOp>(loc, shotsLocal->getResult(0), lib, name, kwargs);
-    llvm::dbgs() << "[mitigation.rem] quantum.device initialization " << tag
-                 << " OK, op=" << devInit << "\n";
+    LLVM_DEBUG(llvm::dbgs() << "[mitigation.rem] quantum.device initialization " << tag
+                            << " OK, op=" << devInit << "\n");
 
     IntegerAttr qubitCountAttr = rewriter.getI64IntegerAttr(qubitCount);
     Value numberQubitsValue = rewriter.create<arith::ConstantOp>(loc, qubitCountAttr);
     Type qregType = quantum::QuregType::get(rewriter.getContext());
     auto qreg = rewriter.create<quantum::AllocOp>(loc, qregType, numberQubitsValue, qubitCountAttr);
-    llvm::dbgs() << "[mitigation.rem] quantum.alloc " << tag << " addition OK, op=" << qreg << "\n";
+    LLVM_DEBUG(llvm::dbgs() << "[mitigation.rem] quantum.alloc " << tag
+                            << " addition OK, op=" << qreg << "\n");
 
     Value currentQreg = qreg.getResult();
     if (applyPauliX) {
@@ -93,31 +94,31 @@ ValueRange emitCalibrationCircuit(PatternRewriter &rewriter, Location loc, func:
     Type obsType = ::catalyst::quantum::ObservableType::get(rewriter.getContext());
     auto compbasis = rewriter.create<quantum::ComputationalBasisOp>(loc, TypeRange{obsType},
                                                                     ValueRange{}, currentQreg);
-    llvm::dbgs() << "[mitigation.rem] quantum.compbasis " << tag << " addition OK, op=" << compbasis
-                 << "\n";
+    LLVM_DEBUG(llvm::dbgs() << "[mitigation.rem] quantum.compbasis " << tag
+                            << " addition OK, op=" << compbasis << "\n");
 
     ValueRange calibratedResult;
     if (MPName == "quantum.probs"s) {
         auto insertedMP = rewriter.create<quantum::ProbsOp>(
             loc, TypeRange{tensorTyF64}, compbasis.getResult(), Value(), Value());
-        llvm::dbgs() << "[mitigation.rem] quantum.probs " << tag
-                     << " addition OK, op=" << insertedMP << "\n";
+        LLVM_DEBUG(llvm::dbgs() << "[mitigation.rem] quantum.probs " << tag
+                                << " addition OK, op=" << insertedMP << "\n");
         calibratedResult = insertedMP->getResults();
     }
     else if (MPName == "quantum.counts"s) {
         auto insertedMP =
             rewriter.create<quantum::CountsOp>(loc, TypeRange{tensorTyF64, tensorTyI64},
                                                compbasis.getResult(), Value(), Value(), Value());
-        llvm::dbgs() << "[mitigation.rem] quantum.counts " << tag
-                     << " addition OK, op=" << insertedMP << "\n";
+        LLVM_DEBUG(llvm::dbgs() << "[mitigation.rem] quantum.counts " << tag
+                                << " addition OK, op=" << insertedMP << "\n");
         // Drop the eigvals half; only the counts tensor feeds calibration.
         calibratedResult = insertedMP->getResults().drop_front();
     }
     else if (MPName == "quantum.sample"s) {
         auto insertedMP = rewriter.create<quantum::SampleOp>(
             loc, TypeRange{tensorTyF64}, compbasis.getResult(), ValueRange{}, Value());
-        llvm::dbgs() << "[mitigation.rem] quantum.sample " << tag
-                     << " addition OK, op=" << insertedMP << "\n";
+        LLVM_DEBUG(llvm::dbgs() << "[mitigation.rem] quantum.sample " << tag
+                                << " addition OK, op=" << insertedMP << "\n");
         // Return the f64 samples, the type of the rem op's zeros/ones results. The
         // callee's post-processing of its own samples (the conversion to integers)
         // is not cloned: its types follow the wires the callee measures, which can
@@ -127,11 +128,11 @@ ValueRange emitCalibrationCircuit(PatternRewriter &rewriter, Location loc, func:
     }
 
     auto dealloc = rewriter.create<quantum::DeallocOp>(loc, currentQreg);
-    llvm::dbgs() << "[mitigation.rem] quantum.dealloc " << tag << " addition OK, op=" << dealloc
-                 << "\n";
+    LLVM_DEBUG(llvm::dbgs() << "[mitigation.rem] quantum.dealloc " << tag
+                            << " addition OK, op=" << dealloc << "\n");
     auto deinit = rewriter.create<quantum::DeviceReleaseOp>(loc);
-    llvm::dbgs() << "[mitigation.rem] quantum.deinit " << tag << " addition OK, op=" << deinit
-                 << "\n";
+    LLVM_DEBUG(llvm::dbgs() << "[mitigation.rem] quantum.deinit " << tag
+                            << " addition OK, op=" << deinit << "\n");
     return calibratedResult;
 }
 
@@ -146,10 +147,12 @@ LogicalResult RemLowering::matchAndRewrite(mitigation::RemOp op, PatternRewriter
     Location loc = op.getLoc();
 
     auto runCalibration = op.getRunCalibrationAttr();
-    llvm::dbgs() << "[mitigation.rem] runCalibration: " << runCalibration << "\n";
-    for (auto v : op.getResultTypes()) {
-        llvm::dbgs() << "[mitigation.rem] Result type: " << v << "\n";
-    }
+    LLVM_DEBUG({
+        llvm::dbgs() << "[mitigation.rem] runCalibration: " << runCalibration << "\n";
+        for (auto v : op.getResultTypes()) {
+            llvm::dbgs() << "[mitigation.rem] Result type: " << v << "\n";
+        }
+    });
     // Resolve callee
     func::FuncOp calleeOp =
         SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(op, op.getCalleeAttr());
@@ -159,9 +162,10 @@ LogicalResult RemLowering::matchAndRewrite(mitigation::RemOp op, PatternRewriter
 
     const bool doCalib = runCalibration.getValue();
     if (!doCalib) {
-        llvm::dbgs() << "[mitigation.rem] doCalibration == false, replacing RemOp with wrapped "
-                        "callee circuit function call..."
-                     << "\n";
+        LLVM_DEBUG(
+            llvm::dbgs() << "[mitigation.rem] doCalibration == false, replacing RemOp with wrapped "
+                            "callee circuit function call..."
+                         << "\n");
         // The zeros/ones result groups are empty variadics when doCalib is false,
         // so the op is replaced by only the callee's SSA values.
         auto callOp = rewriter.create<func::CallOp>(loc, calleeOp, op.getArgs());
@@ -181,10 +185,10 @@ LogicalResult RemLowering::matchAndRewrite(mitigation::RemOp op, PatternRewriter
     // shots value could be a result of some operation, and not just a literal value, which is why
     // pointer to the operation is stored
     Operation *shots = deviceInitOp.getShots().getDefiningOp();
-    llvm::dbgs() << "[mitigation.rem] qubitCount: " << qubitCount << ", shots: " << *shots
-                 << ", lib: " << deviceInitOp.getLibAttr()
-                 << ", name: " << deviceInitOp.getDeviceNameAttr() << ", kwargs"
-                 << deviceInitOp.getKwargsAttr() << "\n";
+    LLVM_DEBUG(llvm::dbgs() << "[mitigation.rem] qubitCount: " << qubitCount
+                            << ", shots: " << *shots << ", lib: " << deviceInitOp.getLibAttr()
+                            << ", name: " << deviceInitOp.getDeviceNameAttr() << ", kwargs"
+                            << deviceInitOp.getKwargsAttr() << "\n");
 
     // check for MP type: Sample, Probs or Counts
     auto measurementProcesses = calleeOp.getOps<quantum::MeasurementProcess>();
@@ -193,7 +197,7 @@ LogicalResult RemLowering::matchAndRewrite(mitigation::RemOp op, PatternRewriter
     }
     const std::string MPName =
         (*measurementProcesses.begin()).getOperation()->getName().getIdentifier().str();
-    llvm::dbgs() << "[mitigation.rem] MP name: " << MPName << "\n";
+    LLVM_DEBUG(llvm::dbgs() << "[mitigation.rem] MP name: " << MPName << "\n");
 
     // pre-compute MP and attribute-dependent values
     RankedTensorType tensorTyI64;
@@ -221,9 +225,9 @@ LogicalResult RemLowering::matchAndRewrite(mitigation::RemOp op, PatternRewriter
                                   "supported for analytic simulation (shots must be > 0)");
         }
         const int64_t shotCount = shotsAttr.getInt();
-        llvm::dbgs()
-            << "[mitigation.rem] Shots is a arth.constant op, shots known at compile time: "
-            << shotCount << "\n";
+        LLVM_DEBUG(llvm::dbgs()
+                   << "[mitigation.rem] Shots is a arth.constant op, shots known at compile time: "
+                   << shotCount << "\n");
         tensorTyI64 = RankedTensorType::get({shotCount, qubitCount}, rewriter.getI64Type());
         tensorTyF64 = RankedTensorType::get({shotCount, qubitCount}, rewriter.getF64Type());
     }
@@ -233,9 +237,10 @@ LogicalResult RemLowering::matchAndRewrite(mitigation::RemOp op, PatternRewriter
                << MPName << " is not supported";
     }
 
-    llvm::dbgs() << "[mitigation.rem] doCalibration == true, start adding all-zeroes and all-ones "
-                    "circuits..."
-                 << "\n";
+    LLVM_DEBUG(llvm::dbgs()
+               << "[mitigation.rem] doCalibration == true, start adding all-zeroes and all-ones "
+                  "circuits..."
+               << "\n");
 
     // Call the original callee
     SmallVector<Value> callArgs(op.getArgs().begin(), op.getArgs().end());
