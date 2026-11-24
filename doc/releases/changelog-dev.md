@@ -1005,6 +1005,13 @@
 
 <h3>Bug fixes 🐛</h3>
 
+* The `catalyst.debug.instrumentation` console output lines up in columns again, and the compiler
+  now reports CPU times. Lines printed by the frontend and by the compiler use the same column
+  widths, and the name column is wide enough for stage names such as
+  `MLIRToLLVMDialectConversion`. The compiler's CPU time was always 0, because its
+  nanosecond-to-millisecond scale factor was computed with integer division.
+  [(#3510)](https://github.com/PennyLaneAI/catalyst/pull/3510)
+
 * The `resource-estimate` pass now keeps the number of control qubits in the names of the gates,
   e.g. `2C(RX)`, as `resource-analysis` does. Gates with different numbers of control qubits were
   counted together as `C(RX)`.
@@ -1605,6 +1612,7 @@ Rylan Malarchick,
 Mehrdad Malekmohammadi,
 River McCubbin,
 Mudit Pandey,
+Rahul,
 Shuli Shu,
 Nikhil Sreekumar,
 Kalman Szenes,
