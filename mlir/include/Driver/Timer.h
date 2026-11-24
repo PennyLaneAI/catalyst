@@ -86,8 +86,6 @@ inline std::string formatMilliseconds(double milliseconds) {
 
 template <IsRatio Duration = std::milli> static inline double getClock() {
     CPUTimeInstance<std::nano> t;
-    // Scale in floating point: Duration::den / std::nano::den is 0 in integer arithmetic for
-    // any Duration coarser than nanoseconds, which made every CPU time 0.
     return t.getTime() * (static_cast<double>(Duration::den) / std::nano::den);
 }
 
