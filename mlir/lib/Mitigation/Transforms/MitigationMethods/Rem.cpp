@@ -216,7 +216,7 @@ LogicalResult RemLowering::matchAndRewrite(mitigation::RemOp op, PatternRewriter
             return op.emitOpError("dynamic number of shots not supported currently");
         }
         auto shotsAttr = shots->getAttrOfType<IntegerAttr>("value");
-        if (!shotsAttr || shotsAttr == 0) {
+        if (!shotsAttr || shotsAttr.getInt() <= 0) {
             return op.emitOpError("shots constant missing non-zero integer value, sample MP not "
                                   "supported for analytic simulation (shots must be > 0)");
         }
