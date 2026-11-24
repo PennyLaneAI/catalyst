@@ -47,6 +47,7 @@ from catalyst.python_interface.dialects.quantum import (
     CustomOp,
     ExtractOp,
     GlobalPhaseOp,
+    MeasurementOp,
     MeasureOp,
     MultiRZOp,
     NamedObsOp,
@@ -436,6 +437,8 @@ def resolve_constant_wire(ssa: SSAValue) -> float | int | str:
             # subtract one as the first ssa index is the result,
             # %res, %q0, ... = pbc.ppm [PAULI_WORD] %q0, ...
             return resolve_constant_wire(op.operands[ssa.index - 1])
+        case MeasurementOp():
+            return resolve_constant_wire(op.in_qubits[ssa.index - len(op.mres)])
         case _:
             raise NotImplementedError(f"Cannot resolve wire for op: {op}")
 
