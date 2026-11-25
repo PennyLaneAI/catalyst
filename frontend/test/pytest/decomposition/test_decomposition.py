@@ -1222,7 +1222,7 @@ class TestPrecompiled:
             precompile_decomp_rules(bytecode_path)
 
         mocker.patch(
-            "catalyst.decomposition.decomposition_rules.compile_on_demand_decomposition_rules",
+            "catalyst.decomposition.on_demand_rules.compile_on_demand_decomposition_rules",
             side_effect=AssertionError(
                 "on-demand rules were used when precompiled rules should provide the necessary decompositions."
             ),

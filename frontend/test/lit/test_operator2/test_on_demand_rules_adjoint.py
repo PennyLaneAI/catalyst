@@ -22,7 +22,7 @@ import pennylane as qp
 from operator2_dummy_gates import NoParams, SingleParam
 from pennylane.typing import Float, Wire
 
-from catalyst.decomposition.decomposition_rules import (
+from catalyst.decomposition.on_demand_rules import (
     compile_on_demand_decomposition_rules,
 )
 
