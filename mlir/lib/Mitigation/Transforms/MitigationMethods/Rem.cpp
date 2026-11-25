@@ -178,8 +178,18 @@ LogicalResult RemLowering::matchAndRewrite(mitigation::RemOp op, PatternRewriter
 
     // Determine quantum device information, specifically number of qubits and shots.
     // Get the number of qubits from quantum.alloc operation inside callee function (FuncOp).
-    const int64_t qubitCount =
-        (*calleeOp.getOps<quantum::AllocOp>().begin()).getNqubitsAttr().value_or(0);
+    auto qubitCountAttr = (*calleeOp.getOps<quantum::AllocOp>().begin()).getNqubitsAttr();
+    // Check for dynamic number of qubits (not supported currently)
+    if (!qubitCountAttr) {
+        return op.emitOpError("dynamic number of qubits in callee ")
+               << op.getCalleeAttr() << " not supported currently";
+    }
+    const int64_t qubitCount = qubitCountAttr.value_or(0);
+    // Check for non-zero wires
+    if (qubitCount == 0) {
+        return op.emitOpError("invalid number of wires: ")
+               << qubitCount << " in callee " << op.getCalleeAttr();
+    }
     // Get the device using quantom.device operation  inside callee function (FuncOp)
     quantum::DeviceInitOp deviceInitOp = *(calleeOp.getOps<quantum::DeviceInitOp>().begin());
     // shots value could be a result of some operation, and not just a literal value, which is why

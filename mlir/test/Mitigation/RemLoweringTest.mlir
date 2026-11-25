@@ -238,6 +238,44 @@ func.func @remUnsupportedMP() -> (tensor<f64>, tensor<f64>, tensor<f64>) {
 
 // -----
 
+func.func @dynamicWiresCircuit(%n: i64) -> tensor<10x?xf64> attributes {qnode} {
+    %shots = arith.constant 10 : i64
+    quantum.device shots(%shots) ["rtd_lightning.so", "LightningQubit", "{}"]
+    %r = quantum.alloc(%n) : !quantum.reg
+    %obs = quantum.compbasis qreg %r : !quantum.obs
+    %samples = quantum.sample %obs shape %n : tensor<10x?xf64>
+    quantum.dealloc %r : !quantum.reg
+    quantum.device_release
+    func.return %samples : tensor<10x?xf64>
+}
+
+func.func @remDynamicWires(%n: i64) -> (tensor<10x?xf64>, tensor<10x?xf64>, tensor<10x?xf64>) {
+    // expected-error@+1 {{dynamic number of qubits in callee @dynamicWiresCircuit not supported currently}}
+    %out:3 = mitigation.rem @dynamicWiresCircuit(%n) runCalibration(true) {resultSegmentSizes = array<i32: 1, 1, 1>} : (i64) -> (tensor<10x?xf64>, tensor<10x?xf64>, tensor<10x?xf64>)
+    func.return %out#0, %out#1, %out#2 : tensor<10x?xf64>, tensor<10x?xf64>, tensor<10x?xf64>
+}
+
+// -----
+
+func.func @zeroWiresCircuit() -> tensor<10x0xf64> attributes {qnode} {
+    %shots = arith.constant 10 : i64
+    quantum.device shots(%shots) ["rtd_lightning.so", "LightningQubit", "{}"]
+    %r = quantum.alloc(0) : !quantum.reg
+    %obs = quantum.compbasis qreg %r : !quantum.obs
+    %samples = quantum.sample %obs : tensor<10x0xf64>
+    quantum.dealloc %r : !quantum.reg
+    quantum.device_release
+    func.return %samples : tensor<10x0xf64>
+}
+
+func.func @remZeroWires() -> (tensor<10x0xf64>, tensor<10x0xf64>, tensor<10x0xf64>) {
+    // expected-error@+1 {{invalid number of wires: 0 in callee @zeroWiresCircuit}}
+    %out:3 = mitigation.rem @zeroWiresCircuit() runCalibration(true) {resultSegmentSizes = array<i32: 1, 1, 1>} : () -> (tensor<10x0xf64>, tensor<10x0xf64>, tensor<10x0xf64>)
+    func.return %out#0, %out#1, %out#2 : tensor<10x0xf64>, tensor<10x0xf64>, tensor<10x0xf64>
+}
+
+// -----
+
 func.func @noMPCircuit() -> tensor<4xf64> attributes {qnode} {
     %shots = arith.constant 0 : i64
     quantum.device shots(%shots) ["rtd_lightning.so", "LightningQubit", "{}"]
