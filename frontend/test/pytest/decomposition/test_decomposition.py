@@ -68,9 +68,13 @@ from catalyst.decomposition.on_demand_rules import (
     compile_on_demand_decomposition_rules,
 )
 from catalyst.decomposition.precompile_decomposition_rules import (
+    precompile_circuit_decomp_rules,
     precompile_decomp_rules,
 )
-from catalyst.decomposition.precompiled_rule_loading import ManifestEntries
+from catalyst.decomposition.precompiled_rule_loading import (
+    ManifestEntries,
+    load_precompiled_rule_identities,
+)
 from catalyst.decomposition.rule_arguments import (
     RuleTraceInputs,
     flatten_hybrid_args,
@@ -1037,6 +1041,40 @@ class TestPrecompiled:
                 and f'target_gate = "{target_gate}"' in line
                 for line in bytecode.splitlines()
             ), f"Missing precompiled rule {frontend_name!r} for {target_gate!r}"
+
+    @pytest.mark.parametrize("use_qjit", [False, True])
+    def test_precompile_circuit_rules(self, tmp_path, use_qjit):
+        """Only the rules reachable from the gates in a circuit are precompiled."""
+
+        @qp.qnode(qp.device("null.qubit", wires=2))
+        def circuit(x):
+            qp.MultiRZ(x, wires=[0, 1])
+            qp.adjoint(qp.RX(x, 0))
+            return qp.expval(qp.Z(0))
+
+        if use_qjit:
+            circuit = qp.qjit(circuit, capture=True, enable_aot_compilation=False)
+
+        bytecode_path = tmp_path / "nested" / "rules.mlirbc"
+        precompile_circuit_decomp_rules(bytecode_path, circuit, 0.5)
+
+        targets = {rule.target_gate for rule in load_precompiled_rule_identities(bytecode_path)}
+        assert "MultiRZ{theta:[f64]}{wires:2}{}" in targets
+        assert "Adjoint(RX){0:[f64]}{wires:1}{}" in targets
+        # gates absent from the circuit (and not reachable from it) are not precompiled
+        assert not any(target.startswith("QFT") for target in targets)
+
+    def test_precompile_circuit_rules_requires_capture(self, tmp_path):
+        """A QJIT object without program capture is rejected."""
+
+        @qp.qjit(capture=False)
+        @qp.qnode(qp.device("null.qubit", wires=1))
+        def circuit():
+            qp.X(0)
+            return qp.expval(qp.Z(0))
+
+        with pytest.raises(CompileError, match="requires program capture"):
+            precompile_circuit_decomp_rules(tmp_path / "rules.mlirbc", circuit)
 
     def test_precompile_writes_hash_to_manifest(self, mocker, tmp_path):
         """The manifest contains the hash of the associated bytecode."""
