@@ -15,6 +15,7 @@ file(GLOB SRC
     ConversionPatterns.cpp
     GraphDecomposition/DecompUtils.cpp
     GraphDecomposition/GraphPrep.cpp
+    GraphDecomposition/ResourceProjection.cpp
     GraphDecomposition/graph_decomposition.cpp
     ResourceEstimatePass.cpp
     DisentangleCNOT.cpp

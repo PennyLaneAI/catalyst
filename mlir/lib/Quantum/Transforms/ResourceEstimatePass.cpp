@@ -34,15 +34,10 @@
 #include "Catalyst/Analysis/ResourceResult.h"
 #include "Quantum/Transforms/Passes.h"
 
-#include "DGBuilder.hpp"
-#include "DGSolver.hpp"
-#include "DGTypes.hpp"
-#include "DGUtils.hpp"
 #include "GraphPrep.hpp"
+#include "ResourceProjection.hpp"
 
 using namespace mlir;
-using namespace DecompGraph::Core;
-using namespace DecompGraph::Solver;
 
 namespace catalyst {
 namespace quantum {
@@ -57,47 +52,23 @@ struct ResourceEstimatePass : public impl::ResourceEstimatePassBase<ResourceEsti
         ModuleOp module = getOperation();
 
         ResourceAnalysis analysis(module, {}, /*collectDetailedOperations=*/true);
-        llvm::StringRef entryFuncName = analysis.getEntryFunc();
-
-        std::vector<std::string> opIDs;
-        if (const catalyst::ResourceResult *flat = analysis.getFlattenedResource(entryFuncName)) {
-            for (const auto &opID : flat->observedGraphOpIds) {
-                opIDs.push_back(opID.getKey().str());
-            }
-        }
-
-        OwningOpRef<ModuleOp> ruleLibrary;
-        std::unique_ptr<DecompositionGraph> graph =
-            GraphPrep::prepareGraph(module, opIDs,
-                                    {
-                                        .targetGateSetOption = targetGateSetOption,
-                                        .fixedDecompsOption = fixedDecompsOption,
-                                        .excludeDecompsOption = excludeDecompsOption,
-                                        .bytecodeRulesFile = bytecodeRulesFile,
-                                        .libQPDPath = libQPDPath,
-                                        .libpythonPath = libpythonPath,
-                                    },
-                                    ruleLibrary);
-
-        if (!graph) {
+        FailureOr<llvm::StringMap<ResourceResult>> estimates =
+            projectDecomposition(module, analysis,
+                                 {
+                                     .targetGateSetOption = targetGateSetOption,
+                                     .fixedDecompsOption = fixedDecompsOption,
+                                     .excludeDecompsOption = excludeDecompsOption,
+                                     .bytecodeRulesFile = bytecodeRulesFile,
+                                     .libQPDPath = libQPDPath,
+                                     .libpythonPath = libpythonPath,
+                                 },
+                                 verboseOption);
+        if (failed(estimates)) {
             return signalPassFailure();
         }
 
-        DecompositionSolver solver(*graph);
-        GraphResult solution = solver.solve();
-        if (verboseOption) {
-            showSolution(solution);
-        }
-
-        const auto &results = analysis.getResults();
-
-        llvm::StringMap<ResourceResult> estimates;
-        for (const auto &funcEntry : results) {
-            estimates[funcEntry.getKey()] = estimateResources(funcEntry.getValue(), solution);
-        }
-
         if (outputJson) {
-            std::string jsonStr = buildJsonString(estimates);
+            std::string jsonStr = buildJsonString(*estimates);
             if (outputFname.empty()) {
                 llvm::outs() << jsonStr;
             } else {
@@ -107,49 +78,6 @@ struct ResourceEstimatePass : public impl::ResourceEstimatePassBase<ResourceEsti
     }
 
   private:
-    /// Replace each op in a function's resources `result` with the basis gates of its chosen
-    /// decomposition rule, scaled by the op's count.
-    static ResourceResult estimateResources(const ResourceResult &result,
-                                            const GraphResult &solution) {
-        ResourceResult estimate;
-        estimate.measurements = result.measurements;
-        estimate.classicalInstructions = result.classicalInstructions;
-        estimate.functionCalls = result.functionCalls;
-        estimate.varFunctionCalls = result.varFunctionCalls;
-        estimate.numAllocQubits = result.numAllocQubits;
-        estimate.numArgQubits = result.numArgQubits;
-        estimate.deviceName = result.deviceName;
-        estimate.isQnode = result.isQnode;
-        estimate.hasBranches = result.hasBranches;
-        estimate.hasDynLoop = result.hasDynLoop;
-        estimate.autoQubitManagement = result.autoQubitManagement;
-
-        // Decomposable gates are keyed by their graph op id (GOID).
-        for (const auto &opEntry : result.detailedOperations) {
-            OperatorNode operatorNode;
-            std::string goid = opEntry.getKey().str();
-            double scale = opEntry.getValue();
-            operatorNode.id = goid;
-
-            auto graphOp = solution.find(operatorNode);
-            if (graphOp == solution.end()) {
-                // this case should not happen, because the graph should be complete
-                // Not a graph operator (e.g. a mid-circuit measurement): count the op itself.
-                estimate.operations[goid][{-1, -1}] += scale;
-                continue;
-            }
-            for (const auto &[basisOp, count] : graphOp->second.basisCounts) {
-                // Getting wires and params from GOID is unreliable. The JSON is flattened anyways,
-                // so for qp.estimate this will be enough.
-                // Unlike `basisOp.name`, the name in the GOID keeps the number of control qubits,
-                // e.g. `2C(RX)`, as in `ResourceAnalysis`.
-                estimate.operations[GraphPrep::getGraphOpName(basisOp.id)][{-1, -1}] +=
-                    count * scale;
-            }
-        }
-        return estimate;
-    }
-
     /// Serialize the estimates into a JSON string. The JSON borrows keys from `estimates`, so it
     /// must be printed while they are alive.
     static std::string buildJsonString(const llvm::StringMap<ResourceResult> &estimates) {

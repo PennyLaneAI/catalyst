@@ -12,18 +12,32 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// A subroutine called inside a quantum.ctrl region is counted as a controlled op (2C_helper).
+// A subroutine called inside a quantum.ctrl region is counted as a controlled op (2C_helper),
+// which calls the function of its chosen rule.
 
 // RUN: catalyst --tool=opt --pass-pipeline='builtin.module(resource-estimate{output-json gate-set=PauliX=1.0,Hadamard=1.0,CNOT=1.0,T=1.0,Adjoint(T)=1.0 bytecode-rules="%PRECOMPILED_BYTECODE_PATH"})' %s -o /dev/null | FileCheck %s
 
 // CHECK-LABEL: "2C_helper": {
+// CHECK:       "function_calls"
+// CHECK:         "ctrl_x_to_toffoli(2C(PauliX){}{wires:1}{})": 1
+// CHECK:       "quantum_operations": {}
+
+// CHECK-LABEL: "ctrl_x_to_toffoli(2C(PauliX){}{wires:1}{})": {
+// CHECK:       "function_calls"
+// CHECK:         "toffoli_to_clifford_t(Toffoli{}{wires:3}{})": 1
 // CHECK:       "quantum_operations"
-// CHECK-NEXT:    "-1"
-// CHECK-NEXT:      "Adjoint(T)": 3
-// CHECK-NEXT:      "CNOT": 6
-// CHECK-NEXT:      "Hadamard": 2
+// CHECK-NEXT:    "1"
 // CHECK-NEXT:      "PauliX": 2
+
+// CHECK-LABEL: "toffoli_to_clifford_t(Toffoli{}{wires:3}{})": {
+// CHECK:       "quantum_operations"
+// CHECK-NEXT:    "1"
+// CHECK-NEXT:      "Adjoint(T)": 3
+// CHECK-NEXT:      "Hadamard": 2
 // CHECK-NEXT:      "T": 4
+// CHECK-NEXT:    }
+// CHECK-NEXT:    "2"
+// CHECK-NEXT:      "CNOT": 6
 func.func public @ctrl_circuit() attributes {quantum.node} {
     %true = arith.constant true
     %0 = quantum.alloc( 3) : !quantum.reg

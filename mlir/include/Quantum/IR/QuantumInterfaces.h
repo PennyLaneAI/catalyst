@@ -14,10 +14,13 @@
 
 #pragma once
 
+#include <cstdint>
+#include <optional>
 #include <string>
 #include <utility>
 
 #include "llvm/ADT/SmallVector.h" // for DecomposableGate interface
+#include "llvm/ADT/StringRef.h"
 #include "mlir/IR/OpDefinition.h" // for QuantumInterfaces.h.inc
 #include "mlir/IR/Operation.h"
 #include "mlir/IR/Types.h"
@@ -42,6 +45,11 @@ std::string defaultGetGraphOpIdExplicitModifiers(mlir::Operation *op, bool isAdj
                                                  unsigned numControlQubits,
                                                  unsigned numWorkWires = 0,
                                                  bool isBorrowed = false);
+
+/// The number of qubits of the operation with the given graph op id, counted as the resource
+/// analysis counts them: its wires, its control qubits and its work wires. Returns std::nullopt if
+/// the id is malformed.
+std::optional<uint64_t> getGraphOpNumQubits(llvm::StringRef graphOpId);
 
 } // namespace quantum
 } // namespace catalyst

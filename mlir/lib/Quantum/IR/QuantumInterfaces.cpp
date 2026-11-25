@@ -15,10 +15,13 @@
 #include "Quantum/IR/QuantumInterfaces.h"
 
 #include <cstddef>
+#include <cstdint>
+#include <optional>
 #include <string>
 
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallVector.h"
+#include "llvm/ADT/StringExtras.h"
 #include "llvm/Support/raw_ostream.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/BuiltinAttributes.h"
@@ -78,6 +81,24 @@ void printDynamicShape(const DynamicShape &dynamicShape, llvm::raw_string_ostrea
 void printWireLens(const WireLens &wireLens, llvm::raw_string_ostream &ss) {
     printSortedMap<size_t>(wireLens, ss,
                            [](size_t len, llvm::raw_string_ostream &stream) { stream << len; });
+}
+
+// Consume a brace-enclosed group from the front of `str` and return its contents.
+std::optional<llvm::StringRef> consumeGroup(llvm::StringRef &str) {
+    if (!str.starts_with("{")) {
+        return std::nullopt;
+    }
+    int depth = 0;
+    for (size_t i = 0; i < str.size(); ++i) {
+        if (str[i] == '{') {
+            ++depth;
+        } else if (str[i] == '}' && --depth == 0) {
+            llvm::StringRef contents = str.slice(1, i);
+            str = str.drop_front(i + 1);
+            return contents;
+        }
+    }
+    return std::nullopt;
 }
 
 } // namespace
@@ -186,6 +207,35 @@ std::string defaultGetGraphOpIdExplicitModifiers(Operation *op, bool isAdjoint,
     ss.flush();
 
     return out;
+}
+
+std::optional<uint64_t> getGraphOpNumQubits(llvm::StringRef graphOpId) {
+    llvm::StringRef name = graphOpId.take_until([](char c) { return c == '{' || c == '['; });
+    llvm::StringRef groups = graphOpId.drop_front(name.size());
+
+    // Control qubits are only in the name, as `<n>C(...)`.
+    uint64_t numQubits = 0;
+    llvm::StringRef numCtrlQubits = name.take_while(llvm::isDigit);
+    if (name.drop_front(numCtrlQubits.size()).starts_with("C(") &&
+        numCtrlQubits.getAsInteger(10, numQubits)) {
+        return std::nullopt;
+    }
+
+    // The dynamic shape comes first, then the wire lengths.
+    std::optional<llvm::StringRef> wireLens;
+    if (!consumeGroup(groups) || !(wireLens = consumeGroup(groups))) {
+        return std::nullopt;
+    }
+    llvm::SmallVector<llvm::StringRef> entries;
+    wireLens->split(entries, ',', /*MaxSplit=*/-1, /*KeepEmpty=*/false);
+    for (llvm::StringRef entry : entries) {
+        uint64_t len;
+        if (entry.rsplit(':').second.getAsInteger(10, len)) {
+            return std::nullopt;
+        }
+        numQubits += len;
+    }
+    return numQubits;
 }
 } // namespace quantum
 } // namespace catalyst

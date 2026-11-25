@@ -40,13 +40,18 @@ struct ResourceResult {
     // method for merging two ResourceResult values
     using MergeMethod = catalyst::MergeMethod;
 
-    // quantum, qref, pbc, mbqc operations are stored
-    // as a map from operation name to a map of
     // name -> ((numWires, numParams) -> count)
-    llvm::StringMap<llvm::DenseMap<std::pair<int, int>, double>> operations;
+    using OperationCounts = llvm::StringMap<llvm::DenseMap<std::pair<int, int>, double>>;
+
+    // quantum, qref, pbc, mbqc operations
+    OperationCounts operations;
 
     // Per-GOID resource counts
     llvm::StringMap<double> detailedOperations;
+
+    // The operations that are not decomposable gates, collected with `detailedOperations`. They
+    // have no GOID, so `resource-estimate` keeps them as they are.
+    OperationCounts nonDecomposableOperations;
 
     // Set of GOIDs observed under this result when `collectDetailedOperations` is
     // enabled. Accounts for dynamic-trip loops.
