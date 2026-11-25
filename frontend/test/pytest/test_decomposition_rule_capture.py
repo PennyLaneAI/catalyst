@@ -425,7 +425,6 @@ def convert_rules(use_capture):
                 wire_lens={"wires": 1},
             ),
             target_id=SerializedGraphOpID("RepeatedGate{}{wires:1}{}"),
-            num_qreg_qubits=1,
             modifier_context=ModifierState(),
             reject_noninvertible=reject_noninvertible,
         )
