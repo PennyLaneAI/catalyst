@@ -1,4 +1,4 @@
-name: Build nightly Catalyst releases for TestPyPI
+name: Upload to PyPI
 
 permissions:
   contents: read
@@ -23,22 +23,24 @@ jobs:
     needs: [setup]
     uses: ./.github/workflows/build-wheel-linux-x86_64.yaml
     with:
-      build_dev_packages: true
+      branch: ${{ github.ref }}
 
   linux-aarch:
     name: Build on Linux aarch64
     needs: [setup]
     uses: ./.github/workflows/build-wheel-linux-arm64.yaml
+    with:
+      branch: ${{ github.ref }}
 
   macos-arm:
     name: Build on macOS arm64
     needs: [setup]
     uses: ./.github/workflows/build-wheel-macos-arm64.yaml
     with:
-      build_dev_packages: true
+      branch: ${{ github.ref }}
 
   upload:
-    name: Prepare & Upload wheels to TestPyPI
+    name: Prepare & Upload wheels to PyPI
     needs: [linux-x86, macos-arm, linux-aarch]
     runs-on: ubuntu-24.04
     permissions:
