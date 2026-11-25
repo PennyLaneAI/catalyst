@@ -896,9 +896,9 @@
 
 * The `to-ppr` pass (`catalyst.passes.to_ppr`) has been renamed to `to-pbc`
   (`catalyst.passes.to_pbc`) and restructured as a full dialect conversion from the Quantum
-  dialect to the PBC dialect. Before conversion, it runs `symbol-dce` and `modifiers-lowering` to
-  lower `quantum.adjoint` and `quantum.ctrl` modifier regions to op-level modifiers, and only
-  allows Quantum runtime/device operations, qubit/register management, uncontrolled global phase,
+  dialect to the PBC dialect. Before conversion, it runs `modifiers-lowering` to lower
+  `quantum.adjoint` and `quantum.ctrl` modifier regions to op-level modifiers, and only allows
+  Quantum runtime/device operations, qubit/register management, uncontrolled global phase,
   observables, and measurement processes to remain. `to-ppr` and `catalyst.passes.to_ppr` remain
   available as deprecated aliases.
   [(#3020)](https://github.com/PennyLaneAI/catalyst/pull/3020)
