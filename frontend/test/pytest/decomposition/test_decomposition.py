@@ -1257,9 +1257,8 @@ class TestPrecompiled:
             assert {
                 rule["frontend_name"] for rule in manifest[ManifestEntries.PRECOMPILED_RULES]
             } == {"root_to_leaf"}
-            mocker.patch(
-                "catalyst.decomposition.precompiled_rule_loading.PRECOMPILED_BYTECODE_PATH",
-                str(bytecode_path),
+            mocker.patch.dict(
+                "os.environ", {"CATALYST_PRECOMPILED_BYTECODE_PATH": str(bytecode_path)}
             )
 
             @qjit(capture=True, target="mlir")

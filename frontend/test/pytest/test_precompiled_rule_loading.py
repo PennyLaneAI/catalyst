@@ -18,7 +18,6 @@ import json
 
 import pytest
 
-from catalyst.decomposition import precompiled_rule_loading
 from catalyst.decomposition.capture_session import RuleIdentity
 from catalyst.decomposition.precompiled_rule_loading import (
     ManifestEntries,
@@ -27,7 +26,11 @@ from catalyst.decomposition.precompiled_rule_loading import (
     load_precompiled_rule_identities,
 )
 from catalyst.decomposition.type_utils import SerializedGraphOpID
-from catalyst.utils.runtime_environment import get_precompiled_manifest_path
+from catalyst.utils.runtime_environment import (
+    PRECOMPILED_BYTECODE_PATH,
+    get_precompiled_bytecode_path,
+    get_precompiled_manifest_path,
+)
 
 BYTECODE = b"bytecode"
 RULE_ENTRY = {
@@ -88,8 +91,8 @@ def test_load_valid_default_cache(monkeypatch, tmp_path):
     bytecode_path = tmp_path / "rules.mlirbc"
     _write_test_cache(bytecode_path)
 
-    # mock the default file location to the tmp file
-    monkeypatch.setattr(precompiled_rule_loading, "PRECOMPILED_BYTECODE_PATH", str(bytecode_path))
+    # point the default file location at the tmp file
+    monkeypatch.setenv("CATALYST_PRECOMPILED_BYTECODE_PATH", str(bytecode_path))
 
     # load from the mocked cache
     identities = load_precompiled_rule_identities()
@@ -103,6 +106,25 @@ def test_load_valid_default_cache(monkeypatch, tmp_path):
             )
         }
     )
+
+
+@pytest.mark.parametrize("value", [None, ""])
+def test_bytecode_path_defaults_to_builtin_rules(monkeypatch, value):
+    """Without the environment variable (or with an empty one), the built-in rules are used."""
+    if value is None:
+        monkeypatch.delenv("CATALYST_PRECOMPILED_BYTECODE_PATH", raising=False)
+    else:
+        monkeypatch.setenv("CATALYST_PRECOMPILED_BYTECODE_PATH", value)
+
+    assert get_precompiled_bytecode_path() == PRECOMPILED_BYTECODE_PATH
+
+
+def test_bytecode_path_from_environment(monkeypatch, tmp_path):
+    """The environment variable overrides the built-in rules path."""
+    bytecode_path = str(tmp_path / "custom.mlirbc")
+    monkeypatch.setenv("CATALYST_PRECOMPILED_BYTECODE_PATH", bytecode_path)
+
+    assert get_precompiled_bytecode_path() == bytecode_path
 
 
 def test_load_empty_cache(tmp_path):
