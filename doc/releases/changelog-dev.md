@@ -14,7 +14,7 @@
   rotations into arbitrary-angle PPRs, since their angles are not known, `ppr-to-ppm` is supported
   with `decompose-method=pauli-corrected` and without `avoid-y-measure`, and `gridsynth` gives the
   expected gates of its decomposition loops.
-  [(#XXXX)](https://github.com/PennyLaneAI/catalyst/pull/XXXX)
+  [(#3520)](https://github.com/PennyLaneAI/catalyst/pull/3520)
 
 * The new `CompileOptions(estimate_decomps=True)` setting prepares reachable decomposition rules for
   resource estimation using their registered resource counts, without tracing or compiling
@@ -1599,7 +1599,7 @@
 
 * The new [Resource Effects of Passes](https://docs.pennylane.ai/projects/catalyst/en/stable/dev/resource_effects.html)
   page explains how a pass declares its resource effect.
-  [(#XXXX)](https://github.com/PennyLaneAI/catalyst/pull/XXXX)
+  [(#3520)](https://github.com/PennyLaneAI/catalyst/pull/3520)
 
 * A broken link was removed in the [Compiler Core](https://docs.pennylane.ai/projects/catalyst/en/stable/modules/mlir.html) documentation page. The link referred to where precompiled decomposition rules were implemented, which has since been refactored.
   [(#2913)](https://github.com/PennyLaneAI/catalyst/pull/2913)
