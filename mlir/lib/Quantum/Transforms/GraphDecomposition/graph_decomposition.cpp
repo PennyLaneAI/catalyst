@@ -85,6 +85,17 @@ namespace quantum {
 struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDecompositionPass> {
     using GraphDecompositionPassBase::GraphDecompositionPassBase;
 
+    GraphPrep::PrepOptions getPrepOptions() const {
+        return {
+            .targetGateSetOption = targetGateSetOption,
+            .fixedDecompsOption = fixedDecompsOption,
+            .excludeDecompsOption = excludeDecompsOption,
+            .bytecodeRulesFile = bytecodeRulesFile,
+            .libQPDPath = libQPDPath,
+            .libpythonPath = libpythonPath,
+        };
+    }
+
     void runOnOperation() final {
         ScopedDiagnosticTimer totalTimer("decomp:total");
 
@@ -109,16 +120,7 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
                 }
             }
 
-            graph = GraphPrep::prepareGraph(module, opIDs,
-                                            {
-                                                .targetGateSetOption = targetGateSetOption,
-                                                .fixedDecompsOption = fixedDecompsOption,
-                                                .excludeDecompsOption = excludeDecompsOption,
-                                                .bytecodeRulesFile = bytecodeRulesFile,
-                                                .libQPDPath = libQPDPath,
-                                                .libpythonPath = libpythonPath,
-                                            },
-                                            ruleLibrary);
+            graph = GraphPrep::prepareGraph(module, opIDs, getPrepOptions(), ruleLibrary);
         }
         if (!graph) {
             return signalPassFailure();
@@ -212,6 +214,13 @@ struct GraphDecompositionPass : public impl::GraphDecompositionPassBase<GraphDec
         }
     }
 };
+
+std::optional<GraphPrep::PrepOptions> GraphPrep::getGraphDecompositionOptions(const Pass &pass) {
+    if (pass.getTypeID() != TypeID::get<GraphDecompositionPass>()) {
+        return std::nullopt;
+    }
+    return static_cast<const GraphDecompositionPass &>(pass).getPrepOptions();
+}
 
 } // namespace quantum
 } // namespace catalyst

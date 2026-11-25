@@ -15,6 +15,7 @@
 #pragma once
 
 #include <memory>
+#include <optional>
 #include <string>
 
 #include "llvm/ADT/ArrayRef.h"
@@ -22,6 +23,7 @@
 #include "llvm/ADT/StringSet.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/OwningOpRef.h"
+#include "mlir/Pass/Pass.h"
 #include "mlir/Support/LLVM.h"
 
 #include "DGBuilder.hpp"
@@ -66,6 +68,10 @@ llvm::StringRef getGraphOpName(llvm::StringRef id);
 mlir::LogicalResult materializeSelectedLibraryRules(mlir::ModuleOp module,
                                                     mlir::ModuleOp ruleLibrary,
                                                     const llvm::StringSet<> &selectedRules);
+
+/// The options of `pass` if it is a `graph-decomposition` pass, or std::nullopt otherwise. They
+/// refer to the options of `pass`, so they must not outlive it.
+std::optional<PrepOptions> getGraphDecompositionOptions(const mlir::Pass &pass);
 
 } // namespace GraphPrep
 } // namespace quantum
