@@ -16,6 +16,7 @@
 #include <cassert>
 #include <cstddef>
 #include <iterator>
+#include <memory>
 #include <utility>
 
 #include "llvm/ADT/STLExtras.h"
@@ -35,6 +36,7 @@
 #include "mlir/IR/ValueRange.h"
 #include "mlir/Support/LLVM.h"
 
+#include "QRef/IR/QRefInterfaces.h"
 #include "QRef/Utils/QubitIndex.h"
 
 #include "StringConstants.h"
@@ -358,8 +360,8 @@ class BaseSignatureAnalyzer {
     }
 };
 
-class DecomposableGateSignatureAnalyzer : public BaseSignatureAnalyzer {
-    static SmallVector<Value> getRuleQubits(DecomposableGate op) {
+class QuantumGateSignatureAnalyzer : public BaseSignatureAnalyzer {
+    static SmallVector<Value> getRuleQubits(QuantumGate op) {
         auto qubits = op.getNonCtrlQubitOperands();
         if (auto operatorOp = dyn_cast<OperatorOp>(op.getOperation())) {
             if (!operatorOp.getQreg() && !operatorOp.getQubitMap().empty()) {
@@ -389,9 +391,9 @@ class DecomposableGateSignatureAnalyzer : public BaseSignatureAnalyzer {
     }
 
   public:
-    DecomposableGateSignatureAnalyzer() = delete;
+    QuantumGateSignatureAnalyzer() = delete;
 
-    DecomposableGateSignatureAnalyzer(DecomposableGate op, bool enableQregMode)
+    QuantumGateSignatureAnalyzer(QuantumGate op, bool enableQregMode)
         : BaseSignatureAnalyzer(op,
                                 isa<ParametrizedGate>(op.getOperation())
                                     ? cast<ParametrizedGate>(op.getOperation()).getAllParams()
@@ -399,6 +401,17 @@ class DecomposableGateSignatureAnalyzer : public BaseSignatureAnalyzer {
                                 getRuleQubits(op), op.getCtrlQubitOperands(),
                                 op.getCtrlValueOperands(), enableQregMode) {}
 };
+
+/// Select a signature analyzer for an Operation based on its type.
+/// Currently only QuantumGates are supported; other kinds hard-fail.
+inline std::unique_ptr<BaseSignatureAnalyzer> createSignatureAnalyzer(Operation *op,
+                                                                      bool enableQregMode) {
+    if (auto gate = dyn_cast<QuantumGate>(op)) {
+        return std::make_unique<QuantumGateSignatureAnalyzer>(gate, enableQregMode);
+    }
+    op->emitError("decompose-lowering: no signature analyzer for this decomposable op");
+    return nullptr;
+}
 
 } // namespace qref
 } // namespace catalyst

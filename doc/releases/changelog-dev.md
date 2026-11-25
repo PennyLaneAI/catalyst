@@ -898,6 +898,12 @@
   release that includes Catalyst and an execution backend. For development, `make frontend`
   installs the versions pinned in `.dep-versions` alongside the Catalyst checkout. The current
   Python frontend still requires PennyLane.
+  [(#3514)](https://github.com/PennyLaneAI/catalyst/pull/3514)
+  
+* Catalyst now provides its own :func:`~.polynomial_extrapolate` and
+  :func:`~.exponential_extrapolate` functions for use with :func:`~.mitigate_with_zne`, replacing
+  ``pennylane.noise.poly_extrapolate`` and ``pennylane.noise.exponential_extrapolate``, which has been removed from PennyLane.
+  [(#3289)](https://github.com/PennyLaneAI/catalyst/pull/3289)
 
 * We now have `capture=True` as the default mode for Catalyst `qjit`.
   [(#3414)](https://github.com/PennyLaneAI/catalyst/pull/3414)
@@ -1563,6 +1569,9 @@
   - `qp.pauli_measure` and `qp.ops.PauliMeasure` bind to `MeasurementOp`, and `MeasurementOp` lowers
     into the PBC dialect via `to_ppr` or directly into the `PauliMeasure` QIR instruction.
     [(#3474)](https://github.com/PennyLaneAI/catalyst/pull/3474)
+  - `DecomposableGate` interface has been renamed to `DecomposableOp` interface, and does not inherit `QuantumGate`. It is a 
+    generic interface to register operations to the graph solver. `MeasurementOp` implements the `DecomposableOp` interface.
+    [(3504)](https://github.com/PennyLaneAI/catalyst/pull/3504)
 
 <h3>Documentation 📝</h3>
 
