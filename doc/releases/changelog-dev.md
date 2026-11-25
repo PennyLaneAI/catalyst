@@ -1565,7 +1565,7 @@
   to project those resource counts in the target gate-set for `qp.estimate(..., target=gate_set)`.
   [(#3351)](https://github.com/PennyLaneAI/catalyst/pull/3351)
 
-* A generic mid-circuit measurement operator with classical results: `MeasurementOp` has been added to 
+* A generic mid-circuit measurement operator with classical results: `MeasurementOp` has been added to
   the `quantum` and `qref` dialects that support qubit and register modes, as well as static and dynamic data. Terminal circuit
   result extraction operators implement the `TerminalMeasurement` instead.
   [(#3439)](https://github.com/PennyLaneAI/catalyst/pull/3439)
