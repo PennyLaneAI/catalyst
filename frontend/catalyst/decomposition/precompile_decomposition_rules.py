@@ -16,11 +16,16 @@
 
 import json
 from pathlib import Path
+from typing import Any, Callable
 
 import pennylane as qp
 
 from catalyst.compiler import _quantum_opt
-from catalyst.decomposition.capture_session import DecompositionScope, OpDecompRequest
+from catalyst.decomposition.capture_session import (
+    DecompositionScope,
+    OpDecompRequest,
+    collect_decomposition_roots,
+)
 from catalyst.decomposition.modifier_state import ModifierState
 from catalyst.decomposition.precompiled_rule_loading import (
     ManifestEntries,
@@ -45,9 +50,6 @@ def precompile_decomp_rules(_decomp_file_path: str | Path = PRECOMPILED_BYTECODE
     Args:
         decomp_file_path (Path): path to compile rules to.
     """
-    Path(_decomp_file_path).parent.mkdir(parents=True, exist_ok=True)
-    _decomp_file_path = Path(_decomp_file_path)
-
     scope = DecompositionScope()
 
     for abstract_ops in qp.decomposition.signature_registry().values():
@@ -55,6 +57,64 @@ def precompile_decomp_rules(_decomp_file_path: str | Path = PRECOMPILED_BYTECODE
             for modifier_state in PRECOMPILATION_MODIFIERS:
                 scope.record_root(OpDecompRequest.from_operation(op, modifier_state))
 
+    precompile_decomp_scope(scope, _decomp_file_path)
+
+
+def precompile_circuit_decomp_rules(
+    output_path: str | Path, circuit: Callable, *args: Any, **kwargs: Any
+) -> None:
+    """Precompile every decomposition rule reachable from the gates used in a circuit.
+
+    The circuit is traced (but not compiled) with program capture to discover the gates it
+    applies, along with any adjoint/control modifiers. All decomposition rules reachable from
+    those gates are then compiled to MLIR bytecode at ``output_path``, with the accompanying
+    manifest written next to it.
+
+    Args:
+        output_path (str | Path): path to write the MLIR bytecode file to.
+        circuit (Callable): a ``QJIT`` object, ``QNode``, or workflow function containing QNodes.
+            Non-``QJIT`` callables are wrapped with ``qjit(capture=True)``. ``QJIT`` objects
+            must use program capture.
+        *args: example arguments to trace the circuit with. If omitted for a ``QJIT`` object, its
+            type-hint signature is used, if available.
+        **kwargs: example keyword arguments to trace the circuit with.
+
+    **Example**
+
+    .. code-block:: python
+
+        @qp.qnode(qp.device("lightning.qubit", wires=2))
+        def circuit(x):
+            qp.MultiRZ(x, wires=[0, 1])
+            return qp.expval(qp.Z(0))
+
+        precompile_circuit_decomp_rules("rules.mlirbc", circuit, 0.5)
+    """
+    # pylint: disable=import-outside-toplevel
+    from catalyst.jit import QJIT, _ensure_capture_mode
+
+    if not isinstance(circuit, QJIT):
+        circuit = qp.qjit(circuit, capture=True, enable_aot_compilation=False)
+
+    # pylint: disable=protected-access
+    if not circuit._get_effective_capture_mode():
+        raise CompileError(
+            "Precompiling the decomposition rules of a circuit requires program capture."
+        )
+
+    if not args and not kwargs:
+        args = circuit.user_sig or ()
+
+    with _ensure_capture_mode(True), collect_decomposition_roots() as scope:
+        circuit.capture(args, **kwargs)
+
+    precompile_decomp_scope(scope, output_path)
+
+
+def precompile_decomp_scope(scope: DecompositionScope, output_path: str | Path) -> None:
+    """Compile all rules reachable from the supplied decomposition roots."""
+    output_path = Path(output_path)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
     rule_module = _capture_rule_module(scope)
 
     bytecode = _quantum_opt(
@@ -67,12 +127,10 @@ def precompile_decomp_rules(_decomp_file_path: str | Path = PRECOMPILED_BYTECODE
         stderr_return=True,
     )
 
-    with open(_decomp_file_path, "wb") as bytecode_file:
+    with open(output_path, "wb") as bytecode_file:
         bytecode_file.write(bytecode)
 
-    with open(
-        get_precompiled_manifest_path(_decomp_file_path), "w", encoding="utf-8"
-    ) as manifest_file:
+    with open(get_precompiled_manifest_path(output_path), "w", encoding="utf-8") as manifest_file:
         manifest = {
             ManifestEntries.PRECOMPILED_BYTECODE_HASH: get_bytecode_hash(bytecode),
             ManifestEntries.PRECOMPILED_RULES: [get_rule_entry(rule) for rule in scope.definitions],
