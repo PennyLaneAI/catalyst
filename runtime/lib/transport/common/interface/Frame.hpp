@@ -15,15 +15,20 @@
 // The frame codec: how a message is laid out in a ring slot, and how a ring is laid out.
 //
 // Every backend builds and reads frames through these functions, so the layouts are defined here
-// once. Two layouts are implemented, chosen per session by its config (see geometry_from_config):
+// once. Three layouts are implemented, chosen per session by its config (see geometry_from_config):
 //
 //   BL16  16 B: | payload 8 | fn_id 4 | seq 4 |            (Payload in WireProtocol.hpp)
 //   BLV   one slot: | header 32 | payload ... | completion 4 |
 //         header = magic "BLV1", version, flags, fn_id, seq, round, len, t_ptp_ns
+//   CUQR  | header 24 | payload ... |                       cudaq-realtime's RPC format
+//         request header = magic "CUQR", function_id, arg_len, request_id, ptp_timestamp
+//         reply header   = magic "CUQS", status, result_len, request_id, ptp_timestamp
 //
-// In both, the word a receiver polls (BL16's seq, BLV's completion word) sits at a fixed offset
-// and is written last, so a frame is complete once it holds the expected sequence number. A BLV
-// frame always fills its slot, so the completion word's offset never depends on the payload.
+// In BL16 and BLV, the word a receiver polls (BL16's seq, BLV's completion word) sits at a fixed
+// offset and is written last, so a frame is complete once it holds the expected sequence number. A
+// BLV frame always fills its slot, so the completion word's offset never depends on the payload.
+// A CUQR frame has no such word: it arrives by RDMA write with immediate, and the receiver learns
+// of it, and of its slot, from its receive completion queue.
 
 #pragma once
 #include <atomic>
@@ -85,6 +90,13 @@ struct CuqrHeader {
 static_assert(sizeof(CuqrHeader) == 24, "a CUQR header is 24 B");
 inline constexpr std::uint32_t CUQR_MAGIC = 0x43555152; // 'CUQR'
 inline constexpr std::uint32_t CUQS_MAGIC = 0x43555153; // 'CUQS'
+/// The most slots a CUQR ring has: the immediate names the slot in its low 12 bits.
+inline constexpr std::uint32_t CUQR_MAX_SLOTS = 4096;
+
+/// The slot a CUQR frame's immediate (in host byte order) names. HSB puts its PSN above it.
+FRAME_HOST_DEVICE constexpr std::uint32_t cuqr_slot(std::uint32_t imm) {
+    return imm & (CUQR_MAX_SLOTS - 1);
+}
 
 /// The smallest slot a ring uses, for the DMA engines that need 64 B alignment.
 inline constexpr std::size_t MIN_STRIDE = 64;
@@ -133,8 +145,8 @@ inline RingGeometry geometry_for(Mode mode, std::size_t max_payload) {
 
 /// The ring a session's backend config asks for: `frame=bl16|blv|cuqr` with
 /// `frame_payload=<bytes>`, the largest payload either way, and `frame_slots=<n>`, a power of two
-/// (256 when not given). A CUQR config may also set `frame_slot_bytes=<n>`. A config without
-/// `frame` gets BL16 frames.
+/// (256 when not given; for CUQR at most CUQR_MAX_SLOTS). A config without `frame` gets BL16
+/// frames.
 inline RingGeometry geometry_from_config(std::string_view config) {
     RingGeometry ring = BL16_RING;
     if (const auto mode = configparser::find(config, "frame")) {
@@ -148,19 +160,6 @@ inline RingGeometry geometry_from_config(std::string_view config) {
                             : *mode == "cuqr" ? Mode::CUQR
                                               : Mode::BL16,
                             max_payload);
-        // A cudaq-realtime server sets its slot size and count (cpu_roce: 8 of 256 B by default),
-        // and answers with whole slots, so a session talking to one matches them.
-        const auto bytes = configparser::find(config, "frame_slot_bytes");
-        if (ring.mode == Mode::CUQR && bytes) {
-            const std::uint64_t n = configparser::parse_u64(*bytes, "frame_slot_bytes");
-            TP_CHECK(n >= MIN_STRIDE && n <= UINT32_MAX && std::has_single_bit(n),
-                     "config: 'frame_slot_bytes' must be a power of two of at least %zu, got %llu",
-                     MIN_STRIDE, static_cast<unsigned long long>(n));
-            TP_CHECK(n >= sizeof(CuqrHeader) + max_payload,
-                     "config: %llu B slots cannot hold a %zu B frame (frame_slot_bytes)",
-                     static_cast<unsigned long long>(n), sizeof(CuqrHeader) + max_payload);
-            ring.stride = static_cast<std::uint32_t>(n);
-        }
     }
     if (const auto slots = configparser::find(config, "frame_slots")) {
         const std::uint64_t n = configparser::parse_u64(*slots, "frame_slots");
@@ -169,6 +168,8 @@ inline RingGeometry geometry_from_config(std::string_view config) {
                  static_cast<unsigned long long>(n));
         ring.slots = static_cast<std::uint32_t>(n);
     }
+    TP_CHECK(ring.mode != Mode::CUQR || ring.slots <= CUQR_MAX_SLOTS,
+             "config: a CUQR ring has at most %u slots, not %u", CUQR_MAX_SLOTS, ring.slots);
     return ring;
 }
 
@@ -178,10 +179,15 @@ struct FrameView {
     std::uint32_t len = 0;        // payload bytes the frame carries (BL16: always 8, zero-padded)
     std::uint32_t fn_id = 0;      // which function on the coprocessor handles it
     std::uint32_t seq = 0;        // the round's sequence number, cursor + 1
-    std::int32_t status = 0;      // CUQR reply: 0 ok, >0 the coprocessor function failed
+    std::int32_t status = 0;      // CUQR reply: 0 ok, nonzero the coprocessor function failed
     std::uint32_t request_id = 0; // CUQR: the sender's opaque request id
     std::uint64_t t_ptp_ns = 0;   // CUQR: the sender's opaque timestamp
 };
+
+/// Whether `seq` is `expect` or later, across the 32-bit wrap.
+FRAME_HOST_DEVICE inline bool seq_reached(std::uint32_t seq, std::uint32_t expect) {
+    return static_cast<std::int32_t>(seq - expect) >= 0;
+}
 
 namespace detail {
 inline void require_mode(Mode mode) {

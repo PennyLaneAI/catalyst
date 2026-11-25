@@ -79,11 +79,16 @@ def QuantumGate : OpInterface<"QuantumGate", [QuantumOperation]> {
         InterfaceMethod<
             "Set adjoint flag.",
             "void", "setAdjointFlag", (ins "bool":$adjoint)
+        >,
+        InterfaceMethod<
+            "Return true if non-control qubit operands must not overlap.",
+            "bool", "requiresNonOverlappingNonCtrlQubitOperands", (ins), [{}],
+            [{ return true; }]
         >
     ];
 
     let verify = [{
-        auto gate = mlir::cast<ConcreteOp>($_op);
+        auto gate = mlir::cast<::catalyst::qref::QuantumGate>($_op);
 
         if (gate.getCtrlValueOperands().size() != gate.getCtrlQubitOperands().size()) {
             return $_op->emitError() <<
@@ -95,7 +100,14 @@ def QuantumGate : OpInterface<"QuantumGate", [QuantumOperation]> {
         }
 
         llvm::SmallPtrSet<mlir::Value, 4> seenQubits;
-        for (mlir::Value qubit : gate.getQubitOperands()) {
+        for (mlir::Value qubit : gate.getNonCtrlQubitOperands()) {
+            if (!seenQubits.insert(qubit).second &&
+                gate.requiresNonOverlappingNonCtrlQubitOperands()) {
+                return $_op->emitError() <<
+                    "all qubits on a quantum gate must be distinct (including controls)";
+            }
+        }
+        for (mlir::Value qubit : gate.getCtrlQubitOperands()) {
             if (!seenQubits.insert(qubit).second) {
                 return $_op->emitError() <<
                     "all qubits on a quantum gate must be distinct (including controls)";
@@ -137,7 +149,7 @@ def ParametrizedGate : OpInterface<"ParametrizedGate", [QuantumGate]> {
     ];
 }
 
-def DecomposableGate : OpInterface<"DecomposableGate", [QuantumGate]> {
+def DecomposableOp : OpInterface<"DecomposableOp"> {
     let description = [{
         This interface provides a generic way to query decomposition data from a quantum operation.
         An operation must implement this interface in order to compatible with the `graph-decomposition` pass.
@@ -148,6 +160,13 @@ def DecomposableGate : OpInterface<"DecomposableGate", [QuantumGate]> {
 
     let methods = [
         InterfaceMethod<
+            "Return true if this op can carry modifiers for graph IDs and lowering.",
+            "bool", "isModifiable", (ins), [{}],
+            /*defaultImplementation=*/[{
+                return mlir::isa<::catalyst::qref::QuantumGate>($_op.getOperation());
+            }]
+        >,
+        InterfaceMethod<
             "Return the name of the corresponding frontend operator (i.e. the rule supplier).", "std::string", "getOperatorName"
         >,
         InterfaceMethod<
@@ -155,7 +174,8 @@ def DecomposableGate : OpInterface<"DecomposableGate", [QuantumGate]> {
             "::catalyst::qref::DynamicShape", "getDynamicShape"
         >,
         InterfaceMethod<
-            "Return the frontend wire argument names with their number of wires (excluding control wires), in operand order.",
+            "Return the frontend wire argument names with their number of wires (excluding control wires). "
+            "OperatorOp follows qubit_map order.",
             "::catalyst::qref::WireLens", "getWireLens"
         >,
         InterfaceMethod<
@@ -179,6 +199,16 @@ def DecomposableGate : OpInterface<"DecomposableGate", [QuantumGate]> {
             "std::string", "getGraphOpId", (ins), [{}], [{ return ::catalyst::qref::defaultGetGraphOpId($_op.getOperation()); }]
         >
     ];
+}
+
+// re-used from quantum dialect
+def MeasurementProcess : Interface<"MeasurementProcess">,
+                         OpInterfaceTrait<"MeasurementProcess"> {
+    let cppNamespace = "::catalyst::quantum";
+}
+
+def Observable : OpInterface<"Observable"> {
+    let cppNamespace = "::catalyst::qref";
 }
 
 #endif // QREF_INTERFACES

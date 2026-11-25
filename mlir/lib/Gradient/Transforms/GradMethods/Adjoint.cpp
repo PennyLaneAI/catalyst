@@ -60,7 +60,7 @@ func::FuncOp AdjointLowering::discardAndReturnReg(PatternRewriter &rewriter, Loc
         if (isa<quantum::DeallocOp>(op)) {
             deallocs.push_back(cast<quantum::DeallocOp>(op));
             continue;
-        } else if (isa<quantum::MeasurementProcess>(op)) {
+        } else if (isa<quantum::TerminalMeasurement>(op)) {
             if (!isa<quantum::ExpvalOp>(op)) {
                 callee.emitOpError() << "Adjoint gradient is only supported on expval measurements";
                 return callee;

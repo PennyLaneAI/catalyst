@@ -213,6 +213,36 @@ directory:
 
   make all
 
+To reuse LLVM, StableHLO and Enzyme built in another Catalyst checkout, run:
+
+.. code-block:: console
+
+  make worktree CATALYST_MAIN_CHECKOUT_DIR="/path/to/a/catalyst/checkout/with/built/dependencies"
+
+This builds Catalyst's components locally and installs the frontend, while sharing
+the other checkout's dependencies. Setup and subsequent builds check that the LLVM,
+StableHLO and Enzyme versions in both checkouts' ``.dep-versions`` files match.
+Patches and build configuration must also be compatible, with builds in the usual
+``mlir/<submodule>/build`` directories.
+
+The selected checkout's absolute path is saved in the ignored ``.catalyst-worktree``
+file. Later builds, tests and Python sessions reuse it automatically, including
+``make all``, ``make mlir``, ``make dialects`` and ``make runtime``. Explicit
+``MLIR_LIB_DIR`` and ``ENZYME_LIB_DIR`` overrides take precedence. Dependency build,
+clean, reset and packaging targets must be run in the shared checkout.
+
+To change the shared checkout or clear cached build paths, reset and configure again:
+
+.. code-block:: console
+
+  make clean-worktree
+  make worktree CATALYST_MAIN_CHECKOUT_DIR="/path/to/compatible/checkout"
+
+``make clean-worktree`` removes the saved setup and local build outputs, preserving
+dependency builds and the frontend installation. It also works if the saved
+checkout is missing. If shared dependencies move or become incompatible, rebuild
+them at their intended location before configuring the worktree again.
+
 To build each component one by one starting from the runtime, or to build additional backend devices
 beyond ``lightning.qubit``, please follow the instructions below.
 
@@ -251,6 +281,26 @@ You can also choose to build the custom Catalyst dialects only, with:
 .. code-block:: console
 
   make dialects
+
+Compiler caching across worktrees
+"""""""""""""""""""""""""""""""""
+
+When installed, ``ccache`` is used by the MLIR Makefile, which defaults
+``CCACHE_BASEDIR`` to the checkout root. This normalizes paths so matching
+compilations across worktrees can share cached results. Use the same cache
+directory, relative build layout, compiler, flags and dependency configuration.
+
+Builds through ``mlir/Makefile`` apply the setting automatically and respect existing
+environment or command-line values. For direct CMake or Ninja builds, export it
+from the checkout root:
+
+.. code-block:: console
+
+  export CCACHE_BASEDIR="$PWD"
+  cmake --build mlir/build
+
+Use ``ccache --show-stats`` to inspect cache usage. Cache hits speed up compilation;
+linking and tests still run normally.
 
 Frontend
 """"""""

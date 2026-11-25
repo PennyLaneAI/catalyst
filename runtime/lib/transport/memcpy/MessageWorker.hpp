@@ -55,7 +55,7 @@ class MessageWorker {
     explicit MessageWorker(common::frame::RingGeometry ring = common::frame::BL16_RING)
         : ring_(ring) {
         TP_CHECK(ring.mode != common::frame::Mode::CUQR,
-                 "memcpy: CUQR frames are carried only by cpu_verbs and gpu_verbs");
+                 "memcpy: CUQR frames travel only over RDMA");
     }
     ~MessageWorker();
     MessageWorker(const MessageWorker &) = delete;

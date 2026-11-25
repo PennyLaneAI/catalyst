@@ -18,6 +18,7 @@
 #include <vector>
 
 #include "Frame.hpp"
+#include "HsbWire.hpp"
 #include "WireProtocol.hpp"
 
 #include <catch2/catch_test_macros.hpp>
@@ -68,6 +69,16 @@ TEST_CASE("the BL16 frame codec writes exactly today's Payload bytes") {
     CHECK(view.len == PAYLOAD_DATA_BYTES);
     CHECK(view.fn_id == 7);
     CHECK(view.seq == 42);
+}
+
+TEST_CASE("seq_reached takes the expected seq or a later one, across the 32-bit wrap") {
+    namespace frame = catalyst::transport::common::frame;
+    CHECK(frame::seq_reached(5, 5));
+    CHECK(frame::seq_reached(7, 5)); // the request after a lost one, in the same slot
+    CHECK_FALSE(frame::seq_reached(4, 5));
+    CHECK_FALSE(frame::seq_reached(0, 1)); // a slot never written
+    CHECK(frame::seq_reached(0x00000002u, 0xFFFFFFFEu));
+    CHECK_FALSE(frame::seq_reached(0xFFFFFFFEu, 0x00000002u));
 }
 
 TEST_CASE("the BL16 codec zero-pads a payload written in place") {
@@ -140,6 +151,14 @@ TEST_CASE("a session's config may set the ring's slot count") {
                       Catch::Matchers::ContainsSubstring("power of two"));
     CHECK_THROWS_WITH(frame::geometry_from_config("frame_slots=0"),
                       Catch::Matchers::ContainsSubstring("power of two"));
+}
+
+TEST_CASE("an HSB ring has one slot") {
+    namespace hsb = catalyst::transport::common::hsb;
+    CHECK(hsb::ring_from_config("dev=mlx5_0;gid=3;peer=hsb").slots == 1);
+    CHECK(hsb::ring_from_config("frame_slots=1").region_bytes() == hsb::SLOT_BYTES);
+    CHECK_THROWS_WITH(hsb::ring_from_config("frame_slots=256"),
+                      Catch::Matchers::ContainsSubstring("one-slot ring"));
 }
 
 TEST_CASE("a BLV frame carries its payload, length and fn_id, and completes last") {
@@ -273,22 +292,12 @@ TEST_CASE("a CUQR slot without a valid frame is not decoded, so it can be droppe
     CHECK_FALSE(frame::poll(ring, slot.data(), 1, v));
 }
 
-TEST_CASE("a CUQR session's config can set the slot size, as a cudaq-realtime server does") {
+TEST_CASE("a CUQR ring has at most 4096 slots, which the immediate's low 12 bits name") {
     namespace frame = catalyst::transport::common::frame;
     CHECK(frame::geometry_from_config("frame=cuqr;frame_payload=100").stride == 128); // 24 + 100
-    // cudaq-realtime's default cpu_roce ring: 8 slots of 256 B.
-    const auto server = frame::geometry_from_config("frame=cuqr;frame_payload=232;frame_slots=8");
-    CHECK(server.mode == frame::Mode::CUQR);
-    CHECK(server.slots == 8);
-    CHECK(server.stride == 256);
-    // A server's replies fill its whole slot, so our slots match it even for small messages.
-    const auto ring =
-        frame::geometry_from_config("frame=cuqr;frame_payload=8;frame_slot_bytes=256");
-    CHECK(ring.stride == 256);
-    CHECK(frame::data_capacity(ring) == 232);
-    CHECK_THROWS_WITH(
-        frame::geometry_from_config("frame=cuqr;frame_payload=300;frame_slot_bytes=256"),
-        Catch::Matchers::ContainsSubstring("324 B frame"));
-    CHECK_THROWS_WITH(frame::geometry_from_config("frame=cuqr;frame_slot_bytes=200"),
-                      Catch::Matchers::ContainsSubstring("power of two"));
+    CHECK(frame::geometry_from_config("frame=cuqr;frame_slots=4096").slots == 4096);
+    CHECK_THROWS_WITH(frame::geometry_from_config("frame=cuqr;frame_slots=8192"),
+                      Catch::Matchers::ContainsSubstring("at most 4096 slots"));
+    // HSB puts its PSN above the slot: imm = {psn[19:0], slot[11:0]}.
+    CHECK(frame::cuqr_slot((0xABCDEu << 12) | 0x123u) == 0x123u);
 }

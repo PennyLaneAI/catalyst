@@ -159,8 +159,14 @@ def test_empty_res_attrs_on_void_func_is_omitted():
 
 @pytest.mark.parametrize("as_mod", [True, False])
 @pytest.mark.usefixtures("use_capture")
-def test_captured_rules_are_used_before_symbol_cleanup(as_mod):
+def test_captured_rules_are_used_before_symbol_cleanup(as_mod, mocker):
     """Use captured decomposition rules before removing unused rule functions."""
+
+    # keep precompiled rules out of the way
+    mocker.patch(
+        "catalyst.from_plxpr.qfunc_interpreter.load_precompiled_rule_identities",
+        return_value=frozenset(),
+    )
 
     @qjit(capture=True, target="mlir")
     @qp.decompose(gate_set=[qp.RY, qp.RZ])

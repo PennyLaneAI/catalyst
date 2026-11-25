@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// RUN: quantum-opt --finalize-memref-to-llvm --convert-index-to-llvm --convert-quantum-to-llvm --split-input-file %s | FileCheck %s
+// RUN: quantum-opt --finalize-memref-to-llvm --convert-index-to-llvm --convert-quantum-to-llvm --split-input-file --verify-diagnostics %s | FileCheck %s
 
 ////////////////////////
 // Runtime Management //
@@ -44,7 +44,7 @@ func.func @finalize() {
 
 // -----
 
-// CHECK: llvm.func @__catalyst__rt__device_init(!llvm.ptr, !llvm.ptr, !llvm.ptr, i64, i1)
+// CHECK: llvm.func @__catalyst__rt__device_init(!llvm.ptr, !llvm.ptr, !llvm.ptr, i64, i1 {llvm.zeroext})
 
 // CHECK-LABEL: @device
 func.func @device() {
@@ -331,7 +331,7 @@ func.func @multirz(%q0 : !quantum.bit, %p : f64) -> (!quantum.bit, !quantum.bit,
 
 // -----
 
-// CHECK: llvm.func @__catalyst__qis__PauliRot(!llvm.ptr, f64, !llvm.ptr, i1, i64, ...)
+// CHECK: llvm.func @__catalyst__qis__PauliRot(!llvm.ptr, f64, !llvm.ptr, i1 {llvm.zeroext}, i64, ...)
 
 // CHECK-LABEL: @paulirot
 func.func @paulirot(%q0 : !quantum.bit, %angle : f64) -> (!quantum.bit) {
@@ -346,7 +346,7 @@ func.func @paulirot(%q0 : !quantum.bit, %angle : f64) -> (!quantum.bit) {
 
 // -----
 
-// CHECK: llvm.func @__catalyst__qis__PauliRot(!llvm.ptr, f64, !llvm.ptr, i1, i64, ...)
+// CHECK: llvm.func @__catalyst__qis__PauliRot(!llvm.ptr, f64, !llvm.ptr, i1 {llvm.zeroext}, i64, ...)
 
 // CHECK-LABEL: @controlled_paulirot
 func.func @controlled_paulirot(%q0 : !quantum.bit, %q1 : !quantum.bit, %angle : f64) -> (!quantum.bit) {
@@ -568,6 +568,114 @@ func.func @measure(%q : !quantum.bit) -> !quantum.bit {
 
     // CHECK: return %arg0
     return %new_q : !quantum.bit
+}
+
+// -----
+
+// CHECK-DAG: llvm.func @__catalyst__qis__PauliMeasure(!llvm.ptr, i1 {llvm.zeroext}, !llvm.ptr, i1 {llvm.zeroext}, i1 {llvm.zeroext}, i64, ...) -> !llvm.ptr
+// CHECK-DAG: llvm.mlir.global internal constant @pauli_word_IXYZ("IXYZ\00")
+
+// CHECK-LABEL: llvm.func @pauli_measurement
+func.func @pauli_measurement(%q0: !quantum.bit, %q1: !quantum.bit,
+                            %q2: !quantum.bit, %q3: !quantum.bit)
+    -> (i1, !quantum.bit, !quantum.bit, !quantum.bit, !quantum.bit) {
+  // CHECK: llvm.mlir.addressof @pauli_word_IXYZ
+  // CHECK: [[WORD:%.+]] = llvm.getelementptr inbounds
+  // CHECK: [[FALSE:%.+]] = llvm.mlir.constant(false) : i1
+  // CHECK: [[TRUE:%.+]] = llvm.mlir.constant(true) : i1
+  // CHECK: [[COUNT:%.+]] = llvm.mlir.constant(4 : i64) : i64
+  // CHECK: [[PTR:%.+]] = llvm.call @__catalyst__qis__PauliMeasure([[WORD]], [[FALSE]], [[WORD]], [[FALSE]], [[TRUE]], [[COUNT]], %arg0, %arg1, %arg2, %arg3)
+  // CHECK: [[M:%.+]] = llvm.load [[PTR]] : !llvm.ptr -> i1
+  %m, %out:4 = quantum.measurement "PauliMeasure"() qubits(%q0, %q1, %q2, %q3)
+      static_data = {pauli_word = "IXYZ", postselect = none}
+      : (i1, !quantum.bit, !quantum.bit, !quantum.bit, !quantum.bit)
+  // CHECK: llvm.insertvalue [[M]]
+  // CHECK: llvm.insertvalue %arg0
+  // CHECK: llvm.insertvalue %arg1
+  // CHECK: llvm.insertvalue %arg2
+  // CHECK: llvm.insertvalue %arg3
+  return %m, %out#0, %out#1, %out#2, %out#3
+      : i1, !quantum.bit, !quantum.bit, !quantum.bit, !quantum.bit
+}
+
+// -----
+
+// CHECK-DAG: llvm.func @__catalyst__qis__PauliMeasure(!llvm.ptr, i1 {llvm.zeroext}, !llvm.ptr, i1 {llvm.zeroext}, i1 {llvm.zeroext}, i64, ...) -> !llvm.ptr
+// CHECK-DAG: llvm.mlir.global internal constant @pauli_word_Z("Z\00")
+
+// CHECK-LABEL: llvm.func @discarded_measurement_result
+func.func @discarded_measurement_result(%q: !quantum.bit) -> !quantum.bit {
+  // CHECK: llvm.call @__catalyst__qis__PauliMeasure
+  // CHECK-NOT: llvm.load
+  %out = quantum.measurement "PauliMeasure"() qubits(%q)
+      static_data = {pauli_word = "Z", meas_uid = "direct"} : (!quantum.bit)
+  // CHECK: llvm.return %arg0 : !llvm.ptr
+  return %out : !quantum.bit
+}
+
+// -----
+
+func.func @other_measurement(%q: !quantum.bit) -> (i1, !quantum.bit) {
+  // expected-error @+1 {{failed to legalize operation 'quantum.measurement'}}
+  %m, %out = quantum.measurement "OtherMeasurement"() qubits(%q)
+      static_data = {pauli_word = "Z"} : (i1, !quantum.bit)
+  return %m, %out : i1, !quantum.bit
+}
+
+// -----
+
+func.func @postselection(%q: !quantum.bit) -> (i1, !quantum.bit) {
+  // expected-error @+1 {{failed to legalize operation 'quantum.measurement'}}
+  %m, %out = quantum.measurement "PauliMeasure"() qubits(%q)
+      static_data = {pauli_word = "Z", postselect = 0 : i64} : (i1, !quantum.bit)
+  return %m, %out : i1, !quantum.bit
+}
+
+// -----
+
+func.func @register_measurement(%reg: !quantum.reg, %idx: i64) -> (i1, !quantum.reg) {
+  %wires = builtin.unrealized_conversion_cast %idx : i64 to tensor<1xi64>
+  // expected-error @+1 {{failed to legalize operation 'quantum.measurement'}}
+  %m, %out = quantum.measurement "PauliMeasure"() quregs(%reg)
+      indices(%wires: tensor<1xi64>) static_data = {pauli_word = "Z"}
+      : (i1, !quantum.reg)
+  return %m, %out : i1, !quantum.reg
+}
+
+// -----
+
+func.func @parameters(%q: !quantum.bit, %angle: f64) -> (i1, !quantum.bit) {
+  // expected-error @+1 {{failed to legalize operation 'quantum.measurement'}}
+  %m, %out = quantum.measurement "PauliMeasure"(%angle: f64) qubits(%q)
+      static_data = {pauli_word = "Z"} : (i1, !quantum.bit)
+  return %m, %out : i1, !quantum.bit
+}
+
+// -----
+
+func.func @invalid_word(%q: !quantum.bit) -> (i1, !quantum.bit) {
+  // expected-error @+1 {{failed to legalize operation 'quantum.measurement'}}
+  %m, %out = quantum.measurement "PauliMeasure"() qubits(%q)
+      static_data = {pauli_word = "H"} : (i1, !quantum.bit)
+  return %m, %out : i1, !quantum.bit
+}
+
+// -----
+
+func.func @word_length_mismatch(%q: !quantum.bit) -> (i1, !quantum.bit) {
+  // expected-error @+1 {{failed to legalize operation 'quantum.measurement'}}
+  %m, %out = quantum.measurement "PauliMeasure"() qubits(%q)
+      static_data = {pauli_word = "ZZ"} : (i1, !quantum.bit)
+  return %m, %out : i1, !quantum.bit
+}
+
+// -----
+
+func.func @invalid_result(%q: !quantum.bit) -> (i64, !quantum.bit) {
+  // expected-error @+1 {{failed to legalize operation 'quantum.measurement'}}
+  %m, %out = quantum.measurement "PauliMeasure"() qubits(%q)
+      static_data = {pauli_word = "Z"} : (i64, !quantum.bit)
+  return %m, %out : i64, !quantum.bit
 }
 
 // -----
@@ -861,4 +969,236 @@ module @test_set_basis_state {
         %2 = quantum.set_basis_state(%arg0) %1 : (memref<1xi1>, !quantum.bit) -> !quantum.bit
         return
     }
+}
+
+// -----
+
+// quantum.operator
+
+// CHECK: llvm.func @__catalyst__qis__RX(f64, !llvm.ptr, !llvm.ptr)
+// CHECK-LABEL: llvm.func @scalar
+func.func @scalar(%q: !quantum.bit, %theta: f64) {
+    // CHECK: [[NULL:%.+]] = llvm.mlir.zero : !llvm.ptr
+    // CHECK: llvm.call @__catalyst__qis__RX(%arg1, %arg0, [[NULL]])
+    %out = quantum.operator "RX"(%theta: f64) qubits(%q)
+    return
+}
+
+// -----
+
+// CHECK: llvm.func @__catalyst__qis__SWAP(!llvm.ptr, !llvm.ptr, !llvm.ptr)
+// CHECK-LABEL: llvm.func @no_params
+func.func @no_params(%q0: !quantum.bit, %q1: !quantum.bit) {
+    // CHECK: [[NULL:%.+]] = llvm.mlir.zero : !llvm.ptr
+    // CHECK: llvm.call @__catalyst__qis__SWAP(%arg0, %arg1, [[NULL]])
+    %out:2 = quantum.operator "SWAP"() qubits(%q0, %q1)
+    return
+}
+
+// -----
+
+// CHECK: llvm.func @__catalyst__qis__Rot(f64, f64, f64, !llvm.ptr, !llvm.ptr)
+// CHECK-LABEL: llvm.func @controlled_adjoint
+func.func @controlled_adjoint(%q: !quantum.bit, %ctrl0: !quantum.bit, %ctrl1: !quantum.bit,
+                             %cv0: i1, %cv1: i1, %theta: f64, %phi: f64, %omega: f64) {
+    // CHECK-DAG: [[CTRL_QUBITS:%.+]] = llvm.alloca {{.*}} x !llvm.ptr
+    // CHECK-DAG: [[CTRL_VALUES:%.+]] = llvm.alloca {{.*}} x i1
+    // CHECK-DAG: [[MOD:%.+]] = llvm.alloca {{.*}} x !llvm.struct<(i1, i64, ptr, ptr)>
+    // CHECK: [[ADJOINT:%.+]] = llvm.mlir.constant(true)
+    // CHECK: [[ADJOINT_PTR:%.+]] = llvm.getelementptr inbounds [[MOD]][0, 0]
+    // CHECK: [[COUNT_PTR:%.+]] = llvm.getelementptr inbounds [[MOD]][0, 1]
+    // CHECK: [[CTRL_QUBITS_PTR:%.+]] = llvm.getelementptr inbounds [[MOD]][0, 2]
+    // CHECK: [[CTRL_VALUES_PTR:%.+]] = llvm.getelementptr inbounds [[MOD]][0, 3]
+    // CHECK: [[CTRL0_PTR:%.+]] = llvm.getelementptr inbounds [[CTRL_QUBITS]][0] : (!llvm.ptr) -> !llvm.ptr, !llvm.ptr
+    // CHECK: llvm.store %arg1, [[CTRL0_PTR]] : !llvm.ptr, !llvm.ptr
+    // CHECK: [[CV0_PTR:%.+]] = llvm.getelementptr inbounds [[CTRL_VALUES]][0] : (!llvm.ptr) -> !llvm.ptr, i1
+    // CHECK: llvm.store %arg3, [[CV0_PTR]] : i1, !llvm.ptr
+    // CHECK: [[CTRL1_PTR:%.+]] = llvm.getelementptr inbounds [[CTRL_QUBITS]][1] : (!llvm.ptr) -> !llvm.ptr, !llvm.ptr
+    // CHECK: llvm.store %arg2, [[CTRL1_PTR]] : !llvm.ptr, !llvm.ptr
+    // CHECK: [[CV1_PTR:%.+]] = llvm.getelementptr inbounds [[CTRL_VALUES]][1] : (!llvm.ptr) -> !llvm.ptr, i1
+    // CHECK: llvm.store %arg4, [[CV1_PTR]] : i1, !llvm.ptr
+    // CHECK: llvm.store [[ADJOINT]], [[ADJOINT_PTR]] : i1, !llvm.ptr
+    // CHECK: [[COUNT:%.+]] = llvm.mlir.constant(2 : i64)
+    // CHECK: llvm.store [[COUNT]], [[COUNT_PTR]] : i64, !llvm.ptr
+    // CHECK: llvm.store [[CTRL_QUBITS]], [[CTRL_QUBITS_PTR]] : !llvm.ptr, !llvm.ptr
+    // CHECK: llvm.store [[CTRL_VALUES]], [[CTRL_VALUES_PTR]] : !llvm.ptr, !llvm.ptr
+    // CHECK: llvm.call @__catalyst__qis__Rot(%arg5, %arg6, %arg7, %arg0, [[MOD]])
+    %out, %ctrls:2 = quantum.operator "Rot"(%theta: f64, %phi: f64, %omega: f64)
+        adj qubits(%q) ctrls(%ctrl0, %ctrl1) ctrl_vals(%cv0, %cv1)
+    return
+}
+
+// -----
+
+// CHECK: llvm.func @__catalyst__qis__Identity(!llvm.ptr, i64, ...)
+// CHECK-LABEL: llvm.func @identity
+func.func @identity(%q0: !quantum.bit, %q1: !quantum.bit) {
+    // CHECK: [[NULL:%.+]] = llvm.mlir.zero : !llvm.ptr
+    // CHECK: [[COUNT:%.+]] = llvm.mlir.constant(2 : i64)
+    // CHECK: llvm.call @__catalyst__qis__Identity([[NULL]], [[COUNT]], %arg0, %arg1)
+    %out:2 = quantum.operator "Identity"() qubits(%q0, %q1)
+    return
+}
+
+// -----
+
+// CHECK: llvm.func @__catalyst__qis__MultiRZ(f64, !llvm.ptr, i64, ...)
+// CHECK-LABEL: llvm.func @multirz
+func.func @multirz(%q0: !quantum.bit, %q1: !quantum.bit, %theta: f64) {
+    // CHECK: [[NULL:%.+]] = llvm.mlir.zero : !llvm.ptr
+    // CHECK: [[COUNT:%.+]] = llvm.mlir.constant(2 : i64)
+    // CHECK: llvm.call @__catalyst__qis__MultiRZ(%arg2, [[NULL]], [[COUNT]], %arg0, %arg1)
+    %out:2 = quantum.operator "MultiRZ"(%theta: f64) qubits(%q0, %q1)
+    return
+}
+
+// -----
+
+// CHECK: llvm.func @__catalyst__qis__PCPhase(f64, i64, !llvm.ptr, i64, ...)
+// CHECK-LABEL: llvm.func @pcphase
+func.func @pcphase(%q0: !quantum.bit, %q1: !quantum.bit, %theta: f64, %dim: i64) {
+    // CHECK: [[NULL:%.+]] = llvm.mlir.zero : !llvm.ptr
+    // CHECK: [[COUNT:%.+]] = llvm.mlir.constant(2 : i64)
+    // CHECK: llvm.call @__catalyst__qis__PCPhase(%arg2, %arg3, [[NULL]], [[COUNT]], %arg0, %arg1)
+    %out:2 = quantum.operator "PCPhase"(%theta: f64, %dim: i64) qubits(%q0, %q1)
+    return
+}
+
+// -----
+
+// CHECK: llvm.func @__catalyst__qis__GlobalPhase(f64, !llvm.ptr)
+// CHECK-LABEL: llvm.func @global_phase
+func.func @global_phase(%theta: f64) {
+    // CHECK: [[NULL:%.+]] = llvm.mlir.zero : !llvm.ptr
+    // CHECK: llvm.call @__catalyst__qis__GlobalPhase(%arg0, [[NULL]])
+    quantum.operator "GlobalPhase"(%theta: f64) qubits()
+    return
+}
+
+// -----
+
+// Memref parameters reach the runtime as pointers to descriptors.
+// CHECK: llvm.func @__catalyst__qis__QubitUnitary(!llvm.ptr, !llvm.ptr, i64, ...)
+// CHECK-LABEL: llvm.func @memref_unitary
+func.func @memref_unitary(%q: !quantum.bit, %ctrl: !quantum.bit, %cv: i1, %matrix: memref<2x2xcomplex<f64>>) {
+    // CHECK-DAG: [[BUFFER:%.+]] = llvm.alloca {{.*}} x !llvm.struct<(ptr, ptr, i64, array<2 x i64>, array<2 x i64>)>
+    // CHECK-DAG: [[MOD:%.+]] = llvm.alloca {{.*}} x !llvm.struct<(i1, i64, ptr, ptr)>
+    // CHECK: llvm.store %arg1,
+    // CHECK: llvm.store %arg2,
+    // CHECK: llvm.store {{.*}}, [[BUFFER]] : !llvm.struct<(ptr, ptr, i64, array<2 x i64>, array<2 x i64>)>, !llvm.ptr
+    // CHECK: [[COUNT:%.+]] = llvm.mlir.constant(1 : i64)
+    // CHECK: llvm.call @__catalyst__qis__QubitUnitary([[BUFFER]], [[MOD]], [[COUNT]], %arg0)
+    %out, %out_ctrl = quantum.operator "QubitUnitary"(%matrix: memref<2x2xcomplex<f64>>)
+        adj qubits(%q) ctrls(%ctrl) ctrl_vals(%cv)
+    return
+}
+
+// -----
+
+// Multiple memref parameters can be interleaved with scalars.
+// Maps and static data do not alter the runtime signature or argument order.
+// CHECK: llvm.func @__catalyst__qis__Mixed(!llvm.ptr, f64, !llvm.ptr, !llvm.ptr, !llvm.ptr)
+// CHECK-LABEL: llvm.func @mixed_params
+func.func @mixed_params(%q: !quantum.bit, %theta: f64, %data: memref<?xf64>, %scalar: memref<f64>) {
+    // CHECK-DAG: [[DATA:%.+]] = llvm.alloca {{.*}} x !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)>
+    // CHECK-DAG: [[SCALAR:%.+]] = llvm.alloca {{.*}} x !llvm.struct<(ptr, ptr, i64)>
+    // CHECK: llvm.store {{.*}}, [[DATA]] : !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)>, !llvm.ptr
+    // CHECK: llvm.store {{.*}}, [[SCALAR]] : !llvm.struct<(ptr, ptr, i64)>, !llvm.ptr
+    // CHECK: llvm.call @__catalyst__qis__Mixed([[DATA]], %arg1, [[SCALAR]], %arg0, {{%.+}})
+    %out = quantum.operator "Mixed"(%data: memref<?xf64>, %theta: f64, %scalar: memref<f64>) qubits(%q)
+        static_data = {extra = 1 : i64}
+        param_map = {data = [0], scalar = [2], theta = [1]} qubit_map = {wires = [0]}
+    return
+}
+
+// -----
+
+// CHECK: llvm.func @__catalyst__qis__RX(f64, !llvm.ptr, !llvm.ptr)
+// CHECK-LABEL: llvm.func @static_data
+func.func @static_data(%q: !quantum.bit, %theta: f64) {
+    // CHECK: [[NULL:%.+]] = llvm.mlir.zero : !llvm.ptr
+    // CHECK: llvm.call @__catalyst__qis__RX(%arg1, %arg0, [[NULL]])
+    %out = quantum.operator "RX"(%theta: f64) qubits(%q) static_data = {extra = 1 : i64}
+    return
+}
+
+// -----
+
+// CHECK: llvm.func @__catalyst__qis__Rot(f64, f64, f64, !llvm.ptr, !llvm.ptr)
+// CHECK-LABEL: llvm.func @param_map
+func.func @param_map(%q: !quantum.bit, %theta: f64, %phi: f64, %omega: f64) {
+    // CHECK: [[NULL:%.+]] = llvm.mlir.zero : !llvm.ptr
+    // CHECK: llvm.call @__catalyst__qis__Rot(%arg1, %arg2, %arg3, %arg0, [[NULL]])
+    %out = quantum.operator "Rot"(%theta: f64, %phi: f64, %omega: f64) qubits(%q)
+        param_map = {first = [2], rest = [0, 1]}
+    return
+}
+
+// -----
+
+// CHECK: llvm.func @__catalyst__qis__SWAP(!llvm.ptr, !llvm.ptr, !llvm.ptr)
+// CHECK-LABEL: llvm.func @qubit_map
+func.func @qubit_map(%q0: !quantum.bit, %q1: !quantum.bit) {
+    // CHECK: [[NULL:%.+]] = llvm.mlir.zero : !llvm.ptr
+    // CHECK: llvm.call @__catalyst__qis__SWAP(%arg0, %arg1, [[NULL]])
+    %out:2 = quantum.operator "SWAP"() qubits(%q0, %q1)
+        qubit_map = {first = [1], second = [0]}
+    return
+}
+
+// -----
+
+// Control work wires are omitted from fixed-arity runtime calls, regardless of their positions.
+// Other qubit groups keep their operand order.
+// CHECK: llvm.func @__catalyst__qis__SWAP(!llvm.ptr, !llvm.ptr, !llvm.ptr)
+// CHECK-LABEL: llvm.func @ctrl_work_wires_fixed
+func.func @ctrl_work_wires_fixed(%work0: !quantum.bit, %q: !quantum.bit, %work1: !quantum.bit, %other: !quantum.bit) {
+    // CHECK: [[NULL:%.+]] = llvm.mlir.zero : !llvm.ptr
+    // CHECK: llvm.call @__catalyst__qis__SWAP(%arg1, %arg3, [[NULL]])
+    %out:4 = quantum.operator "SWAP"() qubits(%work0, %q, %work1, %other)
+        qubit_map = {ctrl_work_wires = [2, 0], wires = [1], work_wires = [3]}
+    return
+}
+
+// -----
+
+// Variadic calls count only runtime qubits; controls still reach the modifier structure.
+// CHECK: llvm.func @__catalyst__qis__MultiRZ(f64, !llvm.ptr, i64, ...)
+// CHECK-LABEL: llvm.func @ctrl_work_wires_variadic
+func.func @ctrl_work_wires_variadic(%q0: !quantum.bit, %work0: !quantum.bit, %q1: !quantum.bit, %work1: !quantum.bit, %ctrl: !quantum.bit, %cv: i1, %theta: f64) {
+    // CHECK: [[MOD:%.+]] = llvm.alloca {{.*}} x !llvm.struct<(i1, i64, ptr, ptr)>
+    // CHECK: llvm.store %arg4,
+    // CHECK: llvm.store %arg5,
+    // CHECK: [[COUNT:%.+]] = llvm.mlir.constant(2 : i64)
+    // CHECK: llvm.call @__catalyst__qis__MultiRZ(%arg6, [[MOD]], [[COUNT]], %arg0, %arg2)
+    %out:4, %out_ctrl = quantum.operator "MultiRZ"(%theta: f64)
+        qubits(%q0, %work0, %q1, %work1) ctrls(%ctrl) ctrl_vals(%cv)
+        qubit_map = {ctrl_work_wires = [3, 1], wires = [2, 0]}
+    return
+}
+
+// -----
+
+// Operators outside the supported runtime signature must fail conversion.
+
+func.func @uid(%q: !quantum.bit, %theta: f64) {
+    // expected-error@+1 {{failed to legalize operation 'quantum.operator'}}
+    %out = quantum.operator "RX"(%theta: f64) qubits(%q) UID(0)
+    return
+}
+
+// -----
+
+func.func @forwarded_args(%q: !quantum.bit, %theta: f64, %forward: f64) {
+    // expected-error@+1 {{failed to legalize operation 'quantum.operator'}}
+    %out = quantum.operator "RX"(%theta: f64) qubits(%q) UID(1) forward(%forward: f64)
+    return
+}
+
+// -----
+
+func.func @register(%qreg: !quantum.reg, %theta: f64) {
+    // expected-error@+1 {{failed to legalize operation 'quantum.operator'}}
+    %out = quantum.operator "RX"(%theta: f64) quregs(%qreg) indices()
+    return
 }

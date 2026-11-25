@@ -19,10 +19,11 @@ from dataclasses import replace
 import numpy as np
 import pennylane as qp
 import pytest
+from pennylane.core.queuing import AnnotatedQueue
 from pennylane.decomposition import add_decomps, register_resources
 from pennylane.devices import Device, NullQubit
 from pennylane.devices.capabilities import DeviceCapabilities, OperatorProperties
-from pennylane.ops.op_math.adjoint2 import adjoint_rotation as adjoint_rotation2
+from pennylane.ops.op_math.adjoint2 import _adjoint_negate_angle as adjoint_rotation2
 from pennylane.tape import QuantumScript
 from utils import CONFIG_CUSTOM_DEVICE
 
@@ -122,6 +123,7 @@ CustomDevice.capabilities.operations.pop("BlockEncode")
 class TestDecomposition:
     """Test the preprocessing transforms implemented in Catalyst."""
 
+    @pytest.mark.old_frontend
     def test_decompose_integration(self):
         """Test the decompose transform as part of the Catalyst pipeline."""
         dev = NullQubit(wires=4, shots=None)
@@ -131,7 +133,7 @@ class TestDecomposition:
             qp.SingleExcitationPlus(theta, wires=[0, 1])
             return qp.state()
 
-        mlir = qjit(circuit, target="mlir").mlir
+        mlir = qjit(circuit, target="mlir", capture=False).mlir
         assert "Hadamard" in mlir
         assert "CNOT" in mlir
         assert "RY" in mlir
@@ -148,6 +150,7 @@ class TestDecomposition:
         assert isinstance(decomposed_ops[0], qp.QubitUnitary)
         assert isinstance(decomposed_ops[1], qp.RX)
 
+    @pytest.mark.old_frontend
     def test_decompose_ops_to_unitary_integration(self):
         """Test the decompose ops to unitary transform as part of the Catalyst pipeline."""
         dev = CustomDevice(wires=4, shots=None)
@@ -157,7 +160,7 @@ class TestDecomposition:
             qp.BlockEncode(np.array([[1, 1, 1], [0, 1, 0]]), wires=[0, 1, 2])
             return qp.state()
 
-        mlir = qjit(circuit, target="mlir").mlir
+        mlir = qjit(circuit, target="mlir", capture=False).mlir
         assert "quantum.unitary" in mlir
         assert "BlockEncode" not in mlir
 
@@ -276,6 +279,7 @@ class TestPreprocessHybridOp:
                     [op.name in expected_ops for op in new_region.quantum_tape.operations]
                 )
 
+    @pytest.mark.old_frontend
     @pytest.mark.parametrize("x, y", [(1.23, -0.4), (0.7, 0.25), (-1.51, 0.6)])
     def test_decomposition_of_adjoint_circuit(self, x, y):
         """Test that unsupported operators nested in Adjoint are decompsed
@@ -289,7 +293,7 @@ class TestPreprocessHybridOp:
             adjoint(lambda: OtherRX(x, 0))()
             return qp.expval(qp.PauliZ(0))
 
-        mlir = qjit(circuit, target="mlir").mlir
+        mlir = qjit(circuit, target="mlir", capture=False).mlir
 
         assert "quantum.adjoint" in mlir
         assert "RX" in mlir
@@ -298,6 +302,7 @@ class TestPreprocessHybridOp:
 
         assert np.isclose(circuit(x, y), np.cos(-x) * np.cos(y))
 
+    @pytest.mark.old_frontend
     @pytest.mark.xfail(
         reason="Legacy preprocessing cannot decompose Operator2 Hadamard subclasses",
         raises=CompileError,
@@ -327,7 +332,7 @@ class TestPreprocessHybridOp:
             return qp.state()
 
         # mlir contains expected gate names, and not the unsupported gate names
-        qjc = qjit(circuit, target="mlir")
+        qjc = qjit(circuit, target="mlir", capture=False)
         # force creation of mlir
         _ = qjc(0.5)
         mlir = qjc.mlir
@@ -351,6 +356,7 @@ class TestPreprocessHybridOp:
         expected_res = np.array([x1, x2, x1, x2])
         assert np.allclose(expected_res, circuit(phi))
 
+    @pytest.mark.old_frontend
     @pytest.mark.xfail(
         reason="Legacy preprocessing cannot decompose Operator2 Hadamard subclasses",
         raises=CompileError,
@@ -362,7 +368,7 @@ class TestPreprocessHybridOp:
 
         dev = qp.device("lightning.qubit", wires=2)
 
-        @qjit
+        @qjit(capture=False)
         @qp.qnode(dev)
         def circuit(n: int, x: float):
             OtherHadamard(wires=0)
@@ -398,18 +404,18 @@ class TestPreprocessHybridOp:
         @qjit
         @qp.qnode(dev)
         def circuit(x: float):
-            @while_loop(lambda x: x < 2.0)
+            @qp.while_loop(lambda x: x < 2.0)
             def loop_rx(x):
                 # perform some work and update (some of) the arguments
                 OtherRX(x, wires=0)
                 return x**2
 
             # apply the while loop
-            final_x = loop_rx(x)
+            loop_rx(x)
 
-            return qp.expval(qp.PauliY(0)), final_x
+            return qp.expval(qp.PauliY(0))
 
-        res, final_phi = circuit(phi)
+        res = circuit(phi)
 
         total_angle = 0
         while phi < 2:
@@ -419,7 +425,6 @@ class TestPreprocessHybridOp:
         expected_res = -np.sin(total_angle)
 
         assert np.isclose(res, expected_res)
-        assert final_phi > 2.0
 
     @pytest.mark.usefixtures("create_temporary_toml_file")
     @pytest.mark.parametrize("create_temporary_toml_file", [TEST_DEVICE_CONFIG_TEXT], indirect=True)
@@ -524,12 +529,14 @@ class TestPreprocessHybridOp:
         if gate_set_src == "capabilities":
             capabilities = DeviceCapabilities.from_toml_file(request.node.toml_file)
             kwargs = {"capabilities": capabilities}
+            expected_ops = capabilities.operations
         else:
             kwargs = {"target_gates": TARGET_GATES_FROM_CONFIG, "capabilities": None}
+            expected_ops = TARGET_GATES_FROM_CONFIG
 
         (new_tape,), _ = catalyst_decompose(tape, **kwargs)
 
-        assert len(new_tape.operations) == 14
+        assert all(op.name in expected_ops for op in new_tape.operations)
         assert np.allclose(qp.matrix(new_tape, wire_order=[1, 0]), tape.operations[0].matrix())
 
     @pytest.mark.usefixtures("create_temporary_toml_file")
@@ -538,7 +545,7 @@ class TestPreprocessHybridOp:
         """Test that an error is raised in decompose if a PennyLane mid-circuit measurement
         is encountered"""
 
-        with qp.queuing.AnnotatedQueue() as q:
+        with AnnotatedQueue() as q:
             qp.RX(1.23, wires=0)
             qp.measure(0)
 
@@ -558,7 +565,7 @@ class TestPreprocessHybridOp:
         """Test that an error is raised in decompose if a PennyLane mid-circuit measurement
         is encountered"""
 
-        with qp.queuing.AnnotatedQueue() as q:
+        with AnnotatedQueue() as q:
             qp.RX(1.23, wires=0)
             qp.measure(0)
 

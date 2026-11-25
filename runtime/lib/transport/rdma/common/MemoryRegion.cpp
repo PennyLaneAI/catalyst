@@ -36,11 +36,21 @@ MemoryRegion::MemoryRegion(std::shared_ptr<ProtectionDomain> pd, void *addr, std
  *        lifetime.
  */
 MemoryRegion::MemoryRegion(std::shared_ptr<ProtectionDomain> pd, void *addr, std::size_t length,
-                           MemAccess access, std::shared_ptr<void> backing, bool zero_iova)
+                           MemAccess access, std::shared_ptr<void> backing)
     : pd_(std::move(pd)), backing_buffer_(std::move(backing)) {
-    mr_ = zero_iova ? ibv_reg_mr_iova(pd_->get(), addr, length, 0, static_cast<int>(access))
-                    : ibv_reg_mr(pd_->get(), addr, length, static_cast<int>(access));
-    TP_CHECK_ERRNO(mr_, zero_iova ? "ibv_reg_mr_iova" : "ibv_reg_mr");
+    mr_ = ibv_reg_mr(pd_->get(), addr, length, static_cast<int>(access));
+    TP_CHECK_ERRNO(mr_, "ibv_reg_mr");
+}
+
+/**
+ * @brief Register caller-provided memory at I/O virtual address `iova`, keeping `backing`
+ *        alive for the MR's lifetime.
+ */
+MemoryRegion::MemoryRegion(std::shared_ptr<ProtectionDomain> pd, void *addr, std::size_t length,
+                           std::uint64_t iova, MemAccess access, std::shared_ptr<void> backing)
+    : pd_(std::move(pd)), backing_buffer_(std::move(backing)) {
+    mr_ = ibv_reg_mr_iova(pd_->get(), addr, length, iova, static_cast<int>(access));
+    TP_CHECK_ERRNO(mr_, "ibv_reg_mr_iova");
 }
 
 /**
@@ -58,7 +68,7 @@ MemoryRegion::MemoryRegion(std::shared_ptr<ProtectionDomain> pd, std::uint64_t o
  * @brief Allocate + own an aligned host buffer, then register it.
  */
 MemoryRegion MemoryRegion::alloc_host(std::shared_ptr<ProtectionDomain> pd, std::size_t length,
-                                      std::size_t alignment, MemAccess access, bool zero_iova) {
+                                      std::size_t alignment, MemAccess access) {
     // aligned_alloc requires a power-of-two alignment and a size that is a
     // multiple of it.
     TP_CHECK(std::has_single_bit(alignment), "alignment must be a power of two, got %zu",
@@ -67,8 +77,7 @@ MemoryRegion MemoryRegion::alloc_host(std::shared_ptr<ProtectionDomain> pd, std:
     void *buf = std::aligned_alloc(alignment, rounded);
     TP_CHECK_ERRNO(buf, "aligned_alloc(%zu)", rounded);
     std::memset(buf, 0, rounded);
-    return MemoryRegion(std::move(pd), buf, length, access, std::shared_ptr<void>(buf, std::free),
-                        zero_iova);
+    return MemoryRegion(std::move(pd), buf, length, access, std::shared_ptr<void>(buf, std::free));
 }
 
 MemoryRegion::~MemoryRegion() {

@@ -69,7 +69,7 @@ class TransportBackend:
         roles: The roles it provides, ``"controller"`` and/or ``"coprocessor"``.
         frame_modes: The frame layouts it speaks: ``"bl16"``, the 16 B frame, carries messages of up
             to 8 B, and ``"blv"`` larger ones, so a backend with a larger limit must list ``"blv"``;
-            ``"cuqr"`` is cudaq-realtime's format.
+            ``"cuqr"`` is cudaq-realtime's RPC format, which a placement asks for by name.
         max_payload_bytes: The largest request it carries per message, ``None`` for no limit.
         max_reply_bytes: The largest reply it carries per message, ``None`` for no limit.
         default: Whether it is picked for its transport and hardware without being named. A node
@@ -117,6 +117,8 @@ _REGISTRY: list[TransportBackend] = [
     ),
     TransportBackend("hwhs", "rdma", "fpga", ("controller",)),
     TransportBackend("fpga_verbs", "rdma", "fpga", ("controller",), default=False),
+    TransportBackend("hsb_hwhs", "rdma", "fpga", ("controller",), default=False),
+    TransportBackend("balboa_hwhs", "rdma", "fpga", ("controller",), default=False),
     TransportBackend(
         "memcpy",
         "memcpy",
@@ -585,8 +587,8 @@ def _frame_config(placement: Placement, transport: str, in_bytes: int, out_bytes
     Messages of up to 8 B travel in the 16 B frame (BL16), which needs no entries, so such programs
     compile as before. Larger ones travel in BLV frames sized for the larger message, written as
     ``frame=blv;frame_payload=<bytes>``. The placement's ``frame``, when not ``"auto"``, overrides
-    that choice: ``"bl16"``, ``"blv"``, or ``"cuqr"`` for cudaq-realtime's format, to talk to a
-    cudaq-realtime peer. Each ring has 256 slots unless a node's config sets ``frame_slots=<n>``, a
+    that choice: ``"bl16"``, ``"blv"``, or ``"cuqr"`` for cudaq-realtime's RPC format. Each ring
+    has 256 slots unless a node's config sets ``frame_slots=<n>``, a
     power of two, which is then passed to every node. Nodes given an explicit ``backend_lib`` are
     taken at their word; the runtime checks them.
 
@@ -1065,6 +1067,8 @@ def _qec_pass_specs(code):
     """
     params = _QEC_CODES[code]
     return (
+        # Drops the unused decomposition rules captured with the circuit
+        ("symbol-dce", {}),
         ("convert-quantum-to-qecl", {"k": params.k}),
         ("symbol-dce", {}),
         ("inject-noise-to-qecl", {}),

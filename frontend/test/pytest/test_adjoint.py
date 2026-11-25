@@ -23,6 +23,7 @@ import pennylane.numpy as pnp
 import pytest
 from numpy.testing import assert_allclose
 from pennylane import adjoint, cond, for_loop, qjit, while_loop
+from pennylane.core.queuing import AnnotatedQueue
 from pennylane.ops.op_math.adjoint import Adjoint, AdjointOperation
 
 import catalyst
@@ -279,6 +280,7 @@ class TestCatalyst:
 
         self.verify_catalyst_adjoint_against_pennylane(func, qp.device(backend, wires=2))
 
+    @pytest.mark.old_frontend
     def test_adjoint_no_measurements(self):
         """Checks that catalyst.adjoint rejects functions containing quantum measurements."""
 
@@ -288,7 +290,7 @@ class TestCatalyst:
 
         with pytest.raises(ValueError, match="Measurement process cannot be used"):
 
-            @qjit
+            @qjit(capture=False)
             @qp.qnode(qp.device("lightning.qubit", wires=2))
             def C_workflow():
                 adjoint(func)()
@@ -296,11 +298,12 @@ class TestCatalyst:
 
             C_workflow()
 
+    @pytest.mark.old_frontend
     def test_adjoint_invalid_argument(self):
         """Checks that catalyst.adjoint rejects non-quantum program arguments."""
         with pytest.raises(ValueError, match="Expected a callable"):
 
-            @qjit
+            @qjit(capture=False)
             @qp.qnode(qp.device("lightning.qubit", wires=2))
             def C_workflow():
                 adjoint(33)()
@@ -532,10 +535,11 @@ class TestCatalyst:
         dev = qp.device(backend, wires=1)
         self.verify_catalyst_adjoint_against_pennylane(func, dev, jnp.pi, capture_mode=capture_mode)
 
+    @pytest.mark.old_frontend
     def test_adjoint_wires(self, backend):
         """Test the wires property of Adjoint"""
 
-        @qjit
+        @qjit(capture=False)
         @qp.qnode(qp.device(backend, wires=3))
         def circuit(theta):
             def func(theta):
@@ -549,10 +553,11 @@ class TestCatalyst:
         # Without the `wires` property, returns `[-1]`
         assert circuit(0.3) == qp.wires.Wires([0, 2])
 
+    @pytest.mark.old_frontend
     def test_adjoint_wires_qubitunitary(self, backend):
         """Test the wires property of nested Adjoint with QubitUnitary"""
 
-        @qjit
+        @qjit(capture=False)
         @qp.qnode(qp.device(backend, wires=3))
         def circuit():
             def func():
@@ -1195,7 +1200,7 @@ class TestQueueing:
         """Test queuing and metadata when both Adjoint and base defined inside a recording
         context."""
 
-        with qp.queuing.AnnotatedQueue() as q:
+        with AnnotatedQueue() as q:
             base = qp.Rot(1.2345, 2.3456, 3.4567, wires="b")
             _ = adjoint(base)
 
@@ -1206,7 +1211,7 @@ class TestQueueing:
         """Test that base isn't added to queue if it's defined outside the recording context."""
 
         base = qp.Rot(1.2345, 2.3456, 3.4567, wires="b")
-        with qp.queuing.AnnotatedQueue() as q:
+        with AnnotatedQueue() as q:
             op = adjoint(base)
 
         assert len(q) == 1
@@ -1424,7 +1429,7 @@ class TestAdjointConstructorPreconstructedOp:
     @pytest.mark.parametrize("base", (qp.IsingXX(1.23, wires=("c", "d")), qp.QFT(wires=(0, 1, 2))))
     def test_single_op(self, base):
         """Test passing a single preconstructed op in a queuing context."""
-        with qp.queuing.AnnotatedQueue() as q:
+        with AnnotatedQueue() as q:
             base.queue()
             out = adjoint(base)
 
@@ -1434,7 +1439,7 @@ class TestAdjointConstructorPreconstructedOp:
     def test_single_observable(self):
         """Test passing a single preconstructed observable in a queuing context."""
 
-        with qp.queuing.AnnotatedQueue() as q:
+        with AnnotatedQueue() as q:
             base = qp.Hermitian([[1, 0], [0, 1]], wires=0)
             out = adjoint(base)
 
@@ -1453,7 +1458,7 @@ class TestAdjointConstructorDifferentCallableTypes:
     def test_adjoint_single_op_function(self):
         """Test the adjoint transform on a single operation."""
 
-        with qp.queuing.AnnotatedQueue() as q:
+        with AnnotatedQueue() as q:
             out = adjoint(qp.RX)(1.234, wires=0)
 
         tape = qp.tape.QuantumScript.from_queue(q)
@@ -1464,7 +1469,7 @@ class TestAdjointConstructorDifferentCallableTypes:
     def test_adjoint_template(self):
         """Test the adjoint transform on a template."""
 
-        with qp.queuing.AnnotatedQueue() as q:
+        with AnnotatedQueue() as q:
             out = adjoint(qp.QFT)(wires=(0, 1, 2))
 
         tape = qp.tape.QuantumScript.from_queue(q)
@@ -1486,7 +1491,7 @@ class TestAdjointConstructorDifferentCallableTypes:
         x = 1.23
         y = 2.34
         z = 3.45
-        with qp.queuing.AnnotatedQueue() as q:
+        with AnnotatedQueue() as q:
             out = adjoint(func)(x, y, z)
 
         tape = qp.tape.QuantumScript.from_queue(q)
@@ -1508,7 +1513,7 @@ class TestAdjointConstructorDifferentCallableTypes:
     def test_nested_adjoint(self):
         """Test the adjoint transform on an adjoint transform."""
         x = 4.321
-        with qp.queuing.AnnotatedQueue() as q:
+        with AnnotatedQueue() as q:
             out = adjoint(adjoint(qp.RX))(x, wires=1)
 
         tape = qp.tape.QuantumScript.from_queue(q)
@@ -1593,6 +1598,7 @@ class TestAdjointConstructorIntegration:
         assert qp.math.allclose(jax.grad(circ)(x), expected_grad)
 
 
+@pytest.mark.old_frontend
 class TestMidCircuitMeasurementAfterAdjoint:
     def test_issue_1055(self, backend):
         """See https://github.com/PennyLaneAI/catalyst/issues/1055"""
@@ -1600,7 +1606,7 @@ class TestMidCircuitMeasurementAfterAdjoint:
         def subroutine():
             qp.Hadamard(wires=1)
 
-        @qjit
+        @qjit(capture=False)
         @qp.qnode(qp.device("lightning.qubit", wires=2))
         def circuit():
             # Comment/uncomment to toggle bug
@@ -1616,13 +1622,14 @@ class TestMidCircuitMeasurementAfterAdjoint:
         assert not circuit()
 
 
+@pytest.mark.old_frontend
 class TestAdjointOfTemplates:
     """Test behaviour of adjoint around complex templates."""
 
     def test_adjoint_for_loop(self, backend):
         """Test operator adjoint works around templates that decompose into for loops."""
 
-        @qp.qjit
+        @qp.qjit(capture=False)
         @qp.qnode(qp.device(backend, wires=1))
         def circuit(n: int):
             qp.H(0)
@@ -1644,7 +1651,7 @@ class TestAdjointOfTemplates:
     def test_adjoint_while_loop(self, backend):
         """Test operator adjoint works around templates that decompose into for loops."""
 
-        @qp.qjit
+        @qp.qjit(capture=False)
         @qp.qnode(qp.device(backend, wires=1))
         def circuit(n: int):
             qp.H(0)
@@ -1667,7 +1674,7 @@ class TestAdjointOfTemplates:
     def test_adjoint_cond(self, backend):
         """Test operator adjoint works around templates that decompose into if conditionals."""
 
-        @qp.qjit
+        @qp.qjit(capture=False)
         @qp.qnode(qp.device(backend, wires=1))
         def circuit(b: bool):
             qp.H(0)
@@ -1699,7 +1706,7 @@ class TestAdjointOfTemplates:
 
             return qp.expval(qp.Z(0))
 
-        result = qjit(circuit)(0)
+        result = qjit(circuit, capture=False)(0)
         assert np.isclose(result, 1.0)
 
 

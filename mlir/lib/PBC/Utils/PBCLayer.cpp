@@ -114,8 +114,8 @@ FailureOr<int64_t> PBCLayerContext::worstCaseDepthOfBlock(Block *block, bool lif
 
     for (Operation &op : *block) {
         if (isa<scf::WhileOp>(&op)) {
-            return op.emitOpError(
-                "worst-case depth is not available when PBC ops are inside scf.while");
+            flushLayer();
+            continue;
         }
         if (auto ifOp = dyn_cast<scf::IfOp>(&op)) {
             flushLayer();

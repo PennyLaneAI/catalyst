@@ -211,8 +211,35 @@ layout. The backend's library is named ``libcatalyst_transport_<backend>_<role>.
 The built-in backends are:
 
 * ``rdma``: ``cpu_verbs`` on ``cpu``, ``gpu_verbs`` on ``gpu``, and ``hwhs`` on ``fpga``.
-  ``fpga_verbs`` is also available on ``fpga`` when named.
+  ``fpga_verbs``, ``hsb_hwhs`` and ``balboa_hwhs`` are also available on ``fpga`` when named.
 * ``memcpy``: ``memcpy`` on ``cpu`` and ``memcpy_gpu`` on ``gpu``.
+
+A node's backend config is the ``config`` string in its ``init_args``, made of ``key=value``
+pairs separated by ``;``. An RDMA coprocessor names its controller, its **peer**, with ``peer=``
+in that string. The coprocessor backends stay ``cpu_verbs`` and ``gpu_verbs``; the peer picks the
+link they reach it through (``runtime/lib/transport/rdma/common/PeerLink.hpp``):
+
+* ``catalyst``: The default, used when ``peer=`` is left out. For the catalyst controllers
+  (``cpu_verbs``, ``hwhs``, ``fpga_verbs``).
+* ``hsb``: For ``hsb_hwhs``, a controller behind NVIDIA's `Holoscan Sensor Bridge`_.
+* ``balboa``: For ``balboa_hwhs``, a controller behind `BALBOA`_, the RDMA stack of ETH Zurich's
+  Coyote.
+
+A node placed on ``hsb_hwhs`` needs ``peer=hsb`` in its coprocessors' configs, and one on
+``balboa_hwhs`` needs ``peer=balboa``. For example, a GPU coprocessor facing an ``hsb_hwhs``
+controller:
+
+.. code-block:: python
+
+    controller = qp.Controller(..., hardware="fpga", backend="hsb_hwhs")
+    coprocessor = qp.Coprocessor(
+        ...,
+        hardware="gpu",
+        init_args={"config": "dev=mlx5_0;gid=3;peer=hsb"},
+    )
+
+``dev`` and ``gid`` are required by every RDMA coprocessor: the RDMA device and the GID index on
+its port.
 
 A backend is a shared library implementing ``ControllerSession`` or ``CoprocessorSession`` from
 ``runtime/include/Transport.hpp`` and exporting the matching factory symbol declared in
@@ -244,12 +271,14 @@ Each round's request and reply travel as a **frame**, written into a slot of a r
 receiving side: over RDMA in the receiver's registered memory, over ``memcpy`` in the
 coprocessor's own memory. A ring has ``frame_slots`` slots, 256 unless a node's backend config sets
 ``frame_slots=<n>``, a power of two, which the compiler then passes to every node; FPGA controllers
-are only tested with 256. Round ``n`` uses slot ``n mod frame_slots``. Over RDMA, ends whose frame
-configs differ fail to connect. Every transport carries the same two frame layouts, and the compiler picks one per placement from its
+are only tested with 256. ``hsb_hwhs`` always uses one slot, so the request after a lost one lands
+where the coprocessor polls. Round ``n`` uses slot ``n mod frame_slots``. Over RDMA, ends whose frame
+configs differ fail to connect. Every transport carries the same two frame layouts, BL16 and BLV, and
+the compiler picks one per placement from its
 message sizes: the 16 B frame, BL16, when requests and replies fit in 8 B, and BLV otherwise.
 ``qp.Backline(..., frame=...)`` overrides that choice with ``"bl16"``, ``"blv"`` or ``"cuqr"``,
-cudaq-realtime's format (see `CUQR frames`_), which only ``cpu_verbs`` and ``gpu_verbs`` carry; the
-compiler checks that the selected backends carry it.
+cudaq-realtime's RPC format (see `CUQR frames`_), and the compiler checks that the selected backends
+carry it.
 
 .. list-table:: BL16, in 64 B slots
     :header-rows: 1
@@ -321,51 +350,48 @@ default 256 slots.
 CUQR frames
 -----------
 
-``cpu_verbs`` and ``gpu_verbs`` also speak cudaq-realtime's RPC format, for exchanging messages
-with a cudaq-realtime (NVQLink) peer. A request is its 24 B ``RPCHeader`` (magic ``"CUQR"``,
-``function_id`` = the ``fn_id``, ``arg_len``, ``request_id``, ``ptp_timestamp``) and then the
-payload; a reply is its ``RPCResponse`` (magic ``"CUQS"``, ``status``, ``result_len``, and the
-request's ``request_id`` and ``ptp_timestamp`` echoed) and then the result. A coprocessor function
-that returns ``COPROCESSOR_FN_ERROR``, or more bytes than the reply holds, is answered with
-``status`` 1 and no result, and the
-controller reports the status; a message that is not a CUQR frame is dropped unanswered, as
-cudaq-realtime does.
+CUQR is cudaq-realtime's RPC format, the one an NVQLink FPGA and a cudaq-realtime host exchange.
+``cpu_verbs`` and ``gpu_verbs`` carry it, and ``qp.Backline(..., frame="cuqr")`` selects it;
+``"auto"`` never does.
 
-A CUQR frame has no word written last, so the receiver posts one receive request per slot and reads
-arrivals from its receive completion queue; the sender's RDMA verb, SEND or write with immediate,
-signals each one. ``peer=cudaq`` follows a cudaq-realtime peer's conventions: one unreliable
-connected (UC) queue pair, its 12 B handshake, rings addressed from 0, MTU 4096 and replies by SEND.
-UC drops a lost message silently, so a controller reports a reply missing after 5 s.
+A request is a 24 B header (magic ``"CUQR"``, ``function_id``, ``arg_len``, ``request_id``,
+``ptp_timestamp``) and the payload, with the ``fn_id`` as its ``function_id``. A reply is a 24 B
+header (magic ``"CUQS"``, ``status``, ``result_len``, and the request's ``request_id`` and
+``ptp_timestamp``) and the result. The controller sets ``request_id`` to the round's sequence number
+and matches the reply by it. A coprocessor function that returns ``COPROCESSOR_FN_ERROR``, or more
+bytes than the reply holds, is answered with ``status`` 1 and no result, and the controller reports
+the status. A message that is not a CUQR request is dropped unanswered, as cudaq-realtime does.
 
-**Setting up CUQR.** Apart from ``frame``, these go in each rdma node's config, e.g.
-``"dev=mlx5_0;gid=3;cuqr_tx=write_imm"``, and none is set for you:
-
-* ``qp.Backline(..., frame="cuqr")`` selects the format; the default ``"auto"`` never picks it.
-* A ``gpu_verbs`` coprocessor needs ``cuqr_tx=write_imm`` on both nodes. The default ``send``
-  is refused when the session is created.
-* Between two Backline nodes, ``cuqr_tx`` must match on both ends, which the session checks.
-* For a cudaq-realtime peer:
-
-  * Set ``peer=cudaq``.
-  * Set ``frame_slots`` and ``frame_slot_bytes`` to the server's ``--num-slots`` and
-    ``--slot-size``. Nothing checks these against the peer: a mismatch shows up only as wrong
-    replies or a missing one.
-  * Use a ``gid`` that is the port's RoCEv2 IPv4 GID, since the handshake carries an IPv4
-    address.
-  * Raise the port's netdev MTU to 4200 or more, for the active MTU of 4096 cudaq-realtime
-    expects. The session refuses a smaller one.
-  * A ``gpu_verbs`` coprocessor in this mode accepts only requests the peer sends by write with
-    immediate.
-
-This has been tested against cudaq-realtime's own server and client on a ConnectX-7. One
-difference: a cudaq-realtime server drops a request whose ``function_id`` it has no function for,
-but a Backline coprocessor has one function, which receives every request with its ``function_id``
-and decides; returning ``COPROCESSOR_FN_ERROR`` gives a ``status`` 1 reply. A GPU-resident
-cudaq-realtime peer has not been tested.
+A CUQR frame has no word written last. The sender writes it by RDMA write with immediate, the
+immediate's low 12 bits naming the slot, so a ring has at most 4096 slots. The receiver keeps one
+receive request posted per slot and takes each arrival from its receive completion queue.
 
 **Not optimized on gpu_verbs.** A GPU kernel cannot read a completion queue, so a host thread relays
 each arrival to the kernel through a flag in host memory, adding about 1 µs per round trip on an
-MI210. Letting the GPU poll the completion queue itself (GPUDirect Async) would remove the hop.
+MI210. The kernel takes the slots in order, so on ``gpu_verbs`` a lost request stops the session.
+
+FPGA controllers
+----------------
+
+``hwhs``, ``hsb_hwhs`` and ``balboa_hwhs`` drive an engine in the FPGA of an AMD VPK120, next to
+the network IP core that carries the RDMA traffic. Each one needs the board booted from its own
+image. The controller runs as root on the board and currently supports only BL16 frames.
+
+``hwhs``
+    The ERNIC image, with AMD's ERNIC as the network IP core. The controller opens ``/dev/xib0``
+    and ``/dev/mem``. Its coprocessors use the default, ``peer=catalyst``, and can leave ``peer``
+    out.
+``hsb_hwhs``
+    The HSB image, with NVIDIA's `Holoscan Sensor Bridge`_ as the network IP core.
+    In the coprocessor's config, set ``peer=hsb`` and set ``gid=`` to the RoCE v2 GID of its IPv4
+    address.
+``balboa_hwhs``
+    The BALBOA image, with ETH Zurich's `BALBOA`_ as the network IP core.
+    In the coprocessor's config, set ``peer=balboa`` and set ``gid=`` to the RoCE v2 GID of its
+    IPv4 address.
+
+The `Backline repository <https://github.com/PennyLaneAI/backline>`_ provides more information about the images, with
+steps to build and boot them and to reproduce its measurements.
 
 The transport dialect
 =====================
@@ -614,3 +640,5 @@ platform is built out.
 .. _pennylane.backline: https://docs.pennylane.ai/en/latest/code/qp_backline.html
 .. _Placement: https://docs.pennylane.ai/en/latest/code/qp_backline.html
 .. _Backline: https://docs.pennylane.ai/en/latest/code/qp_backline.html
+.. _Holoscan Sensor Bridge: https://github.com/nvidia-holoscan/holoscan-sensor-bridge
+.. _BALBOA: https://github.com/fpgasystems/Coyote

@@ -122,7 +122,6 @@ def create_device_preprocessing_pipeline(
     return tuple(pipeline)
 
 
-# pylint: disable=unused-argument
 def _mcm_preprocessing(
     pipeline: list[BoundTransform],
     unsupported_transforms: list[str],
@@ -144,6 +143,8 @@ def _mcm_preprocessing(
         shots_present = qp.math.is_tracer(shots) or shots != 0
         if not shots_present:
             raise CompileError("Cannot use mcm_method='one-shot' with analytic mode.")
+        if MCM_METHOD.ONE_SHOT not in capabilities.supported_mcm_methods:
+            raise ValueError("mcm_method='one-shot' is not supported in the chosen device.")
         pipeline.append(
             _safe_create_bound_transform(
                 Transform(pass_name="dynamic-one-shot"), unsupported_transforms

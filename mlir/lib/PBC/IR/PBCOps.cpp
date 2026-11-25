@@ -72,6 +72,13 @@ template <typename OpType> LogicalResult verifyPPMOp(OpType op) {
     if (op.getQubitOperands().size() != op.getPauliProduct().size()) {
         return op.emitOpError("Number of qubits must match number of pauli operators");
     }
+    for (Attribute attr : op.getPauliProduct()) {
+        StringRef pauli = cast<StringAttr>(attr).getValue();
+        if (pauli != "I" && pauli != "X" && pauli != "Y" && pauli != "Z") {
+            return op.emitOpError()
+                   << "Pauli operator must be I, X, Y or Z, but got \"" << pauli << "\"";
+        }
+    }
     return mlir::success();
 }
 

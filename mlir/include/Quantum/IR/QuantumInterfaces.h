@@ -17,7 +17,7 @@
 #include <string>
 #include <utility>
 
-#include "llvm/ADT/SmallVector.h" // for DecomposableGate interface
+#include "llvm/ADT/SmallVector.h" // for DecomposableOp interface
 #include "mlir/IR/OpDefinition.h" // for QuantumInterfaces.h.inc
 #include "mlir/IR/Operation.h"
 #include "mlir/IR/Types.h"
@@ -31,16 +31,17 @@
 namespace catalyst {
 namespace quantum {
 
-/// The arguments of a DecomposableGate, in operand order.
-///
-/// Operand order is the only positional order of an operator's arguments: the frontend lowering
-/// keeps the binding order set by PennyLane, and the decomposition rules lay out their operands in
-/// it. Names are used only for identity, so they are sorted only when printed into a
-/// graphOpId (see `defaultGetGraphOpId`). Do not use a hash or sorted map for these.
+/// The dynamic parameter arguments of a DecomposableOp, in operand order.
 using DynamicShape = llvm::SmallVector<std::pair<std::string, llvm::SmallVector<mlir::Type>>>;
+
+/// Named wire-group lengths, excluding control wires. OperatorOp follows qubit_map order.
 using WireLens = llvm::SmallVector<std::pair<std::string, size_t>>;
 
 std::string defaultGetGraphOpId(mlir::Operation *op);
+std::string defaultGetGraphOpIdExplicitModifiers(mlir::Operation *op, bool isAdjoint,
+                                                 unsigned numControlQubits,
+                                                 unsigned numWorkWires = 0,
+                                                 bool isBorrowed = false);
 
 } // namespace quantum
 } // namespace catalyst

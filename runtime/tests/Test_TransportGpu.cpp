@@ -18,14 +18,12 @@
 #include <vector>
 
 #include "Frame.hpp"
-#include "GpuCoprocessorSession.hpp"
 #include "GpuLaunchers.hpp"
 #include "GpuRuntime.hpp"
 #include "SteaneLut.hpp"
 #include "TransportABI.h"
 
 #include <catch2/catch_test_macros.hpp>
-#include <catch2/matchers/catch_matchers_string.hpp>
 
 using namespace catalyst::transport;
 using namespace catalyst::transport::common;
@@ -183,13 +181,4 @@ TEST_CASE("the GPU echo kernel answers CUQR frames through the slot flags, echoi
         REQUIRE(replies[c].request_id == c + 1); // the request's id, echoed
         REQUIRE(replies[c].data == requests[c]);
     }
-}
-
-TEST_CASE("gpu_verbs takes CUQR requests only by write with immediate") {
-    // mlx5 hands a small SEND to the CPU to copy into its buffer, which in GPU memory it cannot.
-    const auto ring = frame::geometry_for(frame::Mode::CUQR, 8);
-    CHECK_THROWS_WITH(gpu_verbs::GpuCoprocessorSession("mlx5_1", 3, 0, ring, {.write_imm = false}),
-                      Catch::Matchers::ContainsSubstring("cuqr_tx=write_imm"));
-    // A cudaq-realtime client picks its own verb (its clients write with immediate).
-    CHECK_NOTHROW(gpu_verbs::GpuCoprocessorSession("mlx5_1", 3, 0, ring, {.cudaq_peer = true}));
 }

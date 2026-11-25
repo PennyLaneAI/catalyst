@@ -25,7 +25,6 @@
 #include <thread>
 #include <vector>
 
-#include "BackendConfig.hpp"
 #include "CpuControllerSession.hpp"
 #include "CpuCoprocessorSession.hpp"
 #include "Frame.hpp"
@@ -64,8 +63,7 @@ int main(int argc, char **argv) {
     std::uint32_t rounds = 1;
     // Ring slots on both ends, as the frame_slots config key sets them.
     std::uint32_t slots = 0;
-    // --config sets the rdma config keys for CUQR frames, e.g.
-    // "frame=cuqr;frame_payload=232;cuqr_tx=write_imm;peer=cudaq;frame_slots=8;frame_slot_bytes=256".
+    // --config sets frame keys on both ends, e.g. "frame=cuqr;frame_payload=8;frame_slots=8".
     std::string config;
     // --increment 1: the coprocessor serves (and the controller expects) cudaq-realtime's
     // rpc_increment instead of an echo; --fn-id is the function id requests carry;
@@ -118,17 +116,16 @@ int main(int argc, char **argv) {
         }
         ring.slots = slots;
     }
-    const auto cuqr_cfg = common::parse_backend_config("dev=" + dev + ";gid=0;" + config).cuqr;
 
     std::unique_ptr<TransportSession> s;
     CpuCoprocessorSession *coproc = nullptr;
     CpuControllerSession *controller = nullptr;
     if (is_coprocessor) {
-        auto up = std::make_unique<CpuCoprocessorSession>(dev, gid, ring, cuqr_cfg);
+        auto up = std::make_unique<CpuCoprocessorSession>(dev, gid, ring);
         coproc = up.get();
         s = std::move(up);
     } else {
-        auto up = std::make_unique<CpuControllerSession>(dev, gid, ring, cuqr_cfg);
+        auto up = std::make_unique<CpuControllerSession>(dev, gid, ring);
         controller = up.get();
         s = std::move(up);
     }
@@ -210,10 +207,9 @@ int main(int argc, char **argv) {
             std::fprintf(stderr,
                          "[controller] %s %u B in, %u B out, %u rounds: RTT p50=%.2f us p99=%.2f "
                          "us max=%.2f us\n",
-                         ring.mode == frame::Mode::BL16 ? "BL16"
-                         : ring.mode == frame::Mode::BLV
-                             ? "BLV"
-                             : (cuqr_cfg.write_imm ? "CUQR/write_imm" : "CUQR/send"),
+                         ring.mode == frame::Mode::BL16  ? "BL16"
+                         : ring.mode == frame::Mode::BLV ? "BLV"
+                                                         : "CUQR",
                          syndrome_bytes, correction_bytes, rounds, pct(0.50) / 1e3, pct(0.99) / 1e3,
                          rtt_ns.back() / 1e3);
         }

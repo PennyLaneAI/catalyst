@@ -16,7 +16,6 @@
 Instrumentation module to report Catalyst & program performance.
 """
 
-import copy
 import datetime
 import functools
 import os
@@ -28,6 +27,11 @@ from contextlib import contextmanager
 
 # pylint: disable=f-string-without-interpolation,line-too-long
 # Tested in LIT test suite.
+
+# Column widths of the console output, shared with the compiler driver (mlir/include/Driver/Timer.h)
+# so that the lines printed by both line up.
+NAME_WIDTH = 32
+VALUE_WIDTH = 12
 # pragma: no cover
 
 
@@ -145,12 +149,14 @@ def instrument(fn=None, *, size_from=None, has_finegrained=False):
 
         with ResultReporter(stage_name, has_finegrained) as reporter:
             self = args[0]
-            orig = copy.deepcopy(self.compile_options)
+            orig_keep_intermediate = self.compile_options.keep_intermediate
             self.compile_options.keep_intermediate = True
-            fn_results, wall_time, cpu_time = time_function(fn, args, kwargs)
+            try:
+                fn_results, wall_time, cpu_time = time_function(fn, args, kwargs)
+            finally:
+                self.compile_options.keep_intermediate = orig_keep_intermediate
             program_size = measure_program_size(fn_results, size_from)
             reporter.commit_results(wall_time, cpu_time, program_size)
-            self.compile_options = orig
 
         return fn_results
 
@@ -242,14 +248,22 @@ class ResultReporter:
     def print_results(self, wall_time, cpu_time, program_size=None):
         """Print the provided results to console with some minor formatting."""
         if self.enable_finegrained:
-            print(f"[DIAGNOSTICS] > Total {self.stage_name.ljust(23)}", end="\t", file=sys.stderr)
+            print(
+                f"[DIAGNOSTICS] > Total {self.stage_name.ljust(NAME_WIDTH)}",
+                end="\t",
+                file=sys.stderr,
+            )
         else:
-            print(f"[DIAGNOSTICS] Running {self.stage_name.ljust(23)}", end="\t", file=sys.stderr)
+            print(
+                f"[DIAGNOSTICS] Running {self.stage_name.ljust(NAME_WIDTH)}",
+                end="\t",
+                file=sys.stderr,
+            )
 
-        formatted_wall_time = (str(wall_time // 1e3 / 1e3) + " ms").ljust(12)
+        formatted_wall_time = f"{wall_time / 1e6:.3f} ms".ljust(VALUE_WIDTH)
         print(f"walltime: {formatted_wall_time}", end="\t", file=sys.stderr)
 
-        formatted_cpu_time = (str(cpu_time // 1e3 / 1e3) + " ms").ljust(12)
+        formatted_cpu_time = f"{cpu_time / 1e6:.3f} ms".ljust(VALUE_WIDTH)
         print(f"cputime: {formatted_cpu_time}", end="\t", file=sys.stderr)
 
         if program_size is not None:

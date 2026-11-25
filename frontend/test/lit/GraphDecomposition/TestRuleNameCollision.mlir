@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// RUN: catalyst --tool=opt --pass-pipeline='builtin.module(graph-decomposition{inline-rule-body gate-set=testRZ=1.0,testRY=1.0 fixed-decomps=testHadamard=h_to_rz_ry bytecode-rules="%BYTECODE_PATH"})' %s | FileCheck %s
+// RUN: catalyst --tool=opt --pass-pipeline='builtin.module(graph-decomposition{inline-rule-body gate-set=testRZ=1.0,testRY=1.0 fixed-decomps=testHadamard=h_to_rz_ry bytecode-rules="%PRECOMPILED_BYTECODE_PATH"})' %s | FileCheck %s
 
 // A name collision with an independently compiled rule must not hide the library rule.
 // CHECK-LABEL: func.func @circuit
@@ -24,9 +24,9 @@ func.func @circuit(%q: !quantum.bit) -> !quantum.bit {
     return %out : !quantum.bit
 }
 
-// CHECK-LABEL: func.func @__builtin_h_to_rz_ry()
+// CHECK-LABEL: func.func {{.*}}@__builtin_h_to_rz_ry()
 // CHECK-SAME: target_gate = "Unrelated{}{wires:1}{}"
-func.func @__builtin_h_to_rz_ry() attributes {
+func.func private @__builtin_h_to_rz_ry() attributes {
     frontend_name = "h_to_rz_ry",
     resources = {operations = {}},
     target_gate = "Unrelated{}{wires:1}{}"
@@ -34,6 +34,6 @@ func.func @__builtin_h_to_rz_ry() attributes {
     return
 }
 
-// CHECK-LABEL: func.func @__builtin_h_to_rz_ry_0(
+// CHECK-LABEL: func.func {{.*}}@__builtin_h_to_rz_ry_0(
 // CHECK-SAME: frontend_name = "h_to_rz_ry"
 // CHECK-SAME: target_gate = "testHadamard{}{wires:1}{}"

@@ -25,8 +25,7 @@ namespace {
 catalyst::transport::ControllerSession *make_cpu_controller(const std::string &config) {
     const auto cfg = catalyst::transport::common::parse_backend_config(config);
     return new catalyst::transport::cpu_verbs::CpuControllerSession(
-        cfg.dev, cfg.gid, catalyst::transport::common::frame::geometry_from_config(config),
-        cfg.cuqr);
+        cfg.dev, cfg.gid, catalyst::transport::common::frame::geometry_from_config(config));
 }
 } // namespace
 

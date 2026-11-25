@@ -19,9 +19,9 @@
 
 // COMMENT: Check that the external helpers are declared in the module
 
-// CHECK-DAG: func.func private @rs_decomposition_get_size(f64, f64, i1) -> index
-// CHECK-DAG: func.func private @rs_decomposition_get_gates(memref<?xindex>, f64, f64, i1)
-// CHECK-DAG: func.func private @rs_decomposition_get_phase(f64, f64, i1) -> f64
+// CHECK-DAG: func.func private @rs_decomposition_get_size(f64, f64, i1 {llvm.zeroext}) -> index
+// CHECK-DAG: func.func private @rs_decomposition_get_gates(memref<?xindex>, f64, f64, i1 {llvm.zeroext})
+// CHECK-DAG: func.func private @rs_decomposition_get_phase(f64, f64, i1 {llvm.zeroext}) -> f64
 
 // COMMENT: Test the defined decomposition function
 
@@ -192,9 +192,9 @@ func.func @test_rz_decomposition(%arg0: !quantum.bit) -> !quantum.bit {
 // -----
 
 // Check that the external helpers are declared in the module 
-// CHECK-DAG: func.func private @rs_decomposition_get_size(f64, f64, i1) -> index
-// CHECK-DAG: func.func private @rs_decomposition_get_gates(memref<?xindex>, f64, f64, i1)
-// CHECK-DAG: func.func private @rs_decomposition_get_phase(f64, f64, i1) -> f64
+// CHECK-DAG: func.func private @rs_decomposition_get_size(f64, f64, i1 {llvm.zeroext}) -> index
+// CHECK-DAG: func.func private @rs_decomposition_get_gates(memref<?xindex>, f64, f64, i1 {llvm.zeroext})
+// CHECK-DAG: func.func private @rs_decomposition_get_phase(f64, f64, i1 {llvm.zeroext}) -> f64
 
 // CHECK-LABEL: @test_phaseshift_decomposition
 // CHECK-SAME: ([[Q_IN:%.+]]: !quantum.bit, [[PHI:%.+]]: f64)

@@ -852,7 +852,9 @@ class TestGetLabel:
     def test_global_phase_operator(self):
         """Tests against a GlobalPhase operator instance."""
         assert get_label(qp.GlobalPhase(0.5)) == "GlobalPhase"
-        assert get_label(qp.ctrl(qp.GlobalPhase(0.0), control=0)) == "<name> PhaseShift|<wire> [0]"
+        assert (
+            get_label(qp.ctrl(qp.GlobalPhase(0.0), control=0)) == "<name> C(GlobalPhase)|<wire> [0]"
+        )
         assert get_label(qp.adjoint(qp.GlobalPhase(0.0))) == "Adjoint(GlobalPhase)"
 
     @pytest.mark.parametrize(
@@ -1032,7 +1034,7 @@ class TestCreateStaticOperatorNodes:
         nodes = utility.dag_builder.nodes
         assert len(nodes) == 2  # Device node + operator
 
-        assert nodes["node1"]["label"] == "<name> MidMeasureMP|<wire> [0]"
+        assert nodes["node1"]["label"] == get_label(qp.ops.MidMeasure(0))
 
     def test_ppm(self):
         """Test that PPMs can be captured as nodes."""
@@ -1058,6 +1060,53 @@ class TestCreateStaticOperatorNodes:
         assert nodes["node1"]["attrs"]["fillcolor"] == "#70B3F5"
         assert nodes["node2"]["label"] == "<name> PPM-XY|<wire> [0, 1]"
         assert nodes["node2"]["attrs"]["fillcolor"] == "#70B3F5"
+
+    def test_pbc_ppm(self):
+        """Test that PPMs from the PBC dialect can be captured as nodes."""
+        pipe = [("pipe", ["quantum-compilation-stage"])]
+
+        @qp.qjit(pipelines=pipe, target="mlir", capture=True, collect_decomp_rules=False)
+        @qp.transform(pass_name="to-ppr")
+        @qp.qnode(qp.device("null.qubit", wires=2))
+        def cir():
+            qp.pauli_measure("X", wires=[0])
+            qp.pauli_measure(pauli_word="XY", wires=[0, 1])
+
+        assert "pbc.ppm" in cir.mlir_opt
+        module = parse_generic_to_xdsl_module(cir.mlir_opt)
+
+        # Construct DAG
+        utility = ConstructCircuitDAG(FakeDAGBuilder())
+        utility.construct(module)
+
+        nodes = utility.dag_builder.nodes
+        assert len(nodes) == 3  # Device node + operator
+
+        assert nodes["node1"]["label"] == "<name> PPM-X|<wire> [0]"
+        assert nodes["node1"]["attrs"]["fillcolor"] == "#70B3F5"
+        assert nodes["node2"]["label"] == "<name> PPM-XY|<wire> [0, 1]"
+        assert nodes["node2"]["attrs"]["fillcolor"] == "#70B3F5"
+
+    def test_generic_measurement_on_register(self):
+        """Test that a generic measurement on a register shows its name and acts on all wires."""
+        program = """
+        func.func @circuit(%reg: !quantum.reg, %indices: tensor<2xi64>) {
+          %bits, %out_reg = quantum.measurement "RegisterMeasurement"() quregs(%reg)
+              indices(%indices: tensor<2xi64>) : (tensor<2xi1>, !quantum.reg)
+          return
+        }
+        """
+        module = parse_generic_to_xdsl_module(program)
+
+        # Construct DAG
+        utility = ConstructCircuitDAG(FakeDAGBuilder())
+        utility.construct(module)
+
+        nodes = utility.dag_builder.nodes
+        assert len(nodes) == 1
+
+        assert nodes["node0"]["label"] == "<name> RegisterMeasurement|<wire> all"
+        assert nodes["node0"]["attrs"]["fillcolor"] == "#70B3F5"
 
     @pytest.mark.parametrize("negative_angle", [True, False])
     def test_ppr(self, negative_angle):
@@ -1735,8 +1784,8 @@ class TestOperatorConnectivity:
         else:
             expected_edges = (
                 ("NullQubit", "PauliX"),
-                ("PauliX", "PhaseShift"),
-                ("PhaseShift", "PauliY"),
+                ("PauliX", "C(GlobalPhase)"),
+                ("C(GlobalPhase)", "PauliY"),
             )
         assert_dag_structure(nodes, edges, expected_edges)
 
@@ -3054,7 +3103,7 @@ class TestCtrl:
             assert "Hadamard" in nodes["node1"]["label"]
             assert nodes["node1"]["parent_cluster_uid"] == "cluster2"
         else:
-            assert "CH" in nodes["node1"]["label"]
+            assert "C(Hadamard)" in nodes["node1"]["label"]
             assert "[1, 0]" in nodes["node1"]["label"]
             assert nodes["node1"]["parent_cluster_uid"] == "cluster1"
 
@@ -3085,7 +3134,7 @@ class TestCtrl:
 
         # cluster0 -> qjit
         # cluster1 -> my_workflow
-        assert "CH" in nodes["node1"]["label"]
+        assert "C(Hadamard)" in nodes["node1"]["label"]
         assert "[1, 0]" in nodes["node1"]["label"]
         assert nodes["node1"]["parent_cluster_uid"] == "cluster1"
 
@@ -3122,7 +3171,7 @@ class TestCtrl:
             assert "Hadamard" in nodes["node1"]["label"]
             assert nodes["node1"]["parent_cluster_uid"] == "cluster2"
         else:
-            assert "CH" in nodes["node1"]["label"]
+            assert "C(Hadamard)" in nodes["node1"]["label"]
             assert "[1, 0]" in nodes["node1"]["label"]
             assert nodes["node1"]["parent_cluster_uid"] == "cluster1"
 

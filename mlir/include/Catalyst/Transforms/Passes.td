@@ -221,6 +221,15 @@ def InlineNestedModulePass : Pass<"inline-nested-module"> {
 //   * See https://llvm.org/LICENSE.txt for license information.
 //   * SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+def AnnotateBufferOwnershipPass : Pass<"annotate-buffer-ownership", "ModuleOp"> {
+  let summary = "Identify uniquely owned buffers returned by defined functions";
+  let description = [{
+    Marks call results that are proven to own fresh allocations. External calls,
+    input aliases, views, and results sharing an allocation are left unmarked.
+    Run before buffer-deallocation, which consumes these temporary annotations.
+  }];
+}
+
 def BufferDeallocationPass : Pass<"buffer-deallocation", "func::FuncOp"> {
   let summary = "Adds all required dealloc operations for all allocations in "
                 "the input program";
@@ -326,57 +335,6 @@ def ResourceAnalysisPass : Pass<"resource-analysis"> {
             /*description=*/"The filename to save the output JSON to (only when output-json is true)"
         >
     ];
-}
-
-
-def RegisterDecompRuleResourcePass : Pass<"register-decomp-rule-resource"> {
-    let summary = "Compute and register the resources of decomposition rules.";
-    let description = [{
-        This pass uses `ResourceAnalysisPass` to compute resource metrics of
-        functions marked with the `target_gate` attribute, effectively
-        filtering for decomposition rules.
-
-        Note: This pass only applies to top level functions in the main module.
-
-        Usage:
-            quantum-opt input.mlir -register-decomp-rule-resource
-
-        Input:
-
-        ```mlir
-        func.func @decomp_rule() attributes {target_gate="CustomGate"}  {
-            %0 = quantum.alloc( 2) : !quantum.reg
-            %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
-            %2 = quantum.extract %0[ 1] : !quantum.reg -> !quantum.bit
-            %3 = quantum.custom "Hadamard"() %1 : !quantum.bit
-            %4 = quantum.custom "T"() %3 : !quantum.bit
-            %5 = quantum.custom "S"() %2 : !quantum.bit
-            %6:2 = quantum.custom "CNOT"() %4, %5 : !quantum.bit, !quantum.bit
-            %7 = quantum.insert %0[ 0], %6#0 : !quantum.reg, !quantum.bit
-            %8 = quantum.insert %7[ 1], %6#1 : !quantum.reg, !quantum.bit
-            quantum.dealloc %8 : !quantum.reg
-            return
-        }
-        ```
-
-        Output:
-
-        ```mlir
-        func.func @decomp_rule() attributes {resources = {measurements = {}, num_alloc_qubits = 2 : i64, num_arg_qubits = 0 : i64, num_qubits = 2 : i64, operations = {"CNOT(2)" = 1 : i64, "Hadamard(1)" = 1 : i64, "S(1)" = 1 : i64, "T(1)" = 1 : i64}}, target_gate = "CustomGate"}  {
-            %0 = quantum.alloc( 2) : !quantum.reg
-            %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
-            %2 = quantum.extract %0[ 1] : !quantum.reg -> !quantum.bit
-            %3 = quantum.custom "Hadamard"() %1 : !quantum.bit
-            %4 = quantum.custom "T"() %3 : !quantum.bit
-            %5 = quantum.custom "S"() %2 : !quantum.bit
-            %6:2 = quantum.custom "CNOT"() %4, %5 : !quantum.bit, !quantum.bit
-            %7 = quantum.insert %0[ 0], %6#0 : !quantum.reg, !quantum.bit
-            %8 = quantum.insert %7[ 1], %6#1 : !quantum.reg, !quantum.bit
-            quantum.dealloc %8 : !quantum.reg
-            return
-        }
-        ```
-    }];
 }
 
 def EmptyPass : Pass<"empty"> {
