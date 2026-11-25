@@ -21,7 +21,7 @@
 
 namespace catalyst::quantum {
 
-using PythonRuleLoweringFn = std::string (*)(DecomposableGate op);
+using PythonRuleLoweringFn = std::string (*)(DecomposableOp op);
 
 extern PythonRuleLoweringFn pythonRuleLowering;
 

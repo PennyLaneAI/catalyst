@@ -19,7 +19,7 @@
 #include <string>
 #include <utility>
 
-#include "llvm/ADT/SmallVector.h" // for DecomposableGate interface
+#include "llvm/ADT/SmallVector.h" // for DecomposableOp interface
 #include "llvm/ADT/StringRef.h"
 #include "mlir/IR/OpDefinition.h" // for QuantumInterfaces.h.inc
 #include "mlir/IR/Operation.h"
@@ -34,7 +34,7 @@
 namespace catalyst {
 namespace quantum {
 
-/// The dynamic parameter arguments of a DecomposableGate, in operand order.
+/// The dynamic parameter arguments of a DecomposableOp, in operand order.
 using DynamicShape = llvm::SmallVector<std::pair<std::string, llvm::SmallVector<mlir::Type>>>;
 
 /// Named wire-group lengths, excluding control wires. OperatorOp follows qubit_map order.

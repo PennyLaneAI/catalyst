@@ -136,25 +136,25 @@ std::string defaultGetGraphOpId(Operation *op) {
     std::string out;
     llvm::raw_string_ostream ss(out);
 
-    DecomposableGate gate = cast<DecomposableGate>(op);
+    DecomposableOp decomposable = cast<DecomposableOp>(op);
 
     // Fold op-level modifiers into the operator name so that `Op`, `Adjoint(Op)`, `<n>C(Op)`, and
     // nested combinations are distinct in the graphOpId. Modifiers wrap only the name; the
     // param/wire/static/uid groups follow, e.g. `<n>C(Adjoint(Rot)){...}{wires...}`.
-
-    bool isAdjoint = op->hasAttr("adjoint");
-    size_t numCtrlQubits = 0;
-
-    if (auto gate = mlir::dyn_cast<QuantumGate>(op)) {
-        numCtrlQubits = gate.getCtrlQubitOperands().size();
+    // Non-modifiable ops (e.g. measurements) never carry adjoint/control; skip wrapping.
+    std::string name = decomposable.getOperatorName();
+    if (decomposable.isModifiable()) {
+        bool isAdjoint = op->hasAttr("adjoint");
+        unsigned numCtrlQubits = cast<QuantumGate>(op).getCtrlQubitOperands().size();
+        name = wrapModifiers(name, op, isAdjoint, numCtrlQubits);
     }
 
-    ss << wrapModifiers(gate.getOperatorName(), op, isAdjoint, numCtrlQubits);
-    printDynamicShape(gate.getDynamicShape(), ss);
-    printWireLens(gate.getWireLens(), ss);
-    gate.getStaticData().print(ss);
-    if (gate.getExtraData() != "") {
-        ss << '[' << gate.getExtraData() << ']';
+    ss << name;
+    printDynamicShape(decomposable.getDynamicShape(), ss);
+    printWireLens(decomposable.getWireLens(), ss);
+    decomposable.getStaticData().print(ss);
+    if (decomposable.getExtraData() != "") {
+        ss << '[' << decomposable.getExtraData() << ']';
     }
     ss.flush();
 
@@ -167,7 +167,7 @@ std::string defaultGetGraphOpIdExplicitModifiers(Operation *op, bool isAdjoint,
     std::string out;
     llvm::raw_string_ostream ss(out);
 
-    DecomposableGate gate = cast<DecomposableGate>(op);
+    DecomposableOp gate = cast<DecomposableOp>(op);
 
     // Fold op-level (Adjoint/Ctrl/WorkWire) modifiers into the operator name so that `Op`,
     // `Adjoint(Op)`, `<n>C(Op)`, `WorkWires(Op)`, and nested combinations are distinct in the

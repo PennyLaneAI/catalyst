@@ -14,7 +14,7 @@
 
 // Test that resource-estimate replaces each op by a call to the function of its chosen
 // decomposition rule, which holds the basis gates of the rule, and keeps the ops that are not
-// decomposable gates as they are
+// decomposable ops as they are
 
 // RUN: catalyst --tool=opt --pass-pipeline='builtin.module(resource-estimate{output-json gate-set=testRX=1.0,testRZ=1.0 bytecode-rules="%PRECOMPILED_BYTECODE_PATH"})' %s -o /dev/null | FileCheck %s
 

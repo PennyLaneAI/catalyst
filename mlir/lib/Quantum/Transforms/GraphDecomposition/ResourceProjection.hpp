@@ -30,7 +30,7 @@ namespace quantum {
  * @brief Project the resources of each function onto the decomposition chosen for the module,
  * without applying it.
  *
- * As in the program after `graph-decomposition`, each decomposable gate becomes a call to the
+ * As in the program after `graph-decomposition`, each decomposable op becomes a call to the
  * function of its chosen rule, which holds the rule's basis gates and calls the functions of the
  * rules of its other operators. The other operations are kept as they are.
  *

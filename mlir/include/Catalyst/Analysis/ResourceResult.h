@@ -49,7 +49,7 @@ struct ResourceResult {
     // Per-GOID resource counts
     llvm::StringMap<double> detailedOperations;
 
-    // The operations that are not decomposable gates, collected with `detailedOperations`. They
+    // The operations that are not decomposable ops, collected with `detailedOperations`. They
     // have no GOID, so `resource-estimate` keeps them as they are.
     OperationCounts nonDecomposableOperations;
 

@@ -158,7 +158,7 @@ static std::pair<unsigned, bool> composeWorkWires(unsigned numWorkWires, bool is
 }
 
 /// Op-level `ctrl_work_wires` count and type from a decomposable gate.
-static std::pair<unsigned, StringRef> getOpCtrlWorkWires(quantum::DecomposableGate gate) {
+static std::pair<unsigned, StringRef> getOpCtrlWorkWires(quantum::DecomposableOp gate) {
     unsigned numWorkWires = 0;
     for (const auto &[name, len] : gate.getWireLens()) {
         if (name == CTRL_WORK_WIRES) {
@@ -707,7 +707,7 @@ void ResourceAnalysis::collectOperation(Operation *op, ResourceResult &result, b
         uint64_t nParams = inst.getResourceNumParams();
         uint64_t nQubits = inst.getResourceNumQubits() + nCtrlQubits + numWorkWires;
         result.operations[name][{nQubits, nParams}] += 1;
-        if (collectDetailedOperations && !isa<quantum::DecomposableGate>(op)) {
+        if (collectDetailedOperations && !isa<quantum::DecomposableOp>(op)) {
             result.nonDecomposableOperations[name][{nQubits, nParams}] += 1;
         }
 
@@ -801,7 +801,7 @@ void ResourceAnalysis::collectOperation(Operation *op, ResourceResult &result, b
 void ResourceAnalysis::collectDetailedOperation(Operation *op, ResourceResult &result,
                                                 bool isAdjoint, unsigned numControlQubits,
                                                 unsigned numWorkWires, bool isBorrowed) const {
-    if (auto inst = dyn_cast<quantum::DecomposableGate>(op)) {
+    if (auto inst = dyn_cast<quantum::DecomposableOp>(op)) {
         unsigned opCtrl = 0;
         if (auto gate = dyn_cast<quantum::QuantumGate>(op)) {
             opCtrl = gate.getCtrlQubitOperands().size();

@@ -214,7 +214,7 @@
 
 * `resource-estimate` reports each chosen decomposition rule as a function of its own, called where
   the decomposed gate was, as in the program after `graph-decomposition`. Basis gates get their
-  number of wires, and operations that are not decomposable gates, such as mid-circuit
+  number of wires, and operations that are not decomposable ops, such as mid-circuit
   measurements, are kept.
   [(#3518)](https://github.com/PennyLaneAI/catalyst/pull/3518)
 
@@ -1584,6 +1584,9 @@
   - `qp.pauli_measure` and `qp.ops.PauliMeasure` bind to `MeasurementOp`, and `MeasurementOp` lowers
     into the PBC dialect via `to_ppr` or directly into the `PauliMeasure` QIR instruction.
     [(#3474)](https://github.com/PennyLaneAI/catalyst/pull/3474)
+  - `DecomposableGate` interface has been renamed to `DecomposableOp` interface, and does not inherit `QuantumGate`. It is a 
+    generic interface to register operations to the graph solver. `MeasurementOp` implements the `DecomposableOp` interface.
+    [(3504)](https://github.com/PennyLaneAI/catalyst/pull/3504)
 
 <h3>Documentation 📝</h3>
 
