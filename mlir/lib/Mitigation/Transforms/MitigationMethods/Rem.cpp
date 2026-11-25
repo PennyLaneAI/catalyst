@@ -24,6 +24,7 @@
 #include "Catalyst/Utils/CallGraph.h"
 // Quantum dialect types and ops
 #include "llvm/Support/Debug.h"
+#include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/raw_ostream.h"
 
 #include "Quantum/IR/QuantumOps.h"
@@ -125,6 +126,10 @@ ValueRange emitCalibrationCircuit(PatternRewriter &rewriter, Location loc, func:
         // differ from the calibrated ones, and the REM post-processing converts
         // the calibration samples itself.
         calibratedResult = insertedMP->getResults();
+    }
+    else {
+        // matchAndRewrite emits an error for any other measurement process before creating IR.
+        llvm_unreachable("unsupported measurement process in the REM calibration circuit");
     }
 
     auto dealloc = rewriter.create<quantum::DeallocOp>(loc, currentQreg);
