@@ -26,6 +26,7 @@ namespace pbc {
 #include "PBC/Transforms/Passes.h.inc"
 
 void registerToPPRResourceEffect();
+void registerPPRToPPMResourceEffect();
 
 } // namespace pbc
 } // namespace catalyst

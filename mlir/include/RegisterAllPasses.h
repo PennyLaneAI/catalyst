@@ -55,6 +55,7 @@ inline void registerAllPasses() {
 inline void registerAllResourceEffects() {
     registerUpstreamResourceEffects();
     pbc::registerToPPRResourceEffect();
+    pbc::registerPPRToPPMResourceEffect();
 }
 
 } // namespace catalyst
