@@ -91,7 +91,7 @@ static DictionaryAttr appendCtrlWorkQubitMap(OpBuilder &builder, DictionaryAttr 
     return entries.getDictionary(builder.getContext());
 }
 
-static DictionaryAttr buildParamMap(OpBuilder &builder, DecomposableGate gate) {
+static DictionaryAttr buildParamMap(OpBuilder &builder, DecomposableOp gate) {
     SmallVector<NamedAttribute> entries;
     unsigned offset = 0;
     for (const auto &[name, types] : gate.getDynamicShape()) {
@@ -104,7 +104,7 @@ static DictionaryAttr buildParamMap(OpBuilder &builder, DecomposableGate gate) {
     return builder.getDictionaryAttr(entries);
 }
 
-static DictionaryAttr buildQubitMap(OpBuilder &builder, DecomposableGate gate) {
+static DictionaryAttr buildQubitMap(OpBuilder &builder, DecomposableOp gate) {
     SmallVector<NamedAttribute> entries;
     unsigned offset = 0;
     for (const auto &[name, numWires] : gate.getWireLens()) {
@@ -114,7 +114,8 @@ static DictionaryAttr buildQubitMap(OpBuilder &builder, DecomposableGate gate) {
         }
         entries.emplace_back(builder.getStringAttr(name), builder.getDenseI64ArrayAttr(indices));
     }
-    assert(offset == gate.getNonCtrlQubitOperands().size() &&
+    auto qgate = dyn_cast<QuantumGate>(gate.getOperation());
+    assert(qgate && offset == qgate.getNonCtrlQubitOperands().size() &&
            "wire lengths must cover every non-control qubit");
     return builder.getDictionaryAttr(entries);
 }
@@ -156,10 +157,10 @@ static Operation *createControlledGate(PatternRewriter &rewriter, QuantumGate ga
     ctrlValues.append(addCtrlValues.begin(), addCtrlValues.end());
 
     if (!addWorkQubits.empty()) {
-        auto decomposable = dyn_cast<DecomposableGate>(op);
+        auto decomposable = dyn_cast<DecomposableOp>(op);
         if (!decomposable) {
             op->emitError(
-                "a gate controlled with work wires must implement the DecomposableGate interface.");
+                "a gate controlled with work wires must implement the DecomposableOp interface.");
             return nullptr;
         }
 
