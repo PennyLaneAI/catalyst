@@ -387,9 +387,9 @@ LogicalResult loadPythonDecomps(ModuleOp module, ModuleOp ruleLibrary, ArrayRef<
     llvm::StringSet<> handledOpIds;
     llvm::SmallVector<DictionaryAttr> availableRules;
     // Add IDs from existing decomposable ops with decomposition rules
-    // NOTE: we assume in general that if one decomposition rule for an op is available,
-    // then all decomposition rules for that op are available. No system should introduce a
-    // subset of the rules for an op.
+    // NOTE: if one decomposition rule for an op is available, a fetch for that op will not be
+    // triggered. Additional rules for that op may be acquired as a result of the traversal of the
+    // closure of the fetched rules.
     for (ModuleOp source : {module, ruleLibrary}) {
         source.walk([&](func::FuncOp func) {
             if (auto target = func->getAttrOfType<StringAttr>("target_gate")) {
