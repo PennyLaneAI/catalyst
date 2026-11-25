@@ -426,6 +426,8 @@
     1. As a precompiled rule shipped with the Catalyst package directly.
     Catalyst now generates this library from the abstract operator signatures in PennyLane's `signature_registry`.
     Every registered signature is lowered, as well as any operations/rules reachable from these signatures, or their adjoint/control variants.
+    A rule library tailored to a specific circuit can be generated with `precompile_circuit_decomp_rules`, and used in place of the
+    built-in library by setting the `CATALYST_PRECOMPILED_BYTECODE_PATH` environment variable.
     [(#3057)](https://github.com/PennyLaneAI/catalyst/pull/3057)
     [(#3523)](https://github.com/PennyLaneAI/catalyst/pull/3523)
 
