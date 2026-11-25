@@ -41,7 +41,6 @@ from pennylane.measurements import CountsMP
 from pennylane.pytrees import flatten, unflatten
 from pennylane.wires import AbstractQubit, Wires, is_abstract_qubit
 
-import catalyst
 from catalyst.decomposition.capture_session import (
     DecompositionScope,
     OpDecompRequest,
@@ -49,7 +48,6 @@ from catalyst.decomposition.capture_session import (
 from catalyst.decomposition.modifier_state import ModifierState
 from catalyst.from_plxpr.qref_jax_primitives import (
     MeasurementPlane,
-    QrefQreg,
     qref_compbasis_p,
     qref_get_p,
     qref_gphase_p,
@@ -61,7 +59,6 @@ from catalyst.from_plxpr.qref_jax_primitives import (
     qref_pauli_measure_p,
     qref_pauli_rot_p,
     qref_qinst_p,
-    qref_set_basis_state_p,
     qref_set_state_p,
     qref_unitary_p,
 )

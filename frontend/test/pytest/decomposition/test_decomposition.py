@@ -16,8 +16,6 @@
 
 import hashlib
 import json
-import warnings
-from types import SimpleNamespace
 
 import jax.numpy as jnp
 import numpy as np
@@ -57,7 +55,6 @@ from pennylane.wires import Wires
 
 from catalyst import qjit
 from catalyst.compiler import _quantum_opt
-from catalyst.debug import get_compilation_stage
 from catalyst.decomposition import RuleLoweringWarning
 from catalyst.decomposition.capture_session import RuleIdentity
 from catalyst.decomposition.graph_op_id import (
@@ -100,10 +97,7 @@ from catalyst.decomposition.type_utils import (
 )
 from catalyst.passes import graph_decomposition
 from catalyst.utils.exceptions import CompileError
-from catalyst.utils.runtime_environment import (
-    PRECOMPILED_BYTECODE_PATH,
-    get_precompiled_manifest_path,
-)
+from catalyst.utils.runtime_environment import get_precompiled_manifest_path
 
 
 class TestGenericUtilities:
