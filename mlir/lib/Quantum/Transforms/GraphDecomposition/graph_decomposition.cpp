@@ -37,6 +37,7 @@
 #include "Catalyst/Analysis/ResourceResult.h"
 #include "Driver/Timer.h"
 #include "QRef/Transforms/Passes.h"
+#include "Quantum/IR/QuantumOps.h"
 #include "Quantum/Transforms/Passes.h"
 
 #include "DGBuilder.hpp"

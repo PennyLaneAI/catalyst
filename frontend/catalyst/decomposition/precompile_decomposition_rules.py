@@ -21,7 +21,7 @@ import pennylane as qp
 from jax._src.lib.mlir import ir
 
 from catalyst.compiler import _quantum_opt
-from catalyst.decomposition.capture_session import DecompositionScope, OpDecompRequest
+from catalyst.decomposition.capture_session import DecompositionScope, OpDecompRequest, RuleIdentity
 from catalyst.decomposition.modifier_state import ModifierState
 from catalyst.decomposition.precompiled_rule_loading import (
     ManifestEntries,
@@ -45,8 +45,12 @@ PRECOMPILATION_MODIFIERS = (
 )
 
 
-def _capture_rule_module(scope: DecompositionScope) -> ir.Module:
-    """Capture every reachable rule in scope into one MLIR module."""
+def _capture_rule_module(
+    scope: DecompositionScope,
+    *,
+    precompiled_rule_identities: frozenset[RuleIdentity] = frozenset(),
+) -> ir.Module:
+    """Capture reachable rules into one module, skipping supplied available identities."""
     interpreter = PLxPRToQuantumJaxprInterpreter(
         qp.device("null.qubit", wires=1),
         None,
@@ -58,7 +62,9 @@ def _capture_rule_module(scope: DecompositionScope) -> ir.Module:
     # use target="mlir" and .mlir_module to skip compiler invocation
     @qp.qjit(capture=True, target="mlir", collect_decomp_rules=False)
     def rules_module():
-        capture_and_bind_kernel_rules(interpreter, precompiled_rule_identities=frozenset())
+        capture_and_bind_kernel_rules(
+            interpreter, precompiled_rule_identities=precompiled_rule_identities
+        )
 
     module = rules_module.mlir_module
     if module is None:
