@@ -68,6 +68,10 @@ void ResourceResult::mergeWith(const ResourceResult &other, MergeMethod method) 
         }
     }
 
+    liveQubits = std::max(liveQubits, other.liveQubits);
+    peakQubits = std::max(peakQubits, other.peakQubits);
+    mergeStringMap(liveQubitsAtCall, other.liveQubitsAtCall, MergeMethod::Max);
+
     mergeStringMap(measurements, other.measurements, method);
     mergeStringMap(detailedOperations, other.detailedOperations, method);
 
@@ -175,6 +179,12 @@ llvm::json::Object ResourceResult::toJson() const {
     numQubitObject["alloc"] = countToJson(numAllocQubits);
     numQubitObject["arg"] = numArgQubits;
     numQubitObject["total"] = countToJson(numQubits());
+    numQubitObject["peak"] = countToJson(peakQubits);
+    llvm::json::Object liveAtCallObject;
+    for (const auto &entry : liveQubitsAtCall) {
+        liveAtCallObject[entry.getKey()] = countToJson(entry.getValue());
+    }
+    numQubitObject["live_at_call"] = std::move(liveAtCallObject);
     funcObj["num_qubits"] = std::move(numQubitObject);
 
     // Classical Operations

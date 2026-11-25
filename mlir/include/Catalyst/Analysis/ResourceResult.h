@@ -80,6 +80,13 @@ struct ResourceResult {
     // total qubits (allocated + argument)
     double numQubits() const { return numAllocQubits + numArgQubits; }
 
+    // Qubits allocated by this function and not yet released, their maximum, and their maximum
+    // at each call (loop bodies included). The peak with callees is left to the consumer. These
+    // are not counts: `multiplyBy` keeps them and `mergeWith` takes their maximum.
+    double liveQubits = 0;
+    double peakQubits = 0;
+    llvm::StringMap<double> liveQubitsAtCall;
+
     // from quantum.device op
     std::string deviceName;
 
