@@ -427,6 +427,7 @@
     Catalyst now generates this library from the abstract operator signatures in PennyLane's `signature_registry`.
     Every registered signature is lowered, as well as any operations/rules reachable from these signatures, or their adjoint/control variants.
     [(#3057)](https://github.com/PennyLaneAI/catalyst/pull/3057)
+    [(#3523)](https://github.com/PennyLaneAI/catalyst/pull/3523)
 
     2. When tracing a gate operation to JAXPR, all rules reachable from that gate are injected. Note that rules already available in the precompiled rule library will not get re-traced.
     [(#3061)](https://github.com/PennyLaneAI/catalyst/pull/3061)
