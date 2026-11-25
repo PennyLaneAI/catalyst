@@ -1,5 +1,6 @@
 add_catalyst_unittest(CatalystAnalysisTests
     ResourceAnalysisTest.cpp
+    ResourceEffectTest.cpp
 )
 
 target_link_libraries(CatalystAnalysisTests PRIVATE

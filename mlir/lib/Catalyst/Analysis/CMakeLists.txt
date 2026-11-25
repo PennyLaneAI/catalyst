@@ -5,12 +5,14 @@ set(SRC
     ResourceAnalysis.cpp
     ResourceInterfaces.cpp
     ResourceAnalysisRegistry.cpp
+    ResourceEffect.cpp
 )
 
 get_property(dialect_libs GLOBAL PROPERTY MLIR_DIALECT_LIBS)
 set(LIBS
     ${dialect_libs}
     MLIRAnalysis
+    MLIRPass
     MLIRQuantum
     MLIRPBC
     MLIRMBQC
