@@ -127,6 +127,50 @@ module {
 
 // -----
 
+// Each level is written when it is reached, so the effects of the later passes do not change it.
+
+// CHECK:      "level": 0
+// CHECK:        "chained_effects": {
+// CHECK:            "Hadamard": 1,
+// CHECK-NEXT:       "T": 1
+// CHECK:      "level": 1
+// CHECK-NEXT: "pass": "to-ppr"
+// CHECK:            "GlobalPhase": 2
+// CHECK:            "PPR-pi/4": 3,
+// CHECK-NEXT:       "PPR-pi/8": 1
+// CHECK:      "level": 2
+// CHECK-NEXT: "pass": "ppr-to-ppm"
+// CHECK:          "alloc": 5,
+// CHECK:          "peak": 2,
+// CHECK:            "GlobalPhase": 2,
+// CHECK-NEXT:       "pbc.fabricate": 1
+// CHECK:            "PPM": 4,
+// CHECK-NEXT:       "PPR-pi/2": 4
+// CHECK:            "PPM": 4
+// CHECK:      "level": 3
+// CHECK-NEXT: "pass": "combine-global-phases"
+// CHECK:            "GlobalPhase": 1,
+module {
+  func.func public @chained_effects() attributes {quantum.node} {
+    %q = quantum.alloc_qb : !quantum.bit
+    %0 = quantum.custom "Hadamard"() %q : !quantum.bit
+    %1 = quantum.custom "T"() %0 : !quantum.bit
+    quantum.dealloc_qb %1 : !quantum.bit
+    return
+  }
+
+  module attributes {transform.with_named_sequence} {
+    transform.named_sequence @__transform_main(%arg0: !transform.op<"builtin.module">) {
+      %0 = transform.apply_registered_pass "to-ppr" to %arg0 : (!transform.op<"builtin.module">) -> !transform.op<"builtin.module">
+      %1 = transform.apply_registered_pass "ppr-to-ppm" to %0 : (!transform.op<"builtin.module">) -> !transform.op<"builtin.module">
+      %2 = transform.apply_registered_pass "combine-global-phases" to %1 : (!transform.op<"builtin.module">) -> !transform.op<"builtin.module">
+      transform.yield
+    }
+  }
+}
+
+// -----
+
 // Without a transform sequence, only level 0 is written.
 
 // CHECK:      "level": 0

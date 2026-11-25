@@ -56,6 +56,7 @@ inline void registerAllResourceEffects() {
     registerUpstreamResourceEffects();
     pbc::registerToPPRResourceEffect();
     pbc::registerPPRToPPMResourceEffect();
+    quantum::registerCombineGlobalPhasesResourceEffect();
 }
 
 } // namespace catalyst

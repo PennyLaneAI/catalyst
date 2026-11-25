@@ -30,5 +30,7 @@ namespace quantum {
 #define GEN_PASS_REGISTRATION
 #include "Quantum/Transforms/Passes.h.inc"
 
+void registerCombineGlobalPhasesResourceEffect();
+
 } // namespace quantum
 } // namespace catalyst
