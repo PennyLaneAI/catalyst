@@ -157,6 +157,43 @@ def GetOp : Memory_Op<"get", [NoMemoryEffect]> {
     let hasFolder = 1;
 }
 
+def CastOp : Memory_Op<"cast", [Pure]> {
+    let summary = "Cast a register reference between static and dynamic sizes.";
+    let description = [{
+        This operation converts a register reference to an equivalent type with a different
+        static size information, e.g. from `!qref.reg<3>` to `!qref.reg<?>`. The result refers
+        to the same register as the source. The source and result types must be compatible: their
+        sizes are equal, or at least one of them is dynamic.
+
+        Subroutines take registers of dynamic size, so call sites cast registers of static size
+        to `!qref.reg<?>` before passing them. A sized register has no counterpart in value
+        semantics, so the conversion to value semantics folds the casts away.
+
+        Example:
+
+        ```mlir
+        %r = qref.alloc( 3) : !qref.reg<3>
+        %dyn = qref.cast %r : !qref.reg<3> to !qref.reg<?>
+        func.call @subroutine(%dyn) : (!qref.reg<?>) -> ()
+        ```
+    }];
+
+    let arguments = (ins
+        QuregRefType:$source
+    );
+
+    let results = (outs
+        QuregRefType:$result
+    );
+
+    let assemblyFormat = [{
+        $source attr-dict `:` qualified(type($source)) `to` qualified(type($result))
+    }];
+
+    let hasVerifier = 1;
+    let hasFolder = 1;
+}
+
 // -----
 
 class Gate_Op<string mnemonic, list<Trait> traits = []> :
@@ -408,7 +445,9 @@ def OperatorOp : UnitaryGate_Op<"operator", [ParametrizedGate, AttrSizedOperandS
                              just forwarded to decomposition functions after the params list.
         * Optional frontend-level metadata:
           * `param_map` — maps frontend argument names to the lowered `params` operand positions
-          * `qubit_map` — maps frontend argument names to lowered qubit/index-array positions
+          * `qubit_map` — maps frontend argument names to lowered qubit/index-array positions.
+            Entries may share positions when composite arguments use the same qubits; each
+            entry retains its argument's wire order and number of wire occurrences.
 
         Examples:
 
@@ -472,6 +511,8 @@ def OperatorOp : UnitaryGate_Op<"operator", [ParametrizedGate, AttrSizedOperandS
     );
 
     let extraClassDeclaration = extraBaseClassDeclaration # [{
+        bool requiresNonOverlappingNonCtrlQubitOperands();
+
         mlir::ValueRange getAllParams() {
             // the ODS operands must be next to each other
             auto [start, lenParams] = getODSOperandIndexAndLength(/*params=*/0);
@@ -864,6 +905,88 @@ def HermitianOp : Observable_Op<"hermitian"> {
 }
 
 // -----
+
+def MeasurementOp : QRef_Op<"measurement", [
+        MeasurementProcess, AttrSizedOperandSegments,
+        DeclareOpInterfaceMethods<ResourceQuantumOpInterface>]> {
+    let summary = "A generic mid-circuit measurement with classical results.";
+    let description = [{
+        Represents a named measurement with arbitrary classical parameters and
+        compilable static inputs in `static_data`. Parameters and classical
+        results may have any non-quantum type, and either list may be empty.
+
+        Like `qref.operator`, this operation supports explicit qubit references
+        or a register reference with index tensors selecting the measured wires.
+        These modes cannot be mixed, and at least one target qubit or index
+        array is required. The quantum references are updated in place; only
+        classical results are returned, with caller-specified types always
+        written in parentheses. The operation has measurement effects even when
+        its results are unused.
+
+        Optional frontend-level metadata:
+          * `param_map` — maps frontend argument names to the lowered `params` operand positions
+          * `qubit_map` — maps frontend argument names to lowered qubit/index-array positions
+
+        ```mlir
+        %m = qref.measurement "MeasureInBasis"(%angle: f64)
+            qubits(%q) static_data = {plane = "XY"}
+            param_map = {angle = [0]} qubit_map = {wires = [0]} : (i1)
+
+        %bits = qref.measurement "MeasureMany"()
+            quregs(%reg: !qref.reg<?>) indices(%wires: tensor<?xi64>)
+            : (tensor<?xi1>)
+
+        // Note: PPM example shown below is the 1:1 lowering to the corresponding example in PPMeasurementOp.
+        %result = qref.measurement "PauliMeasure"()
+            qubits(%q0, %q1, %q2)
+            static_data = {pauli_word = "XIZ"} : (i1)
+        ```
+
+        An empty classical result list is written `: ()` when targets are
+        present. Measurement names and static data are interpreted by
+        downstream lowering passes. This operation implements
+        `quantum::MeasurementProcess`; terminal result extraction uses the
+        observable-based `quantum::TerminalMeasurement` interface.
+    }];
+
+    let arguments = (ins
+        StrAttr:$op_name,
+        Variadic<AnyType>:$params,
+        Variadic<QubitRefType>:$qubits,
+        Optional<QuregRefType>:$qreg,
+        Variadic<1DTensorOf<[I64]>>:$arr_qubit_indices,
+        DefaultValuedOptionalAttr<DictionaryAttr, "{}">:$static_data,
+        DefaultValuedOptionalAttr<I64ArrayDictAttr, "{}">:$param_map,
+        DefaultValuedOptionalAttr<I64ArrayDictAttr, "{}">:$qubit_map
+    );
+
+    let results = (outs Variadic<AnyType>:$mres);
+
+    let builders = [
+        OpBuilder<(ins
+            "mlir::TypeRange":$mres,
+            "llvm::StringRef":$op_name,
+            "mlir::ValueRange":$params,
+            "mlir::ValueRange":$qubits,
+            CArg<"mlir::DictionaryAttr", "nullptr">:$static_data,
+            CArg<"mlir::DictionaryAttr", "nullptr">:$param_map,
+            CArg<"mlir::DictionaryAttr", "nullptr">:$qubit_map
+        )>,
+        OpBuilder<(ins
+            "mlir::TypeRange":$mres,
+            "llvm::StringRef":$op_name,
+            "mlir::ValueRange":$params,
+            "mlir::Value":$qreg,
+            "mlir::ValueRange":$arr_qubit_indices,
+            CArg<"mlir::DictionaryAttr", "nullptr">:$static_data,
+            CArg<"mlir::DictionaryAttr", "nullptr">:$param_map,
+            CArg<"mlir::DictionaryAttr", "nullptr">:$qubit_map
+        )>
+    ];
+
+    let hasVerifier = 1;
+    let hasCustomAssemblyFormat = 1;
+}
 
 def MeasureOp : QRef_Op<"measure", [DeclareOpInterfaceMethods<ResourceQuantumOpInterface>]> {
     let summary = "A single-qubit projective measurement in the computational basis.";

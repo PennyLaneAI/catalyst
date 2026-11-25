@@ -17,8 +17,9 @@
 // The macro REFERENCE_SEMANTICS_GATE_OPS defines a list of operations that can take in !qref.bit
 // values as operands, and do not return any observables as results.
 #define REFERENCE_SEMANTICS_GATE_OPS                                                               \
-    qref::QuantumOperation, qref::MeasureOp, qref::CtrlOp, mbqc::RefMeasureInBasisOp,              \
-        pbc::RefPPMeasurementOp, pbc::RefPPRotationOp, pbc::RefSelectPPMeasurementOp
+    qref::QuantumOperation, qref::MeasureOp, qref::MeasurementOp, qref::CtrlOp,                    \
+        mbqc::RefMeasureInBasisOp, pbc::RefPPMeasurementOp, pbc::RefPPRotationOp,                  \
+        pbc::RefSelectPPMeasurementOp
 #define REFERENCE_SEMANTICS_OBSERVABLE_OPS                                                         \
     qref::ComputationalBasisOp, qref::NamedObsOp, qref::HermitianOp
 
@@ -235,6 +236,44 @@ struct RQubitAliasSet {
     llvm::DenseMap<rQubitGetOpInfo, Value> getOpInfoToRQubit;
     llvm::DenseSet<Value> rQubits;
 }; // struct RQubitAliasSet
+
+// Composite arguments can share wires. Keep each named group's indices while threading
+// each physical qubit through value semantics only once.
+void normalizeOperatorQubits(Operation *root, IRRewriter &builder) {
+    root->walk([&](qref::OperatorOp op) {
+        if (op.getQreg() || op.getQubits().size() < 2 || op.getQubitMap().empty()) {
+            return;
+        }
+
+        RQubitAliasSet aliases;
+        llvm::DenseMap<Value, int64_t> positions;
+        SmallVector<Value> qubits;
+        SmallVector<int64_t> operandMap;
+        for (Value qubit : op.getQubits()) {
+            Value canonical = aliases.insert(qubit);
+            if (!canonical) {
+                canonical = qubit;
+                positions[canonical] = qubits.size();
+                qubits.push_back(canonical);
+            }
+            operandMap.push_back(positions.lookup(canonical));
+        }
+        if (qubits.size() == op.getQubits().size()) {
+            return;
+        }
+
+        SmallVector<NamedAttribute> groups;
+        for (NamedAttribute group : op.getQubitMap()) {
+            SmallVector<int64_t> indices;
+            for (int64_t index : cast<DenseI64ArrayAttr>(group.getValue()).asArrayRef()) {
+                indices.push_back(operandMap[index]);
+            }
+            groups.emplace_back(group.getName(), builder.getDenseI64ArrayAttr(indices));
+        }
+        op.getQubitsMutable().assign(qubits);
+        op.setQubitMapAttr(builder.getDictionaryAttr(groups));
+    });
+}
 
 /**
  * @brief Emit an error on `op` if two of the qref.bit Values in `rValues` refer to the same wire.
@@ -1355,6 +1394,22 @@ void handleMeasure(IRRewriter &builder, qref::MeasureOp rMeasureOp, QubitValueTr
     builder.eraseOp(rMeasureOp);
 }
 
+void handleMeasurement(IRRewriter &builder, qref::MeasurementOp op, QubitValueTracker &tracker) {
+    SmallVector<Type> quantumResults(op.getQubits().size(),
+                                     quantum::QubitType::get(op.getContext()));
+    if (op.getQreg()) {
+        quantumResults.push_back(quantum::QuregType::get(op.getContext()));
+    }
+    auto valueOp =
+        migrateOpToValueSemantics<quantum::MeasurementOp>(builder, op, tracker, quantumResults);
+    valueOp->setAttr("resultSegmentSizes",
+                     builder.getDenseI32ArrayAttr({static_cast<int32_t>(op.getMres().size()),
+                                                   static_cast<int32_t>(op.getQubits().size()),
+                                                   op.getQreg() ? 1 : 0}));
+    builder.replaceAllUsesWith(op.getMres(), valueOp.getMres());
+    builder.eraseOp(op);
+}
+
 void handleMeasureInBasis(IRRewriter &builder, mbqc::RefMeasureInBasisOp rMeasureInBasisOp,
                           QubitValueTracker &tracker) {
     OpBuilder::InsertionGuard guard(builder);
@@ -1756,7 +1811,7 @@ void createElseBranchWithDefaultYields(IRRewriter &builder,
     scf::YieldOp::create(builder, ifOp->getLoc(), elseYieldVals);
 }
 
-void handleIf(IRRewriter &builder, scf::IfOp ifOp, QubitValueTracker &tracker) {
+bool handleIf(IRRewriter &builder, scf::IfOp ifOp, QubitValueTracker &tracker) {
     OpBuilder::InsertionGuard guard(builder);
     builder.setInsertionPoint(ifOp);
     MLIRContext *ctx = ifOp->getContext();
@@ -1770,7 +1825,7 @@ void handleIf(IRRewriter &builder, scf::IfOp ifOp, QubitValueTracker &tracker) {
     }
 
     if (rValuesUsedByRegion.size() == 0) {
-        return;
+        return false;
     }
 
     scf::IfOp newIfOp;
@@ -1840,9 +1895,10 @@ void handleIf(IRRewriter &builder, scf::IfOp ifOp, QubitValueTracker &tracker) {
     }
 
     builder.eraseOp(ifOp);
+    return true;
 }
 
-void handleSwitch(IRRewriter &builder, scf::IndexSwitchOp switchOp, QubitValueTracker &tracker) {
+bool handleSwitch(IRRewriter &builder, scf::IndexSwitchOp switchOp, QubitValueTracker &tracker) {
     OpBuilder::InsertionGuard guard(builder);
     builder.setInsertionPoint(switchOp);
     MLIRContext *ctx = switchOp->getContext();
@@ -1855,7 +1911,7 @@ void handleSwitch(IRRewriter &builder, scf::IndexSwitchOp switchOp, QubitValueTr
     collectNecessaryRegionRValues(switchOp.getDefaultRegion(), rValuesUsedByRegion);
 
     if (rValuesUsedByRegion.size() == 0) {
-        return;
+        return false;
     }
 
     scf::IndexSwitchOp newSwitchOp;
@@ -1915,9 +1971,10 @@ void handleSwitch(IRRewriter &builder, scf::IndexSwitchOp switchOp, QubitValueTr
     }
 
     builder.eraseOp(switchOp);
+    return true;
 }
 
-void handleFor(IRRewriter &builder, scf::ForOp forOp, QubitValueTracker &tracker) {
+bool handleFor(IRRewriter &builder, scf::ForOp forOp, QubitValueTracker &tracker) {
     OpBuilder::InsertionGuard guard(builder);
     builder.setInsertionPoint(forOp);
     Location loc = forOp->getLoc();
@@ -1926,7 +1983,7 @@ void handleFor(IRRewriter &builder, scf::ForOp forOp, QubitValueTracker &tracker
     collectNecessaryRegionRValues(forOp.getRegion(), rValuesUsedByRegion);
 
     if (rValuesUsedByRegion.size() == 0) {
-        return;
+        return false;
     }
 
     scf::ForOp newLoop;
@@ -1991,9 +2048,10 @@ void handleFor(IRRewriter &builder, scf::ForOp forOp, QubitValueTracker &tracker
     }
 
     builder.eraseOp(forOp);
+    return true;
 }
 
-void handleWhile(IRRewriter &builder, scf::WhileOp whileOp, QubitValueTracker &tracker) {
+bool handleWhile(IRRewriter &builder, scf::WhileOp whileOp, QubitValueTracker &tracker) {
     OpBuilder::InsertionGuard guard(builder);
     builder.setInsertionPoint(whileOp);
     Location loc = whileOp->getLoc();
@@ -2004,7 +2062,7 @@ void handleWhile(IRRewriter &builder, scf::WhileOp whileOp, QubitValueTracker &t
     collectNecessaryRegionRValues(whileOp.getAfter(), rValuesUsedByRegion);
 
     if (rValuesUsedByRegion.size() == 0) {
-        return;
+        return false;
     }
 
     unsigned numExistingOperands = whileOp.getBefore().front().getArguments().size();
@@ -2073,6 +2131,7 @@ void handleWhile(IRRewriter &builder, scf::WhileOp whileOp, QubitValueTracker &t
     }
 
     builder.eraseOp(whileOp);
+    return true;
 }
 
 void handleSubroutine(IRRewriter &builder, func::FuncOp f,
@@ -2149,6 +2208,10 @@ void handleSubroutine(IRRewriter &builder, func::FuncOp f,
 
 void handleRegion(IRRewriter &builder, Region &r, QubitValueTracker &tracker) {
     r.walk<WalkOrder::PreOrder>([&](Operation *op) {
+        // All handled operations will not be recursed into (WalkResult::skip), so any nested
+        // regions must be handled together with the handled operation. This is to allow operations
+        // to be erased during the walk.
+        bool handled = true;
         llvm::TypeSwitch<Operation *, void>(op)
             .Case<qref::AllocOp>([&](auto o) { handleAlloc(builder, o, tracker); })
             .Case<qref::DeallocOp>([&](auto o) { handleDealloc(builder, o, tracker); })
@@ -2160,6 +2223,7 @@ void handleRegion(IRRewriter &builder, Region &r, QubitValueTracker &tracker) {
             .Case<qref::NamedObsOp>([&](auto o) { handleNamedObs(builder, o, tracker); })
             .Case<qref::HermitianOp>([&](auto o) { handleHermitian(builder, o, tracker); })
             .Case<qref::MeasureOp>([&](auto o) { handleMeasure(builder, o, tracker); })
+            .Case<qref::MeasurementOp>([&](auto o) { handleMeasurement(builder, o, tracker); })
             .Case<mbqc::RefMeasureInBasisOp>(
                 [&](auto o) { handleMeasureInBasis(builder, o, tracker); })
             .Case<pbc::RefPPMeasurementOp>([&](auto o) { handlePPM(builder, o, tracker); })
@@ -2172,13 +2236,15 @@ void handleRegion(IRRewriter &builder, Region &r, QubitValueTracker &tracker) {
                 [&](auto o) { handlePBCQubitProducer<pbc::PrepareStateOp>(builder, o, tracker); })
             .Case<qref::AdjointOp>([&](auto o) { handleAdjoint(builder, o, tracker); })
             .Case<qref::CtrlOp>([&](auto o) { handleCtrl(builder, o, tracker); })
-            .Case<scf::IfOp>([&](auto o) { handleIf(builder, o, tracker); })
-            .Case<scf::IndexSwitchOp>([&](auto o) { handleSwitch(builder, o, tracker); })
-            .Case<scf::ForOp>([&](auto o) { handleFor(builder, o, tracker); })
-            .Case<scf::WhileOp>([&](auto o) { handleWhile(builder, o, tracker); })
+            .Case<scf::IfOp>([&](auto o) { handled = handleIf(builder, o, tracker); })
+            .Case<scf::IndexSwitchOp>([&](auto o) { handled = handleSwitch(builder, o, tracker); })
+            .Case<scf::ForOp>([&](auto o) { handled = handleFor(builder, o, tracker); })
+            .Case<scf::WhileOp>([&](auto o) { handled = handleWhile(builder, o, tracker); })
             .Case<mbqc::RefGraphStatePrepOp>(
                 [&](auto o) { handleGraphStatePrep(builder, o, tracker); })
-            .Default([](Operation *) {});
+            .Default([&](Operation *) { handled = false; });
+
+        return handled ? WalkResult::skip() : WalkResult::advance();
     });
 }
 
@@ -2200,6 +2266,14 @@ struct ValueSemanticsConversionPass
         MLIRContext *ctx = mod->getContext();
         IRRewriter builder(ctx);
 
+        // Registers have no size in value semantics, so a cast between register sizes has no
+        // counterpart: its uses refer to the source register instead. The remaining conversion only
+        // tracks registers by value, and every register type converts to `!quantum.reg`.
+        mod->walk([&](qref::CastOp castOp) {
+            builder.replaceAllUsesWith(castOp.getResult(), castOp.getSource());
+            builder.eraseOp(castOp);
+        });
+
         WalkResult getOpVerification = mod->walk([&](qref::GetOp getOp) {
             if (!llvm::all_of(getOp->getUsers(),
                               llvm::IsaPred<REFERENCE_SEMANTICS_GATE_OPS,
@@ -2214,6 +2288,7 @@ struct ValueSemanticsConversionPass
             return signalPassFailure();
         }
 
+        normalizeOperatorQubits(mod, builder);
         if (failed(verifyDistinctWireOperands(mod))) {
             return signalPassFailure();
         }

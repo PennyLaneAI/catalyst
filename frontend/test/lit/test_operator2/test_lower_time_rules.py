@@ -573,7 +573,7 @@ def test_basis_rotation_decomposition():
         print(test_basis_rotation_complex_valued.mlir)
 
     # CHECK-LABEL: test_basis_rotation_complex_valued
-    # CHECK: func.func private @__builtin__complex_basis_rotation_decomp{{(_[0-9]+)?}}
+    # CHECK: func.func private @__builtin_complex{{(_[0-9]+)?}}
     # CHECK-SAME: resources = {operations = {
     # CHECK-SAME: "PhaseShift{0:[f64]}{wires:1}{}" = 3 : i64
     # CHECK-SAME: "SingleExcitation{0:[f64]}{wires:2}{}" = 1 : i64
@@ -596,7 +596,7 @@ def test_basis_rotation_decomposition():
         print(test_basis_rotation_real_valued.mlir)
 
     # CHECK-LABEL: test_basis_rotation_real_valued
-    # CHECK: func.func private @__builtin__real_basis_rotation_decomp{{(_[0-9]+)?}}
+    # CHECK: func.func private @__builtin_real{{(_[0-9]+)?}}
     # CHECK-SAME: resources = {operations = {
     # CHECK-SAME: "PauliZ{}{wires:1}{}" = 1 : i64
     # CHECK-SAME: "SingleExcitation{0:[f64]}{wires:2}{}" = 1 : i64
@@ -639,7 +639,7 @@ def test_basis_rotation_decomposition():
     # CHECK-SAME: target_gate = "TestQubitUnitary{matrix:[tensor<2x2xf64>]}{wires:2}{}"
     # CHECK: qref.operator "BasisRotation"(
     # CHECK-SAME: tensor<2x2xf64>
-    # CHECK: func.func private @__builtin__real_basis_rotation_decomp{{(_[0-9]+)?}}
+    # CHECK: func.func private @__builtin_real{{(_[0-9]+)?}}
     # CHECK-SAME: "PauliZ{}{wires:1}{}" = 1 : i64
     # CHECK-SAME: "SingleExcitation{0:[f64]}{wires:2}{}" = 1 : i64
     # CHECK-SAME: target_gate = "BasisRotation{unitary_matrix:[tensor<2x2xf64>]}{wires:2}{check = false}"
@@ -663,7 +663,7 @@ def test_basis_rotation_decomposition():
     # CHECK-SAME: resources = {operations = {
     # CHECK-SAME: "BasisRotation{unitary_matrix:[tensor<2x2xcomplex<f64>>]}{wires:2}{check = false}" = 1 : i64
     #
-    # CHECK: func.func private @__builtin__complex_basis_rotation_decomp{{(_[0-9]+)?}}
+    # CHECK: func.func private @__builtin_complex{{(_[0-9]+)?}}
     # CHECK-SAME: "PhaseShift{0:[f64]}{wires:1}{}" = 3 : i64
     # CHECK-SAME: "SingleExcitation{0:[f64]}{wires:2}{}" = 1 : i64
     test_complex_op_that_decomposes_to_basis_rotation()
@@ -707,7 +707,7 @@ def test_ctrl_rule_is_traversed():
 # CHECK: func.func private @__builtin_ctrl_rule{{(_[0-9]+)?}}
 # CHECK-SAME:   resources = {operations = {
 # CHECK-SAME:   "CompilableData{}{wires:1}{a = \22a\22, b = \22b\22, thing = \22thing\22}" = 1 : i64
-# CHECK-SAME:   target_gate = "C(NoParams){}{reg:1}{}"
+# CHECK-SAME:   target_gate = "1C(NoParams){}{reg:1}{}"
 # CHECK: qref.operator "CompilableData"
 #
 # CHECK: func.func private @__builtin_rule{{(_[0-9]+)?}}

@@ -871,3 +871,170 @@ module @outer {
 
 // Tools may process a quantum kernel module on its own, so the attribute is also valid there.
 func.func private @kernel_entry() attributes {quantum.kernel_entry_point}
+
+// -----
+
+func.func @value_map_out_of_bounds(%q: !quantum.bit) -> !quantum.bit {
+  // expected-error@+1 {{qubit_map index is out of bounds}}
+  %out = quantum.operator "Composite"() qubits(%q) qubit_map = {compute = [-1]}
+  return %out : !quantum.bit
+}
+
+// -----
+
+func.func @value_map_missing_qubit(%q0: !quantum.bit, %q1: !quantum.bit) -> (!quantum.bit, !quantum.bit) {
+  // expected-error@+1 {{qubit_map must cover all qubit values}}
+  %out:2 = quantum.operator "Composite"() qubits(%q0, %q1) qubit_map = {compute = [0]}
+  return %out#0, %out#1 : !quantum.bit, !quantum.bit
+}
+
+// -----
+
+func.func @mixed_modes(%q: !quantum.bit, %r: !quantum.reg, %w: tensor<1xi64>) {
+  // expected-error@+1 {{must use either qubits or registers, but not both}}
+  %m, %oq, %or = "quantum.measurement"(%q, %r, %w) <{op_name = "Mixed", operandSegmentSizes = array<i32: 0, 1, 1, 1>, resultSegmentSizes = array<i32: 1, 1, 1>}> : (!quantum.bit, !quantum.reg, tensor<1xi64>) -> (i1, !quantum.bit, !quantum.reg)
+  return
+}
+
+// -----
+
+func.func @indices_without_register(%w: tensor<1xi64>) {
+  // expected-error@+1 {{index arrays require a register}}
+  %m = "quantum.measurement"(%w) <{op_name = "Indices", operandSegmentSizes = array<i32: 0, 0, 0, 1>, resultSegmentSizes = array<i32: 1, 0, 0>}> : (tensor<1xi64>) -> i1
+  return
+}
+
+// -----
+
+func.func @register_without_indices(%r: !quantum.reg) {
+  // expected-error@+1 {{expected at least one target qubit}}
+  %m, %out = quantum.measurement "None"() quregs(%r) indices() : (i1, !quantum.reg)
+  return
+}
+
+// -----
+
+func.func @missing_targets() {
+  // expected-error@+1 {{expected at least one target qubit}}
+  %m = quantum.measurement "None"() qubits() : (i1)
+  return
+}
+
+// -----
+
+func.func @missing_qubit_result(%q: !quantum.bit) {
+  // expected-error@+1 {{number of input and output qubits must be the same}}
+  %m = quantum.measurement "Missing"() qubits(%q) : (i1)
+  return
+}
+
+// -----
+
+func.func @missing_register_result(%r: !quantum.reg, %w: tensor<1xi64>) {
+  // expected-error@+1 {{in_qreg and out_qreg must either both be present or absent}}
+  %m = quantum.measurement "Missing"() quregs(%r) indices(%w: tensor<1xi64>) : (i1)
+  return
+}
+
+// -----
+
+func.func @quantum_param(%q: !quantum.bit) {
+  // expected-error@+1 {{params must have classical types}}
+  %m = quantum.measurement "BadParam"(%q: !quantum.bit) qubits() : (i1)
+  return
+}
+
+// -----
+
+func.func @nested_quantum_param(%q: tuple<!qref.bit>) {
+  // expected-error@+1 {{params must have classical types}}
+  %m = quantum.measurement "BadParam"(%q: tuple<!qref.bit>) qubits() : (i1)
+  return
+}
+
+// -----
+
+func.func @quantum_classical_result() {
+  // expected-error@+1 {{mres must have classical types}}
+  %m = "quantum.measurement"() <{op_name = "BadResult", operandSegmentSizes = array<i32: 0, 0, 0, 0>, resultSegmentSizes = array<i32: 1, 0, 0>}> : () -> !quantum.bit
+  return
+}
+
+// -----
+
+func.func @observable_result() {
+  // expected-error@+1 {{mres must have classical types}}
+  %m = quantum.measurement "BadResult"() qubits() : (!quantum.obs)
+  return
+}
+
+// -----
+
+func.func @result_order(%q: !quantum.bit) {
+  // expected-error@+1 {{expected classical results followed by qubits or a register}}
+  %out, %m = quantum.measurement "Order"() qubits(%q) : (!quantum.bit, i1)
+  return
+}
+
+// -----
+
+func.func @static_data_type() {
+  // expected-error@+1 {{Invalid attribute `static_data` in property conversion}}
+  %m = "quantum.measurement"() <{op_name = "BadData", static_data = "XY", operandSegmentSizes = array<i32: 0, 0, 0, 0>, resultSegmentSizes = array<i32: 1, 0, 0>}> : () -> i1
+  return
+}
+
+// -----
+
+func.func @measurement_custom_invalid_param_map_coverage(%p0 : f64, %p1 : i64, %q0 : !quantum.bit, %q1 : !quantum.bit) {
+  // expected-error@+1 {{param_map must cover all params when provided: expected 2, got 1}}
+  %m, %o0, %o1 = quantum.measurement "custom_bad_param_map"(%p0 : f64, %p1 : i64) qubits(%q0, %q1)
+    param_map = {p0 = [0]}
+    : (i1, !quantum.bit, !quantum.bit)
+  return
+}
+
+// -----
+
+func.func @measurement_custom_invalid_qubit_map_coverage(%r : !quantum.reg, %idx0 : tensor<2xi64>, %idx1 : tensor<1xi64>) {
+  // expected-error@+1 {{qubit_map must cover all index arrays in register mode: expected 2, got 1}}
+  %m, %out = quantum.measurement "custom_bad_qubit_map"()
+    quregs(%r) indices(%idx0 : tensor<2xi64>, %idx1 : tensor<1xi64>)
+    qubit_map = {qi0 = [0]}
+    : (i1, !quantum.reg)
+  return
+}
+
+// -----
+
+func.func @measurement_custom_invalid_qubit_map_sum(%q0 : !quantum.bit, %q1 : !quantum.bit) {
+  // expected-error@+1 {{qubit_map must cover all qubit values in qubit mode: expected 2, got 1}}
+  %m, %o0, %o1 = quantum.measurement "custom_bad_qubit_map_sum"() qubits(%q0, %q1)
+    qubit_map = {pair = [0]}
+    : (i1, !quantum.bit, !quantum.bit)
+  return
+}
+
+// -----
+
+func.func @adjoint(%q: !quantum.bit) {
+  // expected-error@+1 {{quantum measurements are not allowed in the adjoint regions}}
+  %out = quantum.adjoint (%q) : !quantum.bit {
+  ^bb0(%arg: !quantum.bit):
+    %m, %oq = quantum.measurement "Measure"() qubits(%arg) : (i1, !quantum.bit)
+    quantum.yield %oq : !quantum.bit
+  }
+  return
+}
+
+// -----
+
+func.func @ctrl(%q: !quantum.bit, %c: !quantum.bit, %v: i1) {
+  // expected-error@+1 {{quantum measurements are not allowed in the ctrl regions}}
+  %oc, %oq = quantum.ctrl(%c) ctrlvals(%v) (%q) : !quantum.bit -> !quantum.bit {
+  ^bb0(%arg: !quantum.bit):
+    %m, %out = quantum.measurement "Measure"() qubits(%arg) : (i1, !quantum.bit)
+    quantum.yield %out : !quantum.bit
+  }
+  return
+}

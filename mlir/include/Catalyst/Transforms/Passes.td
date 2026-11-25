@@ -221,6 +221,15 @@ def InlineNestedModulePass : Pass<"inline-nested-module"> {
 //   * See https://llvm.org/LICENSE.txt for license information.
 //   * SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+def AnnotateBufferOwnershipPass : Pass<"annotate-buffer-ownership", "ModuleOp"> {
+  let summary = "Identify uniquely owned buffers returned by defined functions";
+  let description = [{
+    Marks call results that are proven to own fresh allocations. External calls,
+    input aliases, views, and results sharing an allocation are left unmarked.
+    Run before buffer-deallocation, which consumes these temporary annotations.
+  }];
+}
+
 def BufferDeallocationPass : Pass<"buffer-deallocation", "func::FuncOp"> {
   let summary = "Adds all required dealloc operations for all allocations in "
                 "the input program";

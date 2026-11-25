@@ -67,12 +67,15 @@ LogicalResult runToPBC(Operation *module, MLIRContext *ctx) {
     target.addLegalDialect<mlir::arith::ArithDialect>();
 
     // Allowlist of Quantum ops that may stay in the PBC representation: runtime and device
-    // management, qubit/register handling, uncontrolled global phase, and the terminal observables
-    // and measurement processes. Gates, mid-circuit measurements, and any remaining modifier
-    // regions must be converted.
+    // management, qubit/register handling, uncontrolled global phase, generic measurements other
+    // than PauliMeasure, and the terminal observables and measurement processes. Gates, mid-circuit
+    // measurements, and any remaining modifier regions must be converted.
     target.addDynamicallyLegalDialect<quantum::QuantumDialect>([](Operation *op) {
         if (auto gphase = dyn_cast<quantum::GlobalPhaseOp>(op)) {
             return gphase.getCtrlQubitOperands().empty();
+        }
+        if (auto measurement = dyn_cast<quantum::MeasurementOp>(op)) {
+            return measurement.getOpName() != "PauliMeasure";
         }
         return isa<quantum::InitializeOp, quantum::FinalizeOp, quantum::DeviceInitOp,
                    quantum::DeviceReleaseOp, quantum::NumQubitsOp, quantum::AllocOp,

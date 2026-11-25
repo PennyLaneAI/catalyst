@@ -29,6 +29,7 @@ from operator2_dummy_gates import (
     CompilableData,
     HybridNoOpArg,
     HybridOpArg,
+    HybridOpArgs,
     HybridWires,
     MultiParams,
     MultiParamsCustom,
@@ -39,6 +40,7 @@ from operator2_dummy_gates import (
     SingleParamCustomOp,
     StaticData,
     TestQubitUnitary,
+    hybrid_op_args_decomp,
 )
 from pennylane import qnode
 from pennylane.core.operator import abstractify
@@ -489,7 +491,7 @@ class TestGenericUtilities:
             (ModifierState(True, 2), '2C(Adjoint(PauliRot)){}{wires:2}{pauli_word = "XY"}'),
             (
                 ModifierState(True, 1, 2, "zeroed"),
-                "C(Adjoint(PauliRot)){}{ctrl_work_wires:2,wires:2}"
+                "1C(Adjoint(PauliRot)){}{ctrl_work_wires:2,wires:2}"
                 '{ctrl_work_wire_type = "zeroed", pauli_word = "XY"}',
             ),
         ],
@@ -664,6 +666,17 @@ class TestGenericUtilities:
         assert str.startswith(GraphOpID(op).getGraphOpId(), id)
 
     @pytest.mark.parametrize(
+        "op, name",
+        [
+            (qp.ops.Prod2((qp.X(0), qp.Z(1))), "Prod2"),
+            (qp.pow(qp.X(0), 2), "Pow2"),
+        ],
+    )
+    def test_graph_op_id_uses_class_name(self, op, name):
+        """Graph IDs use class names, including for display and instance-dependent names."""
+        assert GraphOpID(op).getGraphOpId().partition("{")[0] == name
+
+    @pytest.mark.parametrize(
         "op, expected_adjoint, expected_controls",
         [
             (qp.S(Wire[1]), False, 0),
@@ -705,11 +718,11 @@ class TestGenericUtilities:
             # The caller's modifiers, on a plain operator.
             (qp.S(Wire[1]), True, 2, "2C(Adjoint(S)){}{wires:1}{}"),
             # Both, composed: control outermost, and the two adjoints cancel.
-            (qp.adjoint(qp.S(Wire[1])), True, 1, "C(S){}{wires:1}{}"),
+            (qp.adjoint(qp.S(Wire[1])), True, 1, "1C(S){}{wires:1}{}"),
             (qp.ctrl(qp.S(Wire[1]), Wire[1]), False, 1, "2C(S){}{wires:1}{}"),
             # Either nesting of the same operator spells the one canonical id.
-            (qp.ctrl(qp.adjoint(qp.S(Wire[1])), Wire[1]), False, 0, "C(Adjoint(S)){}{wires:1}{}"),
-            (qp.adjoint(qp.ctrl(qp.S(Wire[1]), Wire[1])), False, 0, "C(Adjoint(S)){}{wires:1}{}"),
+            (qp.ctrl(qp.adjoint(qp.S(Wire[1])), Wire[1]), False, 0, "1C(Adjoint(S)){}{wires:1}{}"),
+            (qp.adjoint(qp.ctrl(qp.S(Wire[1]), Wire[1])), False, 0, "1C(Adjoint(S)){}{wires:1}{}"),
         ],
     )
     def test_graph_op_id_composes_modifiers(self, op, caller_adjoint, caller_controls, expected):
@@ -730,7 +743,7 @@ class TestGenericUtilities:
             ),
             (
                 qp.adjoint(qp.ctrl(qp.S(Wire[1]), Wire[1], work_wires=Wire[1])),
-                'C(Adjoint(S)){}{ctrl_work_wires:1,wires:1}{ctrl_work_wire_type = "borrowed"}',
+                '1C(Adjoint(S)){}{ctrl_work_wires:1,wires:1}{ctrl_work_wire_type = "borrowed"}',
             ),
             (
                 qp.ctrl(
@@ -739,7 +752,7 @@ class TestGenericUtilities:
                     work_wires=Wire[1],
                     work_wire_type="zeroed",
                 ),
-                "C(PauliRot){theta:[f64]}{ctrl_work_wires:1,wires:2}"
+                "1C(PauliRot){theta:[f64]}{ctrl_work_wires:1,wires:2}"
                 '{ctrl_work_wire_type = "zeroed", pauli_word = "XY"}',
             ),
         ],
@@ -823,10 +836,7 @@ class TestGenericUtilities:
         assert call_kwargs["b"] == 3.14
         assert call_kwargs["thing"] == "string"
 
-        probe_wires = np.asarray(call_kwargs["wires"])
-        assert probe_wires.shape == (2,)
-        assert np.all(probe_wires < 0)
-        assert len(np.unique(probe_wires)) == 2
+        assert call_kwargs["wires"] == Wire[2]
 
     def test_rule_with_unreadable_work_wire_spec_is_excluded(self):
         """A rule whose work-wire spec cannot be read is excluded, with a warning.
@@ -847,26 +857,23 @@ class TestGenericUtilities:
         with pytest.warns(RuleLoweringWarning, match="could not read its work-wire spec"):
             assert not _rule_is_compatible("MockOp", raises_on_spec, wires=Wires([0]))
 
-    def test_collect_resources_unrolls_change_op_basis_for_capture(self):
-        """Resources match the rule body that capture produces, even when resource collection
-        itself happens outside a capture context."""
+    def test_collect_resources_preserves_change_op_basis(self):
+        """Resources retain the captured basis-change node when collected outside capture."""
         kwargs = prepare_dynamic_op_kwargs({"0": ShapedArray((), float)}, {"wires": 1})
 
         with qp.capture.toggle_ctx(False):
             collected_rules = collect_resources_for_op("RZ", kwargs, is_custom_op=True)
 
-        collected = next(
-            rule for rule in collected_rules if rule.source_rule.name == "_rz_to_rx_cliff"
-        )
-        assert collected.resource_counts_by_id == {
-            "Hadamard{}{wires:1}{}": 2,
-            "RX{0:[f64]}{wires:1}{}": 1,
-        }
+        collected = next(rule for rule in collected_rules if rule.source_rule.name == "to_rx_cliff")
+        basis_change = qp.ops.ChangeOpBasis2(qp.H(Wire[1]), qp.RX(Float, Wire[1]), qp.H(Wire[1]))
+        assert collected.resource_counts_by_op == {basis_change: 1}
+        assert collected.resource_counts_by_id == {GraphOpID(basis_change).getGraphOpId(): 1}
 
-    def test_collect_symbolic_resources_unrolls_change_op_basis_for_capture(self):
-        """Registered symbolic rules use the same capture-time resource representation."""
+    def test_collect_symbolic_resources_preserves_change_op_basis(self):
+        """Registered symbolic rules retain the same basis-change node as the captured body."""
+        basis_change = qp.ops.ChangeOpBasis2(qp.H(Wire[1]), qp.X(Wire[1]), qp.H(Wire[1]))
 
-        @register_resources({qp.ops.ChangeOpBasis2(qp.H(Wire[1]), qp.X(Wire[1]), qp.H(Wire[1])): 1})
+        @register_resources({basis_change: 1})
         def symbolic_rule(base):
             qp.change_op_basis(qp.H(base.wires), qp.X(base.wires), qp.H(base.wires))
 
@@ -883,10 +890,8 @@ class TestGenericUtilities:
 
         (collected,) = collected_rules
         assert collected.source_rule is symbolic_rule
-        assert collected.resource_counts_by_id == {
-            "Hadamard{}{wires:1}{}": 2,
-            "PauliX{}{wires:1}{}": 1,
-        }
+        assert collected.resource_counts_by_op == {basis_change: 1}
+        assert collected.resource_counts_by_id == {GraphOpID(basis_change).getGraphOpId(): 1}
 
 
 class TestCollectedResources:
@@ -951,7 +956,7 @@ class TestCollectedResources:
         assert populated.source_rule is populated_rule
         assert populated.resource_counts_by_op == {qp.X(Wire[1]): 2}
         resource_id = (
-            "C(Adjoint(PauliX)){}{wires:1}{}" if kind == "distributed" else "PauliX{}{wires:1}{}"
+            "1C(Adjoint(PauliX)){}{wires:1}{}" if kind == "distributed" else "PauliX{}{wires:1}{}"
         )
         assert populated.resource_counts_by_id == {resource_id: 2}
         assert empty.source_rule is empty_rule
@@ -969,16 +974,16 @@ class TestPrecompiled:
 
         bytecode = _quantum_opt("--empty", str(bytecode_path))
         expected_rules = [
-            ("_rz_to_ppr", "RZ{0:[f64]}{wires:1}{}"),
-            ("_rz_to_rot", "RZ{0:[f64]}{wires:1}{}"),
-            ("_multi_rz_decomposition", "MultiRZ{theta:[f64]}{wires:1}{}"),
-            ("_multi_rz_decomposition", "MultiRZ{theta:[f64]}{wires:2}{}"),
+            ("to_paulirot", "RZ{0:[f64]}{wires:1}{}"),
+            ("to_rot", "RZ{0:[f64]}{wires:1}{}"),
+            ("cnot_ladder", "MultiRZ{theta:[f64]}{wires:1}{}"),
+            ("cnot_ladder", "MultiRZ{theta:[f64]}{wires:2}{}"),
             (
-                "_pauli_rot_decomposition",
+                "basis_change_multirz",
                 "PauliRot{theta:[f64]}{wires:1}{pauli_word = \\22Z\\22}",
             ),
             (
-                "_pauli_rot_decomposition",
+                "basis_change_multirz",
                 "PauliRot{theta:[f64]}{wires:2}{pauli_word = \\22XX\\22}",
             ),
         ]
@@ -988,7 +993,7 @@ class TestPrecompiled:
                 f'frontend_name = "{frontend_name}"' in line
                 and f'target_gate = "{target_gate}"' in line
                 for line in bytecode.splitlines()
-            )
+            ), f"Missing precompiled rule {frontend_name!r} for {target_gate!r}"
 
     def test_precompile_writes_hash_to_manifest(self, mocker, tmp_path):
         """The manifest contains the hash of the associated bytecode."""
@@ -1102,7 +1107,7 @@ class TestPrecompiled:
         assert 'target_gate = "Adjoint(SingleParam){x:[tensor<f64>]}{reg:1}{}"' in bytecode
 
         # we should not include control variants
-        assert 'target_gate = "C(NoParams){}{reg:1}{}"' not in bytecode
+        assert 'target_gate = "1C(NoParams){}{reg:1}{}"' not in bytecode
 
         manifest = json.loads(get_precompiled_manifest_path(bytecode_path).read_text())
         assert {
@@ -1569,6 +1574,97 @@ class TestHybridOperatorArgDecomposition:
                 compiled(theta, angles), reference(theta, angles), rtol=1e-7, atol=1e-7
             )
 
+    @pytest.mark.parametrize("modifier", ["plain", "adjoint", "controlled"])
+    @pytest.mark.parametrize("dynamic_wire", [False, True])
+    def test_operator_arguments_share_wire(self, modifier, dynamic_wire):
+        """Operator arguments retain shared wires, parameters, and order under modifiers."""
+
+        with local_decomps():
+            add_decomps(HybridOpArgs, hybrid_op_args_decomp)
+
+            def composite(theta, wire):
+                HybridOpArgs(qp.RX(theta, wire), qp.RY(2 * theta, wire), qp.RZ(3 * theta, wire))
+
+            def expanded(theta, wire):
+                qp.RX(theta, wire)
+                qp.RY(2 * theta, wire)
+                qp.RZ(3 * theta, wire)
+
+            def circuit_body(theta, wire, operation):
+                qp.H(2)
+                if modifier == "controlled":
+                    qp.ctrl(operation, control=2)(theta, wire)
+                elif modifier == "adjoint":
+                    qp.adjoint(operation)(theta, wire)
+                else:
+                    operation(theta, wire)
+
+            @qp.qjit(capture=True)
+            @qp.decompose(gate_set={qp.RX, qp.RY, qp.RZ, qp.H, qp.X, qp.CNOT})
+            @qp.qnode(qp.device("lightning.qubit", wires=3))
+            def compiled(theta, wire):
+                circuit_body(theta, wire if dynamic_wire else 0, composite)
+                return qp.state()
+
+            @qp.qnode(qp.device("default.qubit", wires=3))
+            def reference(theta, wire):
+                circuit_body(theta, wire if dynamic_wire else 0, expanded)
+                return qp.state()
+
+            for theta, wire in [(0.17, 0), (0.49, 1)]:
+                np.testing.assert_allclose(compiled(theta, wire), reference(theta, wire), atol=1e-8)
+            assert 'qref.operator "HybridOpArgs"' in compiled.mlir
+
+    def test_operator_arguments_shared_wire_estimate(self):
+        """Resource estimation counts repeated operator arguments sharing a wire."""
+
+        with local_decomps():
+            add_decomps(HybridOpArgs, hybrid_op_args_decomp)
+
+            @qp.qjit(capture=True, target="mlir", enable_aot_compilation=False)
+            @qp.qnode(qp.device("null.qubit", wires=1))
+            def circuit(theta):
+                HybridOpArgs(qp.H(0), qp.RX(theta, 0), qp.H(0))
+                return qp.probs(wires=0)
+
+            specs = qp.estimate(circuit, target={qp.H, qp.RX})(0.17)
+            assert specs.resources.counts == {"Hadamard": 2, "RX": 1}
+
+    def test_nested_operator_arguments(self):
+        """Nested operator arguments preserve partially overlapping and permuted wires."""
+
+        with local_decomps():
+            add_decomps(HybridOpArgs, hybrid_op_args_decomp)
+
+            @qp.qjit(capture=True)
+            @qp.decompose(gate_set={qp.RX, qp.RY, qp.RZ, qp.H, qp.X, qp.CNOT})
+            @qp.qnode(qp.device("lightning.qubit", wires=3))
+            def compiled(theta):
+                qp.H(0)
+                qp.H(1)
+                HybridOpArgs(
+                    qp.CNOT([2, 0]),
+                    HybridOpArgs(
+                        qp.RX(2 * theta, 1), qp.IsingZZ(3 * theta, [0, 1]), qp.RY(4 * theta, 0)
+                    ),
+                    qp.RZ(5 * theta, 2),
+                )
+                return qp.state()
+
+            @qp.qnode(qp.device("default.qubit", wires=3))
+            def reference(theta):
+                qp.H(0)
+                qp.H(1)
+                qp.CNOT([2, 0])
+                qp.RX(2 * theta, 1)
+                qp.IsingZZ(3 * theta, [0, 1])
+                qp.RY(4 * theta, 0)
+                qp.RZ(5 * theta, 2)
+                return qp.state()
+
+            for theta in (0.17, 0.49):
+                np.testing.assert_allclose(compiled(theta), reference(theta), atol=1e-8)
+
 
 class TestOnDemand:
     """Test the python wrapper functions used for on-demand,
@@ -1596,7 +1692,7 @@ class TestOnDemand:
     @pytest.mark.parametrize(
         "op_name, op_id, expected_base_id, expected_n_ctrl",
         [
-            ("RX", "C(RX){0:[f64]}{wires:1}{}", "RX{0:[f64]}{wires:1}{}", 1),
+            ("RX", "1C(RX){0:[f64]}{wires:1}{}", "RX{0:[f64]}{wires:1}{}", 1),
             ("RX", "2C(RX){0:[f64]}{wires:1}{}", "RX{0:[f64]}{wires:1}{}", 2),
             ("S", "10C(S){}{wires:1}{}", "S{}{wires:1}{}", 10),
         ],
@@ -1610,11 +1706,20 @@ class TestOnDemand:
         )
         assert ModifierState(control_count=expected_n_ctrl).wrap_id(expected_base_id) == op_id
 
-    def test_name_unwrap_control_rejects_non_control_id(self):
-        """A non-controlled id is rejected for the given base op."""
+    @pytest.mark.parametrize(
+        "op_id",
+        [
+            "Adjoint(RX){0:[f64]}{wires:1}{}",
+            "C(RX){0:[f64]}{wires:1}{}",
+            "0C(RX){0:[f64]}{wires:1}{}",
+            "1C(S){0:[f64]}{wires:1}{}",
+        ],
+    )
+    def test_name_unwrap_control_rejects_non_control_id(self, op_id):
+        """Only controlled ids with a positive, explicit count and matching base are accepted."""
 
         with pytest.raises(ValueError, match="not a control id"):
-            ModifierState.name_unwrap_control("RX", "Adjoint(RX){0:[f64]}{wires:1}{}")
+            ModifierState.name_unwrap_control("RX", op_id)
 
     def test_reachable_wrapper_plain_op(self):
         """The on-demand wrapper captures the closure reachable from a plain operator."""
@@ -1627,7 +1732,7 @@ class TestOnDemand:
 
         assert f'target_gate = "{op_id}"' in module_str
 
-    @pytest.mark.parametrize("op_id", ["C(S){}{wires:1}{}", "2C(S){}{wires:1}{}"])
+    @pytest.mark.parametrize("op_id", ["1C(S){}{wires:1}{}", "2C(S){}{wires:1}{}"])
     def test_reachable_wrapper_controlled_op(self, op_id):
         """The on-demand wrapper preserves the requested control count."""
 
@@ -1638,8 +1743,8 @@ class TestOnDemand:
         assert f'target_gate = "{op_id}"' in module_str
         if op_id.startswith("2C("):
             # Reachable controlled rotation rules use singly controlled S.
-            assert '"C(S){}{wires:1}{}" = 1 : i64' in module_str
-            assert 'target_gate = "C(S){}{wires:1}{}"' in module_str
+            assert '"1C(S){}{wires:1}{}" = 1 : i64' in module_str
+            assert 'target_gate = "1C(S){}{wires:1}{}"' in module_str
 
     @pytest.mark.parametrize("work_wire_type", ["zeroed", "borrowed"])
     @pytest.mark.parametrize("adjoint", [False, True])
@@ -1777,7 +1882,7 @@ class TestModifierState:
         [
             (ModifierState(), "RX"),
             (ModifierState(adjoint=True), "Adjoint(RX)"),
-            (ModifierState(control_count=1), "C(RX)"),
+            (ModifierState(control_count=1), "1C(RX)"),
             (ModifierState(control_count=10), "10C(RX)"),
             (ModifierState(True, 2), "2C(Adjoint(RX))"),
         ],
@@ -1794,7 +1899,7 @@ class TestModifierState:
         [
             ("S", "S{}{wires:1}{}", "S{}{wires:1}{}", ModifierState()),
             ("S", "Adjoint(S){}{wires:1}{}", "S{}{wires:1}{}", ModifierState(adjoint=True)),
-            ("S", "C(S){}{wires:1}{}", "S{}{wires:1}{}", ModifierState(control_count=1)),
+            ("S", "1C(S){}{wires:1}{}", "S{}{wires:1}{}", ModifierState(control_count=1)),
             ("S", "10C(S){}{wires:1}{}", "S{}{wires:1}{}", ModifierState(control_count=10)),
             (
                 "Adjoint(S)",
@@ -1827,6 +1932,7 @@ class TestModifierState:
         [
             ("Adjoint", "Adjoint"),
             ("C", "C"),
+            ("1C", "C"),
             ("2C", "C"),  # multi-control normalises to the "C" kind
             ("10C", "C"),
         ],
@@ -1839,7 +1945,8 @@ class TestModifierState:
         "op_id, expected",
         [
             ("Adjoint(RX){0:[f64]}{wires:1}{}", "Adjoint"),
-            ("C(RX){0:[f64]}{wires:1}{}", "C"),
+            ("C(RX)", "C"),  # generic control name
+            ("1C(RX){0:[f64]}{wires:1}{}", "C"),
             ("2C(RX){0:[f64]}{wires:1}{}", "C"),  # exercises the leading-digit scan
             ("10C(RX){0:[f64]}{wires:1}{}", "C"),  # multi-digit control count
             ("RX{0:[f64]}{wires:1}{}", None),  # bare id, no modifier
@@ -1854,7 +1961,11 @@ class TestModifierState:
         "op_id, modifiers, expected",
         [
             # Wrapping a bare id with each modifier kind.
-            ("RX{0:[f64]}{wires:1}{}", ModifierState(control_count=1), "C(RX){0:[f64]}{wires:1}{}"),
+            (
+                "RX{0:[f64]}{wires:1}{}",
+                ModifierState(control_count=1),
+                "1C(RX){0:[f64]}{wires:1}{}",
+            ),
             (
                 "RX{0:[f64]}{wires:1}{}",
                 ModifierState(control_count=2),
@@ -1869,13 +1980,13 @@ class TestModifierState:
             (
                 "Adjoint(RX){0:[f64]}{wires:1}{}",
                 ModifierState(control_count=1),
-                "C(Adjoint(RX)){0:[f64]}{wires:1}{}",
+                "1C(Adjoint(RX)){0:[f64]}{wires:1}{}",
             ),
             # Only the name is wrapped; the `{...}...[uid]` suffix is carried through untouched.
             (
                 "HybridOp{a:[[f64]]}{w:1}{}[42]",
                 ModifierState(control_count=1),
-                "C(HybridOp){a:[[f64]]}{w:1}{}[42]",
+                "1C(HybridOp){a:[[f64]]}{w:1}{}[42]",
             ),
         ],
     )
@@ -1885,7 +1996,7 @@ class TestModifierState:
 
     @pytest.mark.parametrize(
         "op_id",
-        ["C(RX){0:[f64]}{wires:1}{}", "2C(RX){0:[f64]}{wires:1}{}"],
+        ["1C(RX){0:[f64]}{wires:1}{}", "2C(RX){0:[f64]}{wires:1}{}"],
     )
     def test_wrap_modifier_id_rejects_non_canonical(self, op_id):
         """Wrapping the canonically-inner ``Adjoint`` around an already-controlled id is rejected."""
@@ -1990,7 +2101,7 @@ class TestSymbolicRules:
         )
         (rule,) = get_rule_strings_from_module(module)
 
-        name = "C(PPR_8)" if wrap_control else "PPR_8"
+        name = "1C(PPR_8)" if wrap_control else "PPR_8"
         resource = f'"{name}{{}}{{wires:2}}{{pauli_word = \\22XY\\22, sign = -1 : si64}}"'
         assert f"resources = {{operations = {{{resource} = 1 : i64}}}}" in rule
         assert 'static_data = {pauli_word = "XY", sign = -1 : si64}' in rule
@@ -2000,7 +2111,7 @@ class TestSymbolicRules:
         [
             (
                 1,
-                "C(Hadamard){}{wires:1}{}",
+                "1C(Hadamard){}{wires:1}{}",
                 "(%arg0: !qref.reg<2>, %arg1: tensor<1xi64>, %arg2: tensor<1xi64>, %arg3: tensor<1xi1>)",
                 '"CH{}{wires:2}{}" = 1 : i64',
             ),
@@ -2027,7 +2138,12 @@ class TestSymbolicRules:
             op_cls=qp.Hadamard,
             modifiers=ModifierState(control_count=n_ctrl),
         )
-        (rule,) = get_rule_strings_from_module(module)
+        # Generic fallback rules can also decompose the same controlled target.
+        (rule,) = [
+            rule
+            for rule in get_rule_strings_from_module(module)
+            if 'frontend_name = "to_mcx"' in rule
+        ]
 
         assert f'target_gate = "{target_id}"' in rule
         assert resource in rule
@@ -2447,7 +2563,7 @@ class TestSymbolicRules:
             )
 
         (rule,) = get_rule_strings_from_module(module)
-        assert 'target_gate = "C(DisjointRegisters){}{control:2,target:1}{}"' in rule
+        assert 'target_gate = "1C(DisjointRegisters){}{control:2,target:1}{}"' in rule
         assert '"CNOT{}{wires:2}{}" = 1 : i64' in rule
 
     def test_symbolic_resource_id_is_canonical(self):
@@ -2461,7 +2577,7 @@ class TestSymbolicRules:
         # The modifiers a caller applies compose with the operator's own, control outermost.
         assert (
             GraphOpID(qp.adjoint(base)).getGraphOpId(ModifierState(control_count=1))
-            == "C(Adjoint(S)){}{wires:1}{}"
+            == "1C(Adjoint(S)){}{wires:1}{}"
         )
         # The base alone is what owns the rules, so its id leaves the modifiers off.
         assert GraphOpID(qp.ctrl(base, control=[1, 2])).getBaseGraphOpId() == "S{}{wires:1}{}"
@@ -2470,6 +2586,30 @@ class TestSymbolicRules:
             GraphOpID(abstractify(qp.CH(wires=jnp.array([0, 1])))).getGraphOpId()
             == "CH{}{wires:2}{}"
         )
+
+    def test_controlled_adjoint_rule_composes_resource_controls(self):
+        """Controls on an adjoint rule combine with controls already on its resources."""
+
+        @register_resources({ControlledOp2(qp.S(Wire[1]), Wire[1]): 1})
+        def adjoint_rule(base):
+            qp.ctrl(qp.S(base.reg[0]), control=base.reg[1])
+
+        with local_decomps():
+            add_decomps("Adjoint(NoParams)", adjoint_rule)
+            module = compile_registered_symbolic_rules(
+                "NoParams",
+                "NoParams{}{reg:2}{}",
+                {},
+                {"reg": 2},
+                {},
+                op_cls=NoParams,
+                modifiers=ModifierState(adjoint=True, control_count=1),
+            )
+
+        rules = get_rule_strings_from_module(module)
+        assert len(rules) == 1
+        rule = rules[0]
+        assert '"2C(S){}{wires:1}{}" = 1 : i64' in rule
 
     def test_no_registered_symbolic_rules(self):
         """Test an op with no symbolic rules registered against its adjoint yields no module."""
@@ -2837,17 +2977,18 @@ def test_gate_already_in_gateset():
     assert "llvm.call @__catalyst__qis__Hadamard" in circuit.mlir_opt
 
 
-def test_modifiers_in_gateset():
-    """Test that modifiers are correctly interpreted by decomposition gatesets."""
+@pytest.mark.parametrize("control_count", [1, 2, 5])
+def test_modifiers_in_gateset(control_count):
+    """A generic controlled gate-set entry accepts every specific control count."""
 
     @qjit(capture=True, collect_decomp_rules=False)
     @qp.decompose(gate_set={"C(T)"})
-    @qnode(qp.device("null.qubit", wires=3))
+    @qnode(qp.device("null.qubit", wires=control_count + 1))
     def circuit():
-        qp.ctrl(qp.T(0), (1, 2))
+        qp.ctrl(qp.T(0), tuple(range(1, control_count + 1)))
 
     results = qp.analyze(circuit, level=1)()
-    assert results.resources.counts["2C(T)"] == 1
+    assert results.resources.counts == {f"{control_count}C(T)": 1}
 
 
 @pytest.mark.parametrize("reverse", [False, True])
@@ -3169,26 +3310,35 @@ class TestCustomRuleApplication:
 class TestDecomposeAlias:
     """``qp.decompose`` under capture is an alias for ``graph_decomposition`` (same C++ pass)."""
 
-    @pytest.mark.usefixtures("use_capture_dgraph")
-    @pytest.mark.parametrize("clean", [False, None], ids=["false", "none"])
+    @pytest.mark.usefixtures("use_capture")
+    @pytest.mark.parametrize("value", [False, None], ids=["false", "none"])
     @pytest.mark.xfail(
         reason="On-demand rules use separate JAX contexts and can produce duplicate symbols.",
         raises=CompileError,
         strict=True,
     )
-    def test_decompose_none_static_argument_on_demand(self, clean):
-        """The Python fallback accepts a None-valued static argument."""
+    def test_decompose_none_static_argument(self, value):
+        """On-demand decomposition preserves None and Boolean compilable arguments."""
 
-        @qjit(capture=True, target="mlir", collect_decomp_rules=False)
-        @qp.decompose(gate_set={"PauliX", "CNOT", "Toffoli"})
-        @qnode(qp.device("null.qubit", wires=2))
-        def circuit():
-            qp.QROM(Bool[2, 1], control_wires=[0], target_wires=[1], work_wires=[], clean=clean)
-            return qp.probs()
+        @register_resources({qp.PauliX: 1})
+        def rule(a, wires, **_):
+            assert a is value
+            qp.PauliX(wires[0])
 
-        resources = qp.analyze(circuit, level=1)().resources
-        # A two-entry, one-bit table needs at most one X and one controlled X.
-        assert resources.quantum_operations == {"PauliX": 1, "C(PauliX)": 1}
+        with local_decomps():
+            add_decomps(CompilableData, rule)
+
+            @qjit(capture=True, target="mlir", collect_decomp_rules=False)
+            @qp.decompose(gate_set={"PauliX"})
+            @qnode(qp.device("null.qubit", wires=1))
+            def circuit():
+                CompilableData(a=value, b=0, thing="test", wires=[0])
+                return qp.probs()
+
+            assert f"a = {str(value).lower()}" in circuit.mlir
+            resources = qp.analyze(circuit, level=1)().resources
+
+        assert resources.quantum_operations == {"PauliX": 1}
 
     def test_decompose_matches_graph_decomposition(self):
         """``qp.decompose`` compiles to the exact same MLIR as ``graph_decomposition``."""
@@ -3212,7 +3362,7 @@ class TestDecomposeAlias:
 
     def test_decompose_requires_gate_set(self):
         """qp.decompose without a gate set is rejected with a clear error."""
-        with pytest.raises(ValueError, match="requires an explicit 'gate_set'"):
+        with pytest.raises(TypeError, match=r"The gate_set argument is required\."):
 
             @qjit(capture=True, target="mlir")
             @qp.decompose(gate_set=None)
@@ -3618,11 +3768,11 @@ class TestNumericHamiltonianDecomposition:
             )
 
         resources = qp.analyze(circuit, level="all-user")().resources
-        assert resources["Before MLIR Passes"].counts == {"C(TrotterCDF)": 1}
+        assert resources["Before MLIR Passes"].counts == {"1C(TrotterCDF)": 1}
         assert resources["graph-decomposition"].counts == {
-            "C(BasisRotation)": 44,
-            "C(IsingZZ)": 66,
-            "C(RZ)": 40,
+            "1C(BasisRotation)": 44,
+            "1C(IsingZZ)": 66,
+            "1C(RZ)": 40,
             "GlobalPhase": 1,
             "PhaseShift": 1,
         }
@@ -3663,11 +3813,11 @@ class TestNumericHamiltonianDecomposition:
             )
 
         resources = qp.analyze(circuit, level="all-user")().resources
-        assert resources["Before MLIR Passes"].counts == {"C(TrotterCGF)": 1}
+        assert resources["Before MLIR Passes"].counts == {"1C(TrotterCGF)": 1}
         assert resources["graph-decomposition"].counts == {
-            "C(BasisRotation)": 44,
-            "C(IsingZZ)": 99,
-            "C(RZ)": 60,
+            "1C(BasisRotation)": 44,
+            "1C(IsingZZ)": 99,
+            "1C(RZ)": 60,
             "GlobalPhase": 1,
             "PhaseShift": 1,
         }
@@ -3688,8 +3838,8 @@ class TestNumericHamiltonianDecomposition:
             "PhaseShift",
         }
         expected = {
-            "C(Adjoint(BasisRotation))": 44,
-            "C(CNOT)": 132,
+            "1C(Adjoint(BasisRotation))": 44,
+            "1C(CNOT)": 132,
             "CRZ": 106,
             "GlobalPhase": 1,
             "PauliX": 212,
@@ -3730,7 +3880,7 @@ class TestNumericHamiltonianDecomposition:
 
         for circuit in (ctrl_of_adjoint, adjoint_of_ctrl):
             resources = qp.analyze(circuit, level="all-user")().resources
-            assert resources["Before MLIR Passes"].counts == {"C(Adjoint(TrotterCDF))": 1}
+            assert resources["Before MLIR Passes"].counts == {"1C(Adjoint(TrotterCDF))": 1}
             assert resources["graph-decomposition"].counts == expected
 
 

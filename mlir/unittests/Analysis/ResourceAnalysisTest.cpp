@@ -190,8 +190,8 @@ TEST(ResourceAnalysis, MutualRecursionKeepsExternalModifiersAndNonrecursiveCalls
         const auto *flat = analysis.getFlattenedResource("entry");
         ASSERT_NE(flat, nullptr);
         EXPECT_EQ(flat->operations.size(), 2u);
-        EXPECT_EQ(flat->operations.lookup("C(PauliX)").lookup({2, 0}), 1);
-        EXPECT_EQ(flat->operations.lookup("C(Hadamard)").lookup({2, 0}), 1);
+        EXPECT_EQ(flat->operations.lookup("1C(PauliX)").lookup({2, 0}), 1);
+        EXPECT_EQ(flat->operations.lookup("1C(Hadamard)").lookup({2, 0}), 1);
         EXPECT_EQ(flat->functionCalls.lookup("second"), 1);
         if (detailed) {
             EXPECT_EQ(flat->detailedOperations.size(), 2u);

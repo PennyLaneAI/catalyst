@@ -123,7 +123,7 @@ module {
     DecomposableGate op = *module->getOps<CustomOp>().begin();
 
     // Modifiers fold control-outermost
-    ASSERT_EQ(op.getGraphOpId(), "C(Adjoint(RX)){0:[f64]}{wires:1}{}");
+    ASSERT_EQ(op.getGraphOpId(), "1C(Adjoint(RX)){0:[f64]}{wires:1}{}");
 }
 
 TEST(DecomposableGateInterfaceTests, MultiControlledAdjointCustomOp) {
@@ -253,7 +253,7 @@ module {
     mlir::DictionaryAttr expectedStaticData = mlir::DictionaryAttr::get(&context, {entry});
     ASSERT_EQ(pcphase.getStaticData(), expectedStaticData);
 
-    ASSERT_EQ(pcphase.getGraphOpId(), "C(PCPhase){phi:[f64]}{wires:2}{dim = 0 : i64}");
+    ASSERT_EQ(pcphase.getGraphOpId(), "1C(PCPhase){phi:[f64]}{wires:2}{dim = 0 : i64}");
 }
 
 TEST(DecomposableGateInterfaceTests, GlobalPhaseOp) {
@@ -318,7 +318,7 @@ module {
     ASSERT_EQ(gphase.getStaticData().size(), 0);
 
     // Controlled unitary: the control wire is folded into the id (control-outermost).
-    ASSERT_EQ(gphase.getGraphOpId(), "C(GlobalPhase){phi:[f64]}{}{}");
+    ASSERT_EQ(gphase.getGraphOpId(), "1C(GlobalPhase){phi:[f64]}{}{}");
 }
 
 TEST(DecomposableGateInterfaceTests, QubitUnitaryOp) {
@@ -355,7 +355,7 @@ module {
 
     ASSERT_EQ(unitary.getStaticData().size(), 0);
 
-    ASSERT_EQ(unitary.getGraphOpId(), "C(QubitUnitary){U:[tensor<4x4xcomplex<f64>>]}{wires:2}{}");
+    ASSERT_EQ(unitary.getGraphOpId(), "1C(QubitUnitary){U:[tensor<4x4xcomplex<f64>>]}{wires:2}{}");
 }
 
 TEST(DecomposableGateInterfaceTests, OperatorOpQubits) {
@@ -366,7 +366,7 @@ module {
   %index = arith.constant 5 : i64
   %q0 = qref.alloc_qb : !qref.bit
   %q1 = qref.alloc_qb : !qref.bit
-  qref.operator "testInterfaceOp"(%flag: i1, %angle: f64, %index: i64) qubits(%q0, %q1) static_data = {"myStaticArray"=[1,2,3], "myStaticString"="Test", "myStaticInt"=4} param_map = {flag = [0], angle = [1], index = [2]} qubit_map = {wire1 = [0], wire2 = [1]}
+  qref.operator "testInterfaceOp"(%flag: i1, %angle: f64, %index: i64) qubits(%q0, %q1) static_data = {"myStaticArray"=[1,2,3], "myStaticString"="Test", "myStaticInt"=4} param_map = {flag = [0], angle = [1], index = [2]} qubit_map = {wire1 = [1], wire2 = [0, 1], empty = []}
 }
     )mlir";
 
@@ -388,7 +388,7 @@ module {
         {"index", {mlir::IntegerType::get(&context, 64)}}};
     ASSERT_EQ(op.getDynamicShape(), expectedDynamicShape);
 
-    catalyst::qref::WireLens expectedWires = {{"wire1", 1}, {"wire2", 1}};
+    catalyst::qref::WireLens expectedWires = {{"empty", 0}, {"wire1", 1}, {"wire2", 2}};
     ASSERT_EQ(op.getWireLens(), expectedWires);
 
     IntegerType i64 = IntegerType::get(&context, 64);
@@ -410,7 +410,7 @@ module {
     ASSERT_EQ(op.getStaticData(), expectedStaticData);
 
     ASSERT_EQ(op.getGraphOpId(),
-              "testInterfaceOp{angle:[f64],flag:[i1],index:[i64]}{wire1:1,wire2:1}{"
+              "testInterfaceOp{angle:[f64],flag:[i1],index:[i64]}{empty:0,wire1:1,wire2:2}{"
               "myStaticArray = [1, 2, 3], myStaticInt = 4 : i64, myStaticString = \"Test\"}");
 }
 
@@ -439,12 +439,12 @@ module {
     auto operatorOp = *module->getOps<OperatorOp>().begin();
     DecomposableGate op = operatorOp;
     catalyst::qref::WireLens expectedWires = {
-        {"wires", 1}, {"work_wires", 1}, {"ctrl_work_wires", 1}};
+        {"ctrl_work_wires", 1}, {"wires", 1}, {"work_wires", 1}};
 
     ASSERT_EQ(op.getWireLens(), expectedWires);
     ASSERT_EQ(op.getNonCtrlQubitOperands().size(), 3u);
     ASSERT_EQ(op.getGraphOpId(),
-              "C(MultiControlledX){}{ctrl_work_wires:1,wires:1,work_wires:1}{"
+              "1C(MultiControlledX){}{ctrl_work_wires:1,wires:1,work_wires:1}{"
               "ctrl_work_wire_type = \"zeroed\", work_wire_type = \"borrowed\"}");
 }
 
@@ -488,7 +488,7 @@ func.func @testfunc(%first : tensor<1xi64>, %secondthird : tensor<2xi64>) {
 
   %reg = qref.alloc(4) : !qref.reg<4>
 
-  qref.operator "testOperatorQureg"(%flag: i1, %angle: f64, %index: i64) quregs(%reg : !qref.reg<4>) indices(%first: tensor<1xi64>, %secondthird: tensor<2xi64>) static_data={"myStaticArray"=[4,2.4,4], "myStaticString"="string", "myStaticInt"=8} param_map = {angle=[1], index=[2], flag=[0]} qubit_map = {reg=[0, 1]}
+  qref.operator "testOperatorQureg"(%flag: i1, %angle: f64, %index: i64) quregs(%reg : !qref.reg<4>) indices(%first: tensor<1xi64>, %secondthird: tensor<2xi64>) static_data={"myStaticArray"=[4,2.4,4], "myStaticString"="string", "myStaticInt"=8} param_map = {angle=[1], index=[2], flag=[0]} qubit_map = {a_reg=[1], empty=[], z_reg=[0, 1]}
   return
 }
     )mlir";
@@ -511,7 +511,7 @@ func.func @testfunc(%first : tensor<1xi64>, %secondthird : tensor<2xi64>) {
         {"index", {mlir::IntegerType::get(&context, 64)}}};
     ASSERT_EQ(op.getDynamicShape(), expectedDynamicShape);
 
-    catalyst::qref::WireLens expectedWires = {{"reg", 3}};
+    catalyst::qref::WireLens expectedWires = {{"a_reg", 2}, {"empty", 0}, {"z_reg", 3}};
     ASSERT_EQ(op.getWireLens(), expectedWires);
 
     IntegerType i64 = IntegerType::get(&context, 64);
@@ -533,9 +533,10 @@ func.func @testfunc(%first : tensor<1xi64>, %secondthird : tensor<2xi64>) {
         mlir::DictionaryAttr::get(&context, {arrAttr, stringAttr, intAttr});
     ASSERT_EQ(op.getStaticData(), expectedStaticData);
 
-    ASSERT_EQ(op.getGraphOpId(), "testOperatorQureg{angle:[f64],flag:[i1],index:[i64]}{reg:3}{"
-                                 "myStaticArray = [4, 2.400000e+00, 4], myStaticInt = 8 : i64, "
-                                 "myStaticString = \"string\"}");
+    ASSERT_EQ(op.getGraphOpId(),
+              "testOperatorQureg{angle:[f64],flag:[i1],index:[i64]}{a_reg:2,empty:0,z_reg:3}{"
+              "myStaticArray = [4, 2.400000e+00, 4], myStaticInt = 8 : i64, "
+              "myStaticString = \"string\"}");
 }
 
 TEST(DecomposableGateInterfaceTests, OperatorOpUID) {

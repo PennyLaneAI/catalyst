@@ -15,7 +15,8 @@
 import numpy as np
 import pennylane as qp
 import pytest
-from pennylane.tape import QuantumTape
+from pennylane.core.queuing import AnnotatedQueue
+from pennylane.tape import QuantumScript
 from pennylane_lightning.lightning_qubit.lightning_qubit import OperatorProperties
 from utils import get_custom_qjit_device
 
@@ -168,8 +169,7 @@ def test_hybrid_op_repr(backend):
     """Test hybrid operation representation"""
 
     def circuit(n):
-        quantum_tape = QuantumTape()
-        with qp.QueuingManager.stop_recording(), quantum_tape:
+        with qp.QueuingManager.stop_recording(), AnnotatedQueue() as queue:
 
             @for_loop(0, 1, 1)
             def loop0(_):
@@ -197,6 +197,7 @@ def test_hybrid_op_repr(backend):
 
             cond_fn()
 
+        quantum_tape = QuantumScript.from_queue(queue)
         for term in ["ForLoop", "WhileLoop", "Cond", "RX", "RY", "RZ"]:
             assert term in str(quantum_tape.operations)
         for op in quantum_tape.operations:
