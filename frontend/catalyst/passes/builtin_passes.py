@@ -27,9 +27,9 @@ from pennylane.decomposition.utils import to_name
 from catalyst.compiler import _options_to_cli_flags, _quantum_opt
 from catalyst.utils.exceptions import CompileError
 from catalyst.utils.runtime_environment import (
-    PRECOMPILED_BYTECODE_PATH,
     get_lib_path,
     get_libpython_path,
+    get_precompiled_bytecode_path,
 )
 
 # pylint: disable=line-too-long, too-many-lines
@@ -1775,7 +1775,7 @@ def graph_decomposition_setup_inputs(
     gate_set: Iterable[type | str] | dict[type | str, float],
     fixed_decomps: dict[str, DecompositionRule | str] | None = None,
     exclude_decomps: dict[str, list[str] | tuple[str, ...]] | None = None,
-    bytecode_rules: str = PRECOMPILED_BYTECODE_PATH,
+    bytecode_rules: str | None = None,
     libQPD_path: Path | None = None,
     libpython_path: Path | None = None,
     verbose: bool = False,
@@ -1815,8 +1815,9 @@ def graph_decomposition_setup_inputs(
             from this pass's graph. Rules may be given as names or callables. Excluded rules are
             still lowered by the frontend and remain available to subsequent passes. Exclusions
             also apply to rules selected by ``fixed_decomps``.
-        bytecode_rules (str): path to the bytecode file containing decomposition rules.
-            Defaults to the built-in decomposition rules.
+        bytecode_rules (str | None): path to the bytecode file containing decomposition rules.
+            Defaults to the ``CATALYST_PRECOMPILED_BYTECODE_PATH`` environment variable if set,
+            otherwise the built-in decomposition rules.
         verbose (bool): if ``True``, the pass prints the decomposition rule the solver chose for
             each operator, along with its cost and the resulting gate counts, to stderr. ``False`` by default.
 
@@ -1886,7 +1887,9 @@ def graph_decomposition_setup_inputs(
 
     options: dict[str, object] = {
         "gate_set": gate_set,
-        "bytecode_rules": bytecode_rules,
+        "bytecode_rules": str(
+            bytecode_rules if bytecode_rules is not None else get_precompiled_bytecode_path()
+        ),
         "libQPD_path": str(
             libQPD_path if libQPD_path else get_lib_path("catalyst", "CATALYST_LIB_DIR")
         ),

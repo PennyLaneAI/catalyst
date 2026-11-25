@@ -65,6 +65,19 @@ PRECOMPILED_BYTECODE_PATH = os.path.join(
 )
 
 
+PRECOMPILED_BYTECODE_PATH_ENV = "CATALYST_PRECOMPILED_BYTECODE_PATH"
+
+
+def get_precompiled_bytecode_path() -> str:
+    """Return the path to the precompiled decomposition-rule bytecode used during compilation.
+
+    The ``CATALYST_PRECOMPILED_BYTECODE_PATH`` environment variable takes precedence over the
+    built-in rules shipped with Catalyst. It is read on every call, so it may be changed after
+    Catalyst has been imported.
+    """
+    return os.environ.get(PRECOMPILED_BYTECODE_PATH_ENV) or PRECOMPILED_BYTECODE_PATH
+
+
 def get_precompiled_manifest_path(bytecode_path: str | Path) -> Path:
     """Return the manifest path associated with a given bytecode file."""
     return Path(bytecode_path).with_suffix(".json")
