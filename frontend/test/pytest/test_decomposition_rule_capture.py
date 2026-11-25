@@ -1384,6 +1384,7 @@ def test_resource_estimate_uses_declarations(tmp_path, estimate_api):
             compiled = QJIT(circuit, CompileOptions(target="mlir", estimate_decomps=True))
             assert all(len(op.regions[0].blocks) == 0 for op in _rule_funcops(compiled))
             counts = qp.estimate(compiled, target={"RepeatedGate"})().resources.quantum_operations
+            assert counts == {"RepeatedGate": 6}
         else:
             output = tmp_path / "resources.json"
             transformed = qp.transform(pass_name="resource-estimate")(
@@ -1394,9 +1395,12 @@ def test_resource_estimate_uses_declarations(tmp_path, estimate_api):
                 CompileOptions(target="mlir_opt", skip_preprocess=True, estimate_decomps=True),
             )
             resources = json.loads(output.read_text())
-            counts = resources["circuit"]["quantum_operations"]["-1"]
-
-    assert counts == {"RepeatedGate": 6}
+            # Each chosen rule is a function of its own, called where its operator was.
+            root = "__builtin_root_rule(EstimateRoot{}{wires:1}{})"
+            middle = "__builtin_middle_rule(EstimateMiddle{}{wires:1}{})"
+            assert resources["circuit"]["function_calls"]["static"] == {root: 1}
+            assert resources[root]["function_calls"]["static"] == {middle: 2}
+            assert resources[middle]["quantum_operations"] == {"1": {"RepeatedGate": 3}}
 
 
 if __name__ == "__main__":
