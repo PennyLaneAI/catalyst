@@ -43,8 +43,8 @@ jobs:
     name: Prepare & Upload wheels to PyPI
     needs: [linux-x86, macos-arm, linux-aarch]
     runs-on: ubuntu-24.04
-    permissions:
-      id-token: write  # IMPORTANT: mandatory for trusted publishing
+    environment:
+      name: release
 
     steps:
     - name: Download wheels
