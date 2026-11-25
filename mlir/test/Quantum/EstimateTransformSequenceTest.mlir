@@ -105,6 +105,28 @@ module {
 
 // -----
 
+// A pass with a registered resource effect, such as symbol-dce, is estimated by its effect.
+
+// CHECK:      "level": 1
+// CHECK-NEXT: "pass": "symbol-dce"
+// CHECK:        "registered_effect": {
+// CHECK:            "Hadamard": 1
+module {
+  func.func public @registered_effect(%q: !quantum.bit) -> !quantum.bit attributes {quantum.node} {
+    %0 = quantum.custom "Hadamard"() %q : !quantum.bit
+    return %0 : !quantum.bit
+  }
+
+  module attributes {transform.with_named_sequence} {
+    transform.named_sequence @__transform_main(%arg0: !transform.op<"builtin.module">) {
+      %0 = transform.apply_registered_pass "symbol-dce" to %arg0 : (!transform.op<"builtin.module">) -> !transform.op<"builtin.module">
+      transform.yield
+    }
+  }
+}
+
+// -----
+
 // Without a transform sequence, only level 0 is written.
 
 // CHECK:      "level": 0

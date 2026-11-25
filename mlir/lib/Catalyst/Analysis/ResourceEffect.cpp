@@ -121,4 +121,11 @@ const ResourceEffect *ResourceEffectRegistry::lookup(llvm::StringRef passArgumen
     return it == effects.end() ? nullptr : it->second.get();
 }
 
+void registerUpstreamResourceEffects() {
+    [[maybe_unused]] static const bool once = [] {
+        ResourceEffectRegistry::get().add("symbol-dce", makeIdentityEffect());
+        return true;
+    }();
+}
+
 } // namespace catalyst

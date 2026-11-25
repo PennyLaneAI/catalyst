@@ -358,6 +358,7 @@ int QuantumDriverMainFromCL(int argc, char **argv) {
     mlir::registerAllPasses();
     catalyst::registerAllPasses();
     catalyst::pbc::registerPBCResourceAnalysisExtensions();
+    catalyst::registerAllResourceEffects();
     registerAllCatalystPipelines();
     mlirRegisterAllStablehloPasses();
     mlir::stablehlo::registerOptimizationPasses();

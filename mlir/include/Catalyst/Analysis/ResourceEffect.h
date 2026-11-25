@@ -97,4 +97,7 @@ class ResourceEffectRegistry {
     llvm::StringMap<std::unique_ptr<ResourceEffect>> effects;
 };
 
+/// Register the resource effects of the upstream MLIR passes that Catalyst pipelines use.
+void registerUpstreamResourceEffects();
+
 } // namespace catalyst
