@@ -14,6 +14,8 @@
 
 #pragma once
 
+#include <optional>
+
 #include "llvm/ADT/StringMap.h"
 #include "llvm/ADT/StringSet.h"
 #include "llvm/Support/AllocatorBase.h"
@@ -23,6 +25,7 @@
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Transforms/DialectConversion.h"
 
+#include "Catalyst/Analysis/ResourceEffect.h"
 #include "Quantum/Transforms/PassesEnums.h"
 
 namespace catalyst {
@@ -38,6 +41,9 @@ void populateAdjointLoweringPatterns(mlir::RewritePatternSet &);
 void populateCtrlLoweringPatterns(mlir::RewritePatternSet &);
 void populateGridsynthPatterns(mlir::RewritePatternSet &patterns, double epsilon, bool pprBasis,
                                GridsynthMethod method);
+/// What the gridsynth patterns replace an operation with, as the resource analysis estimates it.
+std::optional<Substitution> getGridsynthSubstitution(const OpKey &op, double epsilon, bool pprBasis,
+                                                     GridsynthMethod method);
 void populateQIRConversionPatterns(mlir::TypeConverter &, mlir::RewritePatternSet &, bool);
 void populateCancelInversesPatterns(mlir::RewritePatternSet &);
 void populateMergeRotationsPatterns(mlir::RewritePatternSet &);

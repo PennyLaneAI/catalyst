@@ -19,12 +19,14 @@
 #include <cmath>
 #include <cstdint>
 #include <iterator>
+#include <optional>
 #include <string>
 #include <tuple>
 #include <vector>
 
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallVector.h"
+#include "llvm/ADT/Twine.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/MathExtras.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
@@ -38,6 +40,7 @@
 #include "mlir/IR/Types.h"
 #include "mlir/IR/Value.h"
 
+#include "Catalyst/Analysis/ResourceEffect.h"
 #include "Catalyst/IR/CatalystDialect.h"
 #include "Catalyst/Utils/EnsureFunctionDeclaration.h"
 #include "PBC/IR/PBCOps.h"
@@ -83,33 +86,36 @@ Value createGateChain(PatternRewriter &rewriter, Location loc, Value qbitIn,
     return currentQbit;
 }
 
+const StringRef gates0[] = {"T"};
+const StringRef gates1[] = {"Hadamard", "T"};
+const StringRef gates2[] = {"S", "Hadamard", "T"};
+const StringRef gates3[] = {"Identity"};
+const StringRef gates4[] = {"PauliX"};
+const StringRef gates5[] = {"PauliY"};
+const StringRef gates6[] = {"PauliZ"};
+const StringRef gates7[] = {"Hadamard"};
+const StringRef gates8[] = {"S"}; // Used for both Case 8 and 9
+const StringRef gatesDefault[] = {"Identity"};
+
+const std::pair<ArrayRef<StringRef>, bool> cliffordTCaseConfigs[] = {
+    {gates0, /*isAdjoint=*/false}, // Case 0
+    {gates1, /*isAdjoint=*/false}, // Case 1
+    {gates2, /*isAdjoint=*/false}, // Case 2
+    {gates3, /*isAdjoint=*/false}, // Case 3
+    {gates4, /*isAdjoint=*/false}, // Case 4
+    {gates5, /*isAdjoint=*/false}, // Case 5
+    {gates6, /*isAdjoint=*/false}, // Case 6
+    {gates7, /*isAdjoint=*/false}, // Case 7
+    {gates8, /*isAdjoint=*/false}, // Case 8
+    {gates8, /*isAdjoint=*/true},  // Case 9
+};
+
 /**
  * @brief Populates the scf.index_switch op for the Clifford+T basis.
  */
 void populateCliffordTSwitchCases(PatternRewriter &rewriter, Location loc,
                                   scf::IndexSwitchOp switchOp, Value qbitIn) {
-    static StringRef gates0[] = {"T"};
-    static StringRef gates1[] = {"Hadamard", "T"};
-    static StringRef gates2[] = {"S", "Hadamard", "T"};
-    static StringRef gates3[] = {"Identity"};
-    static StringRef gates4[] = {"PauliX"};
-    static StringRef gates5[] = {"PauliY"};
-    static StringRef gates6[] = {"PauliZ"};
-    static StringRef gates7[] = {"Hadamard"};
-    static StringRef gates8[] = {"S"}; // Used for both Case 8 and 9
-
-    SmallVector<std::pair<llvm::ArrayRef<StringRef>, bool>, 10> caseConfigs = {
-        {gates0, /*isAdjoint=*/false}, // Case 0
-        {gates1, /*isAdjoint=*/false}, // Case 1
-        {gates2, /*isAdjoint=*/false}, // Case 2
-        {gates3, /*isAdjoint=*/false}, // Case 3
-        {gates4, /*isAdjoint=*/false}, // Case 4
-        {gates5, /*isAdjoint=*/false}, // Case 5
-        {gates6, /*isAdjoint=*/false}, // Case 6
-        {gates7, /*isAdjoint=*/false}, // Case 7
-        {gates8, /*isAdjoint=*/false}, // Case 8
-        {gates8, /*isAdjoint=*/true},  // Case 9
-    };
+    ArrayRef<std::pair<ArrayRef<StringRef>, bool>> caseConfigs = cliffordTCaseConfigs;
 
     // Populate Switch Cases
     assert(caseConfigs.size() == switchOp.getCases().size() &&
@@ -129,9 +135,41 @@ void populateCliffordTSwitchCases(PatternRewriter &rewriter, Location loc,
     Region &defaultRegion = switchOp.getDefaultRegion();
     defaultRegion.push_back(new Block());
     rewriter.setInsertionPointToStart(&defaultRegion.front());
-    static StringRef gatesDefault[] = {"Identity"};
     Value qbitDefault = createGateChain(rewriter, loc, qbitIn, gatesDefault, /*isAdjoint=*/false);
     scf::YieldOp::create(rewriter, loc, qbitDefault);
+}
+
+struct PPRConfig {
+    bool isIdentity;
+    ArrayRef<StringRef> pauli;
+    int8_t n;       // The denominator (2, 4, 8)
+    bool isAdjoint; // True if adjX, adjY, etc.
+};
+
+/**
+ * @brief The cases of the scf.index_switch op for the PPR-Basis, in the order of the enum (I,
+ * X2...adjZ8).
+ */
+SmallVector<PPRConfig> getPPRCaseConfigs() {
+    SmallVector<PPRConfig> caseConfigs;
+
+    // Case 0: I
+    caseConfigs.push_back({true, {}, 0, false});
+
+    // Helper to push X, Y, Z series
+    auto pushSeries = [&](ArrayRef<StringRef> pauli) {
+        caseConfigs.push_back({false, pauli, 2, false});
+        caseConfigs.push_back({false, pauli, 4, false});
+        caseConfigs.push_back({false, pauli, 8, false});
+        caseConfigs.push_back({false, pauli, 2, true});
+        caseConfigs.push_back({false, pauli, 4, true});
+        caseConfigs.push_back({false, pauli, 8, true});
+    };
+
+    pushSeries(xPauli);
+    pushSeries(yPauli);
+    pushSeries(zPauli);
+    return caseConfigs;
 }
 
 /**
@@ -152,32 +190,7 @@ void populatePPRBasisSwitchCases(PatternRewriter &rewriter, Location loc,
         return pprOp->getResult(0);
     };
 
-    struct PPRConfig {
-        bool isIdentity;
-        ArrayRef<StringRef> pauli;
-        int8_t n;       // The denominator (2, 4, 8)
-        bool isAdjoint; // True if adjX, adjY, etc.
-    };
-
-    SmallVector<PPRConfig> caseConfigs;
-
-    // Case 0: I
-    caseConfigs.push_back({true, {}, 0, false});
-
-    // Helper to push X, Y, Z series
-    auto pushSeries = [&](ArrayRef<StringRef> pauli) {
-        caseConfigs.push_back({false, pauli, 2, false});
-        caseConfigs.push_back({false, pauli, 4, false});
-        caseConfigs.push_back({false, pauli, 8, false});
-        caseConfigs.push_back({false, pauli, 2, true});
-        caseConfigs.push_back({false, pauli, 4, true});
-        caseConfigs.push_back({false, pauli, 8, true});
-    };
-
-    pushSeries(xPauli);
-    pushSeries(yPauli);
-    pushSeries(zPauli);
-
+    SmallVector<PPRConfig> caseConfigs = getPPRCaseConfigs();
     for (size_t i = 0; i < caseConfigs.size(); i++) {
         const auto &config = caseConfigs[i];
         Region &caseRegion = switchOp.getCaseRegions()[i];
@@ -240,6 +253,7 @@ constexpr double pprCaseFrequencies[] = {0.0000, 0.0000, 0.0000, 0.1678, 0.0000,
                                          0.0000, 0.0000, 0.1673, 0.0000, 0.0000, 0.1630, 0.0000,
                                          0.0000, 0.1716, 0.0000, 0.0000, 0.1657};
 static_assert(std::size(cliffordTCaseFrequencies) == numCliffordTCases);
+static_assert(std::size(cliffordTCaseConfigs) == numCliffordTCases);
 static_assert(std::size(pprCaseFrequencies) == numPPRCases);
 constexpr SequenceStatistics cliffordTStatistics{3.0590, 1.1278, -0.0074, 1.9849,
                                                  cliffordTCaseFrequencies};
@@ -302,19 +316,21 @@ const SequenceStatistics &getSequenceStatistics(bool pprBasis, GridsynthMethod m
     return pprBasis ? pprStatistics : cliffordTStatistics;
 }
 
-/**
- * @brief Attach the expected trip count and case probabilities to the decomposition loop.
- */
-void setResourceHints(PatternRewriter &rewriter, scf::ForOp forOp, scf::IndexSwitchOp switchOp,
-                      const SequenceStatistics &stats, ArrayRef<int64_t> tCases, double epsilon) {
-    assert(stats.caseFrequencies.size() == switchOp.getCases().size() &&
-           "Mismatch in case frequencies and case values");
+struct SequenceHints {
+    double iterations;
+    SmallVector<double> probabilities;
+};
 
+/**
+ * @brief The expected trip count of the decomposition loop and the probability of each case.
+ */
+SequenceHints getSequenceHints(const SequenceStatistics &stats, bool pprBasis, double epsilon) {
+    ArrayRef<int64_t> tCases =
+        pprBasis ? ArrayRef<int64_t>(pprTCases) : ArrayRef<int64_t>(cliffordTTCases);
     double logInverseEpsilon = std::log2(1 / epsilon);
     double numT = std::max(stats.tSlope * logInverseEpsilon + stats.tOffset, 0.0);
     double numOther = std::max(stats.otherSlope * logInverseEpsilon + stats.otherOffset, 0.0);
     double total = std::max(numT + numOther, 1.0);
-    forOp->setAttr(catalyst::EstimatedIterationsAttrName, rewriter.getF64FloatAttr(total));
 
     double tFrequencySum = 0.0;
     double otherFrequencySum = 0.0;
@@ -324,15 +340,62 @@ void setResourceHints(PatternRewriter &rewriter, scf::ForOp forOp, scf::IndexSwi
     auto groupShare = [](double count, double frequencySum) {
         return frequencySum > 0.0 ? count / frequencySum : 0.0;
     };
-    SmallVector<Attribute> probabilities;
+    SequenceHints hints{total, {}};
     for (auto [caseIndex, frequency] : llvm::enumerate(stats.caseFrequencies)) {
         double share = llvm::is_contained(tCases, caseIndex)
                            ? groupShare(numT, tFrequencySum)
                            : groupShare(numOther, otherFrequencySum);
-        probabilities.push_back(rewriter.getF64FloatAttr(share * frequency / total));
+        hints.probabilities.push_back(share * frequency / total);
+    }
+    return hints;
+}
+
+/**
+ * @brief Attach the expected trip count and case probabilities to the decomposition loop.
+ */
+void setResourceHints(PatternRewriter &rewriter, scf::ForOp forOp, scf::IndexSwitchOp switchOp,
+                      const SequenceStatistics &stats, bool pprBasis, double epsilon) {
+    assert(stats.caseFrequencies.size() == switchOp.getCases().size() &&
+           "Mismatch in case frequencies and case values");
+    SequenceHints hints = getSequenceHints(stats, pprBasis, epsilon);
+    forOp->setAttr(catalyst::EstimatedIterationsAttrName,
+                   rewriter.getF64FloatAttr(hints.iterations));
+    SmallVector<Attribute> probabilities;
+    for (double probability : hints.probabilities) {
+        probabilities.push_back(rewriter.getF64FloatAttr(probability));
     }
     switchOp->setAttr(catalyst::EstimatedProbabilitiesAttrName,
                       rewriter.getArrayAttr(probabilities));
+}
+
+/**
+ * @brief Add the expected gates of one gate sequence, scaled by `scale`, as the resource analysis
+ * estimates them from the hints of the decomposition loop.
+ */
+void addExpectedSequence(catalyst::Substitution &substitution, const SequenceStatistics &stats,
+                         bool pprBasis, double epsilon, double scale = 1.0) {
+    SequenceHints hints = getSequenceHints(stats, pprBasis, epsilon);
+    auto addGate = [&](const Twine &name, double probability) {
+        substitution.ops.push_back({{name.str(), 1, 0}, scale * hints.iterations * probability});
+    };
+    if (pprBasis) {
+        for (auto [config, probability] : llvm::zip(getPPRCaseConfigs(), hints.probabilities)) {
+            if (!config.isIdentity) {
+                addGate("PPR-pi/" + Twine(static_cast<int>(config.n)), probability);
+            }
+        }
+        return;
+    }
+    double sumProbability = 0.0;
+    for (auto [config, probability] : llvm::zip(cliffordTCaseConfigs, hints.probabilities)) {
+        for (StringRef gate : config.first) {
+            addGate(config.second ? "Adjoint(" + gate + ")" : Twine(gate), probability);
+        }
+        sumProbability += probability;
+    }
+    for (StringRef gate : gatesDefault) {
+        addGate(gate, std::clamp(1.0 - sumProbability, 0.0, 1.0));
+    }
 }
 
 struct DecompositionExternalFuncs {
@@ -419,9 +482,7 @@ Value buildDecompositionLoop(PatternRewriter &rewriter, Location loc, Value qbit
         } else {
             populateCliffordTSwitchCases(rewriter, loc, switchOp, currentQbit);
         }
-        setResourceHints(
-            rewriter, forOp, switchOp, stats,
-            pprBasis ? ArrayRef<int64_t>(pprTCases) : ArrayRef<int64_t>(cliffordTTCases), epsilon);
+        setResourceHints(rewriter, forOp, switchOp, stats, pprBasis, epsilon);
 
         // Yield the result of the switch op from the for loop
         rewriter.setInsertionPointAfter(switchOp);
@@ -802,6 +863,48 @@ void populateGridsynthPatterns(RewritePatternSet &patterns, double epsilon, bool
                                GridsynthMethod method) {
     patterns.add<DecomposeCustomOpPattern>(patterns.getContext(), epsilon, pprBasis, method);
     patterns.add<DecomposePPRArbitraryOpPattern>(patterns.getContext(), epsilon, pprBasis, method);
+}
+
+std::optional<catalyst::Substitution> getGridsynthSubstitution(const catalyst::OpKey &op,
+                                                               double epsilon, bool pprBasis,
+                                                               GridsynthMethod method) {
+    // The Pauli word of an arbitrary-angle PPR is not known, so all single-qubit ones are
+    // assumed to be Z rotations.
+    if (op.numWires != 1 ||
+        !llvm::is_contained({"RZ", "Adjoint(RZ)", "PhaseShift", "Adjoint(PhaseShift)", "PPR-Phi"},
+                            op.name)) {
+        return std::nullopt;
+    }
+
+    // The decomposition function applies the global phase of the sequence, and the pattern of
+    // PhaseShift another one.
+    const catalyst::OpKey globalPhase{"GlobalPhase", 0, 1};
+    catalyst::Substitution substitution{
+        {{globalPhase, StringRef(op.name).contains("PhaseShift") ? 2.0 : 1.0}}};
+    if (method != GridsynthMethod::MixedFallback) {
+        addExpectedSequence(substitution, getSequenceStatistics(pprBasis, method), pprBasis,
+                            epsilon);
+        return substitution;
+    }
+
+    // `buildMixedFallback`: an ancilla rotated between two CY gates and measured, and the
+    // recovery sequence on failure.
+    if (pprBasis) {
+        substitution.ops.append(
+            {{{"PPR-pi/4", 2, 0}, 2}, {{"PPR-pi/4", 1, 0}, 4}, {{"PPM", 1, 0}, 1}});
+    } else {
+        substitution.ops.append({{{"CY", 2, 0}, 2}, {{"MidCircuitMeasure", 1, 0}, 1}});
+    }
+    addExpectedSequence(substitution,
+                        pprBasis ? fallbackProjectivePPRStatistics
+                                 : fallbackProjectiveCliffordTStatistics,
+                        pprBasis, epsilon);
+    addExpectedSequence(substitution,
+                        pprBasis ? fallbackRecoveryPPRStatistics
+                                 : fallbackRecoveryCliffordTStatistics,
+                        pprBasis, epsilon, fallbackFailureProbability);
+    substitution.wires = {/*alloc=*/1, /*peak=*/1};
+    return substitution;
 }
 
 } // namespace quantum

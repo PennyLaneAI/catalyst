@@ -21,8 +21,10 @@
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
+#include "Catalyst/Analysis/ResourceEffect.h"
 #include "PBC/IR/PBCDialect.h"
 #include "Quantum/IR/QuantumOps.h"
+#include "Quantum/Transforms/Passes.h"
 #include "Quantum/Transforms/Patterns.h"
 
 using namespace llvm;
@@ -31,7 +33,6 @@ using namespace mlir;
 namespace catalyst {
 namespace quantum {
 
-#define GEN_PASS_DECL_GRIDSYNTHPASS
 #define GEN_PASS_DEF_GRIDSYNTHPASS
 #include "Quantum/Transforms/Passes.h.inc"
 
@@ -63,7 +64,21 @@ struct GridsynthPass : impl::GridsynthPassBase<GridsynthPass> {
             signalPassFailure();
         }
     }
+
+    std::optional<Substitution> getResourceSubstitution(const OpKey &op) const {
+        return getGridsynthSubstitution(op, epsilon, pprBasis, method);
+    }
 };
+
+void registerGridsynthResourceEffect() {
+    [[maybe_unused]] static const bool once = [] {
+        ResourceEffectRegistry::get().add(
+            "gridsynth", makeSubstitutionEffect([](const OpKey &op, const Pass &pass) {
+                return static_cast<const GridsynthPass &>(pass).getResourceSubstitution(op);
+            }));
+        return true;
+    }();
+}
 
 } // namespace quantum
 } // namespace catalyst
