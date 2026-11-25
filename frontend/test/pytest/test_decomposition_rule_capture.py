@@ -422,7 +422,6 @@ def convert_rules(use_capture):
                 wire_lens={"wires": 1},
             ),
             target_id=SerializedGraphOpID("RepeatedGate{}{wires:1}{}"),
-            num_qreg_qubits=1,
             modifier_context=ModifierState(),
             reject_noninvertible=reject_noninvertible,
         )
@@ -1008,8 +1007,12 @@ def test_registered_callable_captures_work_wire_operands(work_wire_type):
     assert "callable_ctrl_rule" in circuit.mlir
 
 
-def test_registry_lookup_uses_operator_class():
+def test_registry_lookup_uses_operator_class(mocker):
     """An Operator2 whose graph name is shared with an Operator1 uses its own registry rules."""
+
+    from pennylane.ops.op_math.prod2 import Prod2
+
+    lookup = mocker.spy(qp.decomposition, "list_decomps")
 
     @qjit(capture=True, target="mlir")
     @qp.qnode(qp.device("null.qubit", wires=2))
@@ -1019,8 +1022,9 @@ def test_registry_lookup_uses_operator_class():
 
     mlir = str(circuit.mlir)
 
-    assert 'frontend_name = "_prod2_decomp"' in mlir
-    assert 'frontend_name = "_prod_decomp"' not in mlir
+    assert 'frontend_name = "expand_factors"' in mlir
+    assert any(call.args == (Prod2,) for call in lookup.call_args_list)
+    assert not any(call.args == (qp.ops.Prod,) for call in lookup.call_args_list)
 
 
 def test_shared_descendant_resources_are_collected_once(mocker):

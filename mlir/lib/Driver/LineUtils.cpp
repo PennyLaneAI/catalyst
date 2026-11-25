@@ -24,6 +24,8 @@
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/Pass/PassInstrumentation.h"
 
+#include "Driver/Timer.h"
+
 namespace {
 
 /**
@@ -45,7 +47,9 @@ namespace {
 inline static void print(const std::string &opStrBuf, const std::string &name) {
     const auto num_lines = std::count(opStrBuf.cbegin(), opStrBuf.cend(), '\n');
     if (!name.empty()) {
-        std::cerr << "[DIAGNOSTICS] After " << std::setw(25) << std::left << name;
+        // "After " is two characters shorter than "Running ", so the name column is two wider.
+        std::cerr << "[DIAGNOSTICS] After "
+                  << std::setw(catalyst::utils::DIAGNOSTICS_NAME_WIDTH + 2) << std::left << name;
     }
     std::cerr << "\t" << std::fixed << "programsize: " << num_lines << std::fixed << " lines\n";
 }

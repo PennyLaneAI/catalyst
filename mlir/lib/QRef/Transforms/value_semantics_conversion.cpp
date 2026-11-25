@@ -17,8 +17,9 @@
 // The macro REFERENCE_SEMANTICS_GATE_OPS defines a list of operations that can take in !qref.bit
 // values as operands, and do not return any observables as results.
 #define REFERENCE_SEMANTICS_GATE_OPS                                                               \
-    qref::QuantumOperation, qref::MeasureOp, qref::CtrlOp, mbqc::RefMeasureInBasisOp,              \
-        pbc::RefPPMeasurementOp, pbc::RefPPRotationOp, pbc::RefSelectPPMeasurementOp
+    qref::QuantumOperation, qref::MeasureOp, qref::MeasurementOp, qref::CtrlOp,                    \
+        mbqc::RefMeasureInBasisOp, pbc::RefPPMeasurementOp, pbc::RefPPRotationOp,                  \
+        pbc::RefSelectPPMeasurementOp
 #define REFERENCE_SEMANTICS_OBSERVABLE_OPS                                                         \
     qref::ComputationalBasisOp, qref::NamedObsOp, qref::HermitianOp
 
@@ -1393,6 +1394,22 @@ void handleMeasure(IRRewriter &builder, qref::MeasureOp rMeasureOp, QubitValueTr
     builder.eraseOp(rMeasureOp);
 }
 
+void handleMeasurement(IRRewriter &builder, qref::MeasurementOp op, QubitValueTracker &tracker) {
+    SmallVector<Type> quantumResults(op.getQubits().size(),
+                                     quantum::QubitType::get(op.getContext()));
+    if (op.getQreg()) {
+        quantumResults.push_back(quantum::QuregType::get(op.getContext()));
+    }
+    auto valueOp =
+        migrateOpToValueSemantics<quantum::MeasurementOp>(builder, op, tracker, quantumResults);
+    valueOp->setAttr("resultSegmentSizes",
+                     builder.getDenseI32ArrayAttr({static_cast<int32_t>(op.getMres().size()),
+                                                   static_cast<int32_t>(op.getQubits().size()),
+                                                   op.getQreg() ? 1 : 0}));
+    builder.replaceAllUsesWith(op.getMres(), valueOp.getMres());
+    builder.eraseOp(op);
+}
+
 void handleMeasureInBasis(IRRewriter &builder, mbqc::RefMeasureInBasisOp rMeasureInBasisOp,
                           QubitValueTracker &tracker) {
     OpBuilder::InsertionGuard guard(builder);
@@ -2206,6 +2223,7 @@ void handleRegion(IRRewriter &builder, Region &r, QubitValueTracker &tracker) {
             .Case<qref::NamedObsOp>([&](auto o) { handleNamedObs(builder, o, tracker); })
             .Case<qref::HermitianOp>([&](auto o) { handleHermitian(builder, o, tracker); })
             .Case<qref::MeasureOp>([&](auto o) { handleMeasure(builder, o, tracker); })
+            .Case<qref::MeasurementOp>([&](auto o) { handleMeasurement(builder, o, tracker); })
             .Case<mbqc::RefMeasureInBasisOp>(
                 [&](auto o) { handleMeasureInBasis(builder, o, tracker); })
             .Case<pbc::RefPPMeasurementOp>([&](auto o) { handlePPM(builder, o, tracker); })
@@ -2247,6 +2265,14 @@ struct ValueSemanticsConversionPass
         Operation *mod = getOperation();
         MLIRContext *ctx = mod->getContext();
         IRRewriter builder(ctx);
+
+        // Registers have no size in value semantics, so a cast between register sizes has no
+        // counterpart: its uses refer to the source register instead. The remaining conversion only
+        // tracks registers by value, and every register type converts to `!quantum.reg`.
+        mod->walk([&](qref::CastOp castOp) {
+            builder.replaceAllUsesWith(castOp.getResult(), castOp.getSource());
+            builder.eraseOp(castOp);
+        });
 
         WalkResult getOpVerification = mod->walk([&](qref::GetOp getOp) {
             if (!llvm::all_of(getOp->getUsers(),

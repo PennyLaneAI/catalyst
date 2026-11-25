@@ -86,8 +86,7 @@ void handleFor(IRRewriter &builder, scf::ForOp forOp, QubitValueTracker &tracker
                SmallVector<Operation *> &erasureWorklist);
 void handleWhile(IRRewriter &builder, scf::WhileOp whileOp, QubitValueTracker &tracker,
                  SmallVector<Operation *> &erasureWorklist);
-void handleSubroutine(IRRewriter &builder, func::FuncOp subroutine,
-                      const SmallVector<IntegerAttr> &qregSizesAtCallsite);
+void handleSubroutine(IRRewriter &builder, func::FuncOp subroutine);
 
 // Main driver
 std::optional<SmallVector<Operation *>> handleRegion(IRRewriter &builder, Region &r,

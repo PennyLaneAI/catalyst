@@ -103,7 +103,6 @@ class DecompTargetSpec:
         rules: Applicable rule alternatives for this target.
         trace_inputs: Shared dummy arguments and operand layout used to trace the rules.
         target_id: Full GraphOpID that every rule in the set decomposes.
-        num_qreg_qubits: Register size required by the legacy standalone materializer.
         modifier_context: Additional modifiers propagated to resource operations when
             discovering child rules. May differ from the target's modifiers because
             registered rules can already account for them in their resource operations.
@@ -113,7 +112,6 @@ class DecompTargetSpec:
     rules: list[DecompRuleSpec]
     trace_inputs: RuleTraceInputs
     target_id: SerializedGraphOpID
-    num_qreg_qubits: int
     modifier_context: ModifierState
     reject_noninvertible: bool = False
 
@@ -312,8 +310,7 @@ def build_decomp_target_spec(
         modifiers (ModifierState): the modifiers to distribute the base rules over
 
     Returns:
-        DecompTargetSpec: callables and metadata consumable by either eager JAXPR capture or the
-        legacy standalone MLIR materializer
+        DecompTargetSpec: callables and metadata consumed by the shared rule tracer.
     """
     # Rule lowering gathers named base-wire groups in lexicographic order through qubit_map.
     # Control work wires are appended separately below.
@@ -419,7 +416,6 @@ def build_decomp_target_spec(
             hybrid_leaves=tuple(hybrid_leaves),
         ),
         target_id=target_id,
-        num_qreg_qubits=n_base_wires + n_ctrl + num_work_wires,
         modifier_context=modifiers,
         reject_noninvertible=modifiers.is_modified,
     )
@@ -696,7 +692,6 @@ def build_registered_decomp_target_spec(
             hybrid_leaves=tuple(hybrid_leaves),
         ),
         target_id=target_id,
-        num_qreg_qubits=n_wires + controls.num_work_wires,
         modifier_context=controls if wrap_control else ModifierState(),
         reject_noninvertible=wrap_control,
     )

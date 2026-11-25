@@ -20,13 +20,8 @@ loads its on-demand callback from this module; its implementation lives in
 """
 
 from catalyst.decomposition.graph_op_id import GraphOpID
-from catalyst.decomposition.on_demand_rules import (
-    compile_decomposition_rules,
-    compile_decomposition_rules_wrapper,
-    compile_reachable_decomposition_rules_wrapper,
-    compile_registered_symbolic_rules,
-    materialize_reachable_rule_strings,
-)
+from catalyst.decomposition.modifier_state import ModifierState
+from catalyst.decomposition.on_demand_rules import compile_on_demand_decomposition_rules
 from catalyst.decomposition.rule_arguments import (
     HybridArgumentSpec,
     HybridLeafSource,
@@ -39,15 +34,6 @@ from catalyst.decomposition.rule_arguments import (
     rule_call_operands,
     symbolic_arguments,
     unpack_rule_operands,
-)
-from catalyst.decomposition.rule_compilation import (
-    build_rule_module,
-    get_rule_strings_from_module,
-    get_rules_from_module,
-    materialize_decomp_target_spec,
-)
-from catalyst.decomposition.rule_compilation import (
-    materialize_rule_strings as materialize_decomp_rule_strings,
 )
 from catalyst.decomposition.rule_discovery import walk_reachable_decomp_rule_sets
 from catalyst.decomposition.rule_preparation import (
@@ -72,6 +58,8 @@ __all__ = (
     "DecompRuleSpec",
     "DecompTargetSpec",
     "GraphOpID",
+    "ModifierState",
+    "compile_on_demand_decomposition_rules",
     "HybridArgumentSpec",
     "HybridLeafSource",
     "RuleTraceInputs",
@@ -79,19 +67,9 @@ __all__ = (
     "build_decomp_rule_variants",
     "build_decomp_target_spec",
     "build_registered_decomp_target_spec",
-    "build_rule_module",
     "collect_resources_for_op",
     "collect_symbolic_resources",
-    "compile_decomposition_rules",
-    "compile_decomposition_rules_wrapper",
-    "compile_reachable_decomposition_rules_wrapper",
-    "compile_registered_symbolic_rules",
     "flatten_hybrid_args",
-    "get_rule_strings_from_module",
-    "get_rules_from_module",
-    "materialize_decomp_rule_strings",
-    "materialize_decomp_target_spec",
-    "materialize_reachable_rule_strings",
     "ordered_kwarg_names",
     "prepare_dummy_rule_arguments",
     "prepare_dynamic_op_kwargs",

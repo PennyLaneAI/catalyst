@@ -118,17 +118,23 @@ std::string defaultGetGraphOpId(Operation *op) {
     std::string out;
     llvm::raw_string_ostream ss(out);
 
-    DecomposableGate gate = cast<DecomposableGate>(op);
+    DecomposableOp decomposable = cast<DecomposableOp>(op);
 
     // Fold op-level modifiers into the operator name so that `Op`, `Adjoint(Op)`, `<n>C(Op)`, and
     // nested combinations are distinct in the graphOpId. Modifiers wrap only the name; the
     // param/wire/static/uid groups follow, e.g. `<n>C(Adjoint(Rot)){...}{wires...}`.
-    ss << wrapModifiers(gate.getOperatorName(), op);
-    printDynamicShape(gate.getDynamicShape(), ss);
-    printWireLens(gate.getWireLens(), ss);
-    gate.getStaticData().print(ss);
-    if (gate.getExtraData() != "") {
-        ss << '[' << gate.getExtraData() << ']';
+    // Non-modifiable ops (e.g. measurements) never carry adjoint/control; skip wrapping.
+    std::string name = decomposable.getOperatorName();
+    if (decomposable.isModifiable()) {
+        name = wrapModifiers(name, op);
+    }
+
+    ss << name;
+    printDynamicShape(decomposable.getDynamicShape(), ss);
+    printWireLens(decomposable.getWireLens(), ss);
+    decomposable.getStaticData().print(ss);
+    if (decomposable.getExtraData() != "") {
+        ss << '[' << decomposable.getExtraData() << ']';
     }
     ss.flush();
 

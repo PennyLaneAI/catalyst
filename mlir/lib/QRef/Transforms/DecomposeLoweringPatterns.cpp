@@ -36,6 +36,7 @@
 #include "mlir/Support/LogicalResult.h"
 
 #include "QRef/IR/QRefInterfaces.h"
+#include "QRef/IR/QRefOps.h"
 #include "QRef/IR/QRefTypes.h"
 #include "QRef/Transforms/Patterns.h"
 
@@ -48,6 +49,26 @@ using namespace mlir;
 
 namespace catalyst {
 namespace qref {
+
+/**
+ * @brief Cast the register operands of a rule call to the register types of the rule arguments.
+ *
+ * Calls must match the signature of their callee, but a register of static size, e.g.
+ * `!qref.reg<3>`, is passed to a rule argument of dynamic size, `!qref.reg<?>`. A `qref.cast` is
+ * inserted at the rewriter's insertion point for each such operand.
+ */
+void castQregOperandsToArgTypes(PatternRewriter &rewriter, Location loc,
+                                SmallVector<Value> &operands, TypeRange argTypes) {
+    if (operands.size() != argTypes.size()) {
+        return;
+    }
+    for (auto [operand, argType] : llvm::zip_equal(operands, argTypes)) {
+        if (isa<qref::QuregType>(operand.getType()) && isa<qref::QuregType>(argType) &&
+            operand.getType() != argType) {
+            operand = qref::CastOp::create(rewriter, loc, argType, operand);
+        }
+    }
+}
 
 /**
  * @brief
@@ -105,7 +126,7 @@ func::CallOp cloneAndCallRule(PatternRewriter &rewriter, func::FuncOp originalRu
     return func::CallOp::create(rewriter, loc, clonedFunc, operands);
 }
 
-struct DecomposableGatePattern final : public OpInterfaceRewritePattern<DecomposableGate> {
+struct DecomposableOpPattern final : public OpInterfaceRewritePattern<DecomposableOp> {
   private:
     const llvm::StringMap<func::FuncOp> &decompositionRegistry;
     bool inlineRuleBody;
@@ -114,18 +135,22 @@ struct DecomposableGatePattern final : public OpInterfaceRewritePattern<Decompos
     mutable llvm::DenseMap<func::FuncOp, func::FuncOp> rulesToClonedFuncs;
 
   public:
-    DecomposableGatePattern(MLIRContext *context, const llvm::StringMap<func::FuncOp> &registry,
-                            bool inlineRule, const llvm::StringSet<llvm::MallocAllocator> &gateSet,
-                            SymbolTable &symbolTable)
-        : OpInterfaceRewritePattern<DecomposableGate>(context), decompositionRegistry(registry),
+    DecomposableOpPattern(MLIRContext *context, const llvm::StringMap<func::FuncOp> &registry,
+                          bool inlineRule, const llvm::StringSet<llvm::MallocAllocator> &gateSet,
+                          SymbolTable &symbolTable)
+        : OpInterfaceRewritePattern<DecomposableOp>(context), decompositionRegistry(registry),
           inlineRuleBody(inlineRule), targetGateSet(gateSet), moduleSymbolTable(symbolTable) {};
 
-    LogicalResult matchAndRewrite(DecomposableGate op, PatternRewriter &rewriter) const override {
+    LogicalResult matchAndRewrite(DecomposableOp op, PatternRewriter &rewriter) const override {
         std::string gateName = op.getOperatorName();
 
         // A modified op (adjoint and/or controlled) is a distinct operator from its base gate.
-        bool isModified =
-            op.getOperation()->hasAttr("adjoint") || !op.getCtrlQubitOperands().empty();
+        bool isModified = false;
+        if (op.isModifiable()) {
+            auto qgate = cast<QuantumGate>(op.getOperation());
+            isModified =
+                op.getOperation()->hasAttr("adjoint") || !qgate.getCtrlQubitOperands().empty();
+        }
 
         // Only decompose the op if it is not in the target gate set. A modified op is never treated
         // as a native gate-set member by its base name: `Adjoint(Op)`/`C(Op)` are distinct gates
@@ -141,7 +166,7 @@ struct DecomposableGatePattern final : public OpInterfaceRewritePattern<Decompos
         }
 
         // Find the corresponding decomposition rule for the op
-        // TODO: migration to use the DecomposableGate interface gateID for all decomp rules is not
+        // TODO: migration to use the DecomposableOp interface gateID for all decomp rules is not
         // yet complete. Some rules' target_gate is already gateID, but some other gates' are still
         // the simple gate class name.
         // To maintain legacy compatibility, we fallback to the old pattern, where only the
@@ -189,17 +214,17 @@ struct DecomposableGatePattern final : public OpInterfaceRewritePattern<Decompos
 
         auto enableQreg = llvm::any_of(rule.getFunctionType().getInputs(),
                                        [](mlir::Type t) { return isa<qref::QuregType>(t); });
-        auto analyzer = DecomposableGateSignatureAnalyzer(op, enableQreg);
-        if (!analyzer) {
-            return failure();
-        }
+        auto analyzer = createSignatureAnalyzer(op.getOperation(), enableQreg);
+        assert(analyzer && "lowering to decomposition rule not supported for operator");
 
-        auto operands = analyzer.prepareOperands(rule, rewriter, op.getLoc());
+        auto operands = analyzer->prepareOperands(rule, rewriter, op.getLoc());
         // prepareOperands flags the analyzer invalid (and emits a diagnostic) when the rule's
         // signature cannot be reconciled with the operator, rather than building a malformed op.
-        if (!analyzer) {
-            return failure();
-        }
+        assert(*analyzer && "rule signature cannot be reconciled with the operator");
+
+        // The gate may act on a register of static size, e.g. `!qref.reg<3>`, while rules take
+        // registers of dynamic size.
+        castQregOperandsToArgTypes(rewriter, op.getLoc(), operands, rule.getArgumentTypes());
 
         if (inlineRuleBody) {
             inlineRule(rewriter, rule, operands);
@@ -221,8 +246,8 @@ void populateDecomposeLoweringPatterns(RewritePatternSet &patterns,
                                        bool inlineRuleBody,
                                        const llvm::StringSet<llvm::MallocAllocator> &targetGateSet,
                                        SymbolTable &moduleSymbolTable) {
-    patterns.add<DecomposableGatePattern>(patterns.getContext(), decompositionRegistry,
-                                          inlineRuleBody, targetGateSet, moduleSymbolTable);
+    patterns.add<DecomposableOpPattern>(patterns.getContext(), decompositionRegistry,
+                                        inlineRuleBody, targetGateSet, moduleSymbolTable);
 }
 
 } // namespace qref

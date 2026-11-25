@@ -22,6 +22,7 @@
 #include <sstream>
 #include <string>
 #include <type_traits>
+#include <utility>
 #include <vector>
 
 #include "llvm/ADT/DenseSet.h"
@@ -46,6 +47,7 @@
 #include "mlir/IR/OpImplementation.h"
 #include "mlir/IR/Operation.h"
 #include "mlir/IR/OperationSupport.h"
+#include "mlir/IR/PatternMatch.h"
 #include "mlir/IR/TypeRange.h"
 #include "mlir/IR/Value.h"
 #include "mlir/IR/ValueRange.h"
@@ -55,7 +57,9 @@
 
 #include "MBQC/IR/MBQCOps.h"
 #include "PBC/IR/PBCOps.h"
+#include "QRef/IR/QRefInterfaces.h"
 #include "QRef/IR/QRefOps.h"
+#include "QRef/IR/QRefTypes.h"
 #include "Quantum/IR/QuantumAttrDefs.h"
 #include "Quantum/IR/QuantumDialect.h"
 #include "Quantum/IR/QuantumInterfaces.h"
@@ -244,6 +248,34 @@ LogicalResult CustomOp::verify() {
     return success();
 }
 
+/// Verify that a name -> dense-i64-index dictionary is in-bounds and covers every
+/// index in `[0, numInputs)`. No-op when `dict` is null (attribute absent).
+static LogicalResult verifyDenseI64DictCoversAll(Operation *op, DictionaryAttr dict,
+                                                 StringRef mapName, size_t numInputs,
+                                                 StringRef boundsNoun, StringRef coverageNoun) {
+    if (!dict) {
+        return success();
+    }
+
+    llvm::SmallDenseSet<int64_t> covered;
+    for (NamedAttribute namedAttr : dict) {
+        auto denseArray = cast<DenseI64ArrayAttr>(namedAttr.getValue());
+        for (int64_t idx : denseArray.asArrayRef()) {
+            if (idx < 0 || idx >= static_cast<int64_t>(numInputs)) {
+                return op->emitOpError()
+                       << mapName << " index is out of bounds with respect to " << boundsNoun
+                       << ": " << idx << " is not in [0, " << numInputs << ")";
+            }
+            covered.insert(idx);
+        }
+    }
+    if (covered.size() != numInputs) {
+        return op->emitOpError() << mapName << " must cover all " << coverageNoun << ": expected "
+                                 << numInputs << ", got " << covered.size();
+    }
+    return success();
+}
+
 LogicalResult OperatorOp::verify() {
     const bool hasQregInput = static_cast<bool>(getInQreg());
     const bool hasQregOutput = static_cast<bool>(getOutQreg());
@@ -292,56 +324,17 @@ LogicalResult OperatorOp::verify() {
         }
     }
 
-    if (getParamMapAttr()) {
-        const size_t numParams = getParams().size();
-        std::vector<bool> coveredParams(numParams, false);
-        size_t coveredCount = 0;
-        for (NamedAttribute namedAttr : getParamMap()) {
-            auto denseArray = cast<DenseI64ArrayAttr>(namedAttr.getValue());
-            for (int64_t idx : denseArray.asArrayRef()) {
-                if (idx < 0 || idx >= static_cast<int64_t>(numParams)) {
-                    return emitOpError() << "param_map index is out of bounds with respect to "
-                                            "params: "
-                                         << idx << " is not in [0, " << numParams << ")";
-                }
-                if (!coveredParams[static_cast<size_t>(idx)]) {
-                    coveredParams[static_cast<size_t>(idx)] = true;
-                    ++coveredCount;
-                }
-            }
-        }
-        if (coveredCount != numParams) {
-            return emitOpError() << "param_map must cover all params when provided: expected "
-                                 << numParams << ", got " << coveredCount;
-        }
+    if (failed(verifyDenseI64DictCoversAll(getOperation(), getParamMapAttr(), "param_map",
+                                           getParams().size(), "params", "params when provided"))) {
+        return failure();
     }
 
-    auto qubitMap = getQubitMap();
-    if (qubitMap) {
-        const size_t numTargets = hasQregMode ? getArrQubitIndices().size() : getInQubits().size();
-        const char *boundsNoun = hasQregMode ? "index arrays" : "qubits";
-        const char *coverageNoun =
-            hasQregMode ? "index arrays in register mode" : "qubit values in qubit mode";
-
-        llvm::SmallDenseSet<int64_t> coveredTargets;
-        for (NamedAttribute namedAttr : qubitMap) {
-            auto denseArray = cast<DenseI64ArrayAttr>(namedAttr.getValue());
-            for (int64_t idx : denseArray.asArrayRef()) {
-                if (idx < 0 || idx >= static_cast<int64_t>(numTargets)) {
-                    return emitOpError()
-                           << "qubit_map index is out of bounds with respect to " << boundsNoun
-                           << ": " << idx << " is not in [0, " << numTargets << ")";
-                }
-                coveredTargets.insert(idx);
-            }
-        }
-        if (getQubitMapAttr() && coveredTargets.size() != numTargets) {
-            return emitOpError() << "qubit_map must cover all " << coverageNoun << ": expected "
-                                 << numTargets << ", got " << coveredTargets.size();
-        }
-    }
-
-    return success();
+    const size_t numTargets = hasQregMode ? getArrQubitIndices().size() : getInQubits().size();
+    const char *boundsNoun = hasQregMode ? "index arrays" : "qubits";
+    const char *coverageNoun =
+        hasQregMode ? "index arrays in register mode" : "qubit values in qubit mode";
+    return verifyDenseI64DictCoversAll(getOperation(), getQubitMapAttr(), "qubit_map", numTargets,
+                                       boundsNoun, coverageNoun);
 }
 
 LogicalResult ExtractOp::verify() {
@@ -654,6 +647,59 @@ LogicalResult VarianceOp::verify() {
     return success();
 }
 
+LogicalResult MeasurementOp::verify() {
+    const bool hasQregMode = static_cast<bool>(getInQreg());
+
+    if (hasQregMode && !getInQubits().empty()) {
+        return emitOpError("must use either qubits or registers, but not both");
+    }
+    if (!hasQregMode && !getArrQubitIndices().empty()) {
+        return emitOpError("index arrays require a register");
+    }
+
+    auto isClassical = [](Type type) {
+        bool classical = true;
+        type.walk([&](Type nested) {
+            if (isa<catalyst::qref::QRefDialect, QuantumDialect>(nested.getDialect())) {
+                classical = false;
+            }
+        });
+        return classical;
+    };
+    for (Type type : getParams().getTypes()) {
+        if (!isClassical(type)) {
+            return emitOpError("params must have classical types, got ") << type;
+        }
+    }
+    for (Type type : getMres().getTypes()) {
+        if (!isClassical(type)) {
+            return emitOpError("mres must have classical types, got ") << type;
+        }
+    }
+
+    if (getInQubits().size() != getOutQubits().size()) {
+        return emitOpError("number of input and output qubits must be the same");
+    }
+    if (hasQregMode != static_cast<bool>(getOutQreg())) {
+        return emitOpError("in_qreg and out_qreg must either both be present or absent");
+    }
+
+    if (failed(verifyDenseI64DictCoversAll(getOperation(), getParamMapAttr(), "param_map",
+                                           getParams().size(), "params", "params when provided"))) {
+        return failure();
+    }
+
+    const size_t numTargets = hasQregMode ? getArrQubitIndices().size() : getInQubits().size();
+    if (numTargets == 0) {
+        return emitOpError("expected at least one target qubit");
+    }
+    const char *boundsNoun = hasQregMode ? "index arrays" : "qubits";
+    const char *coverageNoun =
+        hasQregMode ? "index arrays in register mode" : "qubit values in qubit mode";
+    return verifyDenseI64DictCoversAll(getOperation(), getQubitMapAttr(), "qubit_map", numTargets,
+                                       boundsNoun, coverageNoun);
+}
+
 LogicalResult AdjointOp::verify() {
     auto res =
         this->getRegion().walk([](MeasurementProcess op) { return WalkResult::interrupt(); });
@@ -734,6 +780,22 @@ LogicalResult CtrlOp::verify() {
 //===----------------------------------------------------------------------===//
 // Quantum op builders.
 //===----------------------------------------------------------------------===//
+
+void MeasurementOp::build(OpBuilder &builder, OperationState &state, TypeRange mres,
+                          llvm::StringRef op_name, ValueRange params, ValueRange in_qubits,
+                          DictionaryAttr static_data, DictionaryAttr param_map,
+                          DictionaryAttr qubit_map) {
+    build(builder, state, mres, TypeRange(in_qubits), Type(), op_name, params, in_qubits, Value(),
+          ValueRange(), static_data, param_map, qubit_map);
+}
+
+void MeasurementOp::build(OpBuilder &builder, OperationState &state, TypeRange mres,
+                          llvm::StringRef op_name, ValueRange params, Value in_qreg,
+                          ValueRange arr_qubit_indices, DictionaryAttr static_data,
+                          DictionaryAttr param_map, DictionaryAttr qubit_map) {
+    build(builder, state, mres, TypeRange(), in_qreg.getType(), op_name, params, ValueRange(),
+          in_qreg, arr_qubit_indices, static_data, param_map, qubit_map);
+}
 
 void OperatorOp::build(OpBuilder &odsBuilder, OperationState &odsState, llvm::StringRef op_name,
                        ValueRange params, ValueRange in_qubits, ValueRange in_ctrl_qubits,
@@ -816,6 +878,208 @@ static void printDictionaryWithDenseI64Lists(OpAsmPrinter &p, DictionaryAttr dic
         }
     });
     p << "}";
+}
+
+static ParseResult parseDenseI64ArrayDictionary(OpAsmParser &parser, Builder &builder,
+                                                DictionaryAttr &dict) {
+    NamedAttrList attrs;
+    auto parseDictEntry = [&]() -> ParseResult {
+        StringRef key;
+        SmallVector<int64_t> values;
+        auto parseArrayValue = [&]() -> ParseResult {
+            int64_t value = 0;
+            if (parser.parseInteger(value)) {
+                return failure();
+            }
+            values.push_back(value);
+            return success();
+        };
+
+        if (parser.parseKeyword(&key) || parser.parseEqual() ||
+            parser.parseCommaSeparatedList(OpAsmParser::Delimiter::Square, parseArrayValue)) {
+            return failure();
+        }
+        attrs.append(builder.getStringAttr(key), builder.getDenseI64ArrayAttr(values));
+        return success();
+    };
+
+    if (parser.parseCommaSeparatedList(OpAsmParser::Delimiter::Braces, parseDictEntry)) {
+        return failure();
+    }
+    dict = attrs.getDictionary(parser.getContext());
+    return success();
+}
+
+void MeasurementOp::print(OpAsmPrinter &p) {
+    // 1. Measurement name
+    p << " ";
+    p.printAttributeWithoutType(getOpNameAttr());
+
+    auto printTypedOperands = [&](ValueRange operands) {
+        llvm::interleaveComma(operands, p,
+                              [&](Value value) { p << value << ": " << value.getType(); });
+    };
+
+    // 2. Variadic Inputs: (%arg0 : type, ...)
+    p << "(";
+    printTypedOperands(getParams());
+    p << ")";
+
+    // 3. Qubits or (Qreg and indices)
+    if (Value qreg = getInQreg()) {
+        p << " quregs(" << qreg << ") indices(";
+        printTypedOperands(getArrQubitIndices());
+        p << ")";
+    } else {
+        p << " qubits(" << getInQubits() << ")";
+    }
+
+    // 4. Optional static data
+    if (Attribute staticData = getStaticDataAttr()) {
+        p << " static_data = " << staticData;
+    }
+
+    // 5. Optional frontend maps
+    if (getParamMapAttr()) {
+        p << " param_map = ";
+        printDictionaryWithDenseI64Lists(p, getParamMap());
+    }
+    if (getQubitMapAttr()) {
+        p << " qubit_map = ";
+        printDictionaryWithDenseI64Lists(p, getQubitMap());
+    }
+
+    // 6. Optional metadata
+    p.printOptionalAttrDict((*this)->getAttrs(),
+                            {"op_name", "static_data", "param_map", "qubit_map",
+                             "operandSegmentSizes", "resultSegmentSizes"});
+    p << " : ";
+
+    // 7. Result types (always parenthesized)
+    p << "(";
+    llvm::interleaveComma(getOperation()->getResultTypes(), p);
+    p << ")";
+}
+
+ParseResult MeasurementOp::parse(OpAsmParser &parser, OperationState &result) {
+    Builder &builder = parser.getBuilder();
+    auto *ctx = parser.getContext();
+    auto loc = parser.getCurrentLocation();
+
+    // 1. Parse measurement name
+    std::string name;
+    if (parser.parseString(&name)) {
+        return failure();
+    }
+    result.addAttribute("op_name", builder.getStringAttr(name));
+
+    SmallVector<OpAsmParser::UnresolvedOperand> params, qubits, indices;
+    SmallVector<Type> paramTypes, indexTypes, resultTypes;
+    auto parseTypedOperands = [&](auto &operands, auto &types) {
+        return parser.parseCommaSeparatedList(OpAsmParser::Delimiter::Paren, [&]() -> ParseResult {
+            OpAsmParser::UnresolvedOperand operand;
+            Type type;
+            if (parser.parseOperand(operand) || parser.parseColonType(type)) {
+                return failure();
+            }
+            operands.push_back(operand);
+            types.push_back(type);
+            return success();
+        });
+    };
+
+    // 2. Parse variadic params: (%arg0: type, ...)
+    if (parseTypedOperands(params, paramTypes)) {
+        return failure();
+    }
+
+    // 3. Parse qubits or (qreg and indices)
+    SmallVector<OpAsmParser::UnresolvedOperand> qregs;
+    Type qregType = QuregType::get(ctx);
+    if (succeeded(parser.parseOptionalKeyword("qubits"))) {
+        if (parser.parseOperandList(qubits, OpAsmParser::Delimiter::Paren)) {
+            return failure();
+        }
+    } else {
+        OpAsmParser::UnresolvedOperand qreg;
+        if (parser.parseKeyword("quregs") || parser.parseLParen() || parser.parseOperand(qreg) ||
+            parser.parseRParen() || parser.parseKeyword("indices") ||
+            parseTypedOperands(indices, indexTypes)) {
+            return failure();
+        }
+        qregs.push_back(qreg);
+    }
+
+    // 4. Optional static data
+    if (succeeded(parser.parseOptionalKeyword("static_data"))) {
+        DictionaryAttr staticData;
+        if (parser.parseEqual() ||
+            parser.parseAttribute(staticData, "static_data", result.attributes)) {
+            return failure();
+        }
+    }
+
+    // 5. Optional frontend maps
+    if (succeeded(parser.parseOptionalKeyword("param_map"))) {
+        DictionaryAttr paramMap;
+        if (parser.parseEqual() || parseDenseI64ArrayDictionary(parser, builder, paramMap)) {
+            return failure();
+        }
+        result.addAttribute("param_map", paramMap);
+    }
+    if (succeeded(parser.parseOptionalKeyword("qubit_map"))) {
+        DictionaryAttr qubitMap;
+        if (parser.parseEqual() || parseDenseI64ArrayDictionary(parser, builder, qubitMap)) {
+            return failure();
+        }
+        result.addAttribute("qubit_map", qubitMap);
+    }
+
+    // 6. Optional metadata
+    if (parser.parseOptionalAttrDict(result.attributes) || parser.parseColon()) {
+        return failure();
+    }
+
+    // 7. Result types
+    if (parser.parseLParen() || (failed(parser.parseOptionalRParen()) &&
+                                 (parser.parseTypeList(resultTypes) || parser.parseRParen()))) {
+        return failure();
+    }
+
+    // 8. Resolve operands and result segments
+    Type qubitType = QubitType::get(ctx);
+    if (parser.resolveOperands(params, paramTypes, loc, result.operands) ||
+        parser.resolveOperands(qubits, qubitType, result.operands) ||
+        parser.resolveOperands(qregs, qregType, result.operands) ||
+        parser.resolveOperands(indices, indexTypes, loc, result.operands)) {
+        return failure();
+    }
+    result.addAttribute("operandSegmentSizes",
+                        builder.getDenseI32ArrayAttr({static_cast<int32_t>(params.size()),
+                                                      static_cast<int32_t>(qubits.size()),
+                                                      static_cast<int32_t>(qregs.size()),
+                                                      static_cast<int32_t>(indices.size())}));
+    result.addTypes(resultTypes);
+
+    // Classical results, then qubits or a register.
+    unsigned numClassical = 0, numQubits = 0, numQregs = 0;
+    for (Type type : resultTypes) {
+        if (isa<QubitType>(type) && numQregs == 0) {
+            ++numQubits;
+        } else if (isa<QuregType>(type)) {
+            ++numQregs;
+        } else if (numQubits == 0 && numQregs == 0) {
+            ++numClassical;
+        } else {
+            return parser.emitError(loc,
+                                    "expected classical results followed by qubits or a register");
+        }
+    }
+    result.addAttribute("resultSegmentSizes",
+                        builder.getDenseI32ArrayAttr({static_cast<int32_t>(numClassical),
+                                                      static_cast<int32_t>(numQubits),
+                                                      static_cast<int32_t>(numQregs)}));
+    return success();
 }
 
 void OperatorOp::print(OpAsmPrinter &p) {
@@ -908,36 +1172,6 @@ void OperatorOp::print(OpAsmPrinter &p) {
 static ParseResult parseOperandTypePair(OpAsmParser &parser,
                                         OpAsmParser::UnresolvedOperand &operand, Type &type) {
     return failure(parser.parseOperand(operand) || parser.parseColon() || parser.parseType(type));
-}
-
-static ParseResult parseDenseI64ArrayDictionary(OpAsmParser &parser, Builder &builder,
-                                                DictionaryAttr &dict) {
-    NamedAttrList attrs;
-    auto parseDictEntry = [&]() -> ParseResult {
-        StringRef key;
-        SmallVector<int64_t> values;
-        auto parseArrayValue = [&]() -> ParseResult {
-            int64_t value = 0;
-            if (parser.parseInteger(value)) {
-                return failure();
-            }
-            values.push_back(value);
-            return success();
-        };
-
-        if (parser.parseKeyword(&key) || parser.parseEqual() ||
-            parser.parseCommaSeparatedList(OpAsmParser::Delimiter::Square, parseArrayValue)) {
-            return failure();
-        }
-        attrs.append(builder.getStringAttr(key), builder.getDenseI64ArrayAttr(values));
-        return success();
-    };
-
-    if (parser.parseCommaSeparatedList(OpAsmParser::Delimiter::Braces, parseDictEntry)) {
-        return failure();
-    }
-    dict = attrs.getDictionary(parser.getContext());
-    return success();
 }
 
 ParseResult OperatorOp::parse(OpAsmParser &parser, OperationState &result) {
@@ -1187,7 +1421,7 @@ ParseResult OperatorOp::parse(OpAsmParser &parser, OperationState &result) {
 }
 
 //===----------------------------------------------------------------------===//
-// DecomposableGate interface methods.
+// DecomposableOp interface methods.
 //===----------------------------------------------------------------------===//
 
 // CustomOp
@@ -1303,36 +1537,33 @@ getEntriesInOperandOrder(mlir::DictionaryAttr map) {
     return entries;
 }
 
-// OperatorOp
-
-std::string OperatorOp::getOperatorName() { return getOpName().str(); }
-
-DynamicShape OperatorOp::getDynamicShape() {
+// Build DynamicShape from a param_map over a params operand list.
+static DynamicShape getDynamicShapeFromParamMap(mlir::ValueRange params,
+                                                mlir::DictionaryAttr paramMap) {
     DynamicShape dynamicShape;
-    auto params = getParams();
-
-    for (auto [name, indices] : getEntriesInOperandOrder(getParamMap())) {
+    for (auto [name, indices] : getEntriesInOperandOrder(paramMap)) {
         llvm::SmallVector<mlir::Type> types;
         for (int64_t index : indices) {
             types.push_back(params[index].getType());
         }
         dynamicShape.emplace_back(name.str(), std::move(types));
     }
-
     return dynamicShape;
 }
 
-WireLens OperatorOp::getWireLens() {
+// Build WireLens from a qubit_map; in register mode, lengths come from index-tensor dims.
+static WireLens getWireLensFromQubitMap(mlir::DictionaryAttr qubitMap,
+                                        mlir::ValueRange arrQubitIndices, bool hasQreg) {
     WireLens wireLens;
 
-    for (mlir::NamedAttribute entry : getQubitMap()) {
+    for (mlir::NamedAttribute entry : qubitMap) {
         auto indices = cast<mlir::DenseI64ArrayAttr>(entry.getValue()).asArrayRef();
         size_t numQubits;
-        if (getInQreg()) {
+        if (hasQreg) {
             numQubits = 0;
             for (int64_t index : indices) {
                 auto indexTensorType =
-                    cast<mlir::RankedTensorType>(getArrQubitIndices()[index].getType());
+                    cast<mlir::RankedTensorType>(arrQubitIndices[index].getType());
                 numQubits += indexTensorType.getDimSize(0);
             }
         } else {
@@ -1341,12 +1572,37 @@ WireLens OperatorOp::getWireLens() {
 
         wireLens.emplace_back(entry.getName().getValue().str(), numQubits);
     }
-
     return wireLens;
+}
+
+// OperatorOp
+
+std::string OperatorOp::getOperatorName() { return getOpName().str(); }
+
+DynamicShape OperatorOp::getDynamicShape() {
+    return getDynamicShapeFromParamMap(getParams(), getParamMap());
+}
+
+WireLens OperatorOp::getWireLens() {
+    return getWireLensFromQubitMap(getQubitMap(), getArrQubitIndices(),
+                                   static_cast<bool>(getInQreg()));
 }
 
 std::string OperatorOp::getExtraData() {
     return getUID().has_value() ? std::to_string(getUID().value()) : "";
+}
+
+// MeasurementOp
+
+std::string MeasurementOp::getOperatorName() { return getOpName().str(); }
+
+DynamicShape MeasurementOp::getDynamicShape() {
+    return getDynamicShapeFromParamMap(getParams(), getParamMap());
+}
+
+WireLens MeasurementOp::getWireLens() {
+    return getWireLensFromQubitMap(getQubitMap(), getArrQubitIndices(),
+                                   static_cast<bool>(getInQreg()));
 }
 
 //===----------------------------------------------------------------------===//
@@ -1392,6 +1648,14 @@ static llvm::StringRef getObservableName(MLIRContext *ctx, llvm::StringRef baseN
 
     return StringAttr::get(ctx, (baseName + "(" + obs + ")").str()).getValue();
 }
+
+llvm::StringRef MeasurementOp::getResourceName() { return getOpName(); }
+// Note: getResourceNumQubits for MeasurementOp does not consider QReg mode.
+// This is currently consistent with behavior of OperatorOp, and must be updated together if the
+// behavior is to be modifed.
+uint64_t MeasurementOp::getResourceNumQubits() { return getInQubits().size(); }
+uint64_t MeasurementOp::getResourceNumCtrlQubits() { return 0; }
+uint64_t MeasurementOp::getResourceNumParams() { return getParams().size(); }
 
 llvm::StringRef MeasureOp::getResourceName() { return "MidCircuitMeasure"; }
 uint64_t MeasureOp::getResourceNumQubits() { return 1; }
