@@ -299,7 +299,7 @@ bool pythonRuleLowering(llvm::ArrayRef<catalyst::quantum::DecomposableOp> ops,
     try {
         QuantumPythonDecompositions::PyInterpreterGuard guard;
         mlirText = guard.withGil([&] -> std::string {
-            const char *moduleName = "catalyst.decomposition.decomposition_rules";
+            const char *moduleName = "catalyst.decomposition.on_demand_rules";
             const char *functionName = "compile_on_demand_decomposition_rules";
             std::string tracingContext;
 
@@ -307,7 +307,9 @@ bool pythonRuleLowering(llvm::ArrayRef<catalyst::quantum::DecomposableOp> ops,
                 nb::module_ wrapperModule = nb::module_::import_(moduleName);
                 nb::object wrapperFunction = wrapperModule.attr(functionName);
 
-                nb::object parseId = wrapperModule.attr("ModifierState").attr("from_graph_op_id");
+                nb::module_ modifierModule =
+                    nb::module_::import_("catalyst.decomposition.modifier_state");
+                nb::object parseId = modifierModule.attr("ModifierState").attr("from_graph_op_id");
                 nb::list requests = buildRuleRequests(ops, requestedIds, parseId, tracingContext);
 
                 tracingContext = llvm::join(requestedIds, ", ");
