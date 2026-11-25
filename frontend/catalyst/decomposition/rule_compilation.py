@@ -18,10 +18,8 @@ import pennylane as qp
 from jax._src.lib.mlir import ir
 
 from catalyst.decomposition.capture_session import DecompositionScope, RuleIdentity
-from catalyst.from_plxpr.qfunc_interpreter import (
-    PLxPRToQuantumJaxprInterpreter,
-    capture_and_bind_kernel_rules,
-)
+from catalyst.decomposition.rule_capture import capture_and_bind_kernel_rules
+from catalyst.from_plxpr.qfunc_interpreter import PLxPRToQuantumJaxprInterpreter
 from catalyst.from_plxpr.qref_jax_primitives import QrefQreg
 from catalyst.utils.exceptions import CompileError
 

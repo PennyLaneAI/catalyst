@@ -29,14 +29,12 @@ from catalyst import QJIT, CompileOptions, qjit
 from catalyst.decomposition.capture_session import OpDecompRequest, RuleIdentity
 from catalyst.decomposition.modifier_state import ModifierState
 from catalyst.decomposition.rule_arguments import RuleTraceInputs
+from catalyst.decomposition.rule_capture import _convert_decomp_target_spec
 from catalyst.decomposition.rule_discovery import walk_reachable_decomp_rule_sets
 from catalyst.decomposition.rule_lowering_warning import RuleLoweringWarning
 from catalyst.decomposition.rule_preparation import DecompRuleSpec, DecompTargetSpec
 from catalyst.decomposition.type_utils import SerializedGraphOpID
-from catalyst.from_plxpr.qfunc_interpreter import (
-    PLxPRToQuantumJaxprInterpreter,
-    _convert_decomp_target_spec,
-)
+from catalyst.from_plxpr.qfunc_interpreter import PLxPRToQuantumJaxprInterpreter
 from catalyst.from_plxpr.qref_jax_primitives import QrefQreg
 from catalyst.jax_primitives import decomp_definition_p, decomprule_p
 from catalyst.jax_tracer import lower_jaxpr_to_mlir
@@ -57,13 +55,13 @@ class RepeatedGate(qp.core.Operator2):
 def test_repeated_gate_captures_only_plain_variant(mocker):
     """Repeated plain root equations share one captured variant."""
 
-    import catalyst.from_plxpr.qfunc_interpreter as capture_frontend
+    from catalyst.decomposition import rule_capture
 
     @qp.register_resources({})
     def empty_rule(wires):
         del wires
 
-    spy = mocker.spy(capture_frontend, "_convert_decomp_target_spec")
+    spy = mocker.spy(rule_capture, "_convert_decomp_target_spec")
     with qp.decomposition.local_decomps():
         qp.add_decomps(RepeatedGate, empty_rule)
 
@@ -86,13 +84,13 @@ def test_repeated_gate_captures_only_plain_variant(mocker):
 def test_ambient_modifier_states_are_captured_independently(mocker):
     """Nested transforms capture only their concrete control/adjoint states."""
 
-    import catalyst.from_plxpr.qfunc_interpreter as capture_frontend
+    from catalyst.decomposition import rule_capture
 
     @qp.register_resources({})
     def empty_rule(wires):
         del wires
 
-    spy = mocker.spy(capture_frontend, "_convert_decomp_target_spec")
+    spy = mocker.spy(rule_capture, "_convert_decomp_target_spec")
     with qp.decomposition.local_decomps():
         qp.add_decomps(RepeatedGate, empty_rule)
 
@@ -271,7 +269,7 @@ def test_adjoint_context_propagates_to_descendants():
 def test_precompilation_preserves_traversal(mocker):
     """The trace-time rule traversal should continue past precompiled rules."""
 
-    import catalyst.from_plxpr.qfunc_interpreter as capture_frontend
+    from catalyst.decomposition import rule_capture
 
     class CacheRoot(qp.core.Operator2):
         def __init__(self, wires):
@@ -301,7 +299,7 @@ def test_precompilation_preserves_traversal(mocker):
 
     # mock the cache to only include the test CacheRoot
     load_cache = mocker.patch.object(
-        capture_frontend,
+        rule_capture,
         "load_precompiled_rule_identities",
         return_value=frozenset({cached_rule_identity}),
     )
@@ -335,7 +333,7 @@ def test_precompilation_preserves_traversal(mocker):
 def test_changed_resources_get_recaptured(mocker):
     """A rule is recaptured when its resources differ from a precompiled rule."""
 
-    import catalyst.from_plxpr.qfunc_interpreter as capture_frontend
+    from catalyst.decomposition import rule_capture
 
     @qp.register_resources({})
     def current_rule(wires):
@@ -347,7 +345,7 @@ def test_changed_resources_get_recaptured(mocker):
         ((SerializedGraphOpID("PauliX{}{wires:1}{}"), 1),),
     )
     load_cache = mocker.patch.object(
-        capture_frontend,
+        rule_capture,
         "load_precompiled_rule_identities",
         return_value=frozenset({stale_identity}),
     )
@@ -370,7 +368,7 @@ def test_changed_resources_get_recaptured(mocker):
 def test_tracing_recovers_missed_cache(mocker):
     """Test that the trace-time traversal captures all rules if loading the cache fails."""
 
-    import catalyst.from_plxpr.qfunc_interpreter as capture_frontend
+    from catalyst.decomposition import rule_capture
 
     @qp.register_resources({})
     def first_rule(wires):
@@ -381,7 +379,7 @@ def test_tracing_recovers_missed_cache(mocker):
         del wires
 
     load_cache = mocker.patch.object(
-        capture_frontend,
+        rule_capture,
         "load_precompiled_rule_identities",
         side_effect=OSError("cache unavailable"),
     )
@@ -1098,7 +1096,7 @@ def test_rule_uses_size_agnostic_qreg():
 def test_multiple_qnodes_capture_and_materialize_locally(mocker, estimate_decomps):
     """Each QNode captures and materializes its definitions in its own nested module."""
 
-    import catalyst.from_plxpr.qfunc_interpreter as capture_frontend
+    from catalyst.decomposition import rule_capture
 
     @qp.register_resources({})
     def empty_rule(wires):
@@ -1117,7 +1115,7 @@ def test_multiple_qnodes_capture_and_materialize_locally(mocker, estimate_decomp
         RepeatedGate(2)
         return qp.state()
 
-    spy = mocker.spy(capture_frontend, "_convert_decomp_target_spec")
+    spy = mocker.spy(rule_capture, "_convert_decomp_target_spec")
     with qp.decomposition.local_decomps():
         qp.add_decomps(RepeatedGate, empty_rule)
 
@@ -1186,7 +1184,7 @@ def test_estimate_decomps_reuses_declaration_cache():
 @pytest.mark.parametrize("controlled", [False, True])
 def test_estimate_decomps_preserves_signatures_and_resources(mocker, adjoint, controlled):
     """Custom rule declarations match definitions, including parameters and modifier operands."""
-    import catalyst.from_plxpr.qfunc_interpreter as capture_frontend
+    from catalyst.decomposition import rule_capture
 
     class ParameterizedGate(qp.core.Operator2):
         dynamic_argnames = ("theta",)
@@ -1204,9 +1202,7 @@ def test_estimate_decomps_preserves_signatures_and_resources(mocker, adjoint, co
     def leaf_rule(wires):
         del wires
 
-    mocker.patch.object(
-        capture_frontend, "load_precompiled_rule_identities", return_value=frozenset()
-    )
+    mocker.patch.object(rule_capture, "load_precompiled_rule_identities", return_value=frozenset())
 
     @qp.qnode(qp.device("null.qubit", wires=4))
     def circuit(theta: float):
@@ -1256,7 +1252,7 @@ def test_estimate_decomps_preserves_signatures_and_resources(mocker, adjoint, co
 
 def test_estimate_decomps_does_not_trace_implementations(mocker):
     """Resource-only rules remain available even if their implementations cannot be captured."""
-    import catalyst.from_plxpr.qfunc_interpreter as capture_frontend
+    from catalyst.decomposition import rule_capture
 
     @qp.register_resources({RepeatedGate(Wire[1]): 3})
     def unavailable_rule(wires):
@@ -1267,7 +1263,7 @@ def test_estimate_decomps_does_not_trace_implementations(mocker):
         del wires
 
     load_cache = mocker.patch.object(
-        capture_frontend,
+        rule_capture,
         "load_precompiled_rule_identities",
         side_effect=AssertionError("Declarations do not require the implementation cache"),
     )
@@ -1297,14 +1293,14 @@ def test_estimate_decomps_does_not_trace_implementations(mocker):
 
 def test_estimate_decomps_includes_precompiled_rules(mocker):
     """Matching cached implementations still have declarations with their current resources."""
-    import catalyst.from_plxpr.qfunc_interpreter as capture_frontend
+    from catalyst.decomposition import rule_capture
 
     @qp.register_resources({})
     def empty_rule(wires):
         del wires
 
     mocker.patch.object(
-        capture_frontend,
+        rule_capture,
         "load_precompiled_rule_identities",
         return_value=frozenset(
             {RuleIdentity(SerializedGraphOpID("RepeatedGate{}{wires:1}{}"), "empty_rule", ())}

@@ -1151,7 +1151,7 @@ class TestPrecompiled:
             return_value={NoParams: {NoParams(reg=Wire[1])}},
         )
         load_cache = mocker.patch(
-            "catalyst.from_plxpr.qfunc_interpreter.load_precompiled_rule_identities",
+            "catalyst.decomposition.rule_capture.load_precompiled_rule_identities",
             return_value=frozenset({cached_root}),
         )
         bytecode_path = tmp_path / "bytecode.mlirbc"
@@ -1818,7 +1818,7 @@ class TestOnDemand:
 
     def test_reachable_wrapper_shares_tracer_and_symbol_table(self, mocker):
         """Multiple roots share one capture, including dependencies that are also roots."""
-        from catalyst.from_plxpr import qfunc_interpreter
+        from catalyst.decomposition import rule_capture
 
         @qp.capture.subroutine
         def helper():
@@ -1832,7 +1832,7 @@ class TestOnDemand:
         def leaf_rule(x, reg):
             del x, reg
 
-        tracer = mocker.spy(qfunc_interpreter, "_convert_decomp_target_spec")
+        tracer = mocker.spy(rule_capture, "_convert_decomp_target_spec")
         compile_rules = mocker.spy(qp, "qjit")
         with local_decomps():
             add_decomps(NoParams, root_rule)
@@ -1907,7 +1907,7 @@ class TestOnDemand:
                 }
             ]
         load_manifest = mocker.patch(
-            "catalyst.from_plxpr.qfunc_interpreter.load_precompiled_rule_identities",
+            "catalyst.decomposition.rule_capture.load_precompiled_rule_identities",
             side_effect=AssertionError("On-demand capture must use the compiler's loaded rules"),
         )
         with local_decomps():
