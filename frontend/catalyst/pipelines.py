@@ -155,7 +155,9 @@ class CompileOptions:
             ``True`` by default.
         save_ir_on_failure (Optional[Union[str, Path]]): A directory in which to save the IR at
             the compiler pass that fails, as ``<module name>_<pass name>_FAILED.mlir``,
-            independently of ``keep_intermediate``. ``None`` by default.
+            independently of ``keep_intermediate``. The file of a program overwrites that of an
+            earlier program with the same name in the directory. For a pass that runs on a
+            single function, the file only has that function. ``None`` by default.
     """
 
     verbose: Optional[bool] = False
