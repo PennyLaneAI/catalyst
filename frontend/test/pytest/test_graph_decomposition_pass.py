@@ -20,6 +20,7 @@ import pennylane as qp
 import pytest
 from pennylane.decomposition import register_resources
 
+from catalyst.passes import graph_decomposition
 from catalyst.passes.builtin_passes import graph_decomposition_setup_inputs
 from catalyst.utils.runtime_environment import PRECOMPILED_BYTECODE_PATH
 
@@ -37,20 +38,26 @@ def _setup(**kwargs):
 class TestBytecodeRules:
     """Test resolution of the ``bytecode_rules`` option."""
 
-    def test_default_bytecode_rules(self, monkeypatch):
-        """The built-in rules are used when nothing is specified."""
+    @pytest.mark.filterwarnings("ignore:Failed to load precompiled rules")
+    @pytest.mark.parametrize("env_path", [None, "/env/rules.mlirbc"])
+    def test_bytecode_rules_resolved_at_compile_time(self, monkeypatch, env_path):
+        """The pass uses the library selected when compiling, even if the environment variable
+        changes after the QNode is decorated."""
         monkeypatch.delenv("CATALYST_PRECOMPILED_BYTECODE_PATH", raising=False)
-        assert _setup()["bytecode_rules"] == PRECOMPILED_BYTECODE_PATH
 
-    def test_bytecode_rules_from_environment(self, monkeypatch):
-        """The environment variable is read at call time and overrides the built-in rules."""
-        monkeypatch.setenv("CATALYST_PRECOMPILED_BYTECODE_PATH", "/env/rules.mlirbc")
-        assert _setup()["bytecode_rules"] == "/env/rules.mlirbc"
+        @qp.qjit(capture=True, target="mlir")
+        @graph_decomposition(gate_set={qp.RX})
+        @qp.qnode(qp.device("null.qubit", wires=1))
+        def circuit(x):
+            qp.RX(x, 0)
+            return qp.state()
 
-    def test_explicit_bytecode_rules_take_precedence(self, monkeypatch):
-        """An explicitly passed path overrides the environment variable."""
-        monkeypatch.setenv("CATALYST_PRECOMPILED_BYTECODE_PATH", "/env/rules.mlirbc")
-        assert _setup(bytecode_rules="/explicit.mlirbc")["bytecode_rules"] == "/explicit.mlirbc"
+        if env_path is not None:
+            monkeypatch.setenv("CATALYST_PRECOMPILED_BYTECODE_PATH", env_path)
+        expected = PRECOMPILED_BYTECODE_PATH if env_path is None else env_path
+
+        circuit.aot_compile(0.5)
+        assert f'"bytecode-rules" = "{expected}"' in str(circuit.mlir_module)
 
 
 class TestRuleRefName:
