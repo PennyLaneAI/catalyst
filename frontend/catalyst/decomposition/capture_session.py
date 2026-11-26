@@ -19,7 +19,7 @@ from typing import Callable
 
 import pennylane as qp
 from jax.extend.core import ClosedJaxpr
-from pennylane.core import Operator2
+from pennylane.core import Operator
 from pennylane.core.operator import abstractify
 
 from catalyst.decomposition.graph_op_id import GraphOpID
@@ -58,7 +58,7 @@ class OpDecompRequest:
         base_id: Canonical GraphOpID of the unmodified base operator. Used as the traversal key and
             as the starting point for adjoint/control target IDs. Intentionally excludes modifiers.
         op_name: Frontend operator name used to query PennyLane's decomposition registry.
-        op_cls: Concrete Operator2 class used for registry lookup and to rebuild the base for
+        op_cls: Concrete Operator class used for registry lookup and to rebuild the base for
             registered symbolic rules.
         dynamic_shape: Non-hybrid dynamic argument names mapped to MLIR-style type spellings, in
             operand order.
@@ -86,10 +86,10 @@ class OpDecompRequest:
     @classmethod
     def from_operation(
         cls,
-        op: Operator2,
+        op: Operator,
         modifier_context: ModifierState = ModifierState(),
     ) -> "OpDecompRequest":
-        """Build a request from a settled captured Operator2 instance.
+        """Build a request from a settled captured Operator instance.
 
         A rule is a template keyed by the operator's identity, so only shapes, dtypes and pytree
         structure may reach it. The operator is abstractified first: that canonicalizes the

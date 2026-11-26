@@ -26,7 +26,7 @@ from pennylane.measurements import (
     ProbabilityMP,
     VarianceMP,
 )
-from pennylane.operation import Operator
+from pennylane.operation import LegacyOperator
 from pennylane.ops import GlobalPhase
 from xdsl.dialects import builtin, func, scf
 from xdsl.ir import Block, Operation, Region
@@ -200,7 +200,7 @@ class ConstructCircuitDAG:
     def _gate_op(self, op: quantum.GateOp) -> None:
         """Generic handler for unitary gates."""
         # Create PennyLane instance
-        qp_op: Operator = xdsl_to_qp_op(op)
+        qp_op: LegacyOperator = xdsl_to_qp_op(op)
 
         # Add node to current cluster
         node_uid = self.dag_builder.add_node(
@@ -224,7 +224,7 @@ class ConstructCircuitDAG:
         """Handler for the single-qubit projective measurement operation."""
 
         # Create PennyLane instance
-        meas: Operator = xdsl_to_qp_measurement(op)
+        meas: LegacyOperator = xdsl_to_qp_measurement(op)
 
         # Add node to current cluster
         node_uid = self.dag_builder.add_node(
@@ -794,14 +794,14 @@ def _flatten_if_op(operation: scf.IfOp) -> list[Region]:
 
 
 @singledispatch
-def get_label(op: Operator | MeasurementProcess) -> str:
+def get_label(op: LegacyOperator | MeasurementProcess) -> str:
     """Gets the appropriate label for a PennyLane object."""
     return str(op)
 
 
 @get_label.register
-def _operator(op: Operator) -> str:
-    """Returns the appropriate label for PennyLane Operator"""
+def _operator(op: LegacyOperator) -> str:
+    """Returns the appropriate label for PennyLane LegacyOperator"""
     base_op = getattr(op, "base", op)
 
     # If Adjoint(GlobalPhase) or GlobalPhase, wires will be []

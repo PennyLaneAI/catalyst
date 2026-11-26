@@ -732,7 +732,7 @@ class TestCatalyst:
 
 
 # pylint: disable=too-few-public-methods
-class PlainOperator(qp.operation.Operator):
+class PlainOperator(qp.operation.LegacyOperator):
     """just an operator."""
 
 
@@ -747,7 +747,7 @@ class TestInheritanceMixins:
         op = adjoint(base)
 
         assert isinstance(op, Adjoint)
-        assert isinstance(op, qp.operation.Operator)
+        assert isinstance(op, qp.operation.LegacyOperator)
         assert not isinstance(op, qp.operation.Operation)
         assert not isinstance(op, AdjointOperation)
 
@@ -767,7 +767,7 @@ class TestInheritanceMixins:
         op = adjoint(base)
 
         assert isinstance(op, Adjoint)
-        assert isinstance(op, qp.operation.Operator)
+        assert isinstance(op, qp.operation.LegacyOperator)
         assert isinstance(op, qp.operation.Operation)
         assert isinstance(op, AdjointOperation)
 
@@ -964,7 +964,7 @@ class TestProperties:
         """Test `is_verified_hermitian` property mirrors that of the base."""
 
         # pylint: disable=too-few-public-methods
-        class DummyOp(qp.operation.Operator):
+        class DummyOp(qp.operation.LegacyOperator):
             num_wires = 1
             is_verified_hermitian = value
 
@@ -1092,7 +1092,7 @@ class TestMiscMethods:
         """Test the flatten and unflatten methods."""
 
         # pylint: disable=too-few-public-methods
-        class CustomOp(qp.operation.Operator):
+        class CustomOp(qp.operation.LegacyOperator):
             pass
 
         op = CustomOp(1.2, 2.3, wires=0)

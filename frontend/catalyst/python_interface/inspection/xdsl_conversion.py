@@ -25,7 +25,7 @@ from typing import TYPE_CHECKING
 from pennylane import capture, ops
 from pennylane.ftqc.operations import RotXZX
 from pennylane.measurements import counts, expval, probs, sample, state, var
-from pennylane.operation import Operator
+from pennylane.operation import LegacyOperator
 from pennylane.ops import MidMeasure
 from pennylane.ops import __all__ as ops_all
 from pennylane.ops import measure
@@ -138,7 +138,7 @@ def get_mlir_module(workflow: QJIT, args, kwargs) -> Module:
 from_str_to_PL_gate = {
     name: getattr(ops, name)
     for name in ops_all
-    if inspect.isclass(getattr(ops, name, None)) and issubclass(getattr(ops, name), Operator)
+    if inspect.isclass(getattr(ops, name, None)) and issubclass(getattr(ops, name), LegacyOperator)
 }
 
 from_str_to_PL_gate["RotXZX"] = RotXZX  # Include FTQC gates, not in primary module
@@ -166,7 +166,7 @@ def _resolve(name: str, mapping: dict, kind: str):
         raise NotImplementedError(f"Unsupported {kind}: {name}") from exc
 
 
-def resolve_gate(name: str) -> Operator:
+def resolve_gate(name: str) -> LegacyOperator:
     """Resolve the gate from the name."""
     return _resolve(name, from_str_to_PL_gate, "gate")
 
@@ -234,7 +234,7 @@ def _resolve_control_value(ssa: SSAValue) -> float | int | str:
     return values[resolve_constant_params(op.indices[0])]
 
 
-def _apply_adjoint_and_ctrls(qp_op: Operator, xdsl_op) -> Operator:
+def _apply_adjoint_and_ctrls(qp_op: LegacyOperator, xdsl_op) -> LegacyOperator:
     """Apply adjoint and control modifiers to a gate if needed."""
     if xdsl_op.properties.get("adjoint"):
         qp_op = ops.op_math.adjoint(qp_op)
@@ -472,14 +472,14 @@ def ssa_to_qp_wires_named(op: NamedObsOp) -> int:
 ############################################################
 
 
-def xdsl_to_qp_op(op) -> Operator:
-    """Convert an xDSL operation into a PennyLane Operator.
+def xdsl_to_qp_op(op) -> LegacyOperator:
+    """Convert an xDSL operation into a PennyLane LegacyOperator.
 
     Args:
         op: The xDSL operation to convert.
 
     Returns:
-        A PennyLane Operator.
+        A PennyLane LegacyOperator.
     """
     # Pause capture *only if active* so we can allow strings (dynamic wires) as allowed wires
     with conditional_pause(capture.pause):
@@ -534,7 +534,7 @@ def xdsl_to_qp_op(op) -> Operator:
 
 
 def xdsl_to_qp_op_name(op, adjoint_mode: bool) -> str:
-    """Convert an xDSL operation into a string representing a PennyLane Operator.
+    """Convert an xDSL operation into a string representing a PennyLane LegacyOperator.
 
     Args:
         op: The xDSL operation to convert.
@@ -577,14 +577,14 @@ def xdsl_to_qp_op_name(op, adjoint_mode: bool) -> str:
     return gate_name
 
 
-def xdsl_to_qp_measurement(op, *args, **kwargs) -> MeasurementProcess | Operator:
+def xdsl_to_qp_measurement(op, *args, **kwargs) -> MeasurementProcess | LegacyOperator:
     """Convert any xDSL measurement/observable operation to a PennyLane object.
 
     Args:
         op: The xDSL measurement/observable operation to convert.
 
     Returns:
-        A PennyLane MeasurementProcess or Operator.
+        A PennyLane MeasurementProcess or LegacyOperator.
     """
 
     with conditional_pause(capture.pause):

@@ -20,7 +20,7 @@ Preparation supplies each batch; capture or standalone compilation consumes it.
 
 from collections import deque
 
-from pennylane.core.operator import Operator2
+from pennylane.core.operator import Operator
 
 from catalyst.decomposition.capture_session import OpDecompRequest
 from catalyst.decomposition.modifier_state import ModifierState
@@ -62,7 +62,7 @@ def walk_reachable_decomp_rule_sets(
             context = target_spec.modifier_context
             for rule in target_spec.rules:
                 for op in rule.resource_counts_by_op:
-                    if isinstance(op, Operator2):
+                    if isinstance(op, Operator):
                         children.append(OpDecompRequest.from_operation(op, context))
         return children
 

@@ -20,7 +20,7 @@ import jax
 import numpy as np
 import pennylane as qp
 from pennylane.devices.capabilities import DeviceCapabilities, OperatorProperties
-from pennylane.operation import Operation, Operator
+from pennylane.operation import LegacyOperator, Operation
 
 from catalyst.api_extensions import MidCircuitMeasure, MidCircuitPauliMeasure
 from catalyst.jax_tracer import HybridOp
@@ -29,7 +29,7 @@ from catalyst.utils.exceptions import DifferentiableCompileError
 EMPTY_PROPERTIES = OperatorProperties()
 
 
-def get_base_operation_name(op: Operator) -> str:
+def get_base_operation_name(op: LegacyOperator) -> str:
     """Get the base operation name, handling controlled and adjoint operations."""
     if type(op) in (
         qp.ops.Controlled,
@@ -41,7 +41,7 @@ def get_base_operation_name(op: Operator) -> str:
     return op.name
 
 
-def is_supported(op: Operator, capabilities: DeviceCapabilities) -> bool:
+def is_supported(op: LegacyOperator, capabilities: DeviceCapabilities) -> bool:
     """Check whether an operation is supported by the device."""
     return op.name in capabilities.operations
 
@@ -155,7 +155,7 @@ def _adjoint_diff_op_checker(op, capabilities):
 
 
 def is_differentiable(
-    op: Operator, capabilities: DeviceCapabilities, grad_method: Union[str, None] = None
+    op: LegacyOperator, capabilities: DeviceCapabilities, grad_method: Union[str, None] = None
 ) -> bool:
     """Check whether an operation is differentiable on the given device.
 
@@ -206,12 +206,12 @@ def is_differentiable(
         raise ValueError(f"Invalid gradient method: {grad_method}")
 
 
-def is_controllable(op: Operator, capabilities: DeviceCapabilities) -> bool:
+def is_controllable(op: LegacyOperator, capabilities: DeviceCapabilities) -> bool:
     """Check whether an operation is controllable."""
     return capabilities.operations.get(op.name, EMPTY_PROPERTIES).controllable
 
 
-def is_invertible(op: Operator, capabilities: DeviceCapabilities) -> bool:
+def is_invertible(op: LegacyOperator, capabilities: DeviceCapabilities) -> bool:
     """Check whether an operation is invertible."""
     return capabilities.operations.get(op.name, EMPTY_PROPERTIES).invertible
 
@@ -229,6 +229,6 @@ def is_active(op: Operation) -> bool:
         else:
             assert not isinstance(
                 param, (list, tuple)
-            ), "Operator converts any list/tuple parameters to NumPy arrays."
+            ), "LegacyOperator converts any list/tuple parameters to NumPy arrays."
 
     return False

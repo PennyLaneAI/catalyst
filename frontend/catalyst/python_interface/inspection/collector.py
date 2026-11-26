@@ -18,7 +18,7 @@ from functools import singledispatchmethod
 
 import xdsl
 from pennylane.measurements import MeasurementProcess
-from pennylane.operation import Operator
+from pennylane.operation import LegacyOperator
 from xdsl.dialects import builtin, func
 from xdsl.ir import SSAValue
 
@@ -94,7 +94,7 @@ class QMLCollector:
         xdsl_op: (
             CustomOp | GlobalPhaseOp | QubitUnitaryOp | SetStateOp | MultiRZOp | SetBasisStateOp
         ),
-    ) -> Operator:
+    ) -> LegacyOperator:
         if self.quantum_register is None:
             raise ValueError("Quantum register (AllocOp) not found.")
         if not self.wire_to_ssa_qubits:
@@ -125,13 +125,13 @@ class QMLCollector:
         self.wire_to_ssa_qubits.clear()
         self.quantum_register = None
 
-    def collect(self, reset: bool = True) -> tuple[list[Operator], list[MeasurementProcess]]:
+    def collect(self, reset: bool = True) -> tuple[list[LegacyOperator], list[MeasurementProcess]]:
         """Collect PennyLane ops and measurements from the module."""
 
         if reset:
             self.clear_mappings()
 
-        collected_ops: list[Operator] = []
+        collected_ops: list[LegacyOperator] = []
         collected_meas: list[MeasurementProcess] = []
 
         for func_op in self.module.body.ops:
@@ -144,7 +144,7 @@ class QMLCollector:
                 self._process_qubit_mapping(op)
                 result = self.handle(op)
 
-                if isinstance(result, Operator):
+                if isinstance(result, LegacyOperator):
                     collected_ops.append(result)
 
                 elif isinstance(result, MeasurementProcess):

@@ -19,14 +19,14 @@ import hashlib
 from functools import singledispatch
 from typing import Any
 
-from pennylane.core import Operator2
+from pennylane.core import Operator
 from pennylane.pytrees import PyTreeStructure
 from pennylane.wires import AbstractQubit
 
 
 def generate_uid(
     *avals_in: tuple[Any, ...],
-    op_cls: type[Operator2],
+    op_cls: type[Operator],
     wire_lens: tuple[int, ...],
     hybrid_lens: tuple[int, ...],
     hybrid_trees: tuple[PyTreeStructure, ...],

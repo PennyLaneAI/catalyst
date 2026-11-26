@@ -26,7 +26,7 @@ from dataclasses import dataclass
 
 import jax.numpy as jnp
 import pennylane as qp
-from pennylane.core.operator import Operator2, abstractify
+from pennylane.core.operator import Operator, abstractify
 from pennylane.decomposition import DecompositionRule
 from pennylane.decomposition.utils import to_name
 
@@ -66,7 +66,7 @@ class CollectedRule:
     """
 
     source_rule: DecompositionRule
-    resource_counts_by_op: dict[Operator2, int]
+    resource_counts_by_op: dict[Operator, int]
     resource_counts_by_id: dict[SerializedGraphOpID, int]
 
 
@@ -83,13 +83,13 @@ class DecompRuleSpec:
         frontend_name: Name of the PennyLane decomposition rule, retained for fixed and excluded
             rule selection.
         resource_counts_by_id: GraphOpID-to-count mapping attached to the lowered function.
-        resource_counts_by_op: Operator2-to-count mapping used to traverse outgoing resource edges.
+        resource_counts_by_op: Operator-to-count mapping used to traverse outgoing resource edges.
     """
 
     prepared_rule_fn: Callable[..., None]
     frontend_name: str
     resource_counts_by_id: dict[SerializedGraphOpID, int]
-    resource_counts_by_op: dict[Operator2, int]
+    resource_counts_by_op: dict[Operator, int]
 
 
 @dataclass
@@ -241,7 +241,7 @@ def collect_resources_for_op(
             continue
 
         try:
-            # The `compute_resources` function's signature is the same as the Operator2 signature
+            # The `compute_resources` function's signature is the same as the Operator signature
             # for the original op of the rule
             with qp.capture.toggle_ctx(True):
                 resources = rule.compute_resources(*args, **kwargs)
@@ -529,7 +529,7 @@ def build_registered_decomp_target_spec(
         static_data (dict): compiler-static argument names to their values
         extra_data (dict): argument values the graphOpId identifies by UID instead of spelling
         is_custom_op (bool): whether the operator lowers to ``qref.custom``
-        op_cls (type[Operator2]): the base operator's class, required to rebuild it
+        op_cls (type[Operator]): the base operator's class, required to rebuild it
         modifiers (ModifierState): the modifiers of the target the rules decompose
 
     Returns:
@@ -546,7 +546,7 @@ def build_registered_decomp_target_spec(
             f"The operator class of {op_name!r} is needed to lower the decomposition rules "
             f"registered against {target_id}"
         )
-    assert issubclass(op_cls, Operator2), f"Expected an Operator2 subclass, got {op_cls}"
+    assert issubclass(op_cls, Operator), f"Expected an Operator subclass, got {op_cls}"
 
     extra_data = extra_data or {}
     static_and_extra = static_data | extra_data

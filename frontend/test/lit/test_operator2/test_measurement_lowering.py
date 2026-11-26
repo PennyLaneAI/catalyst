@@ -25,7 +25,7 @@ class RotatedMeasurement(qp.ops.MidMeasure):
     compilable_argnames = ("plane",)
 
     def __init__(self, angle, wires, plane="XY"):
-        qp.core.Operator2.__init__(self, angle, wires=wires, plane=plane)
+        qp.core.Operator.__init__(self, angle, wires=wires, plane=plane)
 
 
 class BareMeasurement(qp.ops.MidMeasure):
@@ -34,7 +34,7 @@ class BareMeasurement(qp.ops.MidMeasure):
     compilable_argnames = ()
 
     def __init__(self, wires):
-        qp.core.Operator2.__init__(self, wires=wires)
+        qp.core.Operator.__init__(self, wires=wires)
 
 
 @qp.qjit(capture=True, target="mlir", collect_decomp_rules=False)

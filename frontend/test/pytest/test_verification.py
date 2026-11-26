@@ -136,7 +136,7 @@ class PauliX2(qp.PauliX):
 def test_unsupported_ops_raise_an_error():
     """Test that an unsupported op raises an error"""
 
-    class MyOp(qp.operation.Operator):
+    class MyOp(qp.operation.LegacyOperator):
         """An unsupported operation"""
 
         @property

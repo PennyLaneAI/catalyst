@@ -36,7 +36,7 @@ from operator2_dummy_gates import (
     StaticData,
     StaticDataMultiReg,
 )
-from pennylane.core import Operator2
+from pennylane.core import Operator
 from pennylane.typing import Complex, Float, Int, Wire
 
 from catalyst.decomposition.on_demand_rules import (
@@ -985,13 +985,13 @@ test_multiple_rules()
 def test_for_loop():
     """Test when the rule body has a for loop."""
 
-    class LayerRX(qp.core.Operator2):
+    class LayerRX(qp.core.Operator):
         dynamic_argnames = ("angles",)
 
         def __init__(self, angles, wires):
             super().__init__(angles, wires)
 
-    class TestRX(qp.core.Operator2):
+    class TestRX(qp.core.Operator):
         dynamic_argnames = ("theta",)
         wires_argnames = ("wires",)
         arg_specs = {"theta": Float, "wires": Wire[1]}
@@ -1037,7 +1037,7 @@ test_for_loop()
 def test_if():
     """Test when the rule body has an if op."""
 
-    class TestOp(Operator2):
+    class TestOp(Operator):
         dynamic_argnames = ("flag",)
         wire_argnames = ("wires",)
 
@@ -1073,7 +1073,7 @@ test_if()
 def test_while_loop():
     """Test when the rule body has a while loop."""
 
-    class WhileOp(Operator2):
+    class WhileOp(Operator):
         dynamic_argnames = ("angle",)
         wire_argnames = ("wires",)
 

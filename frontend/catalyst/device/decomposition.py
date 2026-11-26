@@ -269,7 +269,7 @@ def decompose_ops_to_unitary(tape, convert_to_matrix_ops):
 
 
 def catalyst_acceptance(
-    op: qp.operation.Operator, capabilities: DeviceCapabilities, grad_method: Union[str, None]
+    op: qp.operation.LegacyOperator, capabilities: DeviceCapabilities, grad_method: Union[str, None]
 ) -> Union[str, None]:
     """Check whether an Operator is supported and returns the name of the operation or None."""
 

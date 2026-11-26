@@ -26,7 +26,7 @@ import jax.numpy as jnp
 import numpy as np
 import pennylane as qp
 from jax import Array
-from pennylane.core.operator import Operator2
+from pennylane.core.operator import Operator
 from pennylane.wires import Wires
 
 from catalyst.decomposition.graph_op_id import CTRL_WORK_WIRES
@@ -78,7 +78,7 @@ def build_base_op(op_cls, kwargs, is_custom_op):
         is_custom_op (bool): whether the operator lowers to ``qref.custom``
 
     Returns:
-        Operator2: the base operator, built without binding its primitive
+        Operator: the base operator, built without binding its primitive
     """
     args, kwargs = prepare_dummy_rule_arguments(kwargs, is_custom_op)
     with qp.capture.pause():
@@ -96,7 +96,7 @@ def symbolic_arguments(
     flips, matching the all-ones ``ctrlvals`` a ``<n>C(...)`` graphOpId denotes.
 
     Args:
-        base_op (Operator2): the base operator the rule acts on
+        base_op (Operator): the base operator the rule acts on
         kind (str): ``"adjoint"`` or ``"control"``
         ctrl_wires: the control wires, for ``kind="control"``
         ctrl_values: the control values, for ``kind="control"``
@@ -226,12 +226,12 @@ def flatten_hybrid_args(extra_data) -> tuple:
         # Stop at operators to identify which parameters belong to them.
         argument_parts, _ = qp.pytrees.flatten(
             argument,
-            is_leaf=lambda value: isinstance(value, Operator2) or _is_wire_leaf(value),
+            is_leaf=lambda value: isinstance(value, Operator) or _is_wire_leaf(value),
         )
 
         leaf_sources = []
         for argument_part in argument_parts:
-            is_operator = isinstance(argument_part, Operator2)
+            is_operator = isinstance(argument_part, Operator)
             part_leaves, _ = qp.pytrees.flatten(argument_part, is_leaf=_is_wire_leaf)
 
             for leaf in part_leaves:

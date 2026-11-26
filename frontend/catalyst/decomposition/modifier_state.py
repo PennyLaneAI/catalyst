@@ -257,7 +257,7 @@ class ModifierState:
         return SerializedGraphOpID(op_name + op_id[len(prefix) :]), n_ctrl
 
     @staticmethod
-    def peel_modifiers(op: qp.core.Operator2) -> tuple[qp.core.Operator2, ModifierState]:
+    def peel_modifiers(op: qp.core.Operator) -> tuple[qp.core.Operator, ModifierState]:
         """Return the innermost base of ``op`` together with the modifiers wrapping it.
 
         A *generic* symbolic operator (``Adjoint2``/``ControlledOp2``, as opposed to a concrete
@@ -273,10 +273,10 @@ class ModifierState:
         counts add, and work-wire types merge as they do in PennyLane.
 
         Args:
-            op (Operator2): the operator to unwrap
+            op (Operator): the operator to unwrap
 
         Returns:
-            Operator2: the innermost base operator
+            Operator: the innermost base operator
             ModifierState: the modifiers wrapping the base
         """
         modifiers = ModifierState()
