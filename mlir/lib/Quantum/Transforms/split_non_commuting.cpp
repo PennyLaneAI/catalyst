@@ -38,6 +38,28 @@
 //     return %r0#0, %r0#1, %r1
 //   }
 
+#include <cassert>
+#include <string>
+#include <utility>
+
+#include "llvm/ADT/DenseSet.h"
+#include "llvm/ADT/STLExtras.h"
+#include "llvm/ADT/SmallPtrSet.h"
+#include "mlir/IR/Block.h"
+#include "mlir/IR/Builders.h"
+#include "mlir/IR/BuiltinAttributes.h"
+#include "mlir/IR/BuiltinTypes.h"
+#include "mlir/IR/Diagnostics.h"
+#include "mlir/IR/Location.h"
+#include "mlir/IR/OperationSupport.h"
+#include "mlir/IR/Types.h"
+#include "mlir/IR/Value.h"
+#include "mlir/Interfaces/FunctionInterfaces.h"
+#include "mlir/Support/LLVM.h"
+#include "mlir/Support/LogicalResult.h"
+
+#include "Quantum/IR/QuantumAttrDefs.h"
+#include "Quantum/IR/QuantumInterfaces.h"
 #define DEBUG_TYPE "split-non-commuting"
 
 #include <cstdint>
@@ -118,7 +140,7 @@ struct SplitNonCommutingPass : public impl::SplitNonCommutingPassBase<SplitNonCo
 
     struct MeasInfo {
         int idx;
-        MeasurementProcess measurementOp;
+        TerminalMeasurement measurementOp;
         Value obs;
         llvm::DenseSet<Value> qubits;
     };
@@ -139,7 +161,7 @@ struct SplitNonCommutingPass : public impl::SplitNonCommutingPassBase<SplitNonCo
             if (!isSupportedMeasOp(op)) {
                 return;
             }
-            auto measurementOp = cast<MeasurementProcess>(op);
+            auto measurementOp = cast<TerminalMeasurement>(op);
             Value obs = measurementOp.getObs();
             MeasInfo info{.idx = measIdx,
                           .measurementOp = measurementOp,

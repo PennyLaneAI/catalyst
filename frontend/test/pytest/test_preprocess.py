@@ -19,10 +19,11 @@ from dataclasses import replace
 import numpy as np
 import pennylane as qp
 import pytest
+from pennylane.core.queuing import AnnotatedQueue
 from pennylane.decomposition import add_decomps, register_resources
 from pennylane.devices import Device, NullQubit
 from pennylane.devices.capabilities import DeviceCapabilities, OperatorProperties
-from pennylane.ops.op_math.adjoint2 import adjoint_rotation as adjoint_rotation2
+from pennylane.ops.op_math.adjoint2 import _adjoint_negate_angle as adjoint_rotation2
 from pennylane.tape import QuantumScript
 from utils import CONFIG_CUSTOM_DEVICE
 
@@ -528,12 +529,14 @@ class TestPreprocessHybridOp:
         if gate_set_src == "capabilities":
             capabilities = DeviceCapabilities.from_toml_file(request.node.toml_file)
             kwargs = {"capabilities": capabilities}
+            expected_ops = capabilities.operations
         else:
             kwargs = {"target_gates": TARGET_GATES_FROM_CONFIG, "capabilities": None}
+            expected_ops = TARGET_GATES_FROM_CONFIG
 
         (new_tape,), _ = catalyst_decompose(tape, **kwargs)
 
-        assert len(new_tape.operations) == 14
+        assert all(op.name in expected_ops for op in new_tape.operations)
         assert np.allclose(qp.matrix(new_tape, wire_order=[1, 0]), tape.operations[0].matrix())
 
     @pytest.mark.usefixtures("create_temporary_toml_file")
@@ -542,7 +545,7 @@ class TestPreprocessHybridOp:
         """Test that an error is raised in decompose if a PennyLane mid-circuit measurement
         is encountered"""
 
-        with qp.queuing.AnnotatedQueue() as q:
+        with AnnotatedQueue() as q:
             qp.RX(1.23, wires=0)
             qp.measure(0)
 
@@ -562,7 +565,7 @@ class TestPreprocessHybridOp:
         """Test that an error is raised in decompose if a PennyLane mid-circuit measurement
         is encountered"""
 
-        with qp.queuing.AnnotatedQueue() as q:
+        with AnnotatedQueue() as q:
             qp.RX(1.23, wires=0)
             qp.measure(0)
 

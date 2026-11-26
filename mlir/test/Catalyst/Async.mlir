@@ -179,3 +179,33 @@ module @bar {
     return %3 : tensor<2xcomplex<f64>>
   }
 }
+
+// -----
+
+// A dealloc of a QNode argument placed right after the call (as buffer-deallocation does once it
+// knows the call result does not alias its argument) must be delayed until the async.execute has
+// completed, i.e. after the end-of-block await on its token.
+
+module @delay_operand_dealloc {
+  func.func private @f(%arg0: memref<f64>) -> memref<f64> attributes {qnode}
+
+  // CHECK-LABEL: func.func public @jit_delay_operand_dealloc
+  func.func public @jit_delay_operand_dealloc(%arg0: memref<f64>) -> f64 attributes {llvm.emit_c_interface} {
+    // CHECK:      [[ARG:%.+]] = memref.alloc() : memref<f64>
+    // CHECK:      [[TOKEN:%.+]], [[RES:%.+]] = async.execute
+    // CHECK-NEXT:   func.call @f([[ARG]]) {transformed}
+    // CHECK-NOT:    memref.dealloc [[ARG]]
+    // CHECK-NEXT:   async.yield
+    // CHECK-NEXT: }
+    // CHECK:      async.await [[TOKEN]] : !async.token
+    // CHECK:      memref.dealloc [[ARG]] : memref<f64>
+    // CHECK-NEXT: return
+    %alloc = memref.alloc() : memref<f64>
+    memref.copy %arg0, %alloc : memref<f64> to memref<f64>
+    %0 = call @f(%alloc) : (memref<f64>) -> memref<f64>
+    memref.dealloc %alloc : memref<f64>
+    %1 = memref.load %0[] : memref<f64>
+    memref.dealloc %0 : memref<f64>
+    return %1 : f64
+  }
+}

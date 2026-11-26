@@ -14,17 +14,31 @@
 
 """Tests for trace-embedded decomposition-rule definitions."""
 
+import json
+import warnings
+
+import jax
+import jax.numpy as jnp
 import pennylane as qp
 import pytest
+from jax._src.lib.mlir import ir
 from pennylane.testing import find_eqns
 from pennylane.typing import Float, Wire
 
-from catalyst import qjit
+from catalyst import QJIT, CompileOptions, qjit
 from catalyst.decomposition.capture_session import OpDecompRequest, RuleIdentity
-from catalyst.decomposition.decomposition_rules import walk_reachable_decomp_rule_sets
 from catalyst.decomposition.modifier_state import ModifierState
+from catalyst.decomposition.rule_arguments import RuleTraceInputs
+from catalyst.decomposition.rule_capture import _convert_decomp_target_spec
+from catalyst.decomposition.rule_discovery import walk_reachable_decomp_rule_sets
+from catalyst.decomposition.rule_lowering_warning import RuleLoweringWarning
+from catalyst.decomposition.rule_preparation import DecompRuleSpec, DecompTargetSpec
 from catalyst.decomposition.type_utils import SerializedGraphOpID
+from catalyst.from_plxpr.qfunc_interpreter import PLxPRToQuantumJaxprInterpreter
+from catalyst.from_plxpr.qref_jax_primitives import QrefQreg
 from catalyst.jax_primitives import decomp_definition_p, decomprule_p
+from catalyst.jax_tracer import lower_jaxpr_to_mlir
+from catalyst.utils.exceptions import CompileError
 
 # MLIR prints the quotes inside a string attribute as `\22`.
 ZEROED = "{ctrl_work_wire_type = \\22zeroed\\22}"
@@ -41,13 +55,13 @@ class RepeatedGate(qp.core.Operator2):
 def test_repeated_gate_captures_only_plain_variant(mocker):
     """Repeated plain root equations share one captured variant."""
 
-    import catalyst.from_plxpr.qfunc_interpreter as capture_frontend
+    from catalyst.decomposition import rule_capture
 
     @qp.register_resources({})
     def empty_rule(wires):
         del wires
 
-    spy = mocker.spy(capture_frontend, "_convert_decomp_target_spec")
+    spy = mocker.spy(rule_capture, "_convert_decomp_target_spec")
     with qp.decomposition.local_decomps():
         qp.add_decomps(RepeatedGate, empty_rule)
 
@@ -70,13 +84,13 @@ def test_repeated_gate_captures_only_plain_variant(mocker):
 def test_ambient_modifier_states_are_captured_independently(mocker):
     """Nested transforms capture only their concrete control/adjoint states."""
 
-    import catalyst.from_plxpr.qfunc_interpreter as capture_frontend
+    from catalyst.decomposition import rule_capture
 
     @qp.register_resources({})
     def empty_rule(wires):
         del wires
 
-    spy = mocker.spy(capture_frontend, "_convert_decomp_target_spec")
+    spy = mocker.spy(rule_capture, "_convert_decomp_target_spec")
     with qp.decomposition.local_decomps():
         qp.add_decomps(RepeatedGate, empty_rule)
 
@@ -255,7 +269,7 @@ def test_adjoint_context_propagates_to_descendants():
 def test_precompilation_preserves_traversal(mocker):
     """The trace-time rule traversal should continue past precompiled rules."""
 
-    import catalyst.from_plxpr.qfunc_interpreter as capture_frontend
+    from catalyst.decomposition import rule_capture
 
     class CacheRoot(qp.core.Operator2):
         def __init__(self, wires):
@@ -285,7 +299,7 @@ def test_precompilation_preserves_traversal(mocker):
 
     # mock the cache to only include the test CacheRoot
     load_cache = mocker.patch.object(
-        capture_frontend,
+        rule_capture,
         "load_precompiled_rule_identities",
         return_value=frozenset({cached_rule_identity}),
     )
@@ -319,7 +333,7 @@ def test_precompilation_preserves_traversal(mocker):
 def test_changed_resources_get_recaptured(mocker):
     """A rule is recaptured when its resources differ from a precompiled rule."""
 
-    import catalyst.from_plxpr.qfunc_interpreter as capture_frontend
+    from catalyst.decomposition import rule_capture
 
     @qp.register_resources({})
     def current_rule(wires):
@@ -331,7 +345,7 @@ def test_changed_resources_get_recaptured(mocker):
         ((SerializedGraphOpID("PauliX{}{wires:1}{}"), 1),),
     )
     load_cache = mocker.patch.object(
-        capture_frontend,
+        rule_capture,
         "load_precompiled_rule_identities",
         return_value=frozenset({stale_identity}),
     )
@@ -354,7 +368,7 @@ def test_changed_resources_get_recaptured(mocker):
 def test_tracing_recovers_missed_cache(mocker):
     """Test that the trace-time traversal captures all rules if loading the cache fails."""
 
-    import catalyst.from_plxpr.qfunc_interpreter as capture_frontend
+    from catalyst.decomposition import rule_capture
 
     @qp.register_resources({})
     def first_rule(wires):
@@ -365,7 +379,7 @@ def test_tracing_recovers_missed_cache(mocker):
         del wires
 
     load_cache = mocker.patch.object(
-        capture_frontend,
+        rule_capture,
         "load_precompiled_rule_identities",
         side_effect=OSError("cache unavailable"),
     )
@@ -387,6 +401,99 @@ def test_tracing_recovers_missed_cache(mocker):
     # ensure rules were compiled
     assert 'frontend_name = "first_rule"' in mlir
     assert 'frontend_name = "second_rule"' in mlir
+
+
+@pytest.fixture
+def convert_rules(use_capture):
+    """Convert a batch of prepared single-wire rule bodies."""
+    interpreter = PLxPRToQuantumJaxprInterpreter(
+        qp.device("null.qubit", wires=1), qp.measurements.Shots(), None, {}
+    )
+
+    def convert(rules, *, reject_noninvertible=False):
+        target_spec = DecompTargetSpec(
+            rules=[DecompRuleSpec(rule, rule.__name__, {}, {}) for rule in rules],
+            trace_inputs=RuleTraceInputs(
+                call_args=(),
+                call_kwargs={"wires": jnp.array([0])},
+                kwarg_names=["wires"],
+                wire_lens={"wires": 1},
+            ),
+            target_id=SerializedGraphOpID("RepeatedGate{}{wires:1}{}"),
+            modifier_context=ModifierState(),
+            reject_noninvertible=reject_noninvertible,
+        )
+        return _convert_decomp_target_spec(interpreter, target_spec)
+
+    return convert
+
+
+def test_rule_conversion_rejects_noninvertible_body(convert_rules):
+    """Reject measurement-containing bodies while retaining an invertible alternative."""
+
+    def measured_rule(wires):
+        qp.measure(wires[0])
+
+    def valid_rule(wires):
+        del wires
+
+    converted = convert_rules([measured_rule, valid_rule], reject_noninvertible=True)
+
+    assert [rule.frontend_name for rule in converted] == ["valid_rule"]
+
+
+def test_rule_conversion_recovers_from_failure(convert_rules, mocker):
+    """Warn about a failed conversion and continue converting alternative rules."""
+
+    def failed_rule(wires):
+        del wires
+
+    def valid_rule(wires):
+        del wires
+
+    original_call = PLxPRToQuantumJaxprInterpreter.__call__
+
+    def fail_first_conversion(interpreter, *args):
+        if convert.call_count == 1:
+            raise ValueError("conversion failed")
+        return original_call(interpreter, *args)
+
+    convert = mocker.patch.object(
+        PLxPRToQuantumJaxprInterpreter,
+        "__call__",
+        autospec=True,
+        side_effect=fail_first_conversion,
+    )
+    with pytest.warns(
+        RuleLoweringWarning,
+        match=r"Failed to convert the failed_rule decomposition rule for "
+        r"RepeatedGate\{\}\{wires:1\}\{\}: conversion failed",
+    ):
+        converted = convert_rules([failed_rule, valid_rule])
+
+    assert convert.call_count == 2
+    assert [rule.frontend_name for rule in converted] == ["valid_rule"]
+
+
+def test_rule_conversion_propagates_compile_error(convert_rules, mocker):
+    """Fatal compiler errors propagate without becoming recovery warnings."""
+
+    def failed_rule(wires):
+        del wires
+
+    error = CompileError("fatal conversion failure")
+    convert = mocker.patch.object(
+        PLxPRToQuantumJaxprInterpreter, "__call__", autospec=True, side_effect=error
+    )
+
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always", RuleLoweringWarning)
+        with pytest.raises(CompileError) as exc_info:
+            convert_rules([failed_rule])
+
+    assert exc_info.value is error
+    convert.assert_called_once()
+    assert not any(issubclass(warning.category, RuleLoweringWarning) for warning in caught)
 
 
 def test_distributed_control_context_reopens_descendants():
@@ -898,8 +1005,12 @@ def test_registered_callable_captures_work_wire_operands(work_wire_type):
     assert "callable_ctrl_rule" in circuit.mlir
 
 
-def test_registry_lookup_uses_operator_class():
+def test_registry_lookup_uses_operator_class(mocker):
     """An Operator2 whose graph name is shared with an Operator1 uses its own registry rules."""
+
+    from pennylane.ops.op_math.prod2 import Prod2
+
+    lookup = mocker.spy(qp.decomposition, "list_decomps")
 
     @qjit(capture=True, target="mlir")
     @qp.qnode(qp.device("null.qubit", wires=2))
@@ -909,14 +1020,15 @@ def test_registry_lookup_uses_operator_class():
 
     mlir = str(circuit.mlir)
 
-    assert 'frontend_name = "_prod2_decomp"' in mlir
-    assert 'frontend_name = "_prod_decomp"' not in mlir
+    assert 'frontend_name = "expand_factors"' in mlir
+    assert any(call.args == (Prod2,) for call in lookup.call_args_list)
+    assert not any(call.args == (qp.ops.Prod,) for call in lookup.call_args_list)
 
 
 def test_shared_descendant_resources_are_collected_once(mocker):
     """Preparation drives traversal without a second resource-discovery probe."""
 
-    import catalyst.decomposition.decomposition_rules as decomposition_rules
+    import catalyst.decomposition.rule_preparation as rule_preparation
 
     class RootA(qp.core.Operator2):
         def __init__(self, wires):
@@ -938,7 +1050,7 @@ def test_shared_descendant_resources_are_collected_once(mocker):
     def leaf_rule(wires):
         del wires
 
-    spy = mocker.spy(decomposition_rules, "collect_resources_for_op")
+    spy = mocker.spy(rule_preparation, "collect_resources_for_op")
     with qp.decomposition.local_decomps():
         qp.add_decomps(RootA, root_rule)
         qp.add_decomps(RootB, root_rule)
@@ -980,10 +1092,11 @@ def test_rule_uses_size_agnostic_qreg():
     assert 'target_gate = "RepeatedGate{}{wires:1}{}"' in mlir
 
 
-def test_multiple_qnodes_capture_and_materialize_locally(mocker):
+@pytest.mark.parametrize("estimate_decomps", [False, True])
+def test_multiple_qnodes_capture_and_materialize_locally(mocker, estimate_decomps):
     """Each QNode captures and materializes its definitions in its own nested module."""
 
-    import catalyst.from_plxpr.qfunc_interpreter as capture_frontend
+    from catalyst.decomposition import rule_capture
 
     @qp.register_resources({})
     def empty_rule(wires):
@@ -1002,20 +1115,280 @@ def test_multiple_qnodes_capture_and_materialize_locally(mocker):
         RepeatedGate(2)
         return qp.state()
 
-    spy = mocker.spy(capture_frontend, "_convert_decomp_target_spec")
+    spy = mocker.spy(rule_capture, "_convert_decomp_target_spec")
     with qp.decomposition.local_decomps():
         qp.add_decomps(RepeatedGate, empty_rule)
 
-        @qjit(capture=True, target="mlir")
         def workflow():
             return first(), second()
 
+        workflow = QJIT(
+            workflow,
+            CompileOptions(capture=True, target="mlir", estimate_decomps=estimate_decomps),
+        )
         mlir = str(workflow.mlir_module)
 
     assert spy.call_count == 2
     assert mlir.count("target_gate =") == 2
     assert mlir.count("!qref.reg<?>") >= 2
     assert "!qref.reg<4>" in mlir  # circuit allocation remains statically sized
+
+
+def _rule_funcops(compiled):
+    """Collect rule functions from a compiled workflow's nested modules."""
+    rules = []
+
+    def collect(op):
+        if op.name == "func.func" and "target_gate" in op.attributes:
+            rules.append(op)
+        return ir.WalkResult.ADVANCE
+
+    compiled.mlir_module.operation.walk(collect)
+    return rules
+
+
+def test_estimate_decomps_reuses_declaration_cache():
+    """Repeated declarations share a function, with a separate cache entry for its body."""
+
+    def rule(*args):
+        del args
+
+    signature = jax.make_jaxpr(rule)(QrefQreg(), jnp.array([0]))
+
+    def definitions():
+        for estimate_decomps in (True, True, False, True):
+            decomp_definition_p.bind(
+                pyfun=rule,
+                func_jaxpr=signature,
+                target_gate="RepeatedGate{}{wires:1}{}",
+                resources=(),
+                frontend_name="rule",
+                num_wires=None,
+                estimate_decomps=estimate_decomps,
+            )
+        return 0
+
+    module, _ = lower_jaxpr_to_mlir(jax.make_jaxpr(definitions)(), "rule_cache", [])
+    rules = [
+        op
+        for op in module.body.operations
+        if op.operation.name == "func.func" and "target_gate" in op.attributes
+    ]
+
+    assert len(rules) == 2
+    assert sorted(len(op.regions[0].blocks) for op in rules) == [0, 1]
+    assert module.operation.verify()
+
+
+@pytest.mark.parametrize("adjoint", [False, True])
+@pytest.mark.parametrize("controlled", [False, True])
+def test_estimate_decomps_preserves_signatures_and_resources(mocker, adjoint, controlled):
+    """Custom rule declarations match definitions, including parameters and modifier operands."""
+    from catalyst.decomposition import rule_capture
+
+    class ParameterizedGate(qp.core.Operator2):
+        dynamic_argnames = ("theta",)
+
+        def __init__(self, theta, wires):
+            super().__init__(theta=theta, wires=wires)
+
+    @qp.register_resources({RepeatedGate(Wire[1]): 2})
+    def root_rule(theta, wires):
+        del theta
+        RepeatedGate(wires)
+        RepeatedGate(wires)
+
+    @qp.register_resources({})
+    def leaf_rule(wires):
+        del wires
+
+    mocker.patch.object(rule_capture, "load_precompiled_rule_identities", return_value=frozenset())
+
+    @qp.qnode(qp.device("null.qubit", wires=4))
+    def circuit(theta: float):
+        def gate():
+            ParameterizedGate(theta, wires=0)
+
+        modified = qp.adjoint(gate) if adjoint else gate
+        if controlled:
+            modified = qp.ctrl(modified, control=[1, 2], work_wires=[3], work_wire_type="zeroed")
+        modified()
+        return qp.state()
+
+    with qp.decomposition.local_decomps():
+        qp.add_decomps(ParameterizedGate, root_rule)
+        qp.add_decomps(RepeatedGate, leaf_rule)
+        definitions = qjit(circuit, target="mlir")
+        declarations = QJIT(circuit, CompileOptions(target="mlir", estimate_decomps=True))
+
+    target_names = {
+        ModifierState(adjoint=adjoint, control_count=2 if controlled else 0).wrap_name(name)
+        for name in ("ParameterizedGate", "RepeatedGate")
+    }
+
+    def signatures(compiled):
+        return sorted(
+            tuple(
+                str(op.attributes[attr])
+                for attr in (
+                    "function_type",
+                    "target_gate",
+                    "resources",
+                    "frontend_name",
+                    "sym_visibility",
+                )
+            )
+            for op in _rule_funcops(compiled)
+            if ir.StringAttr(op.attributes["frontend_name"]).value in {"root_rule", "leaf_rule"}
+            and ir.StringAttr(op.attributes["target_gate"]).value.partition("{")[0] in target_names
+        )
+
+    assert len(signatures(declarations)) == 2
+    assert signatures(declarations) == signatures(definitions)
+    assert all(len(op.regions[0].blocks) == 0 for op in _rule_funcops(declarations))
+    assert all(len(op.regions[0].blocks) == 1 for op in _rule_funcops(definitions))
+    assert declarations.mlir_module.operation.verify()
+
+
+def test_estimate_decomps_does_not_trace_implementations(mocker):
+    """Resource-only rules remain available even if their implementations cannot be captured."""
+    from catalyst.decomposition import rule_capture
+
+    @qp.register_resources({RepeatedGate(Wire[1]): 3})
+    def unavailable_rule(wires):
+        raise AssertionError("The rule implementation must not be traced")
+
+    @qp.register_resources({})
+    def empty_rule(wires):
+        del wires
+
+    load_cache = mocker.patch.object(
+        rule_capture,
+        "load_precompiled_rule_identities",
+        side_effect=AssertionError("Declarations do not require the implementation cache"),
+    )
+
+    with qp.decomposition.local_decomps():
+        qp.add_decomps(RepeatedGate, unavailable_rule, empty_rule)
+
+        @qp.qnode(qp.device("null.qubit", wires=1))
+        def circuit():
+            RepeatedGate(0)
+            RepeatedGate(0)
+            return qp.state()
+
+        circuit = QJIT(circuit, CompileOptions(target="mlir", estimate_decomps=True))
+
+    load_cache.assert_not_called()
+    rules = _rule_funcops(circuit)
+    assert len(rules) == 2
+    unavailable = next(
+        op
+        for op in rules
+        if ir.StringAttr(op.attributes["frontend_name"]).value == "unavailable_rule"
+    )
+    assert '"RepeatedGate{}{wires:1}{}" = 3' in str(unavailable.attributes["resources"])
+    assert all(len(op.regions[0].blocks) == 0 for op in rules)
+
+
+def test_estimate_decomps_includes_precompiled_rules(mocker):
+    """Matching cached implementations still have declarations with their current resources."""
+    from catalyst.decomposition import rule_capture
+
+    @qp.register_resources({})
+    def empty_rule(wires):
+        del wires
+
+    mocker.patch.object(
+        rule_capture,
+        "load_precompiled_rule_identities",
+        return_value=frozenset(
+            {RuleIdentity(SerializedGraphOpID("RepeatedGate{}{wires:1}{}"), "empty_rule", ())}
+        ),
+    )
+
+    with qp.decomposition.local_decomps():
+        qp.add_decomps(RepeatedGate, empty_rule)
+
+        @qp.qnode(qp.device("null.qubit", wires=1))
+        def circuit():
+            RepeatedGate(0)
+            return qp.state()
+
+        definitions = qjit(circuit, target="mlir")
+        declarations = QJIT(circuit, CompileOptions(target="mlir", estimate_decomps=True))
+
+    assert not _rule_funcops(definitions)
+    assert len(_rule_funcops(declarations)) == 1
+
+
+@pytest.mark.parametrize("capture, collect_rules", [(True, False), (False, True)])
+def test_estimate_decomps_requires_capture_and_collection(capture, collect_rules):
+    """Disabling capture or rule collection takes precedence over requesting declarations."""
+
+    @qp.qnode(qp.device("null.qubit", wires=1))
+    def circuit():
+        qp.RX(0.5, wires=0)
+        return qp.state()
+
+    circuit = QJIT(
+        circuit,
+        CompileOptions(
+            target="mlir",
+            capture=capture,
+            collect_decomp_rules=collect_rules,
+            estimate_decomps=True,
+        ),
+    )
+    assert not _rule_funcops(circuit)
+
+
+@pytest.mark.parametrize("estimate_api", ["qp.estimate", "resource-estimate"])
+def test_resource_estimate_uses_declarations(tmp_path, estimate_api):
+    """The resource estimator solves a transitive rule graph without compiling any rule bodies."""
+
+    class EstimateRoot(qp.core.Operator2):
+        def __init__(self, wires):
+            super().__init__(wires=wires)
+
+    class EstimateMiddle(qp.core.Operator2):
+        def __init__(self, wires):
+            super().__init__(wires=wires)
+
+    @qp.register_resources({EstimateMiddle(Wire[1]): 2})
+    def root_rule(wires):
+        raise AssertionError("The root rule implementation must not be traced")
+
+    @qp.register_resources({RepeatedGate(Wire[1]): 3})
+    def middle_rule(wires):
+        raise AssertionError("The middle rule implementation must not be traced")
+
+    with qp.decomposition.local_decomps():
+        qp.add_decomps(EstimateRoot, root_rule)
+        qp.add_decomps(EstimateMiddle, middle_rule)
+
+        @qp.qnode(qp.device("null.qubit", wires=1))
+        def circuit():
+            EstimateRoot(0)
+            return qp.state()
+
+        if estimate_api == "qp.estimate":
+            compiled = QJIT(circuit, CompileOptions(target="mlir", estimate_decomps=True))
+            assert all(len(op.regions[0].blocks) == 0 for op in _rule_funcops(compiled))
+            counts = qp.estimate(compiled, target={"RepeatedGate"})().resources.quantum_operations
+        else:
+            output = tmp_path / "resources.json"
+            transformed = qp.transform(pass_name="resource-estimate")(
+                gate_set={"RepeatedGate"}, output_json=True, output_fname=str(output)
+            )(circuit)
+            QJIT(
+                transformed,
+                CompileOptions(target="mlir_opt", skip_preprocess=True, estimate_decomps=True),
+            )
+            resources = json.loads(output.read_text())
+            counts = resources["circuit"]["quantum_operations"]["-1"]
+
+    assert counts == {"RepeatedGate": 6}
 
 
 if __name__ == "__main__":

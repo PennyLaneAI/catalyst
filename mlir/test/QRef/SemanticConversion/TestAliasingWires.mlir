@@ -257,3 +257,21 @@ func.func @while_mixed(%i: i64, %flag: i1) attributes {quantum.node} {
   qref.dealloc %r : !qref.reg<3>
   return
 }
+
+// -----
+
+// Controls may not alias any of the composite's physical target qubits.
+func.func @control_alias() attributes {quantum.node} {
+  %true = arith.constant true
+  %r = qref.alloc(1) : !qref.reg<1>
+  // expected-note@+1 {{first use of the qubit}}
+  %q = qref.get %r[0] : !qref.reg<1> -> !qref.bit
+  // expected-note@+1 {{aliasing use of the same qubit}}
+  %control = qref.get %r[0] : !qref.reg<1> -> !qref.bit
+  // expected-error@+1 {{qubit operands must refer to distinct qubits}}
+  qref.operator "Composite"() qubits(%q, %q)
+    ctrls(%control) ctrl_vals(%true)
+    qubit_map = {compute = [0], target = [1]}
+  qref.dealloc %r : !qref.reg<1>
+  return
+}

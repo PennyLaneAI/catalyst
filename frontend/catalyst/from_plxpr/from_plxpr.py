@@ -31,6 +31,7 @@ from pennylane.transforms import decompose as pl_decompose
 
 from catalyst.backline import device_pass_pipeline, remote_device_lib
 from catalyst.decomposition.capture_session import DecompositionScope
+from catalyst.decomposition.rule_capture import capture_and_bind_kernel_rules
 from catalyst.device import extract_backend_info
 from catalyst.device.qjit_device import is_dynamic_wires
 from catalyst.from_plxpr.qref_jax_primitives import (
@@ -47,10 +48,7 @@ from catalyst.jax_primitives import (
 from catalyst.utils.patching import Patcher
 
 from .device_utils import create_device_preprocessing_pipeline
-from .qfunc_interpreter import (
-    PLxPRToQuantumJaxprInterpreter,
-    capture_and_bind_kernel_rules,
-)
+from .qfunc_interpreter import PLxPRToQuantumJaxprInterpreter
 
 # dummy hop (higher order primitive) is used to just return a jaxpr
 # produced inside of a another jaxpr
@@ -148,6 +146,7 @@ def from_plxpr(
     _preprocess_warn: bool = True,
     collect_decomp_rules: bool = True,
     plugin_paths: list[str] | None = None,
+    estimate_decomps: bool = False,
 ) -> Callable[..., Jaxpr]:
     """Convert PennyLane variant jaxpr to Catalyst variant jaxpr.
 
@@ -164,6 +163,8 @@ def from_plxpr(
             decomposition rules from the gates in the circuit. ``True`` by default.
         plugin_paths (None | list[str]): a list that will be **mutated in place** with
             the paths of any transforms from plugins encountered
+        estimate_decomps (bool): Prepare rules for resource estimation without tracing
+            their implementations. Ignored when ``collect_decomp_rules=False``.
 
     Returns:
         Callable: A function that accepts the same arguments as the plxpr and returns catalyst
@@ -225,6 +226,7 @@ def from_plxpr(
         skip_preprocess=skip_preprocess,
         _preprocess_warn=_preprocess_warn,
         collect_decomp_rules=collect_decomp_rules,
+        estimate_decomps=estimate_decomps,
         plugin_paths=plugin_paths,
     )
     original_fn = partial(interpreter.eval, plxpr.jaxpr, plxpr.consts)
@@ -246,6 +248,7 @@ class WorkflowInterpreter(PlxprInterpreter):
             skip_preprocess=self._skip_preprocess,
             _preprocess_warn=self._preprocess_warn,
             collect_decomp_rules=self._collect_decomp_rules,
+            estimate_decomps=self._estimate_decomps,
             plugin_paths=self.plugin_paths,
         )
         new_version._pass_pipeline = copy(self._pass_pipeline)
@@ -258,12 +261,14 @@ class WorkflowInterpreter(PlxprInterpreter):
         _preprocess_warn=True,
         collect_decomp_rules=True,
         plugin_paths: None | list[str] = None,
+        estimate_decomps=False,
     ):
         self._pass_pipeline = []
         self.init_qreg = None
         self._skip_preprocess = skip_preprocess
         self._preprocess_warn = _preprocess_warn
         self._collect_decomp_rules = collect_decomp_rules
+        self._estimate_decomps = estimate_decomps
         self.plugin_paths = plugin_paths if plugin_paths is not None else []
 
         super().__init__()
@@ -284,7 +289,11 @@ def handle_qnode(
 
     closed_jaxpr = ClosedJaxpr(qfunc_jaxpr, consts)
 
-    decomposition_scope = DecompositionScope() if self._collect_decomp_rules else None
+    decomposition_scope = (
+        DecompositionScope(estimate_decomps=self._estimate_decomps)
+        if self._collect_decomp_rules
+        else None
+    )
 
     def calling_convention(*args):
         device_init_p.bind(
@@ -477,6 +486,7 @@ def trace_from_pennylane(
     skip_preprocess=False,
     collect_decomp_rules=True,
     debug_info=None,
+    estimate_decomps=False,
 ):
     """Capture the JAX program representation (JAXPR) of the wrapped function, using
     PL capure module.
@@ -499,6 +509,8 @@ def trace_from_pennylane(
         collect_decomp_rules (bool): Controls whether or not to compile the reachable
             decomposition rules from the gates in the circuit. ``True`` by default.
         debug_info(jax.api_util.debug_info): a source debug information object required by jaxprs.
+        estimate_decomps (bool): Prepare rules for resource estimation without tracing
+            their implementations. Ignored when ``collect_decomp_rules=False``.
 
     Returns:
         ClosedJaxpr: captured JAXPR
@@ -552,6 +564,7 @@ def trace_from_pennylane(
                 plxpr,
                 skip_preprocess=skip_preprocess,
                 collect_decomp_rules=collect_decomp_rules,
+                estimate_decomps=estimate_decomps,
                 plugin_paths=plugin_paths,
             )(*abstract_shapes, *flat_inputs)
 

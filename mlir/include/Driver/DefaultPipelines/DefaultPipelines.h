@@ -126,6 +126,7 @@ const PipelineList pipelineList{
        * "func.func(promote-buffers-to-stack)",
        */
       // TODO: migrate to new buffer deallocation "buffer-deallocation-pipeline"
+      "annotate-buffer-ownership",
       "func.func(buffer-deallocation)",
       "convert-arraylist-to-memref",
       "convert-bufferization-to-memref",
