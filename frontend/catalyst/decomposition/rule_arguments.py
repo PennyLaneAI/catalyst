@@ -22,6 +22,7 @@ import itertools
 from dataclasses import dataclass
 from enum import Enum, auto
 
+import jax
 import jax.numpy as jnp
 import numpy as np
 import pennylane as qp
@@ -38,9 +39,8 @@ from catalyst.utils.exceptions import CompileError
 class RuleTraceInputs:
     """Dummy arguments and operand layout shared by a target's prepared rules.
 
-    :func:`rule_call_operands` packs these inputs as positional and named parameters, numeric
-    hybrid leaves, one grouped base-wire operand, then optional control wires and values.
-    Packing creates JAX arrays, so it must happen in the caller's tracing context.
+    :func:`rule_call_operands` describes these inputs as positional and named parameters,
+    numeric hybrid leaves, one grouped base-wire operand, then optional control wires and values.
 
     ``ctrl_wires`` and ``ctrl_values`` must be supplied together with matching lengths,
     or both be ``None``.
@@ -267,8 +267,8 @@ def flatten_hybrid_args(extra_data) -> tuple:
     return argument_specs, dummy_parameters, static_arguments
 
 
-def rule_call_operands(trace_inputs: RuleTraceInputs) -> list[Array | np.float64]:
-    """Pack dummy inputs into the positional operand layout used to trace a rule.
+def rule_call_operands(trace_inputs: RuleTraceInputs) -> list[jax.ShapeDtypeStruct]:
+    """Describe the shape and dtype of each positional operand used to trace a rule.
 
     The order is positional parameters, named parameters, numeric hybrid leaves, one grouped
     base-wire array, then optional control wires and values. Named parameters follow
@@ -276,22 +276,25 @@ def rule_call_operands(trace_inputs: RuleTraceInputs) -> list[Array | np.float64
     Control work wires are included as a ``ctrl_work_wires`` register in the grouped
     wire array. The grouped wire array is present even when empty.
 
-    Packing creates JAX arrays and must run in the caller's tracing context. All operands are
-    positional so ``jax.jit`` (used by ``qp.capture.subroutine``) cannot reorder keyword arguments
-    alphabetically.
+    Tracing only needs shapes and dtypes, so the grouped wire array is not allocated.
+    All operands are positional so ``jax.jit`` (used by ``qp.capture.subroutine``) cannot reorder
+    keyword arguments alphabetically.
 
     Args:
         trace_inputs (RuleTraceInputs): the rule's dummy arguments and operand layout
 
     Returns:
-        list: positional operands in the layout consumed by :func:`unpack_rule_operands`
+        list: operand descriptors in the layout consumed by :func:`unpack_rule_operands`
     """
     param_names = [name for name in trace_inputs.kwarg_names if name not in trace_inputs.wire_lens]
-    wire_names = list(trace_inputs.wire_lens)
-    grouped_wires = (
-        jnp.concatenate(tuple(trace_inputs.call_kwargs[name] for name in wire_names))
-        if wire_names
-        else jnp.array([], dtype=int)
+    wire_arrays = [trace_inputs.call_kwargs[name] for name in trace_inputs.wire_lens]
+    wire_dtype = (
+        jnp.result_type(*wire_arrays)
+        if wire_arrays
+        else jax.dtypes.canonicalize_dtype(np.dtype(int))
+    )
+    grouped_wires = jax.ShapeDtypeStruct(
+        (sum(array.shape[0] for array in wire_arrays),), wire_dtype
     )
     operands = [
         *trace_inputs.call_args,
@@ -303,7 +306,7 @@ def rule_call_operands(trace_inputs: RuleTraceInputs) -> list[Array | np.float64
         operands.append(trace_inputs.ctrl_wires)
     if trace_inputs.ctrl_values is not None:
         operands.append(trace_inputs.ctrl_values)
-    return operands
+    return [jax.ShapeDtypeStruct(operand.shape, operand.dtype) for operand in operands]
 
 
 def unpack_rule_operands(

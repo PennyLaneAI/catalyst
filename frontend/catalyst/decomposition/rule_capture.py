@@ -46,7 +46,6 @@ def _convert_decomp_target_spec(
     """Convert rules into Catalyst JAXPRs, retaining only their signatures if requested."""
     with take_current_trace():
         operands = rule_call_operands(target_spec.trace_inputs)
-        operands = [jax.ShapeDtypeStruct(operand.shape, operand.dtype) for operand in operands]
     out = []
     for rule in target_spec.rules:
         if (
