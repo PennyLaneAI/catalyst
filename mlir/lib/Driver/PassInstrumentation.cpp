@@ -14,6 +14,7 @@
 
 #include "Driver/PassInstrumentation.h"
 
+#include "llvm/ADT/StringExtras.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/Pass/Pass.h"
@@ -81,11 +82,18 @@ void CatalystPassInstrumentation::runAfterPassFailed(mlir::Pass *pass, mlir::Ope
             this->output.nextPipelineSummaryFilename(pass->getName().str() + "_FAILED"), tmp);
     }
     if (!this->options.saveIROnFailure.empty()) {
+        // The names of some passes, e.g. mlir::detail::OpToOpPassAdaptor, have characters that
+        // file systems or CI artifacts reject
+        std::string passName = pass->getName().str();
+        for (char &c : passName) {
+            if (!llvm::isAlnum(c) && c != '_' && c != '-' && c != '.') {
+                c = '_';
+            }
+        }
         driver::CompilerOptions failureOptions = this->options;
         failureOptions.workspace = this->options.saveIROnFailure;
-        driver::dumpToFile(
-            failureOptions,
-            this->options.moduleName.str() + "_" + pass->getName().str() + "_FAILED.mlir", tmp);
+        driver::dumpToFile(failureOptions,
+                           this->options.moduleName.str() + "_" + passName + "_FAILED.mlir", tmp);
     }
 
     // Clean up fingerprint if present
