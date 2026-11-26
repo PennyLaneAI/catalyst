@@ -11,9 +11,9 @@ compatible PennyLane release that includes Catalyst and an execution backend:
 
     pip install pennylane
 
-Installing ``pennylane-catalyst`` no longer installs PennyLane or Lightning, or enforces
-compatible versions of those packages. A standalone installation does not provide access to
-end-to-end workflows, however the compiler core can be run independently via the
+Beyond Catalyst version 0.15.0, installing ``pennylane-catalyst`` no longer installs PennyLane or
+Lightning, or enforces compatible versions of those packages. A standalone installation does not
+provide access to end-to-end workflows, however the compiler core can be run independently via the
 `CLI <https://docs.pennylane.ai/projects/catalyst/en/stable/catalyst-cli/catalyst-cli.html>`_.
 
 .. warning::
