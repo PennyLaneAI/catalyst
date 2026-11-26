@@ -899,8 +899,9 @@
   dialect to the PBC dialect. Before conversion, it runs `modifiers-lowering` to lower
   `quantum.adjoint` and `quantum.ctrl` modifier regions to op-level modifiers, and only allows
   Quantum runtime/device operations, qubit/register management, uncontrolled global phase,
-  observables, and measurement processes to remain. `to-ppr` and `catalyst.passes.to_ppr` remain
-  available as deprecated aliases.
+  observables, and terminal measurement processes to remain. All mid-circuit measurements,
+  including every `quantum.measurement` op, must be converted to PBC operations.
+  `to-ppr` and `catalyst.passes.to_ppr` remain available as deprecated aliases.
   [(#3020)](https://github.com/PennyLaneAI/catalyst/pull/3020)
 
 * Catalyst now provides its own :func:`~.polynomial_extrapolate` and

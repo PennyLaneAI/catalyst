@@ -96,9 +96,10 @@ def ToPBCPass : Pass<"to-pbc"> {
         `quantum.adjoint` and `quantum.ctrl` modifier regions to op-level
         modifiers. Quantum runtime and device operations, allocation,
         deallocation, register access, uncontrolled global phase, observables,
-        and measurement processes may remain in the resulting PBC
-        representation; Quantum gates and mid-circuit measurements must be
-        converted to PBC operations.
+        and terminal measurement processes may remain in the resulting PBC
+        representation. Quantum gates and all mid-circuit measurements,
+        including every `quantum.measurement` op, must be converted to PBC
+        operations.
     }];
 
     let dependentDialects = [

@@ -573,7 +573,9 @@ struct PBCPauliMeasureLowering : public OpConversionPattern<MeasurementOp> {
     LogicalResult matchAndRewrite(MeasurementOp op, OpAdaptor adaptor,
                                   ConversionPatternRewriter &rewriter) const final {
         if (op.getOpName() != "PauliMeasure") {
-            return failure();
+            return op.emitOpError() << "measurement \"" << op.getOpName()
+                                    << "\" is not supported by PBC conversion, only "
+                                       "\"PauliMeasure\" can be converted";
         }
         if (!op.getParams().empty() || op.getInQreg() || !op.getArrQubitIndices().empty()) {
             return rewriter.notifyMatchFailure(op, "expected explicit qubits and no parameters");
