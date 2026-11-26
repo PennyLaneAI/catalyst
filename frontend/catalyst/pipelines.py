@@ -149,6 +149,12 @@ class CompileOptions:
         enable_aot_compilation (bool): Controls whether or not to enable ahead-of-time compilation.
             If ``True``, the QJIT object will attempt AOT compilation during object initialization.
             ``True`` by default.
+        save_ir_on_failure (Optional[Union[str, Path]]): A directory in which to save the IR at
+            the compiler pass that fails, as ``<module name>_<pass name>_FAILED.mlir``, with
+            ``_`` for the characters of the pass name other than letters, digits, ``_``, ``-``
+            and ``.``, independently of ``keep_intermediate``. The file of a program overwrites
+            that of an earlier program with the same name in the directory. For a pass that runs
+            on a single function, the file only has that function. ``None`` by default.
     """
 
     verbose: Optional[bool] = False
@@ -175,6 +181,7 @@ class CompileOptions:
     runtime_artifacts: tuple[str, ...] = ()
     collect_decomp_rules: bool = True
     enable_aot_compilation: bool = True
+    save_ir_on_failure: Optional[Union[str, Path]] = None
 
     def __post_init__(self):
         valid_targets = ("jaxpr", "mlir", "mlir_opt", "llvmir", "llvmir_opt", "object", "binary")

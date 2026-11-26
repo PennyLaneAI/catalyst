@@ -193,6 +193,11 @@
 
 <h3>Improvements 🛠</h3>
 
+* The new `qjit(save_ir_on_failure=<dir>)` option, with the `--save-ir-on-failure=<dir>` option of
+  the Catalyst CLI, saves the IR at a compiler pass that fails in the given directory, without
+  keeping any other intermediate file.
+  [(#3526)](https://github.com/PennyLaneAI/catalyst/pull/3526)
+
 * Operators whose operator-valued arguments share wires are now supported
   with `qjit`.
   [(#3470)](https://github.com/PennyLaneAI/catalyst/pull/3470)

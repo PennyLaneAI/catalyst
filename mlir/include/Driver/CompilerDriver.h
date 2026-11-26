@@ -113,6 +113,9 @@ struct CompilerOptions {
     bool dumpPassPipeline;
     /// If true, the compiler will write bytecode rather than text.
     bool shouldEmitBytecode;
+    /// If not empty, the directory in which the driver saves the IR at a pass that fails,
+    /// independently of keepIntermediate.
+    mlir::StringRef saveIROnFailure;
 };
 
 /**
