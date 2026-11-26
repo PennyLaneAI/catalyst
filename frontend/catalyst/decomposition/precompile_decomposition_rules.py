@@ -18,22 +18,16 @@ import json
 from pathlib import Path
 
 import pennylane as qp
-from jax._src.lib.mlir import ir
 
 from catalyst.compiler import _quantum_opt
-from catalyst.decomposition.capture_session import DecompositionScope, OpDecompRequest, RuleIdentity
+from catalyst.decomposition.capture_session import DecompositionScope, OpDecompRequest
 from catalyst.decomposition.modifier_state import ModifierState
 from catalyst.decomposition.precompiled_rule_loading import (
     ManifestEntries,
     get_bytecode_hash,
     get_rule_entry,
 )
-from catalyst.from_plxpr.qfunc_interpreter import (
-    PLxPRToQuantumJaxprInterpreter,
-    capture_and_bind_kernel_rules,
-)
-from catalyst.from_plxpr.qref_jax_primitives import QrefQreg
-from catalyst.utils.exceptions import CompileError
+from catalyst.decomposition.rule_compilation import _capture_rule_module
 from catalyst.utils.runtime_environment import (
     PRECOMPILED_BYTECODE_PATH,
     get_precompiled_manifest_path,
@@ -43,33 +37,6 @@ PRECOMPILATION_MODIFIERS = (
     ModifierState(),
     ModifierState(adjoint=True),
 )
-
-
-def _capture_rule_module(
-    scope: DecompositionScope,
-    *,
-    precompiled_rule_identities: frozenset[RuleIdentity] = frozenset(),
-) -> ir.Module:
-    """Capture reachable rules into one module, skipping supplied available identities."""
-    interpreter = PLxPRToQuantumJaxprInterpreter(
-        qp.device("null.qubit", wires=1),
-        None,
-        QrefQreg(),
-        {},
-        decomposition_scope=scope,
-    )
-
-    # use target="mlir" and .mlir_module to skip compiler invocation
-    @qp.qjit(capture=True, target="mlir", collect_decomp_rules=False)
-    def rules_module():
-        capture_and_bind_kernel_rules(
-            interpreter, precompiled_rule_identities=precompiled_rule_identities
-        )
-
-    module = rules_module.mlir_module
-    if module is None:
-        raise CompileError("Failed to generate the precompiled decomposition-rule module")
-    return module
 
 
 def precompile_decomp_rules(_decomp_file_path: str | Path = PRECOMPILED_BYTECODE_PATH) -> None:

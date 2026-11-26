@@ -884,7 +884,7 @@ static ParseResult parseDenseI64ArrayDictionary(OpAsmParser &parser, Builder &bu
                                                 DictionaryAttr &dict) {
     NamedAttrList attrs;
     auto parseDictEntry = [&]() -> ParseResult {
-        StringRef key;
+        std::string key;
         SmallVector<int64_t> values;
         auto parseArrayValue = [&]() -> ParseResult {
             int64_t value = 0;
@@ -895,7 +895,7 @@ static ParseResult parseDenseI64ArrayDictionary(OpAsmParser &parser, Builder &bu
             return success();
         };
 
-        if (parser.parseKeyword(&key) || parser.parseEqual() ||
+        if (parser.parseKeywordOrString(&key) || parser.parseEqual() ||
             parser.parseCommaSeparatedList(OpAsmParser::Delimiter::Square, parseArrayValue)) {
             return failure();
         }
@@ -1084,7 +1084,8 @@ ParseResult MeasurementOp::parse(OpAsmParser &parser, OperationState &result) {
 
 void OperatorOp::print(OpAsmPrinter &p) {
     // 1. Template Name
-    p << " \"" << getOpName() << "\"";
+    p << " ";
+    p.printAttributeWithoutType(getOpNameAttr());
 
     // 2. Variadic Inputs: (%arg0 : type, ...)
     p << "(";

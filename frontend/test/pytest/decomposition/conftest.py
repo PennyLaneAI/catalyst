@@ -19,7 +19,7 @@ from unittest.mock import patch
 import pytest
 
 from catalyst.decomposition.capture_session import DecompositionScope
-from catalyst.decomposition.precompile_decomposition_rules import _capture_rule_module
+from catalyst.decomposition.rule_compilation import _capture_rule_module
 
 
 @pytest.fixture
@@ -30,7 +30,7 @@ def capture_target():
         if target_spec is None:
             return None
         with patch(
-            "catalyst.from_plxpr.qfunc_interpreter.walk_reachable_decomp_rule_sets",
+            "catalyst.decomposition.rule_capture.walk_reachable_decomp_rule_sets",
             return_value=[target_spec],
         ):
             return _capture_rule_module(DecompositionScope())

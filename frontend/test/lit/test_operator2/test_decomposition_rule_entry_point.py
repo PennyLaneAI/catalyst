@@ -39,7 +39,7 @@ from operator2_dummy_gates import (
 from pennylane.core import Operator2
 from pennylane.typing import Complex, Float, Int, Wire
 
-from catalyst.decomposition.decomposition_rules import (
+from catalyst.decomposition.on_demand_rules import (
     compile_on_demand_decomposition_rules,
 )
 

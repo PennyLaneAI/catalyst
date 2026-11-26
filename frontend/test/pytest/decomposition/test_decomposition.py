@@ -16,8 +16,6 @@
 
 import hashlib
 import json
-import warnings
-from types import SimpleNamespace
 
 import jax.numpy as jnp
 import numpy as np
@@ -57,36 +55,40 @@ from pennylane.wires import Wires
 
 from catalyst import qjit
 from catalyst.compiler import _quantum_opt
-from catalyst.debug import get_compilation_stage
-from catalyst.decomposition import RuleLoweringWarning, decomposition_rules
+from catalyst.decomposition import RuleLoweringWarning
 from catalyst.decomposition.capture_session import RuleIdentity
-from catalyst.decomposition.decomposition_rules import (
-    RuleTraceInputs,
-    _adjoint_folds_to_base,
-    _rule_allocates_work_wires,
-    _rule_is_compatible,
-    build_registered_decomp_target_spec,
-    collect_resources_for_op,
-    collect_symbolic_resources,
-    compile_on_demand_decomposition_rules,
-    flatten_hybrid_args,
-    ordered_kwarg_names,
-    prepare_dynamic_op_kwargs,
-    rule_call_operands,
-    symbolic_arguments,
-    symbolic_op_name,
-    unpack_rule_operands,
-)
 from catalyst.decomposition.graph_op_id import (
     GraphOpID,
     add_ctrl_work_wires_to_id,
     build_graph_op_id,
 )
 from catalyst.decomposition.modifier_state import ModifierState
+from catalyst.decomposition.on_demand_rules import (
+    compile_on_demand_decomposition_rules,
+)
 from catalyst.decomposition.precompile_decomposition_rules import (
     precompile_decomp_rules,
 )
 from catalyst.decomposition.precompiled_rule_loading import ManifestEntries
+from catalyst.decomposition.rule_arguments import (
+    RuleTraceInputs,
+    flatten_hybrid_args,
+    ordered_kwarg_names,
+    prepare_dynamic_op_kwargs,
+    rule_call_operands,
+    symbolic_arguments,
+    unpack_rule_operands,
+)
+from catalyst.decomposition.rule_preparation import (
+    _adjoint_folds_to_base,
+    _rule_allocates_work_wires,
+    _rule_is_compatible,
+    build_decomp_target_spec,
+    build_registered_decomp_target_spec,
+    collect_resources_for_op,
+    collect_symbolic_resources,
+    symbolic_op_name,
+)
 from catalyst.decomposition.type_utils import (
     SerializedGraphOpID,
     convert_item_to_mlir_type,
@@ -95,10 +97,7 @@ from catalyst.decomposition.type_utils import (
 )
 from catalyst.passes import graph_decomposition
 from catalyst.utils.exceptions import CompileError
-from catalyst.utils.runtime_environment import (
-    PRECOMPILED_BYTECODE_PATH,
-    get_precompiled_manifest_path,
-)
+from catalyst.utils.runtime_environment import get_precompiled_manifest_path
 
 
 class TestGenericUtilities:
@@ -1146,7 +1145,7 @@ class TestPrecompiled:
             return_value={NoParams: {NoParams(reg=Wire[1])}},
         )
         load_cache = mocker.patch(
-            "catalyst.from_plxpr.qfunc_interpreter.load_precompiled_rule_identities",
+            "catalyst.decomposition.rule_capture.load_precompiled_rule_identities",
             return_value=frozenset({cached_root}),
         )
         bytecode_path = tmp_path / "bytecode.mlirbc"
@@ -1217,7 +1216,7 @@ class TestPrecompiled:
             precompile_decomp_rules(bytecode_path)
 
         mocker.patch(
-            "catalyst.decomposition.decomposition_rules.compile_on_demand_decomposition_rules",
+            "catalyst.decomposition.on_demand_rules.compile_on_demand_decomposition_rules",
             side_effect=AssertionError(
                 "on-demand rules were used when precompiled rules should provide the necessary decompositions."
             ),
@@ -1245,6 +1244,38 @@ class TestPrecompiled:
 
         results = qp.specs(test_phaseshift, level="all")().resources
         assert results["graph-decomposition"].counts == {"GlobalPhase": 1, "RZ": 1}
+
+
+class TestStandaloneCompilation:
+    """Standalone compilation consumes prepared batches independently of the registry."""
+
+    def test_compiles_prepared_rules_without_registry_lookup(self, mocker, capture_target):
+        """Prepared callables and resource counts remain usable after their registry scope ends."""
+
+        @register_resources({qp.X(Wire[1]): 1})
+        def prepared_rule(reg):
+            qp.X(reg)
+
+        with local_decomps():
+            add_decomps(NoParams, prepared_rule)
+            target_spec = build_decomp_target_spec(
+                "NoParams",
+                SerializedGraphOpID("NoParams{}{reg:1}{}"),
+                {},
+                {"reg": 1},
+                {},
+                op_cls=NoParams,
+            )
+
+        mocker.patch(
+            "pennylane.decomposition.list_decomps",
+            side_effect=AssertionError("Compilation must consume the prepared rules"),
+        )
+        rule_string = str(capture_target(target_spec))
+
+        assert 'frontend_name = "prepared_rule"' in rule_string
+        assert 'target_gate = "NoParams{}{reg:1}{}"' in rule_string
+        assert '"PauliX{}{wires:1}{}" = 1 : i64' in rule_string
 
 
 class TestTraceTime:
@@ -1781,7 +1812,7 @@ class TestOnDemand:
 
     def test_reachable_wrapper_shares_tracer_and_symbol_table(self, mocker):
         """Multiple roots share one capture, including dependencies that are also roots."""
-        from catalyst.from_plxpr import qfunc_interpreter
+        from catalyst.decomposition import rule_capture
 
         @qp.capture.subroutine
         def helper():
@@ -1795,7 +1826,7 @@ class TestOnDemand:
         def leaf_rule(x, reg):
             del x, reg
 
-        tracer = mocker.spy(qfunc_interpreter, "_convert_decomp_target_spec")
+        tracer = mocker.spy(rule_capture, "_convert_decomp_target_spec")
         compile_rules = mocker.spy(qp, "qjit")
         with local_decomps():
             add_decomps(NoParams, root_rule)
@@ -1870,7 +1901,7 @@ class TestOnDemand:
                 }
             ]
         load_manifest = mocker.patch(
-            "catalyst.from_plxpr.qfunc_interpreter.load_precompiled_rule_identities",
+            "catalyst.decomposition.rule_capture.load_precompiled_rule_identities",
             side_effect=AssertionError("On-demand capture must use the compiler's loaded rules"),
         )
         with local_decomps():
@@ -1897,7 +1928,7 @@ class TestOnDemand:
 
     def test_reachable_wrapper_merges_modifier_states(self, mocker):
         """Plain, adjoint and controlled roots share a base request without losing variants."""
-        from catalyst.decomposition import precompile_decomposition_rules
+        from catalyst.decomposition import rule_compilation
 
         @register_resources({})
         def empty_rule(reg):
@@ -1915,7 +1946,7 @@ class TestOnDemand:
             }
             for state in states
         ]
-        capture = mocker.spy(precompile_decomposition_rules, "_capture_rule_module")
+        capture = mocker.spy(rule_compilation, "_capture_rule_module")
         with local_decomps():
             add_decomps(NoParams, empty_rule)
             module_str = compile_on_demand_decomposition_rules([*requests, requests[0]])
@@ -1952,9 +1983,9 @@ class TestOnDemand:
 
     def test_reachable_wrapper_empty_batch(self, mocker):
         """An empty batch does not start rule capture."""
-        from catalyst.decomposition import precompile_decomposition_rules
+        from catalyst.decomposition import rule_compilation
 
-        capture = mocker.spy(precompile_decomposition_rules, "_capture_rule_module")
+        capture = mocker.spy(rule_compilation, "_capture_rule_module")
         assert compile_on_demand_decomposition_rules([]) == "module {}"
         capture.assert_not_called()
 
@@ -2170,16 +2201,16 @@ class TestOnDemand:
     def test_compile_rules_reports_missing_mlir_module(self, mocker):
         """A failed qjit compilation should not cause a secondary NoneType error."""
 
-        from catalyst.decomposition import decomposition_rules as dr
+        from catalyst.decomposition import on_demand_rules, rule_compilation
 
         failed_qjit = mocker.MagicMock(mlir_module=None)
-        mocker.patch.object(dr.qp, "qjit", return_value=lambda _circuit: failed_qjit)
+        mocker.patch.object(rule_compilation.qp, "qjit", return_value=lambda _circuit: failed_qjit)
 
         with pytest.raises(
             CompileError,
             match="Failed to generate the precompiled decomposition-rule module",
         ):
-            dr.compile_on_demand_decomposition_rules(
+            on_demand_rules.compile_on_demand_decomposition_rules(
                 [
                     {
                         "op_name": "S",

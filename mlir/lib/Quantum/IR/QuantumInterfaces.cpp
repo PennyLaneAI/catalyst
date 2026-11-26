@@ -99,7 +99,7 @@ namespace quantum {
 // which would split the decomposition graph into two nodes and prevent rules from matching.
 // Always emitting the control-outermost form keeps such ops on a single node. The
 // caller appends the param/wire/static/uid groups. Extend this helper to support future op-level
-// modifiers, preserving the canonical order (mirror the Python side in decomposition_rules.py).
+// modifiers, preserving the canonical order (mirror the Python side in modifier_state.py).
 static std::string wrapModifiers(std::string name, Operation *op, bool isAdjoint,
                                  unsigned numControlQubits) {
     if (isAdjoint) {
