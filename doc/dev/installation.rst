@@ -11,10 +11,10 @@ compatible PennyLane release that includes Catalyst and an execution backend:
 
     pip install pennylane
 
-Installing ``pennylane-catalyst`` alone no longer installs PennyLane or Lightning.
-The current Python frontend still needs PennyLane, and executing quantum programs
-needs an appropriate backend. Until a PennyLane release includes Catalyst, use the
-source installation instructions below to install a matched development environment.
+Installing ``pennylane-catalyst`` no longer installs PennyLane or Lightning, or enforces
+compatible versions of those packages. A standalone installation does not provide access to
+end-to-end workflows, however the compiler core can be run independently via the
+`CLI <https://docs.pennylane.ai/projects/catalyst/en/stable/catalyst-cli/catalyst-cli.html>`_.
 
 .. warning::
 
@@ -322,9 +322,17 @@ in ``.dep-versions``. These pins are development and CI dependencies, not publis
 Catalyst requirements. Update them when new frontend or backend functionality is needed,
 and keep ``doc/requirements.txt`` in sync. Keep compatible pins for release testing too.
 
-Wheel builds and CI use ``make install-frontend`` to install the selected Catalyst
-candidate and these dependencies together. If the pinned PennyLane requires a different
-Catalyst version, installation fails instead of replacing the candidate under test.
+To update the pinned PennyLane and Lightning dependencies without reinstalling Catalyst, run
+``make install-test-deps`` in an environment where Catalyst is already installed. This keeps the
+installed Catalyst version, including an editable installation. Incompatible pins cause an error.
+
+``make frontend`` continues to install these dependencies and replaces any existing PennyLane
+installation with the pinned package. If you develop PennyLane from a local checkout, reinstall
+it afterward with ``python -m pip install --no-deps -e /path/to/pennylane``.
+
+Wheel builds and CI use ``make install-frontend`` to resolve the selected Catalyst source or
+wheel together with the pinned test dependencies. Incompatible pins cause an error instead of
+replacing the Catalyst build under test.
 
 Variables
 ^^^^^^^^^
@@ -568,12 +576,12 @@ The setup script explicitly installs the PennyLane and Lightning versions pinned
 ``.dep-versions`` of your starting checkout. Catalyst wheels no longer install these packages
 automatically. Update the pins before running the script if your branch needs different versions.
 
-To update the dependencies after setup while keeping the selected Catalyst wheel, update the
-pins and run the following, replacing ``<installed-version>`` with your Catalyst version:
+To update the dependencies after setup while keeping the installed Catalyst, update the pins
+and run:
 
 .. code-block:: console
 
-  make install-frontend CATALYST_PACKAGE="pennylane-catalyst==<installed-version>"
+  make install-test-deps
 
 If you require the Catalyst repository with all its submodules, clone it this way:
 

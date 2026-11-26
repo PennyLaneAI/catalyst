@@ -97,6 +97,7 @@ help:
 	@echo "  worktree           to build and install this checkout using prebuilt LLVM, StableHLO and Enzyme"
 	@echo "                     CATALYST_MAIN_CHECKOUT_DIR=<checkout root> selects the shared dependencies"
 	@echo "  frontend           to install Catalyst Frontend"
+	@echo "  install-test-deps  to install pinned PennyLane and Lightning for the installed Catalyst"
 	@echo "  mlir               to build MLIR and custom Catalyst dialects"
 	@echo "  runtime            to build Catalyst Runtime"
 	@echo "  oqc                to build Catalyst-OQC Runtime"
@@ -147,20 +148,42 @@ $(error No Enzyme build found in $(MAIN_MLIR_DIR)/Enzyme/build; run make all in 
 endif
 endif
 
-# Install the candidate and its test dependencies together so PennyLane cannot replace it.
-CATALYST_PACKAGE ?= -e .
+# These pins are for development and CI, not published package requirements.
 PENNYLANE_TEST_VERSION = $(call dependency-version,pennylane,$(MK_DIR))
 LIGHTNING_TEST_VERSION = $(call dependency-version,lightning,$(MK_DIR))
 
-.PHONY: install-frontend
-install-frontend:
+ifneq ($(filter git+%,$(PENNYLANE_TEST_VERSION)),)
+PENNYLANE_TEST_REQUIREMENT = pennylane @ $(PENNYLANE_TEST_VERSION)
+else
+PENNYLANE_TEST_REQUIREMENT = pennylane==$(PENNYLANE_TEST_VERSION)
+endif
+
+ifneq ($(filter git+%,$(LIGHTNING_TEST_VERSION)),)
+LIGHTNING_TEST_REQUIREMENT = pennylane-lightning @ $(LIGHTNING_TEST_VERSION)
+else
+LIGHTNING_TEST_REQUIREMENT = pennylane-lightning==$(LIGHTNING_TEST_VERSION)
+# Install matching Kokkos wheels only when Lightning has a version pin.
+KOKKOS_TEST_REQUIREMENT = pennylane-lightning-kokkos==$(LIGHTNING_TEST_VERSION)
+endif
+
+# Set a default for this target only: keep the installed Catalyst unless overridden.
+.PHONY: install-test-deps
+install-test-deps: CATALYST_PACKAGE ?= pennylane-catalyst==$$( \
+	$(PYTHON) -c "from importlib.metadata import version; print(version('pennylane-catalyst'))")
+# Resolve everything together so conflicts fail instead of replacing Catalyst.
+install-test-deps:
 	$(if $(PENNYLANE_TEST_VERSION),,$(error Set pennylane in .dep-versions for frontend tests))
 	$(if $(LIGHTNING_TEST_VERSION),,$(error Set lightning in .dep-versions for frontend tests))
 	$(PYTHON) -m pip install $(CATALYST_PACKAGE) \
-		"pennylane$(if $(filter git+%,$(PENNYLANE_TEST_VERSION)), @ ,==)$(PENNYLANE_TEST_VERSION)" \
-		"pennylane-lightning$(if $(filter git+%,$(LIGHTNING_TEST_VERSION)), @ ,==)$(LIGHTNING_TEST_VERSION)" \
-		$(if $(filter-out git+%,$(LIGHTNING_TEST_VERSION)),"pennylane-lightning-kokkos==$(LIGHTNING_TEST_VERSION)") \
+		"$(PENNYLANE_TEST_REQUIREMENT)" "$(LIGHTNING_TEST_REQUIREMENT)" \
+		$(KOKKOS_TEST_REQUIREMENT) \
 		--extra-index-url https://test.pypi.org/simple $(PIP_VERBOSE_FLAG)
+
+# Default to the local checkout; CI can supply a built wheel instead.
+.PHONY: install-frontend
+install-frontend: CATALYST_PACKAGE ?= -e .
+install-frontend:
+	$(MAKE) install-test-deps CATALYST_PACKAGE="$(CATALYST_PACKAGE)"
 
 .PHONY: frontend
 frontend:
