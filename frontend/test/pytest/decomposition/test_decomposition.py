@@ -17,6 +17,7 @@
 import hashlib
 import json
 
+import jax
 import jax.numpy as jnp
 import numpy as np
 import pennylane as qp
@@ -132,8 +133,8 @@ class TestGenericUtilities:
             "reg2": jnp.array([3, 4]),
             "empty_reg": jnp.array([], dtype=int),
             "reg1": jnp.array([0, 1, 2]),
-            "z": jnp.array(12.0),
-            "a": jnp.array(11.0),
+            "z": jnp.array([12.0, 13.0], dtype=jnp.float32),
+            "a": jnp.array(11.0j, dtype=jnp.complex64),
         }
         dynamic_shape = {"z": None, "a": None}
         wire_lens = {"reg2": 2, "empty_reg": 0, "reg1": 3}
@@ -151,13 +152,14 @@ class TestGenericUtilities:
         )
         operands = rule_call_operands(trace_inputs)
 
-        assert len(operands) == 6
-        np.testing.assert_array_equal(operands[0], 10.0)
-        np.testing.assert_array_equal(operands[1], 12.0)
-        np.testing.assert_array_equal(operands[2], 11.0)
-        np.testing.assert_array_equal(operands[3], [3, 4, 0, 1, 2])
-        np.testing.assert_array_equal(operands[4], [5, 6])
-        np.testing.assert_array_equal(operands[5], [True, False])
+        assert operands == [
+            jax.ShapeDtypeStruct((), jnp.float64),
+            jax.ShapeDtypeStruct((2,), jnp.float32),
+            jax.ShapeDtypeStruct((), jnp.complex64),
+            jax.ShapeDtypeStruct((5,), jnp.int64),
+            jax.ShapeDtypeStruct((2,), jnp.int64),
+            jax.ShapeDtypeStruct((2,), jnp.bool_),
+        ]
 
     def test_rule_call_operands_preserves_hybrid_leaf_order(self):
         """Hybrid leaves follow parameters and precede the base wires and control operands."""
@@ -173,15 +175,35 @@ class TestGenericUtilities:
 
         operands = rule_call_operands(trace_inputs)
 
-        assert len(operands) == 6
-        np.testing.assert_array_equal(operands[0], 0.25)
-        np.testing.assert_array_equal(operands[1], [3.0, 4.0])
-        np.testing.assert_array_equal(operands[2], [[5.0, 6.0], [7.0, 8.0]])
-        np.testing.assert_array_equal(operands[3], [0, 1])
-        np.testing.assert_array_equal(operands[4], [2])
-        np.testing.assert_array_equal(operands[5], [False])
+        assert operands == [
+            jax.ShapeDtypeStruct((), jnp.float64),
+            jax.ShapeDtypeStruct((2,), jnp.float64),
+            jax.ShapeDtypeStruct((2, 2), jnp.float64),
+            jax.ShapeDtypeStruct((2,), jnp.int64),
+            jax.ShapeDtypeStruct((1,), jnp.int64),
+            jax.ShapeDtypeStruct((1,), jnp.bool_),
+        ]
 
-    def test_rule_operands_without_wires_or_controls(self):
+    @pytest.mark.parametrize("x64", [False, True])
+    def test_rule_call_operands_promotes_wire_dtype(self, x64):
+        """Grouped wire descriptors preserve concatenation's integer promotion."""
+        with jax.experimental.enable_x64(x64):
+            trace_inputs = RuleTraceInputs(
+                call_args=(),
+                call_kwargs={
+                    "wires": jnp.array([0, 1], dtype=jnp.int16),
+                    "work_wires": jnp.array([2], dtype=int),
+                },
+                kwarg_names=["wires", "work_wires"],
+                wire_lens={"wires": 2, "work_wires": 1},
+            )
+
+            assert rule_call_operands(trace_inputs) == [
+                jax.ShapeDtypeStruct((3,), jnp.int64 if x64 else jnp.int32)
+            ]
+
+    @pytest.mark.parametrize("x64", [False, True])
+    def test_rule_operands_without_wires_or_controls(self, x64):
         """A parameter-only rule retains an empty wire operand and reconstructs without controls."""
         trace_inputs = RuleTraceInputs(
             call_args=(np.float64(0.5),),
@@ -190,15 +212,20 @@ class TestGenericUtilities:
             wire_lens={},
         )
 
-        operands = rule_call_operands(trace_inputs)
+        with jax.experimental.enable_x64(x64):
+            operands = rule_call_operands(trace_inputs)
+            assert operands == [
+                jax.ShapeDtypeStruct((), np.float64),
+                jax.ShapeDtypeStruct((0,), jnp.int64 if x64 else jnp.int32),
+            ]
 
-        assert len(operands) == 2
-        np.testing.assert_array_equal(operands[0], 0.5)
-        assert operands[1].shape == (0,)
-
-        args, kwargs, ctrl_wires, ctrl_values, work_wires = unpack_rule_operands(
-            operands, n_params=1, kwarg_names=[], wire_lens={}, has_ctrl_wires=False
-        )
+            args, kwargs, ctrl_wires, ctrl_values, work_wires = unpack_rule_operands(
+                (np.float64(0.5), jnp.array([], dtype=int)),
+                n_params=1,
+                kwarg_names=[],
+                wire_lens={},
+                has_ctrl_wires=False,
+            )
 
         assert len(args) == 1
         np.testing.assert_array_equal(args[0], 0.5)
@@ -250,11 +277,19 @@ class TestGenericUtilities:
                 ctrl_values=jnp.array([True, False]),
             )
         )
-        assert len(operands) == 3
-        np.testing.assert_array_equal(operands[0], [0, 3])
+        assert operands == [
+            jax.ShapeDtypeStruct((2,), jnp.int64),
+            jax.ShapeDtypeStruct((2,), jnp.int64),
+            jax.ShapeDtypeStruct((2,), jnp.bool_),
+        ]
 
-        _, kwargs, ctrl_wires, ctrl_values, work_wires = unpack_rule_operands(
-            operands, 0, kwarg_names, wire_lens, has_ctrl_wires=True
+        @jax.jit
+        def unpack(*args):
+            return unpack_rule_operands(args, 0, kwarg_names, wire_lens, has_ctrl_wires=True)
+
+        compiled = unpack.lower(*operands).compile()
+        _, kwargs, ctrl_wires, ctrl_values, work_wires = compiled(
+            jnp.array([0, 3]), jnp.array([1, 2]), jnp.array([True, False])
         )
 
         np.testing.assert_array_equal(kwargs["wires"], [0])
