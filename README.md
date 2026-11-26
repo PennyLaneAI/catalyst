@@ -80,10 +80,10 @@ higher. Install through a compatible PennyLane release that includes Catalyst an
 pip install pennylane
 ```
 
-Installing `pennylane-catalyst` alone no longer installs PennyLane or Lightning. The current
-Python frontend still needs PennyLane, and executing quantum programs needs an appropriate backend.
-Until a PennyLane release includes Catalyst, use the source installation instructions below
-to install a matched development environment.
+Installing `pennylane-catalyst` no longer installs PennyLane or Lightning, or enforces compatible
+versions of those packages. A standalone installation does not provide access to end-to-end
+workflows, however the compiler core can be run independently via the
+[CLI](https://docs.pennylane.ai/projects/catalyst/en/stable/catalyst-cli/catalyst-cli.html).
 
 Catalyst no longer supports macOS with x86_64 architecture after 0.11.0. This includes Macs running on Intel processors.
 If you would like to use Catalyst on these systems, please install Catalyst version 0.11.0, PennyLane version 0.41.0, PennyLane-Lightning
