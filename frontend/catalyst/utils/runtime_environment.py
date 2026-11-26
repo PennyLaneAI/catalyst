@@ -71,9 +71,21 @@ PRECOMPILED_BYTECODE_PATH_ENV = "CATALYST_PRECOMPILED_BYTECODE_PATH"
 def get_precompiled_bytecode_path() -> str:
     """Return the path to the precompiled decomposition-rule bytecode used during compilation.
 
-    The ``CATALYST_PRECOMPILED_BYTECODE_PATH`` environment variable takes precedence over the
-    built-in rules shipped with Catalyst. It is read on every call, so it may be changed after
-    Catalyst has been imported.
+    There are two ways precompiled rules are used:
+
+    1. **Default:** the built-in rule library shipped with Catalyst is used at every stage.
+    2. **Override (advanced, developer-facing):** if the ``CATALYST_PRECOMPILED_BYTECODE_PATH``
+       environment variable is set, the library at that path is used at every stage instead.
+
+    A library consists of two co-located files: the MLIR bytecode (e.g. ``rules.mlirbc``) and
+    its JSON manifest (``rules.json``, see :func:`get_precompiled_manifest_path`), both
+    produced together by the precompilation utilities. The manifest lists the rules in the
+    bytecode, and is what allows tracing to skip capturing them; the bytecode provides the rule
+    bodies to the decomposition passes. Keep the two files together: if the manifest is missing
+    or does not match the bytecode, a warning is raised and every reachable rule is captured
+    at trace time instead (correct, but without the benefit of precompilation).
+
+    The variable is read each time a program is compiled.
     """
     return os.environ.get(PRECOMPILED_BYTECODE_PATH_ENV) or PRECOMPILED_BYTECODE_PATH
 

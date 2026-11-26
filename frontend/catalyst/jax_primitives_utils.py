@@ -30,6 +30,10 @@ from pennylane.transforms.core import BoundTransform
 from catalyst.backline import module_attributes
 from catalyst.jax_extras.lowering import get_mlir_attribute_from_pyval
 from catalyst.utils.runtime_artifacts import record_device_runtime_artifacts
+from catalyst.utils.runtime_environment import get_precompiled_bytecode_path
+
+# Passes that consume the precompiled decomposition-rule library via ``bytecode_rules``.
+_RULE_LIBRARY_PASSES = frozenset({"graph-decomposition", "resource-estimate"})
 
 
 def _all_expval(call_jaxpr: core.ClosedJaxpr) -> bool:
@@ -310,9 +314,14 @@ class NestedModule:
 
 
 def _lowered_options(_pass: BoundTransform):
+    kwargs = dict(_pass.kwargs)
+    if _pass.pass_name in _RULE_LIBRARY_PASSES and kwargs.get("bytecode_rules") is None:
+        # Resolve the rule library at compile time, so the pass uses the same library (and
+        # environment override) as trace-time rule capture.
+        kwargs["bytecode_rules"] = get_precompiled_bytecode_path()
     return get_mlir_attribute_from_pyval(
         {str(arg).replace("_", "-"): True for arg in _pass.args}
-        | {k.replace("_", "-"): v for k, v in _pass.kwargs.items()}
+        | {k.replace("_", "-"): v for k, v in kwargs.items()}
     )
 
 

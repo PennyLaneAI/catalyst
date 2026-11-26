@@ -29,7 +29,6 @@ from catalyst.utils.exceptions import CompileError
 from catalyst.utils.runtime_environment import (
     get_lib_path,
     get_libpython_path,
-    get_precompiled_bytecode_path,
 )
 
 # pylint: disable=line-too-long, too-many-lines
@@ -1815,9 +1814,10 @@ def graph_decomposition_setup_inputs(
             from this pass's graph. Rules may be given as names or callables. Excluded rules are
             still lowered by the frontend and remain available to subsequent passes. Exclusions
             also apply to rules selected by ``fixed_decomps``.
-        bytecode_rules (str | None): path to the bytecode file containing decomposition rules.
-            Defaults to the ``CATALYST_PRECOMPILED_BYTECODE_PATH`` environment variable if set,
-            otherwise the built-in decomposition rules.
+        bytecode_rules (str | None): internal option; leave unset. The precompiled rule library
+            is resolved at compile time from the built-in rules, or the
+            ``CATALYST_PRECOMPILED_BYTECODE_PATH`` override (see
+            :func:`~catalyst.utils.runtime_environment.get_precompiled_bytecode_path`).
         verbose (bool): if ``True``, the pass prints the decomposition rule the solver chose for
             each operator, along with its cost and the resulting gate counts, to stderr. ``False`` by default.
 
@@ -1887,14 +1887,15 @@ def graph_decomposition_setup_inputs(
 
     options: dict[str, object] = {
         "gate_set": gate_set,
-        "bytecode_rules": str(
-            bytecode_rules if bytecode_rules is not None else get_precompiled_bytecode_path()
-        ),
         "libQPD_path": str(
             libQPD_path if libQPD_path else get_lib_path("catalyst", "CATALYST_LIB_DIR")
         ),
         "libpython_path": str(libpython_path if libpython_path else get_libpython_path()),
     }
+    # When unset, the rule library is resolved at lowering time (see ``_lowered_options``), so the
+    # pass reads the same library as trace-time rule capture.
+    if bytecode_rules is not None:
+        options["bytecode_rules"] = str(bytecode_rules)
 
     def rule_ref_name(rule):
         # A rule reference may be a name string, or a PennyLane ``DecompositionRule``
