@@ -24,7 +24,8 @@ jobs:
         python3 -m pip install -r requirements.txt
         # Install graphviz for testing graph visualization
         sudo apt-get install -y graphviz
-        make install-frontend PYTHON=python3 CATALYST_PACKAGE="--pre -U PennyLane-Catalyst"
+        pip install --pre -U --extra-index-url https://test.pypi.org/simple/ PennyLane-Catalyst
+        make install-pl-deps PYTHON=python3
 
     - name: Run Python Pytest Tests with flaky Checks
       run: |

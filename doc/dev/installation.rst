@@ -323,16 +323,16 @@ Catalyst requirements. Update them when new frontend or backend functionality is
 and keep ``doc/requirements.txt`` in sync. Keep compatible pins for release testing too.
 
 To update the pinned PennyLane and Lightning dependencies without reinstalling Catalyst, run
-``make install-test-deps`` in an environment where Catalyst is already installed. This keeps the
+``make install-pl-deps`` in an environment where Catalyst is already installed. This keeps the
 installed Catalyst version, including an editable installation. Incompatible pins cause an error.
 
 ``make frontend`` continues to install these dependencies and replaces any existing PennyLane
 installation with the pinned package. If you develop PennyLane from a local checkout, reinstall
 it afterward with ``python -m pip install --no-deps -e /path/to/pennylane``.
 
-Wheel builds and CI use ``make install-frontend`` to resolve the selected Catalyst source or
-wheel together with the pinned test dependencies. Incompatible pins cause an error instead of
-replacing the Catalyst build under test.
+Wheel builds and CI install Catalyst first, then run ``make install-pl-deps``. This installs
+the pinned PennyLane and Lightning dependencies while keeping the installed Catalyst version.
+Incompatible pins cause an error instead of replacing the Catalyst build under test.
 
 Variables
 ^^^^^^^^^
@@ -581,7 +581,7 @@ and run:
 
 .. code-block:: console
 
-  make install-test-deps
+  make install-pl-deps
 
 If you require the Catalyst repository with all its submodules, clone it this way:
 
