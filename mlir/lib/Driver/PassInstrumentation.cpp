@@ -80,6 +80,13 @@ void CatalystPassInstrumentation::runAfterPassFailed(mlir::Pass *pass, mlir::Ope
             this->options,
             this->output.nextPipelineSummaryFilename(pass->getName().str() + "_FAILED"), tmp);
     }
+    if (!this->options.saveIROnFailure.empty()) {
+        driver::CompilerOptions failureOptions = this->options;
+        failureOptions.workspace = this->options.saveIROnFailure;
+        driver::dumpToFile(
+            failureOptions,
+            this->options.moduleName.str() + "_" + pass->getName().str() + "_FAILED.mlir", tmp);
+    }
 
     // Clean up fingerprint if present
     if (this->options.keepIntermediate == driver::SaveTemps::AfterPassChanged) {

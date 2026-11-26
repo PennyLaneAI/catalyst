@@ -106,6 +106,7 @@ def qjit(
     skip_preprocess=False,
     collect_decomp_rules=True,
     enable_aot_compilation=True,
+    save_ir_on_failure=None,
 ):  # pylint: disable=too-many-arguments,unused-argument
     """A just-in-time decorator for PennyLane and JAX programs using Catalyst.
 
@@ -209,6 +210,9 @@ def qjit(
         enable_aot_compilation (bool): Controls whether or not to enable ahead-of-time compilation.
             If ``True``, the QJIT object will attempt AOT compilation during object initialization.
             ``True`` by default.
+        save_ir_on_failure (Optional[Union[str, Path]]): A directory in which to save the IR at
+            the compiler pass that fails, as ``<module name>_<pass name>_FAILED.mlir``,
+            independently of ``keep_intermediate``. ``None`` by default.
 
     Returns:
         QJIT object.

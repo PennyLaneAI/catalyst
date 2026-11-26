@@ -127,6 +127,12 @@ intermediate files are saved.
 Keep intermediate files after each pipeline in the compilation. By default, no intermediate files
 are saved. Using ``--keep-intermediate`` is equivalent to using ``--save-ir-after-each=pipeline``.
 
+``--save-ir-on-failure=<dir>``
+""""""""""""""""""""""""""""""
+
+Save the IR at a pass that fails in the given directory, as ``<module name>_<pass name>_FAILED.mlir``,
+independently of ``--keep-intermediate`` and ``--save-ir-after-each``. By default, it is not saved.
+
 ``--use-nameloc-as-prefix[=<true|false>]``
 """"""""""""""""""""""""""""""""""""""""""
 
