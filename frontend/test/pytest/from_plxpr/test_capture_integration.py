@@ -1293,9 +1293,11 @@ class TestCapture:
             return qp.expval(qp.PauliZ(0))
 
         # non-capture pathway is not actively developed and raises unnecessary warnings (wontfix)
-        with pytest.warns(UserWarning, match="MidCircuitMeasure does not define a decomposition"):
-            with pytest.warns(UserWarning, match="Cond does not define a decomposition"):
-                non_capture_result = qjit(circuit, capture=False)(1.5, 2.5, 3.5)
+        with pytest.warns(
+            (UserWarning, qp.exceptions.DecompositionWarning),
+            match="does not define a decomposition|unable to find a decomposition",
+        ):
+            non_capture_result = qjit(circuit, capture=False)(1.5, 2.5, 3.5)
 
         assert jnp.allclose(non_capture_result, capture_result)
 

@@ -15,6 +15,13 @@
     when the device does not provide a table the program needs.
   - `null.qubit` provides both tables.
 
+* The new `CompileOptions(estimate_decomps=True)` setting prepares reachable decomposition rules for
+  resource estimation using their registered resource counts, without tracing or compiling
+  their implementations. `qp.estimate` can use these rules even when their implementations
+  cannot be compiled. This option requires program capture and `collect_decomp_rules=True`,
+  and defaults to `False`.
+ [(#3482)](https://github.com/PennyLaneAI/catalyst/pull/3482)
+
 * Backline can drive a VPK120 whose FPGA carries NVIDIA's Holoscan Sensor Bridge (HSB), through
   the new `hsb_hwhs` controller backend. Its coprocessors stay `cpu_verbs` and `gpu_verbs`,
   set to face HSB with `peer=hsb`.
@@ -205,6 +212,10 @@
   [(#3303)](https://github.com/PennyLaneAI/catalyst/pull/3303)
 
 <h3>Improvements 🛠</h3>
+
+* Operators whose operator-valued arguments share wires are now supported
+  with `qjit`.
+  [(#3470)](https://github.com/PennyLaneAI/catalyst/pull/3470)
 
 * Ahead-of-time compilation with `qjit` can now stop at any of the main internal compiler stages,
   in addition to the frontend-controlled stages (`target="jaxpr"|"mlir"|"binary"`).
@@ -430,7 +441,7 @@
     Every registered signature is lowered, as well as any operations/rules reachable from these signatures, or their adjoint/control variants.
     [(#3057)](https://github.com/PennyLaneAI/catalyst/pull/3057)
 
-    2. When tracing a gate operation to JAXPR, all rules reachable from that gate are injected. Note that rules already available in the precompiled rule library will not get re-traced. 
+    2. When tracing a gate operation to JAXPR, all rules reachable from that gate are injected. Note that rules already available in the precompiled rule library will not get re-traced.
     [(#3061)](https://github.com/PennyLaneAI/catalyst/pull/3061)
     [(#3160)](https://github.com/PennyLaneAI/catalyst/pull/3160)
     [(#3149)](https://github.com/PennyLaneAI/catalyst/pull/3149)
@@ -896,6 +907,11 @@
 
 <h3>Breaking changes 💔</h3>
 
+* Catalyst now provides its own :func:`~.polynomial_extrapolate` and
+  :func:`~.exponential_extrapolate` functions for use with :func:`~.mitigate_with_zne`, replacing
+  ``pennylane.noise.poly_extrapolate`` and ``pennylane.noise.exponential_extrapolate``, which has been removed from PennyLane.
+  [(#3289)](https://github.com/PennyLaneAI/catalyst/pull/3289)
+
 * We now have `capture=True` as the default mode for Catalyst `qjit`.
   [(#3414)](https://github.com/PennyLaneAI/catalyst/pull/3414)
 
@@ -1006,6 +1022,48 @@
 <h3>Deprecations 👋</h3>
 
 <h3>Bug fixes 🐛</h3>
+
+* The `catalyst.debug.instrumentation` console output lines up in columns again, and the compiler
+  now reports CPU times. Lines printed by the frontend and by the compiler use the same column
+  widths, and the name column is wide enough for stage names such as
+  `MLIRToLLVMDialectConversion`. The compiler's CPU time was always 0, because its
+  nanosecond-to-millisecond scale factor was computed with integer division.
+  [(#3510)](https://github.com/PennyLaneAI/catalyst/pull/3510)
+
+* The `resource-estimate` pass now keeps the number of control qubits in the names of the gates,
+  e.g. `2C(RX)`, as `resource-analysis` does. Gates with different numbers of control qubits were
+  counted together as `C(RX)`.
+  [(#3484)](https://github.com/PennyLaneAI/catalyst/pull/3484)
+
+* Subroutines converted by `convert-to-reference-semantics` now take registers of dynamic size,
+  `!qref.reg<?>`, and call sites cast registers of static size with the new `qref.cast` operation.
+  Decompose lowering casts the registers it passes to rules in the same way. Before, a
+  subroutine's register type was copied from its first call site, so a subroutine called with
+  registers of different sizes failed with a `func.call` operand type mismatch.
+  [(#3506)](https://github.com/PennyLaneAI/catalyst/pull/3506)
+
+* Buffers returned by internal helper functions, such as the Givens rotation helpers of
+  `qp.BasisRotation`, are now deallocated by the caller instead of leaking until the end of
+  execution.
+  [(#3491)](https://github.com/PennyLaneAI/catalyst/pull/3491)
+
+* Buffers passed to decomposition rules, such as the wire index arrays created by decompose
+  lowering, are now deallocated after the call. Before, `buffer-deallocation` treated them
+  as aliases of the returned `!quantum.reg`, so they leaked until the end of execution.
+  [(#3491)](https://github.com/PennyLaneAI/catalyst/pull/3491)
+
+* With `async_qnodes=True`, buffers passed to a QNode are no longer deallocated before its
+  `async.execute` completes. Their deallocations now come after the final await on the
+  execute's token.
+  [(#3491)](https://github.com/PennyLaneAI/catalyst/pull/3491)
+
+* Subroutines with the same structure that close over different JAX arrays are no longer
+  compiled as the same subroutine.
+  [(#3502)](https://github.com/PennyLaneAI/catalyst/pull/3502)
+
+* The `--convert-to-value-semantics` and `--convert-to-reference-semantics` passes no longer read
+  freed memory.
+  [(#3496)](https://github.com/PennyLaneAI/catalyst/pull/3496)
 
 * The `gpu_verbs` coprocessor now supports the NVIDIA GH200 with CUDA 12.4.
   [(#3467)](https://github.com/PennyLaneAI/catalyst/pull/3467)
@@ -1196,7 +1254,15 @@
 * Fixed hinted while loops to be counted symbolically in `ResourceAnalysis`.
   [(#3370)](https://github.com/PennyLaneAI/catalyst/pull/3370)
 
+* `adjoint-lowering` no longer aborts when an extract inside an adjoint region reads the
+  register from before an insert at another index. When the register an extract reads is replaced
+  by something other than a single insert, the pass now reports an error instead of aborting.
+  [(#3409)](https://github.com/PennyLaneAI/catalyst/pull/3409)
+
 <h3>Internal changes ⚙️</h3>
+
+* Uses `AnnotatedQueue` and `QuantumScript` instead of the to-be-removed `QuantumTape`.
+  [(#3509)](https://github.com/PennyLaneAI/catalyst/pull/3509)
 
 * Updated `pylint` to version 4.1.3 in the development requirements and CI formatting workflow.
   [(#3459)](https://github.com/PennyLaneAI/catalyst/pull/3459)
@@ -1503,6 +1569,16 @@
   to project those resource counts in the target gate-set for `qp.estimate(..., target=gate_set)`.
   [(#3351)](https://github.com/PennyLaneAI/catalyst/pull/3351)
 
+* A generic mid-circuit measurement operator with classical results: `MeasurementOp` has been added to 
+  the `quantum` and `qref` dialects that support qubit and register modes, as well as static and dynamic data. Terminal circuit
+  result extraction operators implement the `TerminalMeasurement` instead.
+  [(#3439)](https://github.com/PennyLaneAI/catalyst/pull/3439)
+  - `qp.pauli_measure` and `qp.ops.PauliMeasure` bind to `MeasurementOp`, and `MeasurementOp` lowers
+    into the PBC dialect via `to_ppr` or directly into the `PauliMeasure` QIR instruction.
+    [(#3474)](https://github.com/PennyLaneAI/catalyst/pull/3474)
+  - `DecomposableGate` interface has been renamed to `DecomposableOp` interface, and does not inherit `QuantumGate`. It is a 
+    generic interface to register operations to the graph solver. `MeasurementOp` implements the `DecomposableOp` interface.
+    [(3504)](https://github.com/PennyLaneAI/catalyst/pull/3504)
 
 <h3>Documentation 📝</h3>
 
@@ -1546,6 +1622,7 @@ Marcus Edwards,
 Lillian Frederiksen,
 Sengthai Heng,
 David Ittah,
+Harshal Janjani,
 JiaRung Jian,
 Jeffrey Kam,
 Jacob Kitchen,
@@ -1556,6 +1633,7 @@ Rylan Malarchick,
 Mehrdad Malekmohammadi,
 River McCubbin,
 Mudit Pandey,
+Rahul,
 Shuli Shu,
 Nikhil Sreekumar,
 Kalman Szenes,

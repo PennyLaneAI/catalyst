@@ -34,7 +34,7 @@
 #include "Real.hpp"
 #include "Rings.hpp"
 
-#define ROSS_CACHE_SIZE 10000
+#define ROSS_CACHE_SIZE 100000
 // Factoring attempts per candidate. Candidates whose norm is hard to factor are skipped, since the
 // next levels of the grid problem provide plenty of further candidates.
 #define CANDIDATE_FACTORING_TRIALS 2

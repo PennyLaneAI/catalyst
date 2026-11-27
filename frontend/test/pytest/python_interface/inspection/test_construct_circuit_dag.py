@@ -1061,6 +1061,53 @@ class TestCreateStaticOperatorNodes:
         assert nodes["node2"]["label"] == "<name> PPM-XY|<wire> [0, 1]"
         assert nodes["node2"]["attrs"]["fillcolor"] == "#70B3F5"
 
+    def test_pbc_ppm(self):
+        """Test that PPMs from the PBC dialect can be captured as nodes."""
+        pipe = [("pipe", ["quantum-compilation-stage"])]
+
+        @qp.qjit(pipelines=pipe, target="mlir", capture=True, collect_decomp_rules=False)
+        @qp.transform(pass_name="to-ppr")
+        @qp.qnode(qp.device("null.qubit", wires=2))
+        def cir():
+            qp.pauli_measure("X", wires=[0])
+            qp.pauli_measure(pauli_word="XY", wires=[0, 1])
+
+        assert "pbc.ppm" in cir.mlir_opt
+        module = parse_generic_to_xdsl_module(cir.mlir_opt)
+
+        # Construct DAG
+        utility = ConstructCircuitDAG(FakeDAGBuilder())
+        utility.construct(module)
+
+        nodes = utility.dag_builder.nodes
+        assert len(nodes) == 3  # Device node + operator
+
+        assert nodes["node1"]["label"] == "<name> PPM-X|<wire> [0]"
+        assert nodes["node1"]["attrs"]["fillcolor"] == "#70B3F5"
+        assert nodes["node2"]["label"] == "<name> PPM-XY|<wire> [0, 1]"
+        assert nodes["node2"]["attrs"]["fillcolor"] == "#70B3F5"
+
+    def test_generic_measurement_on_register(self):
+        """Test that a generic measurement on a register shows its name and acts on all wires."""
+        program = """
+        func.func @circuit(%reg: !quantum.reg, %indices: tensor<2xi64>) {
+          %bits, %out_reg = quantum.measurement "RegisterMeasurement"() quregs(%reg)
+              indices(%indices: tensor<2xi64>) : (tensor<2xi1>, !quantum.reg)
+          return
+        }
+        """
+        module = parse_generic_to_xdsl_module(program)
+
+        # Construct DAG
+        utility = ConstructCircuitDAG(FakeDAGBuilder())
+        utility.construct(module)
+
+        nodes = utility.dag_builder.nodes
+        assert len(nodes) == 1
+
+        assert nodes["node0"]["label"] == "<name> RegisterMeasurement|<wire> all"
+        assert nodes["node0"]["attrs"]["fillcolor"] == "#70B3F5"
+
     @pytest.mark.parametrize("negative_angle", [True, False])
     def test_ppr(self, negative_angle):
         """Tests that a PPR node can be created."""

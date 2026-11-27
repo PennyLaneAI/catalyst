@@ -67,11 +67,11 @@ void handleSelectPPM(IRRewriter &builder, pbc::SelectPPMeasurementOp vSelPPMOp,
 void handleCall(IRRewriter &builder, func::CallOp callOp, QubitValueTracker &tracker,
                 SmallVector<Operation *> &erasureWorklist);
 void handleCompbasis(IRRewriter &builder, quantum::ComputationalBasisOp vCompbasisOp,
-                     QubitValueTracker &tracker);
+                     QubitValueTracker &tracker, SmallVector<Operation *> &erasureWorklist);
 void handleNamedObs(IRRewriter &builder, quantum::NamedObsOp vNamedObsOp,
-                    QubitValueTracker &tracker);
+                    QubitValueTracker &tracker, SmallVector<Operation *> &erasureWorklist);
 void handleHermitian(IRRewriter &builder, quantum::HermitianOp vHermitianOp,
-                     QubitValueTracker &tracker);
+                     QubitValueTracker &tracker, SmallVector<Operation *> &erasureWorklist);
 void handleGraphStatePrep(IRRewriter &builder, mbqc::GraphStatePrepOp vGraphStatePrepOp,
                           QubitValueTracker &tracker, SmallVector<Operation *> &erasureWorklist);
 void handleAdjoint(IRRewriter &builder, quantum::AdjointOp vAdjointOp, QubitValueTracker &tracker,
@@ -86,8 +86,7 @@ void handleFor(IRRewriter &builder, scf::ForOp forOp, QubitValueTracker &tracker
                SmallVector<Operation *> &erasureWorklist);
 void handleWhile(IRRewriter &builder, scf::WhileOp whileOp, QubitValueTracker &tracker,
                  SmallVector<Operation *> &erasureWorklist);
-void handleSubroutine(IRRewriter &builder, func::FuncOp subroutine,
-                      const SmallVector<IntegerAttr> &qregSizesAtCallsite);
+void handleSubroutine(IRRewriter &builder, func::FuncOp subroutine);
 
 // Main driver
 std::optional<SmallVector<Operation *>> handleRegion(IRRewriter &builder, Region &r,
