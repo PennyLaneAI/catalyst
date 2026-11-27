@@ -17,10 +17,17 @@
 // RUN: catalyst --tool=opt --pass-pipeline='builtin.module(resource-estimate{output-json gate-set=testMCM=1.0})' %s -o /dev/null | FileCheck %s
 
 // CHECK-LABEL: "circuit"
+// CHECK: "function_calls"
+// CHECK:   "static"
+// CHECK:       "test_op_to_test_mcm(testOp{}{wires:2}{})": 1
 // CHECK: "quantum_operations"
-// CHECK:   "-1"
-// CHECK:       "testMCM": 3
+// CHECK:       "testMCM": 1
 // CHECK-NOT:   "testOp"
+
+// CHECK-LABEL: "test_op_to_test_mcm(testOp{}{wires:2}{})": {
+// CHECK: "quantum_operations"
+// CHECK:   "2"
+// CHECK:       "testMCM": 2
 func.func public @circuit() attributes {quantum.node} {
     %q0 = quantum.alloc_qb : !quantum.bit
     %q1 = quantum.alloc_qb : !quantum.bit

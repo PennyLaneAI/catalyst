@@ -278,13 +278,16 @@ def ResourceEstimatePass : Pass<"resource-estimate", "mlir::ModuleOp"> {
     let description = [{
         Runs resource analysis to collect the graph op ids reached from the entry function, then
         solves the decomposition graph for the target gate set like `graph-decomposition`, but
-        without applying the chosen rules. In each function's resources (including modifier
-        contexts such as `A_foo` and `2C_foo`), every gate is replaced with the basis gates of its
-        chosen rule, scaled by the gate's count. Function calls, measurements, classical
-        instructions and qubit counts are kept unchanged.
+        without applying the chosen rules. As in the program after `graph-decomposition`, in each
+        function's resources (including modifier contexts such as `A_foo` and `2C_foo`), every
+        gate is replaced with a call to the function of its chosen rule, named
+        `<rule>(<graph op id>)`, which holds the basis gates of the rule and calls the functions of
+        the rules of its other operators. Other operations, function calls, measurements,
+        classical instructions and qubit counts are kept unchanged.
 
-        Basis gates are recorded with -1 wires and params, as these cannot be reliably recovered
-        from a graph op id. Ops without an entry in the solution are counted under their own name.
+        Basis gates get their number of wires from their graph op id, and -1 params, since these
+        are not in the graph op id. Gates without an entry in the solution are counted under their
+        own name.
 
         Usage:
             quantum-opt input.mlir -resource-estimate='output-json=True gate-set=RX=1.0,RZ=1.0'
@@ -346,6 +349,53 @@ def ResourceEstimatePass : Pass<"resource-estimate", "mlir::ModuleOp"> {
             /*Type*/"bool",
             /*Default*/[{ false }],
             /*Description*/"Print the decomposition rule chosen for each operator to stderr.">
+    ];
+
+    let dependentDialects = [
+        "memref::MemRefDialect",
+        "func::FuncDialect",
+        "scf::SCFDialect",
+        "LLVM::LLVMDialect",
+        "stablehlo::StablehloDialect",
+        "tensor::TensorDialect",
+        "catalyst::CatalystDialect",
+        "catalyst::qref::QRefDialect",
+        "catalyst::pbc::PBCDialect",
+        "catalyst::mbqc::MBQCDialect",
+    ];
+}
+
+def EstimateTransformSequencePass : Pass<"estimate-transform-sequence", "mlir::ModuleOp"> {
+    let summary = "Estimate the resources after each pass of the transform sequence, without running it.";
+    let description = [{
+        Reads the `transform.apply_registered_pass` ops of the transform sequence in the module,
+        as `apply-transform-sequence` would apply them, but runs none of the passes. The resources
+        of the program are analyzed once. A `graph-decomposition` pass, which must be the first, is
+        projected as `resource-estimate` does. Every other pass is replaced by the resource effect
+        registered for it in `ResourceEffectRegistry`, configured with the options of the op.
+
+        Writes a JSON list with one entry per level, each with the `level`, the `pass` that ends
+        at it (null for level 0) and the `resources` of each function. Level 0 is the program
+        before the transform sequence, and level `i` the program after its `i`-th pass.
+
+        Usage:
+            quantum-opt input.mlir -estimate-transform-sequence='output-fname=out.json'
+    }];
+
+    let options = [
+        Option<
+            /*C++ name*/"outputFname",
+            /*CLI name*/"output-fname",
+            /*Type*/"std::string",
+            /*Default*/[{ "" }],
+            /*Description*/"The file to write the levels to. Prints to stdout if empty.">,
+        Option<
+            /*C++ name*/"allowUnknownPasses",
+            /*CLI name*/"allow-unknown-passes",
+            /*Type*/"bool",
+            /*Default*/[{ false }],
+            /*Description*/"Assume, with a warning, that a pass without a resource effect does "
+                           "not change the resources, instead of failing.">
     ];
 
     let dependentDialects = [

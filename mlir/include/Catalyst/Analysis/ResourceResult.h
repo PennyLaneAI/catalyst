@@ -40,13 +40,18 @@ struct ResourceResult {
     // method for merging two ResourceResult values
     using MergeMethod = catalyst::MergeMethod;
 
-    // quantum, qref, pbc, mbqc operations are stored
-    // as a map from operation name to a map of
     // name -> ((numWires, numParams) -> count)
-    llvm::StringMap<llvm::DenseMap<std::pair<int, int>, double>> operations;
+    using OperationCounts = llvm::StringMap<llvm::DenseMap<std::pair<int, int>, double>>;
+
+    // quantum, qref, pbc, mbqc operations
+    OperationCounts operations;
 
     // Per-GOID resource counts
     llvm::StringMap<double> detailedOperations;
+
+    // The operations that are not decomposable ops, collected with `detailedOperations`. They
+    // have no GOID, so `resource-estimate` keeps them as they are.
+    OperationCounts nonDecomposableOperations;
 
     // Set of GOIDs observed under this result when `collectDetailedOperations` is
     // enabled. Accounts for dynamic-trip loops.
@@ -79,6 +84,13 @@ struct ResourceResult {
 
     // total qubits (allocated + argument)
     double numQubits() const { return numAllocQubits + numArgQubits; }
+
+    // Qubits allocated by this function and not yet released, their maximum, and their maximum
+    // at each call (loop bodies included). The peak with callees is left to the consumer. These
+    // are not counts: `multiplyBy` keeps them and `mergeWith` takes their maximum.
+    double liveQubits = 0;
+    double peakQubits = 0;
+    llvm::StringMap<double> liveQubitsAtCall;
 
     // from quantum.device op
     std::string deviceName;

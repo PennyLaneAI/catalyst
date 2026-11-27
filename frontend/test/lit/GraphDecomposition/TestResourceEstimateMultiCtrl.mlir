@@ -13,20 +13,33 @@
 // limitations under the License.
 
 // Test that resource-estimate counts gates with different numbers of control qubits separately,
-// with the number of control qubits in their names, as resource-analysis does. This holds both for
-// gates in the gate set and for the gates of a decomposition.
+// with the number of control qubits in their names and widths, as resource-analysis does. This
+// holds both for gates in the gate set and for the gates of a decomposition, which are in the
+// function of its rule.
 
 // RUN: catalyst --tool=opt --pass-pipeline='builtin.module(resource-estimate{output-json gate-set=C(RX)=1.0,C(PauliX)=1.0,C(Adjoint(S))=1.0 bytecode-rules="%PRECOMPILED_BYTECODE_PATH"})' %s -o /dev/null | FileCheck %s
 
-// CHECK-LABEL: "circuit"
+// CHECK-LABEL: "circuit": {
+// CHECK:       "function_calls"
+// CHECK:         "ctrl_my_op(2C(MyOp){}{wires:1}{})": 1
 // CHECK:       "quantum_operations"
-// CHECK-NEXT:    "-1"
+// CHECK-NEXT:    "2"
 // CHECK-NEXT:      "1C(RX)": 1
+// CHECK-NEXT:    }
+// CHECK-NEXT:    "3"
 // CHECK-NEXT:      "2C(Adjoint(S))": 1
-// CHECK-NEXT:      "2C(PauliX)": 2
 // CHECK-NEXT:      "2C(RX)": 1
-// CHECK-NEXT:      "3C(Adjoint(S))": 1
+// CHECK-NEXT:    }
+// CHECK-NEXT:    "4"
 // CHECK-NEXT:      "3C(RX)": 1
+
+// CHECK-LABEL: "ctrl_my_op(2C(MyOp){}{wires:1}{})": {
+// CHECK:       "quantum_operations"
+// CHECK-NEXT:    "3"
+// CHECK-NEXT:      "2C(PauliX)": 2
+// CHECK-NEXT:    }
+// CHECK-NEXT:    "4"
+// CHECK-NEXT:      "3C(Adjoint(S))": 1
 func.func public @circuit() attributes {quantum.node} {
     %angle = arith.constant 0.5 : f64
     %true = arith.constant true

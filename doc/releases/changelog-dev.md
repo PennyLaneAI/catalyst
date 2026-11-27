@@ -2,6 +2,13 @@
 
 <h3>New features since last release</h3>
 
+* The new `estimate-transform-sequence` pass estimates the resources of a program after each pass
+  of its transform sequence, without running the passes. It analyzes the program once, projects a
+  first `graph-decomposition` as `resource-estimate` does, and replaces every other pass by the
+  resource effect that it registers in `ResourceEffectRegistry`. The `estimate-transform-stage`
+  pipeline runs it in place of `apply-transform-sequence`.
+  [(#3518)](https://github.com/PennyLaneAI/catalyst/pull/3518)
+
 * The new `CompileOptions(estimate_decomps=True)` setting prepares reachable decomposition rules for
   resource estimation using their registered resource counts, without tracing or compiling
   their implementations. `qp.estimate` can use these rules even when their implementations
@@ -199,6 +206,17 @@
   [(#3303)](https://github.com/PennyLaneAI/catalyst/pull/3303)
 
 <h3>Improvements 🛠</h3>
+
+* The resource analysis reports the qubit liveness of each function: its peak number of live
+  qubits (`num_qubits.peak`) and the qubits live at each call (`num_qubits.live_at_call`), from
+  which the peak of a whole program follows.
+  [(#3518)](https://github.com/PennyLaneAI/catalyst/pull/3518)
+
+* `resource-estimate` reports each chosen decomposition rule as a function of its own, called where
+  the decomposed gate was, as in the program after `graph-decomposition`. Basis gates get their
+  number of wires, and operations that are not decomposable ops, such as mid-circuit
+  measurements, are kept.
+  [(#3518)](https://github.com/PennyLaneAI/catalyst/pull/3518)
 
 * Operators whose operator-valued arguments share wires are now supported
   with `qjit`.
@@ -1247,6 +1265,9 @@
   [(#3409)](https://github.com/PennyLaneAI/catalyst/pull/3409)
 
 <h3>Internal changes ⚙️</h3>
+
+* Each pass of a transform sequence has its own timer under `--mlir-timing`.
+  [(#3518)](https://github.com/PennyLaneAI/catalyst/pull/3518)
 
 * Uses `AnnotatedQueue` and `QuantumScript` instead of the to-be-removed `QuantumTape`.
   [(#3509)](https://github.com/PennyLaneAI/catalyst/pull/3509)

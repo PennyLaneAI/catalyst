@@ -44,6 +44,9 @@ class ResourceAnalysis {
 
     const llvm::StringMap<ResourceResult> &getResults() const { return funcResults; }
 
+    // Move out the per-function resource counts, leaving the analysis without results.
+    llvm::StringMap<ResourceResult> takeResults() { return std::move(funcResults); }
+
     const ResourceResult *getResult(llvm::StringRef funcName) const {
         auto it = funcResults.find(funcName);
         if (it == funcResults.end()) {

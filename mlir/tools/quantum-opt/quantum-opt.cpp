@@ -65,6 +65,7 @@ int main(int argc, char **argv) {
     mlir::registerAllPasses();
     catalyst::registerAllPasses();
     catalyst::pbc::registerPBCResourceAnalysisExtensions();
+    catalyst::registerAllResourceEffects();
     mlirRegisterAllStablehloPasses();
     mlir::stablehlo::registerOptimizationPasses();
 

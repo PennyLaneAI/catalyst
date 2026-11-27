@@ -703,3 +703,46 @@ func.func @testfunc(%wires : tensor<2xi64>) {
 
     ASSERT_EQ(op.getGraphOpId(), "MeasureQreg{}{wires:2}{}");
 }
+
+TEST(GraphOpIdTests, NumQubits) {
+    EXPECT_EQ(getGraphOpNumQubits("Hadamard{}{wires:1}{}"), 1u);
+    EXPECT_EQ(getGraphOpNumQubits("RX{0:[f64]}{wires:2}{}"), 2u);
+    EXPECT_EQ(getGraphOpNumQubits("2C(PauliX){}{wires:1}{}"), 3u);
+    EXPECT_EQ(getGraphOpNumQubits("1C(Adjoint(RX)){0:[f64]}{wires:1}{}"), 2u);
+    EXPECT_EQ(getGraphOpNumQubits("2C(PauliX){}{ctrl_work_wires:1,wires:1}"
+                                  "{work_wire_type = \"zeroed\"}"),
+              4u);
+    EXPECT_EQ(getGraphOpNumQubits("testOperatorUID{angle:[tensor<f64>],index:["
+                                  "tensor<i1>,tensor<i64>]}{reg:3}{}[248]"),
+              3u);
+    EXPECT_EQ(getGraphOpNumQubits("PPR_8{}{wires:2}{pauli_word = \"XZ\", sign = 1 : i64}"), 2u);
+}
+
+TEST(GraphOpIdTests, NumQubitsOfMalformedId) {
+    EXPECT_EQ(getGraphOpNumQubits("Hadamard"), std::nullopt);
+    EXPECT_EQ(getGraphOpNumQubits("Hadamard{}"), std::nullopt);
+    EXPECT_EQ(getGraphOpNumQubits("Hadamard{}{wires:one}{}"), std::nullopt);
+    EXPECT_EQ(getGraphOpNumQubits("C(PauliX){}{wires:1}{}"), std::nullopt);
+}
+
+TEST(GraphOpIdTests, NumQubitsOfPrintedId) {
+    std::string moduleStr = R"mlir(
+module {
+  %true = arith.constant true
+  %q0 = quantum.alloc_qb : !quantum.bit
+  %c0 = quantum.alloc_qb : !quantum.bit
+  %c1 = quantum.alloc_qb : !quantum.bit
+  %oq, %oc:2 = quantum.custom "PauliX"() %q0 ctrls(%c0, %c1) ctrlvals(%true, %true) : !quantum.bit ctrls !quantum.bit, !quantum.bit
+}
+    )mlir";
+
+    DialectRegistry registry;
+    registry.insert<mlir::arith::ArithDialect, QuantumDialect>();
+    MLIRContext context(registry);
+    ParserConfig config(&context, /*verifyAfterParse=*/false);
+    OwningOpRef<ModuleOp> module = parseSourceString<ModuleOp>(moduleStr, config);
+
+    DecomposableOp op = *module->getOps<CustomOp>().begin();
+    EXPECT_EQ(getGraphOpNumQubits(op.getGraphOpId()), 3u);
+    EXPECT_EQ(getGraphOpNumQubits(op.getGraphOpIdExplicitModifiers(false, 2, 1, false)), 4u);
+}

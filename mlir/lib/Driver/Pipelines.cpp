@@ -14,9 +14,12 @@
 
 #include "Driver/Pipelines.h"
 
+#include "mlir/IR/BuiltinOps.h"
 #include "mlir/Pass/PassManager.h"
+#include "mlir/Pass/PassOptions.h"
 
 #include "Driver/DefaultPipelines/DefaultPipelines.h"
+#include "Quantum/Transforms/Passes.h"
 
 #include <fmt/core.h>
 #include <fmt/ranges.h>
@@ -38,6 +41,31 @@ void createQuantumCompilationStage(OpPassManager &pm) {
 }
 
 void createUserTransformStage(OpPassManager &pm) { parsePassPipeline(getUserTransformStage(), pm); }
+
+struct EstimateTransformStageOptions : public PassPipelineOptions<EstimateTransformStageOptions> {
+    Option<std::string> outputFname{
+        *this, "output-fname",
+        llvm::cl::desc("The file to write the levels to. Prints to stdout if empty.")};
+    Option<bool> allowUnknownPasses{
+        *this, "allow-unknown-passes",
+        llvm::cl::desc(
+            "Assume that a pass without a resource effect does not change the resources."),
+        llvm::cl::init(false)};
+};
+
+// The user transform stage, with the transform sequence estimated instead of applied.
+void createEstimateTransformStage(OpPassManager &pm, const EstimateTransformStageOptions &options) {
+    PassNames passNames = getUserTransformStage();
+    assert(passNames.back() == ApplyTransformSequencePassName &&
+           "apply-transform-sequence must end the user transform stage");
+    passNames.pop_back();
+    parsePassPipeline(passNames, pm);
+
+    quantum::EstimateTransformSequencePassOptions passOptions;
+    passOptions.outputFname = options.outputFname;
+    passOptions.allowUnknownPasses = options.allowUnknownPasses;
+    pm.nest<ModuleOp>().addPass(quantum::createEstimateTransformSequencePass(passOptions));
+}
 
 void createHLOLoweringStage(OpPassManager &pm) { parsePassPipeline(getHLOLoweringStage(), pm); }
 
@@ -68,6 +96,14 @@ void registerQuantumCompilationStage() {
 void registerUserTransformStage() {
     PassPipelineRegistration<>("user-transform-stage", "Register user transform stage as a pass.",
                                createUserTransformStage);
+}
+
+void registerEstimateTransformStage() {
+    PassPipelineRegistration<EstimateTransformStageOptions>(
+        "estimate-transform-stage",
+        "Register the user transform stage, estimating the resources after each pass of the "
+        "transform sequence instead of applying it, as a pass.",
+        createEstimateTransformStage);
 }
 
 void registerHLOLoweringStage() {
@@ -101,6 +137,7 @@ void registerDefaultCatalystPipeline() {
 void registerAllCatalystPipelines() {
     registerQuantumCompilationStage();
     registerUserTransformStage();
+    registerEstimateTransformStage();
     registerHLOLoweringStage();
     registerGradientLoweringStage();
     registerBufferizationStage();

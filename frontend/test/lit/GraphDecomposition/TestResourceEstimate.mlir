@@ -12,19 +12,33 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Test that resource-estimate counts each op by the basis gates of its chosen decomposition
+// Test that resource-estimate replaces each op by a call to the function of its chosen
+// decomposition rule, which holds the basis gates of the rule, and keeps the ops that are not
+// decomposable ops as they are
 
 // RUN: catalyst --tool=opt --pass-pipeline='builtin.module(resource-estimate{output-json gate-set=testRX=1.0,testRZ=1.0 bytecode-rules="%PRECOMPILED_BYTECODE_PATH"})' %s -o /dev/null | FileCheck %s
 
+// CHECK-LABEL: "__builtin_h_to_rz_rx(testHadamard{}{wires:1}{})"
+// CHECK: "quantum_operations"
+// CHECK:   "1"
+// CHECK:       "testRX": 1
+// CHECK:       "testRZ": 2
+
 // CHECK-LABEL: "circuit"
+// CHECK: "function_calls"
+// CHECK:   "static"
+// CHECK:       "__builtin_h_to_rz_rx(testHadamard{}{wires:1}{})": 2
 // CHECK: "num_qubits"
 // CHECK:   "alloc": 1
 // CHECK:   "arg": 0
+// CHECK:   "live_at_call"
+// CHECK:       "__builtin_h_to_rz_rx(testHadamard{}{wires:1}{})": 1
+// CHECK:   "peak": 1
 // CHECK:   "total": 1
 // CHECK: "quantum_operations"
-// CHECK:   "-1"
-// CHECK:       "testRX": 3
-// CHECK:       "testRZ": 4
+// CHECK:   "1"
+// CHECK:       "MidCircuitMeasure": 1
+// CHECK:       "testRX": 1
 // CHECK-NOT:   "testHadamard"
 func.func public @circuit() attributes {quantum.node} {
     %angle = arith.constant 0.5 : f64
@@ -33,7 +47,8 @@ func.func public @circuit() attributes {quantum.node} {
     %2 = quantum.custom "testHadamard"() %1 : !quantum.bit
     %3 = quantum.custom "testHadamard"() %2 : !quantum.bit
     %4 = quantum.custom "testRX"(%angle) %3 : !quantum.bit
-    %5 = quantum.insert %0[ 0], %4 : !quantum.reg, !quantum.bit
+    %mres, %out = quantum.measure %4 : i1, !quantum.bit
+    %5 = quantum.insert %0[ 0], %out : !quantum.reg, !quantum.bit
     quantum.dealloc %5 : !quantum.reg
     return
 }

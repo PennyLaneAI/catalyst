@@ -14,6 +14,7 @@
 
 #pragma once
 
+#include "Catalyst/Analysis/ResourceEffect.h"
 #include "Catalyst/Transforms/Passes.h"
 #include "Gradient/Transforms/Passes.h"
 #include "Ion/Transforms/Passes.h"
@@ -50,5 +51,7 @@ inline void registerAllPasses() {
     transport::registerTransportPasses();
     test::registerTestPasses();
 }
+
+inline void registerAllResourceEffects() { registerUpstreamResourceEffects(); }
 
 } // namespace catalyst

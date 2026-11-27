@@ -2825,3 +2825,111 @@ func.func @operator2() {
     quantum.dealloc %r2 : !quantum.reg
     return
 }
+
+// -----
+
+// Qubit liveness: a register released before the next allocation does not add to the peak.
+
+// CHECK-LABEL: "liveness_sequential_registers"
+// CHECK: "num_qubits"
+// CHECK:   "alloc": 5
+// CHECK:   "live_at_call": {}
+// CHECK:   "peak": 3
+func.func @liveness_sequential_registers() {
+    %r0 = quantum.alloc( 2) : !quantum.reg
+    quantum.dealloc %r0 : !quantum.reg
+    %r1 = quantum.alloc( 3) : !quantum.reg
+    quantum.dealloc %r1 : !quantum.reg
+    return
+}
+
+// -----
+
+// A register threaded through a loop is still traced back to its allocation when released.
+
+// CHECK-LABEL: "liveness_register_through_loop"
+// CHECK: "num_qubits"
+// CHECK:   "alloc": 3
+// CHECK:   "live_at_call":
+// CHECK:     "for_loop_1": 2
+// CHECK:   "peak": 2
+func.func @liveness_register_through_loop() {
+    %c0 = arith.constant 0 : index
+    %c1 = arith.constant 1 : index
+    %c4 = arith.constant 4 : index
+    %r0 = quantum.alloc( 2) : !quantum.reg
+    %r1 = scf.for %i = %c0 to %c4 step %c1 iter_args(%r = %r0) -> (!quantum.reg) {
+        %q = quantum.extract %r[ 0] : !quantum.reg -> !quantum.bit
+        %h = quantum.custom "Hadamard"() %q : !quantum.bit
+        %ri = quantum.insert %r[ 0], %h : !quantum.reg, !quantum.bit
+        scf.yield %ri : !quantum.reg
+    }
+    quantum.dealloc %r1 : !quantum.reg
+    %qb = quantum.alloc_qb : !quantum.bit
+    quantum.dealloc_qb %qb : !quantum.bit
+    return
+}
+
+// -----
+
+// A loop body keeps its own peak; the caller records the qubits live when it runs the body.
+
+// CHECK-LABEL: "for_loop_1": {
+// CHECK: "num_qubits"
+// CHECK:   "peak": 1
+// CHECK-LABEL: "liveness_ancilla_in_loop"
+// CHECK: "num_qubits"
+// CHECK:   "live_at_call":
+// CHECK:     "for_loop_1": 2
+// CHECK:   "peak": 2
+func.func @liveness_ancilla_in_loop() {
+    %c0 = arith.constant 0 : index
+    %c1 = arith.constant 1 : index
+    %c4 = arith.constant 4 : index
+    %r0 = quantum.alloc( 2) : !quantum.reg
+    scf.for %i = %c0 to %c4 step %c1 {
+        %qb = quantum.alloc_qb : !quantum.bit
+        quantum.dealloc_qb %qb : !quantum.bit
+    }
+    quantum.dealloc %r0 : !quantum.reg
+    return
+}
+
+// -----
+
+// Qubits a loop body leaves allocated are live in the later iterations and after the loop.
+
+// CHECK-LABEL: "liveness_leaking_loop"
+// CHECK: "num_qubits"
+// CHECK:   "live_at_call":
+// CHECK:     "for_loop_1": 2
+// CHECK:   "peak": 3
+func.func @liveness_leaking_loop() {
+    %c0 = arith.constant 0 : index
+    %c1 = arith.constant 1 : index
+    %c3 = arith.constant 3 : index
+    scf.for %i = %c0 to %c3 step %c1 {
+        %qb = quantum.alloc_qb : !quantum.bit
+    }
+    return
+}
+
+// -----
+
+// The peak of alternative branches is the largest branch peak on top of what is live before.
+
+// CHECK-LABEL: "liveness_branches"
+// CHECK: "num_qubits"
+// CHECK:   "peak": 4
+func.func @liveness_branches(%cond: i1) {
+    %r0 = quantum.alloc( 1) : !quantum.reg
+    scf.if %cond {
+        %r1 = quantum.alloc( 3) : !quantum.reg
+        quantum.dealloc %r1 : !quantum.reg
+    } else {
+        %qb = quantum.alloc_qb : !quantum.bit
+        quantum.dealloc_qb %qb : !quantum.bit
+    }
+    quantum.dealloc %r0 : !quantum.reg
+    return
+}

@@ -59,14 +59,32 @@ template <typename Map> static void mergeStringMap(Map &dst, const Map &src, Mer
     }
 }
 
-void ResourceResult::mergeWith(const ResourceResult &other, MergeMethod method) {
-    for (const auto &opEntry : other.operations) {
-        auto &innerDst = operations[opEntry.getKey()];
+static void mergeOperationCounts(ResourceResult::OperationCounts &dst,
+                                 const ResourceResult::OperationCounts &src, MergeMethod method) {
+    for (const auto &opEntry : src) {
+        auto &innerDst = dst[opEntry.getKey()];
         for (const auto &sizeEntry : opEntry.getValue()) {
             auto &slot = innerDst[sizeEntry.first];
             slot = applyMerge(slot, sizeEntry.second, method);
         }
     }
+}
+
+static void scaleOperationCounts(ResourceResult::OperationCounts &counts, double scalar) {
+    for (auto &opEntry : counts) {
+        for (auto &sizeEntry : opEntry.getValue()) {
+            sizeEntry.second *= scalar;
+        }
+    }
+}
+
+void ResourceResult::mergeWith(const ResourceResult &other, MergeMethod method) {
+    mergeOperationCounts(operations, other.operations, method);
+    mergeOperationCounts(nonDecomposableOperations, other.nonDecomposableOperations, method);
+
+    liveQubits = std::max(liveQubits, other.liveQubits);
+    peakQubits = std::max(peakQubits, other.peakQubits);
+    mergeStringMap(liveQubitsAtCall, other.liveQubitsAtCall, MergeMethod::Max);
 
     mergeStringMap(measurements, other.measurements, method);
     mergeStringMap(detailedOperations, other.detailedOperations, method);
@@ -108,11 +126,8 @@ void ResourceResult::mergeWith(const ResourceResult &other, MergeMethod method) 
 }
 
 void ResourceResult::multiplyBy(double scalar) {
-    for (auto &opEntry : operations) {
-        for (auto &sizeEntry : opEntry.getValue()) {
-            sizeEntry.second *= scalar;
-        }
-    }
+    scaleOperationCounts(operations, scalar);
+    scaleOperationCounts(nonDecomposableOperations, scalar);
 
     for (auto &entry : measurements) {
         entry.getValue() *= scalar;
@@ -175,6 +190,12 @@ llvm::json::Object ResourceResult::toJson() const {
     numQubitObject["alloc"] = countToJson(numAllocQubits);
     numQubitObject["arg"] = numArgQubits;
     numQubitObject["total"] = countToJson(numQubits());
+    numQubitObject["peak"] = countToJson(peakQubits);
+    llvm::json::Object liveAtCallObject;
+    for (const auto &entry : liveQubitsAtCall) {
+        liveAtCallObject[entry.getKey()] = countToJson(entry.getValue());
+    }
+    numQubitObject["live_at_call"] = std::move(liveAtCallObject);
     funcObj["num_qubits"] = std::move(numQubitObject);
 
     // Classical Operations
