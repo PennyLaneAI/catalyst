@@ -519,6 +519,37 @@ func.func @test_if_non_root_no_else(%arg0: i1) attributes {quantum.node} {
 
 // -----
 
+// CHECK-LABEL: test_if_classical_result_empty_else
+func.func @test_if_classical_result_empty_else(%arg0: i1) -> f64 attributes {quantum.node} {
+    // CHECK: [[qb:%.+]] = qref.alloc_qb : !qref.bit
+    %0 = quantum.alloc_qb : !quantum.bit
+    // CHECK: [[zero:%.+]] = arith.constant 0.000000e+00 : f64
+    %cst = arith.constant 0.0 : f64
+
+    // CHECK: [[ifOut:%.+]] = scf.if %arg0 -> (f64) {
+    // CHECK:   qref.custom "Hadamard"() [[qb]] : !qref.bit
+    // CHECK:   [[one:%.+]] = arith.constant 1.000000e+00 : f64
+    // CHECK:   scf.yield [[one]] : f64
+    // CHECK: } else {
+    // CHECK:   scf.yield [[zero]] : f64
+    // CHECK: }
+    %1:2 = scf.if %arg0 -> (!quantum.bit, f64) {
+        %out = quantum.custom "Hadamard"() %0 : !quantum.bit
+        %one = arith.constant 1.0 : f64
+        scf.yield %out, %one : !quantum.bit, f64
+    } else {
+        scf.yield %0, %cst : !quantum.bit, f64
+    }
+
+    // CHECK: qref.dealloc_qb [[qb]] : !qref.bit
+    // CHECK: return [[ifOut]] : f64
+    quantum.dealloc_qb %1#0 : !quantum.bit
+    return %1#1 : f64
+}
+
+
+// -----
+
 
 // CHECK-LABEL: test_if_non_root_with_else
 func.func @test_if_non_root_with_else(%arg0: i1) attributes {quantum.node} {

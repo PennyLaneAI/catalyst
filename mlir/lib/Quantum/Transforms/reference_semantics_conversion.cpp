@@ -699,10 +699,6 @@ void handleIf(IRRewriter &builder, scf::IfOp ifOp, QubitValueTracker &tracker,
         });
     }
 
-    // The else block is empty if the only remaining op is the mandatory scf.yield terminator
-    bool hasElseRegion =
-        hasElseBlock && (&(ifOp.elseBlock()->front()) != ifOp.elseBlock()->getTerminator());
-
     // Collect classical returns of the old if op
     SmallVector<unsigned> classicalReturnIndices;
     SmallVector<Type> classicalReturnTypes;
@@ -712,6 +708,12 @@ void handleIf(IRRewriter &builder, scf::IfOp ifOp, QubitValueTracker &tracker,
             classicalReturnIndices.push_back(i);
         }
     }
+
+    // A yield-only else branch can be dropped when the if defines no values after conversion.
+    // We need keep a yield-only else if any classical results remain.
+    bool hasElseRegion =
+        hasElseBlock && (!classicalReturnTypes.empty() ||
+                         &(ifOp.elseBlock()->front()) != ifOp.elseBlock()->getTerminator());
     auto newIfOp = scf::IfOp::create(builder, loc, classicalReturnTypes, ifOp.getCondition(),
                                      /*withElseRegion=*/hasElseRegion);
     newIfOp->setDiscardableAttrs(ifOp->getDiscardableAttrDictionary());
