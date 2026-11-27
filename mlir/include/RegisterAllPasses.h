@@ -52,6 +52,12 @@ inline void registerAllPasses() {
     test::registerTestPasses();
 }
 
-inline void registerAllResourceEffects() { registerUpstreamResourceEffects(); }
+inline void registerAllResourceEffects() {
+    registerUpstreamResourceEffects();
+    pbc::registerToPPRResourceEffect();
+    pbc::registerPPRToPPMResourceEffect();
+    quantum::registerCombineGlobalPhasesResourceEffect();
+    quantum::registerGridsynthResourceEffect();
+}
 
 } // namespace catalyst

@@ -87,6 +87,7 @@ Catalyst
    Compiler Core <modules/mlir>
    MLIR Dialects <dev/dialects>
    Compiler Passes <dev/transforms>
+   Resource Effects of Passes <dev/resource_effects>
    Compiler Plugins <dev/plugins>
    Quantum Runtime <modules/runtime>
    Backline <dev/backline>

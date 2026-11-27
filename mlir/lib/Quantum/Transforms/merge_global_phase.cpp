@@ -14,6 +14,7 @@
 
 #define DEBUG_TYPE "combine-global-phases"
 
+#include <algorithm>
 #include <iterator>
 
 #include "llvm/ADT/SmallVector.h"
@@ -21,14 +22,15 @@
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/Pass/Pass.h"
 
+#include "Catalyst/Analysis/ResourceEffect.h"
 #include "Quantum/IR/QuantumOps.h"
+#include "Quantum/Transforms/Passes.h"
 
 using namespace mlir;
 
 namespace catalyst {
 namespace quantum {
 
-#define GEN_PASS_DECL_COMBINEGLOBALPHASESPASS
 #define GEN_PASS_DEF_COMBINEGLOBALPHASESPASS
 #include "Quantum/Transforms/Passes.h.inc"
 
@@ -72,6 +74,33 @@ struct CombineGlobalPhasesPass : impl::CombineGlobalPhasesPassBase<CombineGlobal
         });
     }
 };
+
+/// The pass merges the uncontrolled global phases of each block. Loop bodies and callees are
+/// functions of their own, and the phases of branches are assumed to be merged with the others.
+static void combineGlobalPhaseResources(ResourceResult &function, const Pass &) {
+    double numPhases = 0;
+    for (StringRef name : {"GlobalPhase", "Adjoint(GlobalPhase)"}) {
+        auto phases = function.operations.find(name);
+        if (phases == function.operations.end()) {
+            continue;
+        }
+        for (const auto &[size, count] : phases->second) {
+            numPhases += count;
+        }
+        function.operations.erase(phases);
+    }
+    if (numPhases > 0) {
+        function.operations["GlobalPhase"][{0, 1}] = std::min(numPhases, 1.0);
+    }
+}
+
+void registerCombineGlobalPhasesResourceEffect() {
+    [[maybe_unused]] static const bool once = [] {
+        ResourceEffectRegistry::get().add("combine-global-phases",
+                                          makeTransferEffect(combineGlobalPhaseResources));
+        return true;
+    }();
+}
 
 } // namespace quantum
 } // namespace catalyst

@@ -49,7 +49,7 @@ struct WireEffect {
 /// What replaces an operation. An empty `ops` removes it.
 struct Substitution {
     llvm::SmallVector<std::pair<OpKey, double>> ops;
-    WireEffect wires;
+    WireEffect wires = {};
 };
 
 /// How a compilation pass changes the resources of a function, declared next to the pass so that

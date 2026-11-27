@@ -25,5 +25,8 @@ namespace pbc {
 #define GEN_PASS_REGISTRATION
 #include "PBC/Transforms/Passes.h.inc"
 
+void registerToPPRResourceEffect();
+void registerPPRToPPMResourceEffect();
+
 } // namespace pbc
 } // namespace catalyst

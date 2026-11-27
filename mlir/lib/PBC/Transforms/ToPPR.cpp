@@ -21,6 +21,7 @@
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/STLForwardCompat.h"
 #include "llvm/ADT/StringSwitch.h"
+#include "llvm/ADT/Twine.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/BuiltinAttributes.h"
@@ -35,6 +36,7 @@
 #include "mlir/Support/LogicalResult.h"
 #include "mlir/Transforms/DialectConversion.h"
 
+#include "Catalyst/Analysis/ResourceEffect.h"
 #include "Catalyst/Utils/ConstantResolve.h"
 #include "PBC/IR/PBCOps.h"
 #include "PBC/Transforms/Patterns.h"
@@ -74,8 +76,7 @@ enum class GateEnum {
 };
 
 // Hash gate name to GateEnum
-GateEnum hashGate(CustomOp op) {
-    auto gateName = op.getGateName();
+GateEnum hashGate(StringRef gateName) {
     if (gateName == "H" || gateName == "Hadamard") {
         return GateEnum::H;
     } else if (gateName == "S") {
@@ -440,8 +441,8 @@ LogicalResult convertPauliRotGate(PauliRotOp op, ConversionPatternRewriter &rewr
 }
 
 // The PPR_k operators (k = 2, 4, 8) carry their angle denominator in the op name.
-std::optional<int8_t> getPPROperatorDenominator(OperatorOp op) {
-    return llvm::StringSwitch<std::optional<int8_t>>(op.getOpName())
+std::optional<int8_t> getPPROperatorDenominator(StringRef opName) {
+    return llvm::StringSwitch<std::optional<int8_t>>(opName)
         .Case("PPR_2", 2)
         .Case("PPR_4", 4)
         .Case("PPR_8", 8)
@@ -508,7 +509,7 @@ struct PBCGateLowering : public OpInterfaceConversionPattern<QuantumOperation> {
         }
 
         if (auto originOp = dyn_cast<CustomOp>(op)) {
-            switch (hashGate(originOp)) {
+            switch (hashGate(originOp.getGateName())) {
             case GateEnum::H:
                 return convertHGate(originOp, rewriter);
             case GateEnum::S:
@@ -549,7 +550,7 @@ struct PBCGateLowering : public OpInterfaceConversionPattern<QuantumOperation> {
         } else if (auto originOp = dyn_cast<PauliRotOp>(op)) {
             return convertPauliRotGate(originOp, rewriter);
         } else if (auto originOp = dyn_cast<OperatorOp>(op)) {
-            if (auto denominator = getPPROperatorDenominator(originOp)) {
+            if (auto denominator = getPPROperatorDenominator(originOp.getOpName())) {
                 return convertPPROperator(originOp, *denominator, rewriter);
             }
         }
@@ -617,6 +618,63 @@ struct PBCPauliMeasureLowering : public OpConversionPattern<MeasurementOp> {
     }
 };
 
+//===----------------------------------------------------------------------===//
+//                       Resource effect
+//===----------------------------------------------------------------------===//
+
+/// What the patterns above replace an operation with, as the resource analysis counts it. The
+/// angles of rotations are not known, so all rotations become arbitrary-angle PPRs.
+std::optional<Substitution> getToPPRSubstitution(const OpKey &op, const Pass &) {
+    // An adjoint operation is converted as the operation, with the signs of its rotations flipped.
+    StringRef name = op.name;
+    if (name.starts_with("Adjoint(") && name.ends_with(")")) {
+        name = name.drop_front(StringRef("Adjoint(").size()).drop_back();
+    }
+
+    const OpKey globalPhase{"GlobalPhase", 0, 1};
+    auto ppr = [](const Twine &angle, int numWires) {
+        return OpKey{("PPR-" + angle).str(), numWires, 0};
+    };
+    switch (hashGate(name)) {
+    case GateEnum::H:
+        return Substitution{{{ppr("pi/4", 1), 3}, {globalPhase, 1}}};
+    case GateEnum::S:
+        return Substitution{{{ppr("pi/4", 1), 1}, {globalPhase, 1}}};
+    case GateEnum::T:
+        return Substitution{{{ppr("pi/8", 1), 1}, {globalPhase, 1}}};
+    case GateEnum::X:
+    case GateEnum::Y:
+    case GateEnum::Z:
+        return Substitution{{{ppr("pi/2", 1), 1}, {globalPhase, 1}}};
+    case GateEnum::CNOT:
+    case GateEnum::CY:
+    case GateEnum::CZ:
+        return Substitution{{{ppr("pi/4", 2), 1}, {ppr("pi/4", 1), 2}, {globalPhase, 1}}};
+    case GateEnum::I:
+        // The identity PPR is removed by the canonicalization.
+        return Substitution{};
+    case GateEnum::RX:
+    case GateEnum::RY:
+    case GateEnum::RZ:
+    case GateEnum::IsingXX:
+    case GateEnum::IsingYY:
+    case GateEnum::IsingZZ:
+        return Substitution{{{ppr("Phi", op.numWires), 1}}};
+    case GateEnum::Unknown:
+        break;
+    }
+    if (name == "MultiRZ" || name == "PauliRot") {
+        return Substitution{{{ppr("Phi", op.numWires), 1}}};
+    }
+    if (std::optional<int8_t> denominator = getPPROperatorDenominator(name)) {
+        return Substitution{{{ppr("pi/" + Twine(static_cast<int>(*denominator)), op.numWires), 1}}};
+    }
+    if (name == "MidCircuitMeasure" || name == "PauliMeasure") {
+        return Substitution{{{OpKey{"PPM", op.numWires, 0}, 1}}};
+    }
+    return std::nullopt;
+}
+
 } // namespace
 
 namespace catalyst {
@@ -626,6 +684,13 @@ void populateToPPRPatterns(RewritePatternSet &patterns) {
     patterns.add<PBCGateLowering>(patterns.getContext());
     patterns.add<PBCMeasureLowering>(patterns.getContext());
     patterns.add<PBCPauliMeasureLowering>(patterns.getContext());
+}
+
+void registerToPPRResourceEffect() {
+    [[maybe_unused]] static const bool once = [] {
+        ResourceEffectRegistry::get().add("to-ppr", makeSubstitutionEffect(getToPPRSubstitution));
+        return true;
+    }();
 }
 
 } // namespace pbc
