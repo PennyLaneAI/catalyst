@@ -34,7 +34,6 @@ from pennylane import QueuingManager
 from pennylane.core.qscript import QuantumScript
 from pennylane.core.queuing import AnnotatedQueue
 from pennylane.decomposition.resources import resolve_work_wire_type
-from pennylane.operation import Operator, Operator2
 from pennylane.ops.op_math.adjoint import create_adjoint_op
 from pennylane.ops.op_math.controlled import create_controlled_op, create_controlled_op2
 
@@ -56,6 +55,9 @@ from catalyst.jax_tracer import (
     trace_quantum_operations,
 )
 from catalyst.tracing.contexts import EvaluationContext
+
+LegacyOperator = getattr(qp.operation, "LegacyOperator", None) or qp.operation.Operator
+Operator = getattr(qp.core, "Operator2", None) or qp.core.Operator
 
 pl_adjoint_module = sys.modules["pennylane.ops.op_math.adjoint"]
 pl_ctrl_module = sys.modules["pennylane.ops.op_math.controlled"]
@@ -244,7 +246,7 @@ def pauli_measure(
     return m
 
 
-def adjoint(f: Union[Callable, Operator]) -> Union[Callable, Operator]:
+def adjoint(f: Union[Callable, LegacyOperator]) -> Union[Callable, LegacyOperator]:
     """A :func:`~.qjit` compatible adjoint transformer for PennyLane/Catalyst.
 
     Returns a quantum function or operator that applies the adjoint of the
@@ -256,11 +258,11 @@ def adjoint(f: Union[Callable, Operator]) -> Union[Callable, Operator]:
         of quantum functions that contain mid-circuit measurements.
 
     Args:
-        f (Callable or Operator): A PennyLane operation or a Python function
+        f (Callable or LegacyOperator): A PennyLane operation or a Python function
                                   containing PennyLane quantum operations.
 
     Returns:
-        If an Operator is provided, returns an Operator that is the adjoint. If
+        If a LegacyOperator is provided, returns a LegacyOperator that is the adjoint. If
         a function is provided, returns a function with the same call signature
         that returns the Adjoint of the provided function.
 
@@ -311,11 +313,11 @@ def adjoint(f: Union[Callable, Operator]) -> Union[Callable, Operator]:
     adj = AdjointCallable(f)
 
     # Return an instantiated version of the Adjoint class if we receive an operator instance.
-    return adj() if isinstance(f, Operator) else adj
+    return adj() if isinstance(f, LegacyOperator) else adj
 
 
 def ctrl(
-    f: Union[Callable, Operator],
+    f: Union[Callable, LegacyOperator],
     control: List[Any],
     control_values: Optional[List[Any]] = None,
     work_wires: Optional[List[Any]] = None,
@@ -326,7 +328,7 @@ def ctrl(
     conditionals.
 
     Args:
-        f (Callable or Operator): A PennyLane operation or a Python function
+        f (Callable or LegacyOperator): A PennyLane operation or a Python function
                                   containing PennyLane quantum operations.
         control (Wires): The control wire(s).
         control_values (List[bool], optional): The value(s) the control wire(s) should take.
@@ -335,8 +337,8 @@ def ctrl(
         work_wire_type (str): The type of work wire(s), can be ``"zeroed"`` or ``"borrowed"``.
 
     Returns:
-        (function or :class:`~.operation.Operator`): If an Operator is provided, returns a
-        Controlled version of the Operator.  If a function is provided, returns a function with the
+        (function or :class:`~.operation.LegacyOperator`): If a LegacyOperator is provided, returns a
+        Controlled version of the LegacyOperator. If a function is provided, returns a function with the
         same call signature that creates a controlled version of the provided function.
 
     Raises:
@@ -388,7 +390,7 @@ def ctrl(
         work_wires=work_wires,
         work_wire_type=work_wire_type,
     )
-    return res() if isinstance(f, Operator) else res
+    return res() if isinstance(f, LegacyOperator) else res
 
 
 ## IMPL ##
@@ -481,11 +483,11 @@ class AdjointCallable:
     def __init__(self, target):
         self.target = target
 
-        if isinstance(target, Operator):
+        if isinstance(target, LegacyOperator):
             # Case 1: User passed an already instantiated operation, e.g. adjoint(qp.Hadamard(0))
             self.single_op = True
             self.instantiated = True
-        elif isinstance(target, type) and issubclass(target, Operator):
+        elif isinstance(target, type) and issubclass(target, LegacyOperator):
             # Case 2: User passed the constructor of an operation, e.g. adjoint(qp.Hadamard)(0)
             self.single_op = True
             self.instantiated = False
@@ -497,7 +499,7 @@ class AdjointCallable:
             self.single_op = False
             self.instantiated = False
         else:
-            raise ValueError(f"Expected a callable or a qp.Operator, not {target}")
+            raise ValueError(f"Expected a callable or a qp.LegacyOperator, not {target}")
 
     def __call__(self, *args, **kwargs):
         if self.single_op:
@@ -623,11 +625,11 @@ class CtrlCallable:
         self.work_wires = work_wires
         self.work_wire_type = work_wire_type
 
-        if isinstance(target, Operator):
+        if isinstance(target, LegacyOperator):
             # Case 1. Support an initialized operation as the base target
             self.single_op = True
             self.instantiated = True
-        elif isinstance(target, type) and issubclass(target, Operator):
+        elif isinstance(target, type) and issubclass(target, LegacyOperator):
             # Case 2: Support an operation constructor as the base op
             self.single_op = True
             self.instantiated = False
@@ -636,12 +638,12 @@ class CtrlCallable:
             self.single_op = False
             self.instantiated = False
         else:
-            raise ValueError(f"Expected a callable or a qp.Operator, not {target}")
+            raise ValueError(f"Expected a callable or a qp.LegacyOperator, not {target}")
 
     def __call__(self, *args, **kwargs):
         if self.single_op:
             base_op = self.target if self.instantiated else self.target(*args, **kwargs)
-            if isinstance(base_op, Operator2):
+            if isinstance(base_op, Operator):
                 return create_controlled_op2(
                     base_op,
                     control_wires=self.control_wires,
@@ -854,7 +856,7 @@ def ctrl_distribute(
             )
             new_ops.append(create_adjoint_op(ctrl_op))
         else:
-            if isinstance(op, Operator2):
+            if isinstance(op, Operator):
                 ctrl_op = create_controlled_op2(
                     copy.copy(op),
                     control_wires=control_wires,

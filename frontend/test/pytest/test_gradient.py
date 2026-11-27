@@ -47,6 +47,8 @@ from catalyst.device.op_support import (
 )
 from catalyst.jax_tracer import HybridOp
 
+LegacyOperator = getattr(qp.operation, "LegacyOperator", None) or qp.operation.Operator
+
 # pylint: disable=too-many-lines,missing-function-docstring,missing-class-docstring
 
 
@@ -2098,14 +2100,14 @@ class TestParameterShiftVerificationUnitTests:
         """Check that if grad recipe is not defined, no exception gets triggered"""
 
         # a family of ops that do not have grad recipe are control flow ops
-        class DummyOp(qp.operation.Operator): ...
+        class DummyOp(LegacyOperator): ...
 
         assert not _has_grad_recipe(DummyOp(wires=[0]))
 
     def test_check_grad_recipe_empty(self):
         """Some grad recipes are defined but are filled with Nones"""
 
-        class DummyOp(qp.operation.Operator):
+        class DummyOp(LegacyOperator):
             @property
             def grad_recipe(self):
                 return [None]
@@ -2115,7 +2117,7 @@ class TestParameterShiftVerificationUnitTests:
     def test_check_grad_recipe_different_size(self):
         """len(grad_recipe) != len(op.data)"""
 
-        class DummyOp(qp.operation.Operator):
+        class DummyOp(LegacyOperator):
             def __init__(self, wires=None):
                 param = 0.0
                 super().__init__(param, wires=wires)
@@ -2136,7 +2138,7 @@ class TestParameterShiftVerificationUnitTests:
     def test_check_grad_recipe_different(self):
         """Check exception is raised when invalid grad_recipe is found"""
 
-        class DummyOp(qp.operation.Operator):
+        class DummyOp(LegacyOperator):
             def __init__(self, wires=None):
                 param = 0.0
                 super().__init__(param, wires=wires)
@@ -2154,7 +2156,7 @@ class TestParameterShiftVerificationUnitTests:
     def test_check_grad_recipe_dynamic(self):
         """Check exception is raised when dynamic grad recipe is found"""
 
-        class DummyOp(qp.operation.Operator):
+        class DummyOp(LegacyOperator):
             def __init__(self, param, wires=None):
                 self.param = param
                 super().__init__(param, wires=wires)
@@ -2175,7 +2177,7 @@ class TestParameterShiftVerificationUnitTests:
     def test_check_param_frequencies(self):
         """No param frequencies attr"""
 
-        class DummyOp(qp.operation.Operator): ...
+        class DummyOp(LegacyOperator): ...
 
         assert not hasattr(DummyOp, "parameter_frequencies")
         assert not _has_parameter_frequencies(DummyOp(wires=[0]))
@@ -2239,7 +2241,7 @@ class TestParameterShiftVerificationUnitTests:
     def test_no_grad_recipe_no_param_frequencies(self):
         """No grad recipe, no param shift, not hybrid op => no grad"""
 
-        class DummyOp(qp.operation.Operator):
+        class DummyOp(LegacyOperator):
             def __init__(self, wires=None):
                 super().__init__(0.0, wires=wires)
 

@@ -77,6 +77,8 @@ from catalyst.jax_primitives import (
 )
 from catalyst.utils.exceptions import CompileError
 
+LegacyOperator = getattr(qp.operation, "LegacyOperator", None) or qp.operation.Operator
+
 measurement_map = {
     qp.measurements.SampleMP: sample_p,
     qp.measurements.ExpectationMP: expval_p,
@@ -132,12 +134,12 @@ class PLxPRToQuantumJaxprInterpreter(PlxprInterpreter):
         super().__init__()
 
     def interpret_operation_eqn(self, eqn):
-        """Override to handle Operator2 (operator_p) equations.
+        """Override to handle Operator (operator_p) equations.
 
-        For Operator2 ops used as observables (output is not DropVar),
+        For Operator ops used as observables (output is not DropVar),
         return the operator instance without applying it as a gate.
-        For Operator2 ops used as gates (output is DropVar), apply the gate
-        using the Operator2-specific lowering.
+        For Operator ops used as gates (output is DropVar), apply the gate
+        using the Operator-specific lowering.
         For legacy ops, delegate to the parent implementation.
         """
         if eqn.primitive is operator_p:
@@ -164,7 +166,7 @@ class PLxPRToQuantumJaxprInterpreter(PlxprInterpreter):
         binding, we refer to the `_special_op_bind_call` mapping.
 
         Args:
-            op (qp.operation.Operator): The operation to interpret.
+            op (qp.operation.LegacyOperator): The operation to interpret.
             is_adjoint (bool): Whether the operation is in adjoint mode.
             control_values (tuple): Control values for controlled operations.
             control_wires (tuple): Control wires for controlled operations.
@@ -283,7 +285,7 @@ class PLxPRToQuantumJaxprInterpreter(PlxprInterpreter):
         mcm_mv = measurement.mv
         mcm_obs = measurement.obs
         mp_is_on_mcm = (mcm_mv is not None) or (
-            mcm_obs is not None and not isinstance(mcm_obs, qp.operation.Operator)
+            mcm_obs is not None and not isinstance(mcm_obs, LegacyOperator)
         )
 
         if mp_is_on_mcm:
@@ -360,7 +362,7 @@ def _apply_operator2_gate(
     ctrl_work_wire_type="borrowed",
     **kwargs,
 ):
-    """Apply an Operator2 as a gate instruction using qref_operator_p."""
+    """Apply an Operator as a gate instruction using qref_operator_p."""
     n_wires = sum(wire_lens)
     wire_inputs = args[len(op_cls.dynamic_argnames) : len(op_cls.dynamic_argnames) + n_wires]
     work_wire_inputs = ()
