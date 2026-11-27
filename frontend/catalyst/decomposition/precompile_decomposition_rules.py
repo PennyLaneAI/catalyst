@@ -33,6 +33,7 @@ from catalyst.decomposition.precompiled_rule_loading import (
     get_rule_entry,
 )
 from catalyst.decomposition.rule_compilation import _capture_rule_module
+from catalyst.utils.exceptions import CompileError
 from catalyst.utils.runtime_environment import (
     PRECOMPILED_BYTECODE_PATH,
     get_precompiled_manifest_path,
