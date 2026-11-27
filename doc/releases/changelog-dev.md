@@ -892,6 +892,13 @@
 * Add `post-device-pipeline` to the `transform-sequence` when `qp.qjit(capture=True)`
   [(#3312)](https://github.com/PennyLaneAI/catalyst/pull/3312)
 
+* IR amplification for circuits whose gate parameters are computed from runtime values
+  (e.g. `qp.TrotterProduct` with runtime Hamiltonian coefficients) is drastically reduced.
+  The new `scalarize-tensor-extracts` pass computes gate angles using scalar arithmetic,
+  and the default pipeline fuses remaining elementwise operations. This reduces the
+  number of temporary tensors that require allocations during bufferization.
+  [(#3013)](https://github.com/PennyLaneAI/catalyst/pull/3013)
+
 <h3>Breaking changes 💔</h3>
 
 * Captured operators now use PennyLane's `Operator` class, formerly named `Operator2`, while
