@@ -18,7 +18,7 @@
 
 import jax
 import numpy as np
-import pennylane as qp
+import pennylane2 as qp
 import pytest
 from jax import numpy as jnp
 from jax._src.source_info_util import current as current_source_info

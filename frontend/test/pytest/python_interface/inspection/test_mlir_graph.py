@@ -16,7 +16,7 @@
 from pathlib import Path
 from shutil import which
 
-import pennylane as qp
+import pennylane2 as qp
 import pytest
 
 from catalyst.python_interface.inspection import generate_mlir_graph

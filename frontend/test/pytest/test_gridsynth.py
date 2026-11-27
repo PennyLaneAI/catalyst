@@ -15,7 +15,7 @@
 """Test cases for the gridsynth discretization/decomposition pass."""
 
 import numpy as np
-import pennylane as qp
+import pennylane2 as qp
 import pytest
 
 from catalyst.passes import gridsynth

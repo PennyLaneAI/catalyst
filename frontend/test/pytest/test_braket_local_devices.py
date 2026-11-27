@@ -15,7 +15,7 @@
 """Unit tests for `OpenQasmDevice` on "local" Amazon Braket devices"""
 
 import numpy as np
-import pennylane as qp
+import pennylane2 as qp
 import pytest
 from numpy.testing import assert_allclose
 

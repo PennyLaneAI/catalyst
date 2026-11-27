@@ -25,10 +25,10 @@ from collections.abc import Callable
 from dataclasses import dataclass
 
 import jax.numpy as jnp
-import pennylane as qp
-from pennylane.core.operator import Operator2, abstractify
-from pennylane.decomposition import DecompositionRule
-from pennylane.decomposition.utils import to_name
+import pennylane2 as qp
+from pennylane2.core.operator import Operator2, abstractify
+from pennylane2.decomposition import DecompositionRule
+from pennylane2.decomposition.utils import to_name
 
 from catalyst.decomposition.capture_session import OpDecompRequest
 from catalyst.decomposition.graph_op_id import (

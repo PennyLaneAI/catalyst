@@ -17,10 +17,10 @@
 from pathlib import Path
 from tempfile import NamedTemporaryFile
 
-import pennylane as qp
+import pennylane2 as qp
 import pytest
 from jax.interpreters.mlir import ir
-from pennylane.transforms.core import BoundTransform
+from pennylane2.transforms.core import BoundTransform
 
 from catalyst import qjit
 from catalyst.jax_primitives_utils import _lowered_options

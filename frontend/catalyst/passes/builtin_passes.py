@@ -20,9 +20,9 @@ import os
 from pathlib import Path
 from typing import Iterable
 
-import pennylane as qp
-from pennylane.decomposition import DecompositionRule
-from pennylane.decomposition.utils import to_name
+import pennylane2 as qp
+from pennylane2.decomposition import DecompositionRule
+from pennylane2.decomposition.utils import to_name
 
 from catalyst.compiler import _options_to_cli_flags, _quantum_opt
 from catalyst.utils.exceptions import CompileError
@@ -46,19 +46,19 @@ def cancel_inverses_setup_inputs():
     The full list of supported gates are as follows:
 
     One-bit Gates:
-    :class:`qp.Hadamard <pennylane.Hadamard>`,
-    :class:`qp.PauliX <pennylane.PauliX>`,
-    :class:`qp.PauliY <pennylane.PauliY>`,
-    :class:`qp.PauliZ <pennylane.PauliZ>`
+    :class:`qp.Hadamard <pennylane2.Hadamard>`,
+    :class:`qp.PauliX <pennylane2.PauliX>`,
+    :class:`qp.PauliY <pennylane2.PauliY>`,
+    :class:`qp.PauliZ <pennylane2.PauliZ>`
 
     Two-bit Gates:
-    :class:`qp.CNOT <pennylane.CNOT>`,
-    :class:`qp.CY <pennylane.CY>`,
-    :class:`qp.CZ <pennylane.CZ>`,
-    :class:`qp.SWAP <pennylane.SWAP>`
+    :class:`qp.CNOT <pennylane2.CNOT>`,
+    :class:`qp.CY <pennylane2.CY>`,
+    :class:`qp.CZ <pennylane2.CZ>`,
+    :class:`qp.SWAP <pennylane2.SWAP>`
 
     Three-bit Gates:
-    :class:`qp.Toffoli <pennylane.Toffoli>`
+    :class:`qp.Toffoli <pennylane2.Toffoli>`
 
     .. note::
 
@@ -77,13 +77,13 @@ def cancel_inverses_setup_inputs():
         fn (QNode): the QNode to apply the cancel inverses compiler pass to
 
     Returns:
-        :class:`QNode <pennylane.QNode>`
+        :class:`QNode <pennylane2.QNode>`
 
     **Example**
 
     .. code-block:: python
 
-        import pennylane as qp
+        import pennylane2 as qp
         from catalyst import qjit
         from catalyst.debug import get_compilation_stage
         from catalyst.passes import cancel_inverses
@@ -174,10 +174,10 @@ def diagonalize_measurements_setup_inputs(
             eigenvalues and wires rather than observables. Defaults to ``False``.
 
     Returns:
-        :class:`QNode <pennylane.QNode>`
+        :class:`QNode <pennylane2.QNode>`
 
     .. note::
-        Unlike the PennyLane tape transform, :func:`pennylane.transforms.diagonalize_measurements`,
+        Unlike the PennyLane tape transform, :func:`pennylane2.transforms.diagonalize_measurements`,
         the QNode itself will not be changed or transformed by applying this decorator.
 
         Unlike the PennyLane tape transform, ``supported_base_obs`` here only accepts a tuple of supported
@@ -195,7 +195,7 @@ def diagonalize_measurements_setup_inputs(
 
     .. code-block:: python
 
-        import pennylane as qp
+        import pennylane2 as qp
         from catalyst import qjit
         from catalyst.passes import diagonalize_measurements
 
@@ -219,7 +219,7 @@ def diagonalize_measurements_setup_inputs(
 
     .. code-block:: python
 
-        import pennylane as qp
+        import pennylane2 as qp
         from catalyst import qjit
         from catalyst.passes import diagonalize_measurements
 
@@ -244,8 +244,8 @@ def diagonalize_measurements_setup_inputs(
 
     .. code-block:: python
 
-        import pennylane as qp
-        from pennylane.exceptions import CompileError
+        import pennylane2 as qp
+        from pennylane2.exceptions import CompileError
         from catalyst import qjit
         from catalyst.passes import diagonalize_measurements
 
@@ -290,7 +290,7 @@ def disentangle_cnot_setup_inputs():
         fn (QNode): the QNode to apply the pass to
 
     Returns:
-        :class:`QNode <pennylane.QNode>`
+        :class:`QNode <pennylane2.QNode>`
 
     **Example**
 
@@ -299,7 +299,7 @@ def disentangle_cnot_setup_inputs():
 
     .. code-block:: python
 
-        import pennylane as qp
+        import pennylane2 as qp
 
         dev = qp.device("lightning.qubit", wires=2)
 
@@ -354,7 +354,7 @@ def disentangle_swap_setup_inputs():
         fn (QNode): the QNode to apply the pass to
 
     Returns:
-        :class:`QNode <pennylane.QNode>`
+        :class:`QNode <pennylane2.QNode>`
 
     **Example**
 
@@ -363,7 +363,7 @@ def disentangle_swap_setup_inputs():
 
     .. code-block:: python
 
-        import pennylane as qp
+        import pennylane2 as qp
 
         dev = qp.device("lightning.qubit", wires=2)
 
@@ -410,17 +410,17 @@ def merge_rotations_setup_inputs():
 
     The full list of supported gates are as follows:
 
-    :class:`qp.RX <pennylane.RX>`,
-    :class:`qp.CRX <pennylane.CRX>`,
-    :class:`qp.RY <pennylane.RY>`,
-    :class:`qp.CRY <pennylane.CRY>`,
-    :class:`qp.RZ <pennylane.RZ>`,
-    :class:`qp.CRZ <pennylane.CRZ>`,
-    :class:`qp.PhaseShift <pennylane.PhaseShift>`,
-    :class:`qp.ControlledPhaseShift <pennylane.ControlledPhaseShift>`,
-    :class:`qp.Rot <pennylane.Rot>`,
-    :class:`qp.CRot <pennylane.CRot>`,
-    :class:`qp.MultiRZ <pennylane.MultiRZ>`.
+    :class:`qp.RX <pennylane2.RX>`,
+    :class:`qp.CRX <pennylane2.CRX>`,
+    :class:`qp.RY <pennylane2.RY>`,
+    :class:`qp.CRY <pennylane2.CRY>`,
+    :class:`qp.RZ <pennylane2.RZ>`,
+    :class:`qp.CRZ <pennylane2.CRZ>`,
+    :class:`qp.PhaseShift <pennylane2.PhaseShift>`,
+    :class:`qp.ControlledPhaseShift <pennylane2.ControlledPhaseShift>`,
+    :class:`qp.Rot <pennylane2.Rot>`,
+    :class:`qp.CRot <pennylane2.CRot>`,
+    :class:`qp.MultiRZ <pennylane2.MultiRZ>`.
 
     .. note::
 
@@ -439,11 +439,11 @@ def merge_rotations_setup_inputs():
         fn (QNode): the QNode to apply the merge rotations compiler pass to
 
     Returns:
-        :class:`QNode <pennylane.QNode>`
+        :class:`QNode <pennylane2.QNode>`
 
     **Example**
 
-    In this example the three :class:`qp.RX <pennylane.RX>` will be merged in a single
+    In this example the three :class:`qp.RX <pennylane2.RX>` will be merged in a single
     one with the sum of angles as parameter.
 
     .. code-block:: python
@@ -495,7 +495,7 @@ def parity_synth_setup_inputs():
         fn (QNode): QNode to apply the pass to
 
     Returns:
-        :class:`QNode <pennylane.QNode>`
+        :class:`QNode <pennylane2.QNode>`
 
     This pass walks over the input circuit and aggregates all ``CNOT`` and ``RZ`` operators
     into a subcircuit that describes a phase polyonomial. Other gates form the boundaries of
@@ -520,7 +520,7 @@ def parity_synth_setup_inputs():
 
     .. code-block:: python
 
-        import pennylane as qp
+        import pennylane2 as qp
 
         dev = qp.device("lightning.qubit", wires=2)
 
@@ -575,7 +575,7 @@ def decompose_lowering_setup_inputs():  # pragma: no cover
         fn (QNode): the QNode to apply the decompose-lowering compiler pass to
 
     Returns:
-        :class:`QNode <pennylane.QNode>`
+        :class:`QNode <pennylane2.QNode>`
 
     **Example**
         // TODO: add example here
@@ -616,14 +616,14 @@ def ions_decomposition_setup_inputs():  # pragma: nocover
         fn (QNode): the QNode to apply the ions-decomposition pass to
 
     Returns:
-        :class:`QNode <pennylane.QNode>`
+        :class:`QNode <pennylane2.QNode>`
 
     **Example**
 
     .. code-block:: python
 
-        import pennylane as qp
-        from pennylane.devices import NullQubit
+        import pennylane2 as qp
+        from pennylane2.devices import NullQubit
 
         import catalyst
         from catalyst import qjit
@@ -724,7 +724,7 @@ def combine_global_phases_setup_inputs():
         qnode (QNode): the QNode to apply the compiler pass to
 
     Returns:
-        :class:`QNode <pennylane.QNode>`
+        :class:`QNode <pennylane2.QNode>`
 
     **Example**
 
@@ -732,7 +732,7 @@ def combine_global_phases_setup_inputs():
 
     .. code-block:: python
 
-        import pennylane as qp
+        import pennylane2 as qp
         import catalyst
         from catalyst import qjit, for_loop
         from catalyst.passes import combine_global_phases
@@ -855,7 +855,7 @@ def gridsynth_setup_inputs(epsilon=1e-4, ppr_basis=False, method="deterministic"
             the T-count of ``"mixed"`` at the cost of one temporary ancilla qubit per rotation.
 
     Returns:
-        :class:`QNode <pennylane.QNode>`
+        :class:`QNode <pennylane2.QNode>`
 
     .. note::
 
@@ -894,7 +894,7 @@ def gridsynth_setup_inputs(epsilon=1e-4, ppr_basis=False, method="deterministic"
     .. note::
 
         With ``method="mixed-fallback"``, each rotation uses a temporary ancilla qubit and a
-        mid-circuit measurement, as :func:`pennylane.transforms.ppr_to_ppm` does. Resource
+        mid-circuit measurement, as :func:`pennylane2.transforms.ppr_to_ppm` does. Resource
         estimates count every allocation, so they report one additional wire per rotation.
 
     **Example**
@@ -904,7 +904,7 @@ def gridsynth_setup_inputs(epsilon=1e-4, ppr_basis=False, method="deterministic"
 
     .. code-block:: python
 
-        import pennylane as qp
+        import pennylane2 as qp
         from catalyst import qjit
         from catalyst.passes import gridsynth
 
@@ -1015,12 +1015,12 @@ def to_ppr_setup_inputs():
         fn (QNode): the QNode to apply the pass to
 
     Returns:
-        :class:`QNode <pennylane.QNode>`
+        :class:`QNode <pennylane2.QNode>`
 
     .. seealso::
-        :func:`pennylane.transforms.commute_ppr`, :func:`pennylane.transforms.merge_ppr_ppm`,
-        :func:`pennylane.transforms.ppr_to_ppm`, :func:`pennylane.transforms.ppm_compilation`,
-        :func:`pennylane.transforms.reduce_t_depth`, :func:`pennylane.transforms.decompose_arbitrary_ppr`
+        :func:`pennylane2.transforms.commute_ppr`, :func:`pennylane2.transforms.merge_ppr_ppm`,
+        :func:`pennylane2.transforms.ppr_to_ppm`, :func:`pennylane2.transforms.ppm_compilation`,
+        :func:`pennylane2.transforms.reduce_t_depth`, :func:`pennylane2.transforms.decompose_arbitrary_ppr`
 
     .. note::
 
@@ -1037,7 +1037,7 @@ def to_ppr_setup_inputs():
 
     .. code-block:: python
 
-        import pennylane as qp
+        import pennylane2 as qp
 
         @qp.qjit(capture=True)
         @qp.transforms.to_ppr
@@ -1072,7 +1072,7 @@ def to_ppr_setup_inputs():
     In the above output, ``PPR-theta-w<int>`` denotes the type of PPR present in the circuit, where
     ``theta`` is the PPR angle (:math:`\theta`) and ``w<int>`` denotes the PPR weight (the number of
     qubits it acts on, or the length of the Pauli word). ``PPM-w<int>`` follows the same convention.
-    Note that the mid-circuit measurement (:func:`pennylane.measure`) in the circuit has been
+    Note that the mid-circuit measurement (:func:`pennylane2.measure`) in the circuit has been
     converted to a Pauli product measurement (PPM), as well.
     """
     return (), {}
@@ -1088,11 +1088,11 @@ def commute_ppr_setup_inputs(max_pauli_size=0):
 
     .. note::
 
-        This transform requires decorating the workflow with :func:`@qp.qjit <pennylane.qjit>`. In
+        This transform requires decorating the workflow with :func:`@qp.qjit <pennylane2.qjit>`. In
         addition, the circuits generated by this pass are executable on ``lightning.qubit``,
         ``lightning.kokkos``, ``lightning.gpu``, or ``null.qubit`` (for mock-execution).
 
-        Lastly, the :func:`pennylane.transforms.to_ppr` transform must be applied before
+        Lastly, the :func:`pennylane2.transforms.to_ppr` transform must be applied before
         ``commute_ppr``.
 
     For more information on PPRs, check out the
@@ -1106,12 +1106,12 @@ def commute_ppr_setup_inputs(max_pauli_size=0):
             performed. Note that the default ``max_pauli_size=0`` indicates no limit.
 
     Returns:
-        :class:`QNode <pennylane.QNode>`
+        :class:`QNode <pennylane2.QNode>`
 
     .. seealso::
-        :func:`pennylane.transforms.to_ppr`, :func:`pennylane.transforms.merge_ppr_ppm`,
-        :func:`pennylane.transforms.ppr_to_ppm`, :func:`pennylane.transforms.ppm_compilation`,
-        :func:`pennylane.transforms.reduce_t_depth`, :func:`pennylane.transforms.decompose_arbitrary_ppr`
+        :func:`pennylane2.transforms.to_ppr`, :func:`pennylane2.transforms.merge_ppr_ppm`,
+        :func:`pennylane2.transforms.ppr_to_ppm`, :func:`pennylane2.transforms.ppm_compilation`,
+        :func:`pennylane2.transforms.reduce_t_depth`, :func:`pennylane2.transforms.decompose_arbitrary_ppr`
 
     .. note::
 
@@ -1124,7 +1124,7 @@ def commute_ppr_setup_inputs(max_pauli_size=0):
 
     .. code-block:: python
 
-        import pennylane as qp
+        import pennylane2 as qp
 
         @qp.qjit(capture=True)
         @qp.transforms.commute_ppr(max_pauli_size=2)
@@ -1187,7 +1187,7 @@ def merge_ppr_ppm_setup_inputs(max_pauli_size=0):
 
     .. note::
 
-        This transform requires decorating the workflow with :func:`@qp.qjit <pennylane.qjit>`. In
+        This transform requires decorating the workflow with :func:`@qp.qjit <pennylane2.qjit>`. In
         addition, the circuits generated by this pass are executable on ``lightning.qubit``,
         ``lightning.kokkos``, ``lightning.gpu``, or ``null.qubit`` (for mock-execution).
 
@@ -1195,7 +1195,7 @@ def merge_ppr_ppm_setup_inputs(max_pauli_size=0):
         So, for accurate results, it is recommended to return nothing (i.e., a blank ``return``
         statement) from the QNode.
 
-        Lastly, the :func:`pennylane.transforms.to_ppr` transform must be applied before
+        Lastly, the :func:`pennylane2.transforms.to_ppr` transform must be applied before
         ``merge_ppr_ppm``.
 
     For more information on PPRs and PPMs, check out
@@ -1209,12 +1209,12 @@ def merge_ppr_ppm_setup_inputs(max_pauli_size=0):
             default value is ``0`` (no limit).
 
     Returns:
-        :class:`QNode <pennylane.QNode>`
+        :class:`QNode <pennylane2.QNode>`
 
     .. seealso::
-        :func:`pennylane.transforms.to_ppr`, :func:`pennylane.transforms.commute_ppr`,
-        :func:`pennylane.transforms.ppr_to_ppm`, :func:`pennylane.transforms.ppm_compilation`,
-        :func:`pennylane.transforms.reduce_t_depth`, :func:`pennylane.transforms.decompose_arbitrary_ppr`
+        :func:`pennylane2.transforms.to_ppr`, :func:`pennylane2.transforms.commute_ppr`,
+        :func:`pennylane2.transforms.ppr_to_ppm`, :func:`pennylane2.transforms.ppm_compilation`,
+        :func:`pennylane2.transforms.reduce_t_depth`, :func:`pennylane2.transforms.decompose_arbitrary_ppr`
 
     .. note::
 
@@ -1227,7 +1227,7 @@ def merge_ppr_ppm_setup_inputs(max_pauli_size=0):
 
     .. code-block:: python
 
-        import pennylane as qp
+        import pennylane2 as qp
 
         @qp.qjit(capture=True)
         @qp.transforms.merge_ppr_ppm(max_pauli_size=2)
@@ -1274,11 +1274,11 @@ def ppr_to_ppm_setup_inputs(decompose_method="pauli-corrected", avoid_y_measure=
 
     .. note::
 
-        This transform requires decorating the workflow with :func:`@qp.qjit <pennylane.qjit>`. In
+        This transform requires decorating the workflow with :func:`@qp.qjit <pennylane2.qjit>`. In
         addition, the circuits generated by this pass are executable on ``lightning.qubit``,
         ``lightning.kokkos``, ``lightning.gpu``, or ``null.qubit`` (for mock-execution).
 
-        Lastly, the :func:`pennylane.transforms.to_ppr` transform must be applied before
+        Lastly, the :func:`pennylane2.transforms.to_ppr` transform must be applied before
         ``ppr_to_ppm``.
 
     This pass is used to decompose both non-Clifford and Clifford PPRs into PPMs. The non-Clifford
@@ -1307,12 +1307,12 @@ def ppr_to_ppm_setup_inputs(decompose_method="pauli-corrected", avoid_y_measure=
             ``False``.
 
     Returns:
-        :class:`QNode <pennylane.QNode>`
+        :class:`QNode <pennylane2.QNode>`
 
     .. seealso::
-        :func:`pennylane.transforms.to_ppr`, :func:`pennylane.transforms.commute_ppr`,
-        :func:`pennylane.transforms.merge_ppr_ppm`, :func:`pennylane.transforms.ppm_compilation`,
-        :func:`pennylane.transforms.reduce_t_depth`, :func:`pennylane.transforms.decompose_arbitrary_ppr`
+        :func:`pennylane2.transforms.to_ppr`, :func:`pennylane2.transforms.commute_ppr`,
+        :func:`pennylane2.transforms.merge_ppr_ppm`, :func:`pennylane2.transforms.ppm_compilation`,
+        :func:`pennylane2.transforms.reduce_t_depth`, :func:`pennylane2.transforms.decompose_arbitrary_ppr`
 
     .. note::
 
@@ -1325,7 +1325,7 @@ def ppr_to_ppm_setup_inputs(decompose_method="pauli-corrected", avoid_y_measure=
 
     .. code-block:: python
 
-        import pennylane as qp
+        import pennylane2 as qp
         from functools import partial
 
         @qp.qjit(capture=True)
@@ -1392,20 +1392,20 @@ def ppm_compilation_setup_inputs(
 
     .. note::
 
-        This transform requires decorating the workflow with :func:`@qp.qjit <pennylane.qjit>`. In
+        This transform requires decorating the workflow with :func:`@qp.qjit <pennylane2.qjit>`. In
         addition, the circuits generated by this pass are executable on ``lightning.qubit``,
         ``lightning.kokkos``, ``lightning.gpu``, or ``null.qubit`` (for mock-execution).
 
     This pass combines multiple sub-passes:
 
-    - :func:`pennylane.transforms.to_ppr` : Converts gates into Pauli Product Rotations (PPRs)
-    - :func:`pennylane.transforms.commute_ppr` : Commutes PPRs past non-Clifford PPRs
-    - :func:`pennylane.transforms.merge_ppr_ppm` : Merges PPRs into Pauli Product Measurements (PPMs)
-    - :func:`pennylane.transforms.ppr_to_ppm` : Decomposes PPRs into PPMs
+    - :func:`pennylane2.transforms.to_ppr` : Converts gates into Pauli Product Rotations (PPRs)
+    - :func:`pennylane2.transforms.commute_ppr` : Commutes PPRs past non-Clifford PPRs
+    - :func:`pennylane2.transforms.merge_ppr_ppm` : Merges PPRs into Pauli Product Measurements (PPMs)
+    - :func:`pennylane2.transforms.ppr_to_ppm` : Decomposes PPRs into PPMs
 
     The ``avoid_y_measure`` and ``decompose_method`` arguments are passed to the
-    :func:`pennylane.transforms.ppr_to_ppm` pass. The ``max_pauli_size`` argument is passed to the
-    :func:`pennylane.transforms.commute_ppr` and :func:`pennylane.transforms.merge_ppr_ppm` passes.
+    :func:`pennylane2.transforms.ppr_to_ppm` pass. The ``max_pauli_size`` argument is passed to the
+    :func:`pennylane2.transforms.commute_ppr` and :func:`pennylane2.transforms.merge_ppr_ppm` passes.
 
     For more information on PPRs and PPMs, check out
     the `Compilation Hub <https://pennylane.ai/compilation/pauli-based-computation>`_.
@@ -1432,7 +1432,7 @@ def ppm_compilation_setup_inputs(
             Defaults to 0 (no limit).
 
     Returns:
-        :class:`QNode <pennylane.QNode>`
+        :class:`QNode <pennylane2.QNode>`
 
     .. note::
 
@@ -1445,7 +1445,7 @@ def ppm_compilation_setup_inputs(
 
     .. code-block:: python
 
-        import pennylane as qp
+        import pennylane2 as qp
 
         @qp.qjit(capture=True)
         @qp.transforms.ppm_compilation(decompose_method="clifford-corrected", max_pauli_size=2)
@@ -1510,23 +1510,23 @@ def reduce_t_depth_setup_inputs():
 
     .. note::
 
-        This transform requires decorating the workflow with :func:`@qp.qjit <pennylane.qjit>`. In
+        This transform requires decorating the workflow with :func:`@qp.qjit <pennylane2.qjit>`. In
         addition, the circuits generated by this pass are executable on ``lightning.qubit``,
         ``lightning.kokkos``, ``lightning.gpu``, or ``null.qubit`` (for mock-execution).
 
-        Lastly, the :func:`pennylane.transforms.to_ppr` transform must be applied before
+        Lastly, the :func:`pennylane2.transforms.to_ppr` transform must be applied before
         ``reduce_t_depth``.
 
     Args:
         qnode (QNode): the QNode to apply the pass to
 
     Returns:
-        :class:`QNode <pennylane.QNode>`
+        :class:`QNode <pennylane2.QNode>`
 
     .. seealso::
-        :func:`pennylane.transforms.to_ppr`, :func:`pennylane.transforms.commute_ppr`,
-        :func:`pennylane.transforms.merge_ppr_ppm`, :func:`pennylane.transforms.ppr_to_ppm`,
-        :func:`pennylane.transforms.ppm_compilation`, :func:`pennylane.transforms.decompose_arbitrary_ppr`
+        :func:`pennylane2.transforms.to_ppr`, :func:`pennylane2.transforms.commute_ppr`,
+        :func:`pennylane2.transforms.merge_ppr_ppm`, :func:`pennylane2.transforms.ppr_to_ppm`,
+        :func:`pennylane2.transforms.ppm_compilation`, :func:`pennylane2.transforms.decompose_arbitrary_ppr`
 
     .. note::
 
@@ -1535,8 +1535,8 @@ def reduce_t_depth_setup_inputs():
 
     **Example**
 
-    In the example below, after performing the :func:`pennylane.transforms.to_ppr` and
-    :func:`pennylane.transforms.merge_ppr_ppm` passes, the circuit contains a depth of four of
+    In the example below, after performing the :func:`pennylane2.transforms.to_ppr` and
+    :func:`pennylane2.transforms.merge_ppr_ppm` passes, the circuit contains a depth of four of
     non-Clifford PPRs. Subsequently applying the ``reduce_t_depth`` pass will move PPRs around via
     commutation, resulting in a circuit with a smaller PPR depth.
 
@@ -1547,7 +1547,7 @@ def reduce_t_depth_setup_inputs():
 
     .. code-block:: python
 
-        import pennylane as qp
+        import pennylane2 as qp
 
         @qp.qjit(capture=True)
         @qp.transforms.reduce_t_depth
@@ -1625,7 +1625,7 @@ def ppr_to_mbqc_setup_inputs():
         fn (QNode): the QNode to apply the pass to
 
     Returns:
-        :class:`QNode <pennylane.QNode>`
+        :class:`QNode <pennylane2.QNode>`
 
     **Example**
 
@@ -1635,7 +1635,7 @@ def ppr_to_mbqc_setup_inputs():
 
     .. code-block:: python
 
-        import pennylane as qp
+        import pennylane2 as qp
         import catalyst
 
         p = [("my_pipe", ["quantum-compilation-stage"])]
@@ -1695,23 +1695,23 @@ def decompose_arbitrary_ppr_setup_inputs():  # pragma: nocover
 
     .. note::
 
-        This transform requires decorating the workflow with :func:`@qp.qjit <pennylane.qjit>`. In
+        This transform requires decorating the workflow with :func:`@qp.qjit <pennylane2.qjit>`. In
         addition, the circuits generated by this pass are executable on ``lightning.qubit``,
         ``lightning.kokkos``, ``lightning.gpu``, or ``null.qubit`` (for mock-execution).
 
-        Lastly, the :func:`pennylane.transforms.to_ppr` transform must be applied before
+        Lastly, the :func:`pennylane2.transforms.to_ppr` transform must be applied before
         ``decompose_arbitrary_ppr``.
 
     Args:
         qnode (QNode): the QNode to apply the pass to
 
     Returns:
-        :class:`QNode <pennylane.QNode>`
+        :class:`QNode <pennylane2.QNode>`
 
     .. seealso::
-        :func:`pennylane.transforms.to_ppr`, :func:`pennylane.transforms.commute_ppr`,
-        :func:`pennylane.transforms.merge_ppr_ppm`, :func:`pennylane.transforms.ppr_to_ppm`,
-        :func:`pennylane.transforms.ppm_compilation`, :func:`pennylane.transforms.reduce_t_depth`
+        :func:`pennylane2.transforms.to_ppr`, :func:`pennylane2.transforms.commute_ppr`,
+        :func:`pennylane2.transforms.merge_ppr_ppm`, :func:`pennylane2.transforms.ppr_to_ppm`,
+        :func:`pennylane2.transforms.ppm_compilation`, :func:`pennylane2.transforms.reduce_t_depth`
 
     .. note::
 
@@ -1727,7 +1727,7 @@ def decompose_arbitrary_ppr_setup_inputs():  # pragma: nocover
 
     .. code-block:: python
 
-        import pennylane as qp
+        import pennylane2 as qp
 
         @qp.qjit(capture=True)
         @qp.transforms.decompose_arbitrary_ppr
@@ -1827,8 +1827,8 @@ def graph_decomposition_setup_inputs(
 
     .. code-block:: python
 
-        import pennylane as qp
-        import pennylane.numpy as np
+        import pennylane2 as qp
+        import pennylane2.numpy as np
 
         from catalyst import qjit
         from catalyst.jax_primitives import decomposition_rule

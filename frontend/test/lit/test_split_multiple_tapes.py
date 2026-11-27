@@ -25,8 +25,8 @@ correctly.
 from typing import Callable, Sequence
 
 import numpy as np
-import pennylane as qp
-from pennylane.core.qscript import QuantumScript
+import pennylane2 as qp
+from pennylane2.core.qscript import QuantumScript
 from utils import print_jaxpr, print_mlir
 
 from catalyst import qjit

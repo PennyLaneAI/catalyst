@@ -21,7 +21,7 @@ PLxPR conversion.
 
 # pylint: disable=line-too-long
 
-import pennylane as qp
+import pennylane2 as qp
 from jax import numpy as jnp
 
 

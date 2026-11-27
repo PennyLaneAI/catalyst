@@ -13,10 +13,10 @@
 # limitations under the License.
 """Test for the device API."""
 
-import pennylane as qp
+import pennylane2 as qp
 import pytest
-from pennylane.devices import NullQubit
-from pennylane.devices.capabilities import DeviceCapabilities, ExecutionCondition
+from pennylane2.devices import NullQubit
+from pennylane2.devices.capabilities import DeviceCapabilities, ExecutionCondition
 
 from catalyst import qjit
 from catalyst.device import QJITDevice, get_device_capabilities, qjit_device

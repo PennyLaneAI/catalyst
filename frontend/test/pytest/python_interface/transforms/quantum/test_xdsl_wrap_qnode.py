@@ -16,9 +16,9 @@
 
 # pylint: disable=line-too-long
 
-import pennylane as qp
+import pennylane2 as qp
 import pytest
-from pennylane.exceptions import CompileError
+from pennylane2.exceptions import CompileError
 from xdsl.context import Context
 from xdsl.dialects import func, test
 

@@ -15,7 +15,7 @@
 """Unit tests for get_arg_names function."""
 
 import jax.numpy as jnp
-import pennylane as qp
+import pennylane2 as qp
 from jax.core import ShapedArray
 
 from catalyst import qjit

@@ -20,7 +20,7 @@ from io import StringIO
 from typing import Any
 from unittest.mock import MagicMock
 
-import pennylane as qp
+import pennylane2 as qp
 import pytest
 from xdsl.context import Context
 from xdsl.dialects import builtin, func, test, transform

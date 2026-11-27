@@ -168,7 +168,7 @@ class ExecutorFlags:
 
 # --- logging -----------------------------------------------------------------------------------
 # PennyLane convention: library-silent by default. Attach a handler to the ``catalyst.executor``
-# logger tree (or call :func:`pennylane.logging.enable_logging`) to see output.
+# logger tree (or call :func:`pennylane2.logging.enable_logging`) to see output.
 #
 # ``Executor(verbose=)`` / :func:`set_verbose` maps an int 0-3 to log level and ssh-verbosity:
 #   0 quiet    → WARNING

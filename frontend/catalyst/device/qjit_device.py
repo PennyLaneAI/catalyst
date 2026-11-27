@@ -27,16 +27,16 @@ from copy import deepcopy
 from dataclasses import dataclass, replace
 from typing import Any, Dict, Optional
 
-import pennylane as qp
+import pennylane2 as qp
 from jax.interpreters.partial_eval import DynamicJaxprTracer
-from pennylane import CompilePipeline
-from pennylane.devices.capabilities import (
+from pennylane2 import CompilePipeline
+from pennylane2.devices.capabilities import (
     DeviceCapabilities,
     ExecutionCondition,
     OperatorProperties,
 )
-from pennylane.logging import debug_logger, debug_logger_init
-from pennylane.transforms import (
+from pennylane2.logging import debug_logger, debug_logger_init
+from pennylane2.transforms import (
     diagonalize_measurements,
     split_non_commuting,
     split_to_single_terms,

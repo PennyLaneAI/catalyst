@@ -28,8 +28,8 @@ Known Limitations
 from collections import defaultdict
 from collections.abc import Collection
 
-from pennylane.exceptions import CompileError
-from pennylane.ops import Hadamard, PauliX, PauliY
+from pennylane2.exceptions import CompileError
+from pennylane2.ops import Hadamard, PauliX, PauliY
 from xdsl import context, passes, pattern_rewriter
 from xdsl.dialects import arith, builtin, func
 from xdsl.rewriter import InsertPoint

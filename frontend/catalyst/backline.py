@@ -37,10 +37,10 @@ from pathlib import Path
 from typing import NamedTuple
 
 import jax
-import pennylane as qp
+import pennylane2 as qp
 from jax.interpreters.mlir import ir
-from pennylane.backline import Node, Placement
-from pennylane.devices import Device
+from pennylane2.backline import Node, Placement
+from pennylane2.devices import Device
 
 from catalyst.executor import Executor
 from catalyst.pipelines import insert_pass_before
@@ -1107,7 +1107,7 @@ def placement_pipeline(placement: Placement, stages: list) -> list:
     """``stages`` with the passes ``placement`` needs to be lowered, ready to compile with.
 
     Args:
-        placement: The :class:`~pennylane.backline.Placement` to compile for.
+        placement: The :class:`~pennylane2.backline.Placement` to compile for.
         stages: The base pipeline, as ``(stage_name, passes)`` pairs.
 
     Returns:

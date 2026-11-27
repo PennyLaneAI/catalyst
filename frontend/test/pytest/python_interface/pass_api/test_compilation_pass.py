@@ -18,7 +18,7 @@
 from functools import lru_cache, partial
 from typing import Union
 
-import pennylane as qp
+import pennylane2 as qp
 import pytest
 from xdsl.context import Context
 from xdsl.dialects import arith, builtin, test

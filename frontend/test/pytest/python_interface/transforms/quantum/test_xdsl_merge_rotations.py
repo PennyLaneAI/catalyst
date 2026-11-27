@@ -15,7 +15,7 @@
 
 # pylint: disable=line-too-long
 
-import pennylane as qp
+import pennylane2 as qp
 import pytest
 
 from catalyst.python_interface.transforms import MergeRotationsPass, merge_rotations_pass

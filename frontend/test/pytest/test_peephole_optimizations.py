@@ -15,12 +15,12 @@
 """Test the quantum peephole passes"""
 
 import numpy as np
-import pennylane as qp
+import pennylane2 as qp
 import pytest
 from operator2_dummy_gates import NoParams, NoParamsCustomOp
-from pennylane.decomposition import add_decomps, local_decomps, register_resources
-from pennylane.transforms import to_ppr as qp_to_ppr
-from pennylane.typing import Wire
+from pennylane2.decomposition import add_decomps, local_decomps, register_resources
+from pennylane2.transforms import to_ppr as qp_to_ppr
+from pennylane2.typing import Wire
 
 from catalyst import qjit
 from catalyst.passes import (

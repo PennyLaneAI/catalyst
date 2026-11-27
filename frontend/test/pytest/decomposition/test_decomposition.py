@@ -20,7 +20,7 @@ import json
 import jax
 import jax.numpy as jnp
 import numpy as np
-import pennylane as qp
+import pennylane2 as qp
 import pytest
 from jax.core import ShapedArray
 from operator2_dummy_gates import (
@@ -41,18 +41,18 @@ from operator2_dummy_gates import (
     TestQubitUnitary,
     hybrid_op_args_decomp,
 )
-from pennylane import qnode
-from pennylane.core.operator import abstractify
-from pennylane.decomposition import (
+from pennylane2 import qnode
+from pennylane2.core.operator import abstractify
+from pennylane2.decomposition import (
     add_decomps,
     local_decomps,
     register_condition,
     register_resources,
 )
-from pennylane.ops.op_math.adjoint2 import Adjoint2
-from pennylane.ops.op_math.controlled2 import ControlledOp2
-from pennylane.typing import Bool, Complex, Float, Int, Wire
-from pennylane.wires import Wires
+from pennylane2.ops.op_math.adjoint2 import Adjoint2
+from pennylane2.ops.op_math.controlled2 import ControlledOp2
+from pennylane2.typing import Bool, Complex, Float, Int, Wire
+from pennylane2.wires import Wires
 
 from catalyst import qjit
 from catalyst.compiler import _quantum_opt
@@ -832,7 +832,7 @@ class TestGenericUtilities:
         mock_decomp.get_work_wire_spec.return_value.total = 0
         mock_decomp.compute_resources.side_effect = ValueError("Fake Resource Related Error")
 
-        mocker.patch("pennylane.decomposition.list_decomps", return_value=[mock_decomp])
+        mocker.patch("pennylane2.decomposition.list_decomps", return_value=[mock_decomp])
 
         with pytest.warns(RuleLoweringWarning, match="Failed to get resources"):
             res = compile_on_demand_decomposition_rules(
@@ -858,7 +858,7 @@ class TestGenericUtilities:
             lambda *, wires, a, b, thing: a and b == 3.14 and thing == "string"
         )
 
-        mocker.patch("pennylane.decomposition.list_decomps", return_value=[mock_decomp])
+        mocker.patch("pennylane2.decomposition.list_decomps", return_value=[mock_decomp])
 
         res = compile_on_demand_decomposition_rules(
             [
@@ -1041,7 +1041,7 @@ class TestPrecompiled:
     def test_precompile_writes_hash_to_manifest(self, mocker, tmp_path):
         """The manifest contains the hash of the associated bytecode."""
         # this test doesn't need any actual rules
-        mocker.patch("pennylane.decomposition.signature_registry", return_value={})
+        mocker.patch("pennylane2.decomposition.signature_registry", return_value={})
         compiler = mocker.patch(
             "catalyst.decomposition.precompile_decomposition_rules._quantum_opt",
             return_value=b"bytecode",
@@ -1067,7 +1067,7 @@ class TestPrecompiled:
             raise RuntimeError("intentional capture failure")
 
         mocker.patch(
-            "pennylane.decomposition.signature_registry",
+            "pennylane2.decomposition.signature_registry",
             return_value={NoParams: {NoParams(reg=Wire[1])}},
         )
         bytecode_path = tmp_path / "rules.mlirbc"
@@ -1095,7 +1095,7 @@ class TestPrecompiled:
             raise RuntimeError("intentional capture failure")
 
         mocker.patch(
-            "pennylane.decomposition.signature_registry",
+            "pennylane2.decomposition.signature_registry",
             return_value={NoParams: {NoParams(reg=Wire[1])}},
         )
         bytecode_path = tmp_path / "rules.mlirbc"
@@ -1130,7 +1130,7 @@ class TestPrecompiled:
             NoParamsCustomOp(wires=reg)
 
         mocker.patch(
-            "pennylane.decomposition.signature_registry",
+            "pennylane2.decomposition.signature_registry",
             return_value={NoParams: {NoParams(reg=Wire[1])}},
         )
 
@@ -1176,7 +1176,7 @@ class TestPrecompiled:
             ((SerializedGraphOpID("SingleParam{x:[tensor<f64>]}{reg:1}{}"), 1),),
         )
         mocker.patch(
-            "pennylane.decomposition.signature_registry",
+            "pennylane2.decomposition.signature_registry",
             return_value={NoParams: {NoParams(reg=Wire[1])}},
         )
         load_cache = mocker.patch(
@@ -1207,7 +1207,7 @@ class TestPrecompiled:
             NoParamsCustomOp(wires=reg)
 
         mocker.patch(
-            "pennylane.decomposition.signature_registry",
+            "pennylane2.decomposition.signature_registry",
             return_value={NoParams: {NoParams(reg=Wire[1])}},
         )
         bytecode_path = tmp_path / "bytecode.mlirbc"
@@ -1242,7 +1242,7 @@ class TestPrecompiled:
             NoParamsCustomOp(wires=reg)
 
         mocker.patch(
-            "pennylane.decomposition.signature_registry",
+            "pennylane2.decomposition.signature_registry",
             return_value={NoParams: {NoParams(reg=Wire[1])}},
         )
         bytecode_path = tmp_path / "bytecode.mlirbc"
@@ -1303,7 +1303,7 @@ class TestStandaloneCompilation:
             )
 
         mocker.patch(
-            "pennylane.decomposition.list_decomps",
+            "pennylane2.decomposition.list_decomps",
             side_effect=AssertionError("Compilation must consume the prepared rules"),
         )
         rule_string = str(capture_target(target_spec))

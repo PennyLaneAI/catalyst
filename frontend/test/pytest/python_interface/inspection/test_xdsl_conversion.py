@@ -13,7 +13,7 @@
 # limitations under the License.
 """Unit test module for the utilities in xdsl_conversion.py"""
 
-import pennylane as qp
+import pennylane2 as qp
 import pytest
 from jaxlib.mlir._mlir_libs._mlir.ir import Module
 from xdsl.dialects.test import TestOp

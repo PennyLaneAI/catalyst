@@ -16,7 +16,7 @@
 from textwrap import dedent
 
 import numpy as np
-import pennylane as qp
+import pennylane2 as qp
 import pytest
 
 import catalyst

@@ -15,7 +15,7 @@
 
 # RUN: %PYTHON %s | FileCheck %s
 
-import pennylane as qp
+import pennylane2 as qp
 
 
 class RotatedMeasurement(qp.ops.MidMeasure):

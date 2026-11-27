@@ -15,7 +15,7 @@
 """Tests for the convert-qecp-to-quantum xDSL dialect-conversion pass."""
 
 import numpy as np
-import pennylane as qp
+import pennylane2 as qp
 import pytest
 
 from catalyst.ftqc import qec_pipeline

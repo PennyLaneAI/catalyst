@@ -8,8 +8,9 @@ enzyme=v0.0.238
 
 # For a custom PL version, update the package version here and at
 # 'doc/requirements.txt'
-pennylane=0.46.0-dev161
+# Temporary companion branches; replace after the PennyLane2 development cutover.
+pennylane=git+https://github.com/PennyLaneAI/pennylane.git@chore/rename-pennylane-module
 
 # For a custom LQ/LK version, update the package version here and at
 # 'doc/requirements.txt'
-lightning=0.46.0-dev41
+lightning=git+https://github.com/PennyLaneAI/pennylane-lightning.git@chore/update-pennylane-rename

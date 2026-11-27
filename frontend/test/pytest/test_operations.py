@@ -13,10 +13,10 @@
 # limitations under the License.
 
 import numpy as np
-import pennylane as qp
+import pennylane2 as qp
 import pytest
-from pennylane.core.queuing import AnnotatedQueue
-from pennylane.tape import QuantumScript
+from pennylane2.core.queuing import AnnotatedQueue
+from pennylane2.tape import QuantumScript
 from pennylane_lightning.lightning_qubit.lightning_qubit import OperatorProperties
 from utils import get_custom_qjit_device
 

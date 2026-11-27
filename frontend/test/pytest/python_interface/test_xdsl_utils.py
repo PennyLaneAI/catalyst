@@ -15,7 +15,7 @@
 
 # pylint: disable=line-too-long
 
-import pennylane as qp
+import pennylane2 as qp
 import pytest
 from jax import jit
 from jaxlib.mlir.ir import Module as jaxModule

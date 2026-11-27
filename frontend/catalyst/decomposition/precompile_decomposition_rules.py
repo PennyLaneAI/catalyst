@@ -17,7 +17,7 @@
 import json
 from pathlib import Path
 
-import pennylane as qp
+import pennylane2 as qp
 
 from catalyst.compiler import _quantum_opt
 from catalyst.decomposition.capture_session import DecompositionScope, OpDecompRequest

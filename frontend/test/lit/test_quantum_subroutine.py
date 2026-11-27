@@ -19,9 +19,9 @@
 from functools import partial
 
 import jax
-import pennylane as qp
+import pennylane2 as qp
 from jax import numpy as jnp
-from pennylane.capture import subroutine
+from pennylane2.capture import subroutine
 
 # pylint: disable=line-too-long
 

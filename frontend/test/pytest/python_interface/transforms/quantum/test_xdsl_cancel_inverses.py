@@ -13,7 +13,7 @@
 # limitations under the License.
 """Unit test module for the iterative cancel inverses transform"""
 
-import pennylane as qp
+import pennylane2 as qp
 import pytest
 
 from catalyst.python_interface.transforms import (

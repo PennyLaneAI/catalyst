@@ -16,9 +16,9 @@
 import inspect
 from typing import Any
 
-import pennylane as qp
+import pennylane2 as qp
 import pytest
-from pennylane.transforms.core import CompilePipeline, Transform
+from pennylane2.transforms.core import CompilePipeline, Transform
 
 from catalyst.passes import builtin_passes
 

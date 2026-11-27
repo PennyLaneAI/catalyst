@@ -17,9 +17,9 @@
 import json
 
 import numpy as np
-import pennylane as qp
+import pennylane2 as qp
 import pytest
-from pennylane import cond, qjit
+from pennylane2 import cond, qjit
 
 
 def test_global_phase(backend, capture_mode):

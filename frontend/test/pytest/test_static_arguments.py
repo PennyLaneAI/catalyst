@@ -16,7 +16,7 @@
 
 from dataclasses import dataclass
 
-import pennylane as qp
+import pennylane2 as qp
 import pytest
 
 from catalyst import grad, qjit

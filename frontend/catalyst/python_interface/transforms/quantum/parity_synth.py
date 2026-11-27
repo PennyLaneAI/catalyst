@@ -27,7 +27,7 @@ except ModuleNotFoundError as networkx_import_error:  # pragma: no cover
     has_networkx = False
 
 import numpy as np
-from pennylane.transforms.intermediate_reps.rowcol import _rowcol_parity_matrix
+from pennylane2.transforms.intermediate_reps.rowcol import _rowcol_parity_matrix
 from xdsl import context, passes, pattern_rewriter
 from xdsl.dialects import arith, builtin
 from xdsl.ir import Operation, SSAValue

@@ -28,19 +28,19 @@ from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 import jax
 import jax._src.interpreters.partial_eval as pe
 import jax.numpy as jnp
-import pennylane as qp
+import pennylane2 as qp
 from jax._src.lax import lax
 from jax._src.lax.lax import _extract_tracers_dyn_shape
 from jax._src.pjit import jit_p
 from jax._src.source_info_util import current as current_source_info
 from jax.api_util import debug_info as jdb
 from jax.core import Tracer, get_aval
-from pennylane import QubitUnitary, QueuingManager
-from pennylane.core.qscript import QuantumScript
-from pennylane.core.queuing import AnnotatedQueue
-from pennylane.devices import QubitDevice
-from pennylane.logging import debug_logger, debug_logger_init
-from pennylane.measurements import (
+from pennylane2 import QubitUnitary, QueuingManager
+from pennylane2.core.qscript import QuantumScript
+from pennylane2.core.queuing import AnnotatedQueue
+from pennylane2.devices import QubitDevice
+from pennylane2.logging import debug_logger, debug_logger_init
+from pennylane2.measurements import (
     CountsMP,
     ExpectationMP,
     MeasurementProcess,
@@ -49,8 +49,8 @@ from pennylane.measurements import (
     StateMP,
     VarianceMP,
 )
-from pennylane.operation import Operation, Operator, Wires
-from pennylane.ops import Adjoint, Controlled, ControlledOp, ControlledOp2
+from pennylane2.operation import Operation, Operator, Wires
+from pennylane2.ops import Adjoint, Controlled, ControlledOp, ControlledOp2
 
 import catalyst
 from catalyst.api_extensions.callbacks import MemrefCallable
@@ -1044,10 +1044,10 @@ def trace_observables(
 
 @debug_logger
 def pauli_sentence_to_hamiltonian_obs(paulis, qrp: QRegPromise) -> List[DynamicJaxprTracer]:
-    """Convert a :class:`pennylane.pauli.PauliSentence` into a Hamiltonian.
+    """Convert a :class:`pennylane2.pauli.PauliSentence` into a Hamiltonian.
 
     Args:
-        paulis: a :class:`pennylane.pauli.PauliSentence`
+        paulis: a :class:`pennylane2.pauli.PauliSentence`
         qrp (QRegPromise): Quantum register tracer with cached qubits
 
     Returns:
@@ -1066,10 +1066,10 @@ def pauli_sentence_to_hamiltonian_obs(paulis, qrp: QRegPromise) -> List[DynamicJ
 
 @debug_logger
 def pauli_word_to_tensor_obs(obs, qrp: QRegPromise) -> List[DynamicJaxprTracer]:
-    """Convert a :class:`pennylane.pauli.PauliWord` into a Named or Tensor observable.
+    """Convert a :class:`pennylane2.pauli.PauliWord` into a Named or Tensor observable.
 
     Args:
-        obs: a :class:`pennylane.pauli.PauliWord`
+        obs: a :class:`pennylane2.pauli.PauliWord`
         qrp (QRegPromise): Quantum register tracer with cached qubits
 
     Returns:

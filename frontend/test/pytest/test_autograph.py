@@ -22,11 +22,11 @@ from collections import defaultdict
 import jax
 import jax.numpy as jnp
 import numpy as np
-import pennylane as qp
+import pennylane2 as qp
 import pytest
 from jax.errors import TracerBoolConversionError
 from numpy.testing import assert_allclose
-from pennylane.capture.autograph.transformer import TRANSFORMER as capture_TRANSFORMER
+from pennylane2.capture.autograph.transformer import TRANSFORMER as capture_TRANSFORMER
 
 import catalyst
 from catalyst import AutoGraphError, debug, passes, qjit

@@ -25,9 +25,9 @@ from unittest import mock
 
 import jax.numpy as jnp
 import numpy as np
-import pennylane as qp
+import pennylane2 as qp
 import pytest
-from pennylane.backline import Transport
+from pennylane2.backline import Transport
 
 from catalyst import Executor, compiled_functions, qjit
 from catalyst.backline import (
@@ -66,14 +66,14 @@ from catalyst.utils.exceptions import CompileError
 from catalyst.utils.runtime_environment import get_lib_path
 
 if hasattr(qp, "backline"):
-    from pennylane.backline import Transport
+    from pennylane2.backline import Transport
 
 
 @pytest.fixture(autouse=True)
 def _net_transport():
     """Register a test-only ``"net"`` transport per test; unregister on teardown."""
-    from pennylane import backline as _bl
-    from pennylane.backline import register_transport
+    from pennylane2 import backline as _bl
+    from pennylane2.backline import register_transport
 
     register_transport("net")(lambda: Transport("net"))
     try:

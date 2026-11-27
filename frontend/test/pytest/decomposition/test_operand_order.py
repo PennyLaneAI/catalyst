@@ -21,10 +21,10 @@ whose declaration order differs from their sorted order.
 import re
 
 import numpy as np
-import pennylane as qp
+import pennylane2 as qp
 import pytest
 from operator2_dummy_gates import HybridOpArgs, hybrid_op_args_decomp
-from pennylane.decomposition import add_decomps, local_decomps, register_resources
+from pennylane2.decomposition import add_decomps, local_decomps, register_resources
 
 from catalyst.decomposition import GraphOpID
 from catalyst.decomposition.rule_arguments import ordered_kwarg_names

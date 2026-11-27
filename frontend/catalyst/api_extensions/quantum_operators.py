@@ -25,18 +25,18 @@ from functools import partial
 from typing import Any, Callable, List, Optional, Union
 
 import jax
-import pennylane as qp
+import pennylane2 as qp
 from jax._src.source_info_util import current as current_source_info
 from jax._src.tree_util import tree_flatten
 from jax.api_util import debug_info
 from jax.core import get_aval
-from pennylane import QueuingManager
-from pennylane.core.qscript import QuantumScript
-from pennylane.core.queuing import AnnotatedQueue
-from pennylane.decomposition.resources import resolve_work_wire_type
-from pennylane.operation import Operator, Operator2
-from pennylane.ops.op_math.adjoint import create_adjoint_op
-from pennylane.ops.op_math.controlled import create_controlled_op, create_controlled_op2
+from pennylane2 import QueuingManager
+from pennylane2.core.qscript import QuantumScript
+from pennylane2.core.queuing import AnnotatedQueue
+from pennylane2.decomposition.resources import resolve_work_wire_type
+from pennylane2.operation import Operator, Operator2
+from pennylane2.ops.op_math.adjoint import create_adjoint_op
+from pennylane2.ops.op_math.controlled import create_controlled_op, create_controlled_op2
 
 from catalyst.api_extensions.control_flow import cond
 from catalyst.jax_extras import (
@@ -57,8 +57,8 @@ from catalyst.jax_tracer import (
 )
 from catalyst.tracing.contexts import EvaluationContext
 
-pl_adjoint_module = sys.modules["pennylane.ops.op_math.adjoint"]
-pl_ctrl_module = sys.modules["pennylane.ops.op_math.controlled"]
+pl_adjoint_module = sys.modules["pennylane2.ops.op_math.adjoint"]
+pl_ctrl_module = sys.modules["pennylane2.ops.op_math.controlled"]
 
 
 ## API ##
@@ -69,7 +69,7 @@ def measure(
 
     .. important::
 
-        The :func:`qp.measure() <pennylane.measure>` function is **not** QJIT
+        The :func:`qp.measure() <pennylane2.measure>` function is **not** QJIT
         compatible and :func:`catalyst.measure` from Catalyst should be used instead.
 
     Args:
@@ -96,7 +96,7 @@ def measure(
 
     .. code-block:: python
 
-        import pennylane as qp
+        import pennylane2 as qp
         from catalyst import qjit, measure
 
         dev = qp.device("lightning.qubit", wires=2)
@@ -199,7 +199,7 @@ def pauli_measure(
 
     .. important::
 
-        The :func:`qp.pauli_measure() <pennylane.pauli_measure>` function is **not** QJIT
+        The :func:`qp.pauli_measure() <pennylane2.pauli_measure>` function is **not** QJIT
         compatible under the legacy tracing pathway; use :func:`catalyst.pauli_measure` instead.
 
     Args:
@@ -270,7 +270,7 @@ def adjoint(f: Union[Callable, Operator]) -> Union[Callable, Operator]:
     **Example 1 (basic usage)**
 
     .. code-block:: python
-        import pennylane as qp
+        import pennylane2 as qp
         import catalyst
         from catalyst import qjit
 
@@ -346,7 +346,7 @@ def ctrl(
 
     .. code-block:: python
 
-        import pennylane as qp
+        import pennylane2 as qp
         import catalyst
         from catalyst import qjit
 
@@ -808,7 +808,7 @@ def ctrl_distribute(
             if isinstance(op, HybridCtrl):
                 # For nested HybridCtrl, resolve the combined work_wire_type first.
                 # This is the same as the logic in PennyLane:
-                # `pennylane/ops/op_math/controlled.py:create_controlled_op`
+                # `pennylane2/ops/op_math/controlled.py:create_controlled_op`
                 combined_work_wire_type = resolve_work_wire_type(
                     qp.wires.Wires(work_wires) if work_wires is not None else qp.wires.Wires([]),
                     work_wire_type,

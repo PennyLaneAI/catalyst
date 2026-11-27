@@ -19,11 +19,11 @@ from typing import Iterable, Sequence
 
 import jax.numpy as jnp
 import numpy as np
-import pennylane as qp
+import pennylane2 as qp
 import pytest
 from jax.tree_util import tree_flatten
-from pennylane import exceptions, measure
-from pennylane.transforms.dynamic_one_shot import fill_in_value
+from pennylane2 import exceptions, measure
+from pennylane2.transforms.dynamic_one_shot import fill_in_value
 
 import catalyst
 from catalyst import CompileError, cond, grad

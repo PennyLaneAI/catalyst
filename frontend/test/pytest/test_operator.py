@@ -20,7 +20,7 @@ As execution unit tests for these primitives' lowering, we do not include any de
 
 # pylint: disable = useless-parent-delegation, missing-function-docstring, missing-class-docstring
 
-import pennylane as qp
+import pennylane2 as qp
 import pytest
 from jax import numpy as jnp
 

@@ -17,7 +17,7 @@
 
 import os
 
-import pennylane as qp
+import pennylane2 as qp
 import pytest
 
 from catalyst.utils.exceptions import CompileError

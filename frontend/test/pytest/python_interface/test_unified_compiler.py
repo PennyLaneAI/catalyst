@@ -18,10 +18,10 @@
 from dataclasses import dataclass
 
 import jax
-import pennylane as qp
+import pennylane2 as qp
 import pytest
 from jaxlib.mlir.ir import Module as jModule
-from pennylane.capture import enabled as capture_enabled
+from pennylane2.capture import enabled as capture_enabled
 from xdsl import passes
 from xdsl.context import Context
 from xdsl.dialects import builtin, func, transform

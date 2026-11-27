@@ -20,7 +20,7 @@ Unit tests for lowering subroutines to reference semantics MLIR during PLxPR con
 
 # pylint: disable=line-too-long
 
-import pennylane as qp
+import pennylane2 as qp
 
 
 @qp.capture.subroutine

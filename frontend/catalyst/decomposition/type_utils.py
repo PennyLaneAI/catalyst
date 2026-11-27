@@ -21,11 +21,11 @@ from typing import NewType, TypedDict
 
 import jax.numpy as jnp
 import numpy as np
-import pennylane as qp
+import pennylane2 as qp
 from jax._src.interpreters.mlir import dtype_to_ir_type
 from jax._src.lib.mlir import ir
 from jax.core import ShapedArray
-from pennylane.pytrees import flatten, unflatten
+from pennylane2.pytrees import flatten, unflatten
 
 from catalyst.jax_extras.lowering import mlir_build_context
 

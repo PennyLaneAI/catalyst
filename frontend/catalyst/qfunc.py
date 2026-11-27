@@ -26,16 +26,16 @@ from numbers import Integral
 from typing import Callable, Sequence
 
 import jax.numpy as jnp
-import pennylane as qp
+import pennylane2 as qp
 from jax.core import eval_jaxpr
 from jax.tree_util import tree_flatten, tree_unflatten
-from pennylane import exceptions
-from pennylane.core.qscript import QuantumScript
-from pennylane.logging import debug_logger
-from pennylane.measurements import CountsMP, ExpectationMP, ProbabilityMP, SampleMP, VarianceMP
-from pennylane.transforms import _tape_decompose
-from pennylane.transforms import decompose as pl_decompose
-from pennylane.transforms.dynamic_one_shot import (
+from pennylane2 import exceptions
+from pennylane2.core.qscript import QuantumScript
+from pennylane2.logging import debug_logger
+from pennylane2.measurements import CountsMP, ExpectationMP, ProbabilityMP, SampleMP, VarianceMP
+from pennylane2.transforms import _tape_decompose
+from pennylane2.transforms import decompose as pl_decompose
+from pennylane2.transforms.dynamic_one_shot import (
     gather_non_mcm,
     init_auxiliary_tape,
     parse_native_mid_circuit_measurements,

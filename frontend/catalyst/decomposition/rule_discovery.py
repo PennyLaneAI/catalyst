@@ -20,7 +20,7 @@ Preparation supplies each batch; capture or standalone compilation consumes it.
 
 from collections import deque
 
-from pennylane.core.operator import Operator2
+from pennylane2.core.operator import Operator2
 
 from catalyst.decomposition.capture_session import OpDecompRequest
 from catalyst.decomposition.modifier_state import ModifierState

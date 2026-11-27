@@ -24,7 +24,7 @@ running -apply-transform-sequence.
 
 # pylint: disable=line-too-long
 
-import pennylane as qp
+import pennylane2 as qp
 from utils import print_jaxpr, print_mlir
 
 from catalyst import qjit

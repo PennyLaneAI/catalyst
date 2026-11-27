@@ -33,8 +33,8 @@ from itertools import islice
 
 import jax
 import jax.numpy as jnp
-from pennylane import math
-from pennylane.exceptions import CompileError
+from pennylane2 import math
+from pennylane2.exceptions import CompileError
 from xdsl import context, ir, passes, pattern_rewriter
 from xdsl.dialects import builtin, func, tensor
 from xdsl.pattern_rewriter import PatternRewriter, RewritePattern
@@ -56,7 +56,7 @@ from catalyst.python_interface.utils import get_constant_from_ssa
 @dataclass(frozen=True)
 class MeasurementsFromSamplesPass(passes.ModulePass):
     """Pass that replaces all terminal measurements in a program with
-    :func:`pennylane.sample` measurements, and adds postprocessing instructions to recover the
+    :func:`pennylane2.sample` measurements, and adds postprocessing instructions to recover the
     original measurement.
 
     This pass supports ExpvalOp, VarianceOp, SampleOp and ProbsOp. ExpvalOp and VarianceOp
@@ -93,7 +93,7 @@ measurements_from_samples_pass = compiler_transform(MeasurementsFromSamplesPass)
 
 class MeasurementsFromSamplesPattern(RewritePattern):
     """Rewrite pattern base class for the ``measurements_from_samples`` transform, which replaces
-    all terminal measurements in a program with :func:`pennylane.sample` measurements, and
+    all terminal measurements in a program with :func:`pennylane2.sample` measurements, and
     adds postprocessing instructions to recover the original measurement.
     """
 

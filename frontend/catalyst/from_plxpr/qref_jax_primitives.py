@@ -18,7 +18,7 @@ of quantum operations, measurements, and observables to reference semantics JAXP
 
 from enum import Enum
 
-import pennylane as qp
+import pennylane2 as qp
 from jax._src import source_info_util
 from jax._src.lib.mlir import ir
 from jax.core import AbstractValue, ShapedArray
@@ -27,9 +27,9 @@ from jax.interpreters import mlir
 from jaxlib.mlir._mlir_libs import _mlir as _ods_cext
 from jaxlib.mlir.dialects.arith import ExtUIOp, constant
 from jaxlib.mlir.dialects.stablehlo import ConvertOp as StableHLOConvertOp
-from pennylane.capture.primitives import adjoint_transform_prim as plxpr_adjoint_transform_prim
-from pennylane.capture.primitives import ctrl_transform_prim as plxpr_ctrl_transform_prim
-from pennylane.wires import AbstractQubit
+from pennylane2.capture.primitives import adjoint_transform_prim as plxpr_adjoint_transform_prim
+from pennylane2.capture.primitives import ctrl_transform_prim as plxpr_ctrl_transform_prim
+from pennylane2.wires import AbstractQubit
 
 from catalyst.jax_extras.lowering import get_mlir_attribute_from_pyval
 

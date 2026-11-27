@@ -17,7 +17,7 @@
 
 # pylint: disable=missing-function-docstring
 
-import pennylane as qp
+import pennylane2 as qp
 
 from catalyst import qjit, switch
 

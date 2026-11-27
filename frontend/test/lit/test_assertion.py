@@ -16,7 +16,7 @@
 
 # RUN: %PYTHON %s | FileCheck %s
 
-import pennylane as qp
+import pennylane2 as qp
 
 from catalyst import debug_assert, qjit
 

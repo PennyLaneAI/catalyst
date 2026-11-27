@@ -19,7 +19,7 @@
 
 import inspect
 
-import pennylane as qp
+import pennylane2 as qp
 from jax.core import ShapedArray
 
 from catalyst import jacobian, mitigate_with_zne, qjit, vmap

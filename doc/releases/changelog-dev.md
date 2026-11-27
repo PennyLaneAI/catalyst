@@ -894,6 +894,10 @@
 
 <h3>Breaking changes 💔</h3>
 
+* Development builds now require PennyLane2. Use `import pennylane2 as qp`;
+  the `catalyst` import and package version scheme remain unchanged.
+  These builds no longer support Classic PennyLane.
+  
 * Catalyst now provides its own :func:`~.polynomial_extrapolate` and
   :func:`~.exponential_extrapolate` functions for use with :func:`~.mitigate_with_zne`, replacing
   ``pennylane.noise.poly_extrapolate`` and ``pennylane.noise.exponential_extrapolate``, which has been removed from PennyLane.

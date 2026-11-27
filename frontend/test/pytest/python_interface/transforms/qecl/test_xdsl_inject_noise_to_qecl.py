@@ -14,7 +14,7 @@
 
 """Test module for the inject-noise-to-qecl transform."""
 
-import pennylane as qp
+import pennylane2 as qp
 import pytest
 
 from catalyst.python_interface.transforms.qecl import (

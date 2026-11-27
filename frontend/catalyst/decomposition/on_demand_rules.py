@@ -16,7 +16,7 @@
 
 import warnings
 
-from pennylane.core.operator import get_op_class_by_name
+from pennylane2.core.operator import get_op_class_by_name
 
 from catalyst.decomposition.capture_session import DecompositionScope, OpDecompRequest
 from catalyst.decomposition.graph_op_id import CTRL_WORK_WIRE_TYPE, CTRL_WORK_WIRES

@@ -16,9 +16,9 @@
 
 from pathlib import Path
 
-import pennylane as qp
+import pennylane2 as qp
 import pytest
-from pennylane.decomposition import register_resources
+from pennylane2.decomposition import register_resources
 
 from catalyst.passes.builtin_passes import graph_decomposition_setup_inputs
 

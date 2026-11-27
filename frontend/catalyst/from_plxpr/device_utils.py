@@ -20,15 +20,15 @@ import copy
 # pylint: disable=too-many-arguments, too-many-positional-arguments
 import warnings
 
-import pennylane as qp
-from pennylane.devices.capabilities import DeviceCapabilities, ExecutionCondition
-from pennylane.devices.execution_config import MCM_METHOD, POSTSELECT_MODE, ExecutionConfig
-from pennylane.transforms import (
+import pennylane2 as qp
+from pennylane2.devices.capabilities import DeviceCapabilities, ExecutionCondition
+from pennylane2.devices.execution_config import MCM_METHOD, POSTSELECT_MODE, ExecutionConfig
+from pennylane2.transforms import (
     diagonalize_measurements,
     split_non_commuting,
     split_to_single_terms,
 )
-from pennylane.transforms.core import BoundTransform, Transform
+from pennylane2.transforms.core import BoundTransform, Transform
 
 from catalyst.device.decomposition import (
     measurements_from_counts,

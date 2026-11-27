@@ -21,7 +21,7 @@ Unit tests for the gridsynth decomposition pass.
 
 from functools import partial
 
-import pennylane as qp
+import pennylane2 as qp
 
 from catalyst import qjit
 from catalyst.passes import gridsynth

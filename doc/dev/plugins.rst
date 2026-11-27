@@ -404,7 +404,7 @@ See our ``setup.py`` `file in the standalone plugin python package <https://gith
         # ...
     )
 
-After this, the user will be able to use your pass with the :func:`pennylane.transform` function.
+After this, the user will be able to use your pass with the :func:`pennylane2.transform` function.
 
 .. code-block:: python
 
@@ -419,9 +419,9 @@ After this, the user will be able to use your pass with the :func:`pennylane.tra
 
     print(module.mlir)
 
-Of course, you can also define your own instances of :func:`pennylane.transform`
+Of course, you can also define your own instances of :func:`pennylane2.transform`
 to check parameters, do some other validation or perhaps just to improve the user interface.
-See the documentation on :func:`pennylane.transform` for more information.
+See the documentation on :func:`pennylane2.transform` for more information.
 
 For example:
 

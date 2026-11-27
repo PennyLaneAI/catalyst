@@ -15,7 +15,7 @@
 """Test measurement results with finite-shots."""
 
 import numpy as np
-import pennylane as qp
+import pennylane2 as qp
 import pytest
 
 from catalyst import CompileError, qjit
@@ -467,7 +467,7 @@ class TestVar:
         if isinstance(dev, qp.devices.LegacyDeviceFacade):
             with pytest.raises(
                 RuntimeError,
-                match=r"Cannot split up terms in sums for MeasurementProcess <class 'pennylane.measurements.var.VarianceMP'>",
+                match=r"Cannot split up terms in sums for MeasurementProcess <class 'pennylane2.measurements.var.VarianceMP'>",
             ):
                 circuit(0.432, 0.123, -0.543)
         else:

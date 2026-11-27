@@ -15,7 +15,7 @@
 
 import platform
 
-import pennylane as qp
+import pennylane2 as qp
 import pytest
 from utils import CONFIG_CUSTOM_DEVICE
 

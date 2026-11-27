@@ -61,7 +61,7 @@ from jax.interpreters.partial_eval import (
 from jax.lax import convert_element_type
 from jax.tree_util import PyTreeDef, tree_flatten, tree_structure, tree_unflatten, treedef_is_leaf
 from jaxlib._jax.pytree import PyTreeRegistry
-from pennylane.logging import debug_logger
+from pennylane2.logging import debug_logger
 
 from catalyst.jax_extras.patches import gather2_p, get_aval2
 from catalyst.tracing.type_signatures import verify_static_argnums_type

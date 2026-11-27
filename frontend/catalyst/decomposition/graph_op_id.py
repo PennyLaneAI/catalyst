@@ -18,9 +18,9 @@ import re
 from collections.abc import Mapping, Sequence
 from typing import Any
 
-import pennylane as qp
+import pennylane2 as qp
 from jax._src.lib.mlir import ir
-from pennylane.pytrees import flatten
+from pennylane2.pytrees import flatten
 
 from catalyst.decomposition.modifier_state import ModifierState
 from catalyst.decomposition.type_utils import (

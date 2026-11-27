@@ -90,7 +90,7 @@ Overview
 The stack is organized into three interacting layers, mirroring the overall Catalyst architecture:
 
 **Frontend**
-    A PennyLane-facing API (`pennylane.backline`_) for declaring where each part of a workload
+    A PennyLane-facing API (`pennylane2.backline`_) for declaring where each part of a workload
     runs. A `Placement`_ names a controller, its coprocessors, and the transport between them.
     ``catalyst.backline`` serializes that placement onto the root module as the
     ``catalyst.backline`` attribute and inserts the passes that lower it.

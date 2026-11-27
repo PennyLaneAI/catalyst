@@ -27,8 +27,8 @@ Two use cases are covered for each representation:
 # RUN: %PYTHON %s | FileCheck %s
 
 import numpy as np
-import pennylane as qp
-from pennylane.typing import Float
+import pennylane2 as qp
+from pennylane2.typing import Float
 
 # CDF: N orbitals -> 2N wires. CGF: M modes x K modals -> M*K wires.
 L, N = 1, 2

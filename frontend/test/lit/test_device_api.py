@@ -23,9 +23,9 @@ import pathlib
 import platform
 from typing import Optional
 
-import pennylane as qp
-from pennylane.devices import Device
-from pennylane.devices.execution_config import ExecutionConfig
+import pennylane2 as qp
+from pennylane2.devices import Device
+from pennylane2.devices.execution_config import ExecutionConfig
 
 from catalyst import qjit
 from catalyst.compiler import get_lib_path

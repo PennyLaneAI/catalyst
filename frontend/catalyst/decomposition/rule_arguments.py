@@ -25,10 +25,10 @@ from enum import Enum, auto
 import jax
 import jax.numpy as jnp
 import numpy as np
-import pennylane as qp
+import pennylane2 as qp
 from jax import Array
-from pennylane.core.operator import Operator2
-from pennylane.wires import Wires
+from pennylane2.core.operator import Operator2
+from pennylane2.wires import Wires
 
 from catalyst.decomposition.graph_op_id import CTRL_WORK_WIRES
 from catalyst.decomposition.type_utils import get_dummy_values_for_dynamic_shape

@@ -24,7 +24,7 @@ from typing import Iterable, List, Union
 
 import jax
 import numpy as np
-import pennylane as qp
+import pennylane2 as qp
 from jax._src import core, source_info_util, util
 from jax._src.core import pytype_aval_mappings
 from jax._src.interpreters import partial_eval as pe
@@ -51,7 +51,7 @@ from jaxlib.mlir.dialects.func import FuncOp, FunctionType
 from jaxlib.mlir.dialects.scf import ConditionOp, ForOp, IfOp, IndexSwitchOp, WhileOp, YieldOp
 from jaxlib.mlir.dialects.stablehlo import ConstantOp as StableHLOConstantOp
 from jaxlib.mlir.dialects.stablehlo import ConvertOp as StableHLOConvertOp
-from pennylane.capture.primitives import symbolic_array_prim
+from pennylane2.capture.primitives import symbolic_array_prim
 
 # TODO: remove after jax v0.7.2 upgrade
 # Mock _ods_cext.globals.register_traceback_file_exclusion due to API conflicts between
@@ -142,15 +142,15 @@ with Patcher(
         unconditional_to_conditional_if_probs,
     )
 
-from pennylane.backline.runtime import CType, get_runtime_call_prim
-from pennylane.capture.primitives import cond_prim as pl_cond_prim
-from pennylane.capture.primitives import for_loop_prim as pl_for_loop_prim
-from pennylane.capture.primitives import jacobian_prim as pl_jac_prim
-from pennylane.capture.primitives import jvp_prim as pl_jvp_prim
-from pennylane.capture.primitives import quantum_subroutine_prim
-from pennylane.capture.primitives import value_and_grad_prim as pl_value_and_grad_prim
-from pennylane.capture.primitives import vjp_prim as pl_vjp_prim
-from pennylane.capture.primitives import while_loop_prim as pl_while_loop_prim
+from pennylane2.backline.runtime import CType, get_runtime_call_prim
+from pennylane2.capture.primitives import cond_prim as pl_cond_prim
+from pennylane2.capture.primitives import for_loop_prim as pl_for_loop_prim
+from pennylane2.capture.primitives import jacobian_prim as pl_jac_prim
+from pennylane2.capture.primitives import jvp_prim as pl_jvp_prim
+from pennylane2.capture.primitives import quantum_subroutine_prim
+from pennylane2.capture.primitives import value_and_grad_prim as pl_value_and_grad_prim
+from pennylane2.capture.primitives import vjp_prim as pl_vjp_prim
+from pennylane2.capture.primitives import while_loop_prim as pl_while_loop_prim
 
 import catalyst
 from catalyst.compiler import get_lib_path

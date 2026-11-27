@@ -28,12 +28,12 @@ from contextlib import contextmanager
 
 import jax
 import jax.numpy as jnp
-import pennylane as qp
+import pennylane2 as qp
 from jax.api_util import debug_info
 from jax.interpreters import mlir
 from jax.tree_util import tree_flatten, tree_unflatten
-from pennylane.core.transforms import Transform
-from pennylane.logging import debug_logger, debug_logger_init
+from pennylane2.core.transforms import Transform
+from pennylane2.logging import debug_logger, debug_logger_init
 
 import catalyst
 from catalyst.autograph import run_autograph
@@ -179,9 +179,9 @@ def qjit(
             ``lightning.gpu``. The default value is None, which means no seeding is performed,
             and all processes are random. A seed is expected to be an unsigned 32-bit integer.
             Currently, the following measurement processes are seeded: :func:`~.measure`,
-            :func:`qp.sample() <pennylane.sample>`, :func:`qp.counts() <pennylane.counts>`,
-            :func:`qp.probs() <pennylane.probs>`, :func:`qp.expval() <pennylane.expval>`,
-            :func:`qp.var() <pennylane.var>`.
+            :func:`qp.sample() <pennylane2.sample>`, :func:`qp.counts() <pennylane2.counts>`,
+            :func:`qp.probs() <pennylane2.probs>`, :func:`qp.expval() <pennylane2.expval>`,
+            :func:`qp.var() <pennylane2.var>`.
         pass_plugins (Optional[List[Path]]): List of paths to pass plugins.
         dialect_plugins (Optional[List[Path]]): List of paths to dialect plugins.
         capture (str or bool): Controls whether to use PennyLane program capture for tracing.
@@ -493,10 +493,10 @@ def qjit(
 
         Out of all the :ref:`Catalyst-supported terminal measurements <measurements>`, there are
         four that have a return shape that depend on the number of qubits. Namely, the return shape
-        of :func:`qp.probs() <pennylane.probs>` and :func:`qp.state() <pennylane.state>` is a 1D
+        of :func:`qp.probs() <pennylane2.probs>` and :func:`qp.state() <pennylane2.state>` is a 1D
         array of size ``(2**num_qubits)``, the return shape of
-        :func:`qp.sample() <pennylane.sample>` is a 2D array of size ``(shots, num_qubits)``, and
-        the return shape of :func:`qp.counts() <pennylane.counts>` is two 1D arrays of size
+        :func:`qp.sample() <pennylane2.sample>` is a 2D array of size ``(shots, num_qubits)``, and
+        the return shape of :func:`qp.counts() <pennylane2.counts>` is two 1D arrays of size
         ``(2**num_qubits)``. The general rule of recompilation mentioned above would imply that
         changing the number of qubits in a workflow that returns any of these four measurements
         triggers recompilation.

@@ -15,7 +15,7 @@
 # RUN: %PYTHON %s | FileCheck %s
 
 import jax
-import pennylane as qp
+import pennylane2 as qp
 from jax.core import ShapedArray
 
 from catalyst import qjit

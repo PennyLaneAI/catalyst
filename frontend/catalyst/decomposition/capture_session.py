@@ -17,10 +17,10 @@
 from dataclasses import dataclass, field
 from typing import Callable
 
-import pennylane as qp
+import pennylane2 as qp
 from jax.extend.core import ClosedJaxpr
-from pennylane.core import Operator2
-from pennylane.core.operator import abstractify
+from pennylane2.core import Operator2
+from pennylane2.core.operator import abstractify
 
 from catalyst.decomposition.graph_op_id import GraphOpID
 from catalyst.decomposition.modifier_state import ModifierState
