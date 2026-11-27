@@ -900,6 +900,10 @@
   Python frontend still requires PennyLane.
   [(#3514)](https://github.com/PennyLaneAI/catalyst/pull/3514)
   
+* Captured operators now use PennyLane's `Operator` class, formerly named `Operator2`, while
+  the legacy operation class is named `LegacyOperator`.
+  [(#3524)](https://github.com/PennyLaneAI/catalyst/pull/3524)
+
 * Catalyst now provides its own :func:`~.polynomial_extrapolate` and
   :func:`~.exponential_extrapolate` functions for use with :func:`~.mitigate_with_zne`, replacing
   ``pennylane.noise.poly_extrapolate`` and ``pennylane.noise.exponential_extrapolate``, which has been removed from PennyLane.

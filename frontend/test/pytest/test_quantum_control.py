@@ -39,8 +39,6 @@ from pennylane.core.queuing import AnnotatedQueue
 from pennylane.operation import (
     DecompositionUndefinedError,
     Operation,
-    Operator,
-    Operator2,
     Wires,
 )
 from pennylane.ops.op_math.controlled import Controlled
@@ -50,6 +48,8 @@ from catalyst import ctrl as C_ctrl
 from catalyst import measure
 from catalyst.api_extensions.quantum_operators import HybridCtrl
 from catalyst.jax_tracer import HybridOpRegion
+
+LegacyOperator = getattr(qp.operation, "LegacyOperator", None) or qp.operation.Operator
 
 
 def verify_catalyst_ctrl_against_pennylane(
@@ -678,7 +678,7 @@ class TestCatalystOnlyControlled:
 # - remove PL-only tests of the Controlled class
 
 
-class TempOperator(Operator):
+class TempOperator(LegacyOperator):
     """A custom operator."""
 
     num_wires = 1
@@ -821,7 +821,7 @@ class TestControlledProperties:
     def test_has_matrix(self, value):
         """Test that `catalyst.ctrl` defers has_matrix to base operator."""
 
-        class DummyOp(Operator):
+        class DummyOp(LegacyOperator):
             """DummyOp"""
 
             num_wires = 1
@@ -902,7 +902,7 @@ class TestControlledProperties:
     def test_has_adjoint(self, value):
         """Test that `catalyst.ctrl` defers has_adjoint to base operator."""
 
-        class DummyOp(Operator):
+        class DummyOp(LegacyOperator):
             """DummyOp"""
 
             num_wires = 1
@@ -915,7 +915,7 @@ class TestControlledProperties:
     def test_has_diagonalizing_gates(self, value):
         """Test that `catalyst.ctrl` defers has_diagonalizing_gates to base operator."""
 
-        class DummyOp(Operator):
+        class DummyOp(LegacyOperator):
             """DummyOp"""
 
             num_wires = 1
@@ -928,7 +928,7 @@ class TestControlledProperties:
     def test_is_verified_hermitian(self, value):
         """Test that `catalyst.ctrl` defers `is_verified_hermitian` to base operator."""
 
-        class DummyOp(Operator):
+        class DummyOp(LegacyOperator):
             """DummyOp"""
 
             num_wires = 1
@@ -1582,7 +1582,7 @@ class TestDecomposition:
         base_op = base_cls(*params, wires=base_wires)
         op = C_ctrl(base_op, control=ctrl_wires, control_values=[False] * len(ctrl_wires))
 
-        if isinstance(base_op, Operator2):
+        if isinstance(base_op, LegacyOperator):
             expected = [custom_ctrl_op(*params, wires=ctrl_wires + base_wires)]
 
         decomp = op.decomposition()

@@ -22,8 +22,10 @@ from pennylane.wires import AbstractQubit
 from catalyst.decomposition.graph_op_id import GraphOpID
 from catalyst.from_plxpr.uid import _serialize_static, generate_uid
 
+Operator = getattr(qp.core, "Operator2", None) or qp.core.Operator
 
-class StaticOp(qp.core.Operator2):
+
+class StaticOp(Operator):
     """Test operator with static Python-only data."""
 
     static_argnames = ("label",)
@@ -33,7 +35,7 @@ class StaticOp(qp.core.Operator2):
         super().__init__(label, wires)
 
 
-class HybridWiresOp(qp.core.Operator2):
+class HybridWiresOp(Operator):
     """Test operator with a hybrid wire argument."""
 
     hybrid_argnames = ("cwires",)
@@ -44,7 +46,7 @@ class HybridWiresOp(qp.core.Operator2):
         super().__init__(cwires=cwires)
 
 
-class DynamicStaticOp(qp.core.Operator2):
+class DynamicStaticOp(Operator):
     """Test operator with dynamic and static Python-only data."""
 
     dynamic_argnames = ("angle",)
@@ -55,7 +57,7 @@ class DynamicStaticOp(qp.core.Operator2):
         super().__init__(angle, label, wires)
 
 
-class InnerOp(qp.core.Operator2):
+class InnerOp(Operator):
     """Simple test operator to use as an input for hybrid operator testing."""
 
     dynamic_argnames = ("phi",)
@@ -65,7 +67,7 @@ class InnerOp(qp.core.Operator2):
         super().__init__(phi, wires)
 
 
-class HybridOp(qp.core.Operator2):
+class HybridOp(Operator):
     """Test operator that takes an operator as input."""
 
     hybrid_argnames = ("op",)
