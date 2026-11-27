@@ -58,9 +58,11 @@ ARG PENNYLANE_VERSION=
 ARG LIGHTNING_VERSION=
 
 COPY --from=build /opt/wheel /opt/wheel
+COPY --from=build /opt/catalyst/.dep-versions /opt/catalyst/Makefile /opt/catalyst/Makefile.worktree /opt/catalyst/
 
 RUN pip install --no-cache-dir --extra-index-url https://test.pypi.org/simple \
         /opt/wheel/*.whl
+RUN PIP_NO_CACHE_DIR=1 make -C /opt/catalyst install-pl-deps
 RUN if [ -n "${PENNYLANE_VERSION}" ]; then \
         pip install --no-cache-dir --no-deps --force-reinstall \
             "git+https://github.com/PennyLaneAI/pennylane.git@${PENNYLANE_VERSION}"; \

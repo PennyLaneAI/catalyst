@@ -4,7 +4,9 @@ stablehlo=v1.13.7
 llvm=8f264586d7521b0e305ca7bb78825aa3382ffef7
 enzyme=v0.0.238
 
-# Always remove custom PL/LQ versions before release.
+# PennyLane and Lightning pins are for development, builds, and CI only.
+# Keep explicit compatible pins here, including for release testing.
+# These are not Catalyst runtime package requirements.
 
 # For a custom PL version, update the package version here and at
 # 'doc/requirements.txt'

@@ -35,6 +35,7 @@ install_catalyst_wheel(){
 
         # Install Catalyst from TestPyPI
         python -m pip install --extra-index-url https://test.pypi.org/simple/ pennylane-catalyst --pre --upgrade
+        make install-pl-deps PYTHON=python
     fi
 }
 

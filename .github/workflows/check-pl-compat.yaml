@@ -71,7 +71,7 @@ jobs:
     - name: Install deps (Python)
       run: |
         python3 --version | grep ${{ needs.constants.outputs.primary_python_version }}
-        python3 -m pip install -r requirements.txt
+        python3 -m pip install -r requirements.txt pennylane pennylane-lightning
         pip install amazon-braket-pennylane-plugin
         echo "AWS_DEFAULT_REGION=us-east-1" >> $GITHUB_ENV
 
@@ -172,9 +172,8 @@ jobs:
     - name: Install Catalyst (release-candidate)
       if: ${{ inputs.catalyst == 'release-candidate' }}
       run: |
-        # This is the first for the three rc installs
-        # Thus this one shouldn't have no-deps: it needs to pull in all PL dependencies
-        # And also this one needs to be --extra-index-url because it needs to see regular PyPI
+        # Install Catalyst's runtime dependencies from PyPI or TestPyPI.
+        # The matrix installs PennyLane and Lightning separately.
         sudo apt-get update
         sudo apt-get install -y graphviz
         pip install --extra-index-url https://test.pypi.org/simple/ pennylane-catalyst'>=0.15.0rc0,<=0.15.0'

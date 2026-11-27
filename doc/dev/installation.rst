@@ -4,11 +4,17 @@ Installation
 
 Catalyst is officially supported on Linux (x86_64, aarch64) and macOS (arm64)
 platforms, and pre-built binaries are being distributed via the Python Package Index (PyPI) for
-Python versions 3.12 and higher. To install it, simply run the following ``pip`` command:
+Python versions 3.12 and higher. The supported user installation path is through a
+compatible PennyLane release that includes Catalyst and an execution backend:
 
 .. code-block:: console
 
-    pip install pennylane-catalyst
+    pip install pennylane
+
+Beyond Catalyst version 0.15.0, installing ``pennylane-catalyst`` no longer installs PennyLane or
+Lightning, or enforces compatible versions of those packages. A standalone installation does not
+provide access to end-to-end workflows, however the compiler core can be run independently via the
+`CLI <https://docs.pennylane.ai/projects/catalyst/en/stable/catalyst-cli/catalyst-cli.html>`_.
 
 .. warning::
 
@@ -311,6 +317,23 @@ To install the ``pennylane-catalyst`` Python package (the compiler frontend) in 
 
   make frontend
 
+This installs the Catalyst checkout together with the PennyLane and Lightning versions
+in ``.dep-versions``. These pins are development and CI dependencies, not published
+Catalyst requirements. Update them when new frontend or backend functionality is needed,
+and keep ``doc/requirements.txt`` in sync. Keep compatible pins for release testing too.
+
+To update the pinned PennyLane and Lightning dependencies without reinstalling Catalyst, run
+``make install-pl-deps`` in an environment where Catalyst is already installed. This keeps the
+installed Catalyst version, including an editable installation. Incompatible pins cause an error.
+
+``make frontend`` continues to install these dependencies and replaces any existing PennyLane
+installation with the pinned package. If you develop PennyLane from a local checkout, reinstall
+it afterward with ``python -m pip install --no-deps -e /path/to/pennylane``.
+
+Wheel builds and CI install Catalyst first, then run ``make install-pl-deps``. This installs
+the pinned PennyLane and Lightning dependencies while keeping the installed Catalyst version.
+Incompatible pins cause an error instead of replacing the Catalyst build under test.
+
 Variables
 ^^^^^^^^^
 
@@ -549,14 +572,16 @@ To exit the Python virtual environment, type:
 Special Considerations
 ^^^^^^^^^^^^^^^^^^^^^^
 
-Catalyst dev wheels are tied to fixed versions of PennyLane and Lightning, which are installed
-together as a bundle. If you want to use different versions of Pennylane or Lightning, reinstall the
-desired versions after having run the script:
+The setup script explicitly installs the PennyLane and Lightning versions pinned in
+``.dep-versions`` of your starting checkout. Catalyst wheels no longer install these packages
+automatically. Update the pins before running the script if your branch needs different versions.
+
+To update the dependencies after setup while keeping the installed Catalyst, update the pins
+and run:
 
 .. code-block:: console
 
-  python -m pip install pennylane==0.*.*
-  python -m pip install pennylane-lightning==0.*.*
+  make install-pl-deps
 
 If you require the Catalyst repository with all its submodules, clone it this way:
 
