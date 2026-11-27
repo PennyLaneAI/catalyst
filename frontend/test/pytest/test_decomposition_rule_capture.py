@@ -40,12 +40,14 @@ from catalyst.jax_primitives import decomp_definition_p, decomprule_p
 from catalyst.jax_tracer import lower_jaxpr_to_mlir
 from catalyst.utils.exceptions import CompileError
 
+Operator = getattr(qp.core, "Operator2", None) or qp.core.Operator
+
 # MLIR prints the quotes inside a string attribute as `\22`.
 ZEROED = "{ctrl_work_wire_type = \\22zeroed\\22}"
 BORROWED = "{ctrl_work_wire_type = \\22borrowed\\22}"
 
 
-class RepeatedGate(qp.core.Operator2):
+class RepeatedGate(Operator):
     """A minimal gate for testing capture-session deduplication."""
 
     def __init__(self, wires):
@@ -229,11 +231,11 @@ def test_operator_and_ambient_modifiers_compose():
 def test_adjoint_context_propagates_to_descendants():
     """Distributed adjoint capture propagates its state through reachable resource operations."""
 
-    class ContextRoot(qp.core.Operator2):
+    class ContextRoot(Operator):
         def __init__(self, wires):
             super().__init__(wires=wires)
 
-    class ContextLeaf(qp.core.Operator2):
+    class ContextLeaf(Operator):
         def __init__(self, wires):
             super().__init__(wires=wires)
 
@@ -271,11 +273,11 @@ def test_precompilation_preserves_traversal(mocker):
 
     from catalyst.decomposition import rule_capture
 
-    class CacheRoot(qp.core.Operator2):
+    class CacheRoot(Operator):
         def __init__(self, wires):
             super().__init__(wires=wires)
 
-    class CacheLeaf(qp.core.Operator2):
+    class CacheLeaf(Operator):
         def __init__(self, wires):
             super().__init__(wires=wires)
 
@@ -499,11 +501,11 @@ def test_rule_conversion_propagates_compile_error(convert_rules, mocker):
 def test_distributed_control_context_reopens_descendants():
     """A newly demanded control count propagates through distributed-rule resources."""
 
-    class ContextRoot(qp.core.Operator2):
+    class ContextRoot(Operator):
         def __init__(self, wires):
             super().__init__(wires=wires)
 
-    class ContextLeaf(qp.core.Operator2):
+    class ContextLeaf(Operator):
         def __init__(self, wires):
             super().__init__(wires=wires)
 
@@ -539,11 +541,11 @@ def test_distributed_control_context_reopens_descendants():
 def test_registered_symbolic_resources_keep_their_own_modifiers():
     """Direct symbolic resources use their actual GraphOpID instead of the parent's context."""
 
-    class SymbolicRoot(qp.core.Operator2):
+    class SymbolicRoot(Operator):
         def __init__(self, wires):
             super().__init__(wires=wires)
 
-    class SymbolicLeaf(qp.core.Operator2):
+    class SymbolicLeaf(Operator):
         def __init__(self, wires):
             super().__init__(wires=wires)
 
@@ -571,7 +573,7 @@ def test_registered_symbolic_resources_keep_their_own_modifiers():
 def test_modifier_changing_identity_cycle_is_closed():
     """A controlled self-cycle captures its first state without growing controls forever."""
 
-    class CyclicGate(qp.core.Operator2):
+    class CyclicGate(Operator):
         def __init__(self, wires):
             super().__init__(wires=wires)
 
@@ -596,11 +598,11 @@ def test_modifier_changing_identity_cycle_is_closed():
 def test_indirect_control_cycle_uses_same_ancestor_count():
     """An intervening uncontrolled operator does not hide increasing controls."""
 
-    class IndirectCycleGate(qp.core.Operator2):
+    class IndirectCycleGate(Operator):
         def __init__(self, wires):
             super().__init__(wires=wires)
 
-    class CycleBridge(qp.core.Operator2):
+    class CycleBridge(Operator):
         def __init__(self, wires):
             super().__init__(wires=wires)
 
@@ -648,7 +650,7 @@ class TestControlWorkWireCycles:
         """A controlled self-cycle that adds a control work wire on every pass captures its first state
         without growing work wires forever, even though the control count stays the same."""
 
-        class WorkWireCycleGate(qp.core.Operator2):
+        class WorkWireCycleGate(Operator):
             def __init__(self, wires):
                 super().__init__(wires=wires)
 
@@ -686,11 +688,11 @@ class TestControlWorkWireCycles:
         C(RZ)``, where ``C(SemiAdder)`` hands its spare work wires to the controls it emits.
         """
 
-        class WorkWireRoot(qp.core.Operator2):
+        class WorkWireRoot(Operator):
             def __init__(self, wires):
                 super().__init__(wires=wires)
 
-        class WorkWireBridge(qp.core.Operator2):
+        class WorkWireBridge(Operator):
             def __init__(self, wires):
                 super().__init__(wires=wires)
 
@@ -741,7 +743,7 @@ class TestControlWorkWireCycles:
         """A rule that trades a control for a work wire, followed by a cycle that only grows work wires,
         is closed against every earlier state of the base, not only the one with most controls."""
 
-        class TradeGate(qp.core.Operator2):
+        class TradeGate(Operator):
             def __init__(self, wires):
                 super().__init__(wires=wires)
 
@@ -777,7 +779,7 @@ class TestControlWorkWireCycles:
 def test_same_base_modifier_transition_reopens_closure():
     """A symbolic rule may transition back to another state of the same base identity."""
 
-    class TransitionGate(qp.core.Operator2):
+    class TransitionGate(Operator):
         def __init__(self, wires):
             super().__init__(wires=wires)
 
@@ -909,11 +911,11 @@ def test_distributed_control_carries_work_wires():
     """A distributed control rule takes the work wires in its grouped wire operand, and its
     resources keep the work wires of the target."""
 
-    class ContextRoot(qp.core.Operator2):
+    class ContextRoot(Operator):
         def __init__(self, wires):
             super().__init__(wires=wires)
 
-    class ContextLeaf(qp.core.Operator2):
+    class ContextLeaf(Operator):
         def __init__(self, wires):
             super().__init__(wires=wires)
 
@@ -1030,15 +1032,15 @@ def test_shared_descendant_resources_are_collected_once(mocker):
 
     import catalyst.decomposition.rule_preparation as rule_preparation
 
-    class RootA(qp.core.Operator2):
+    class RootA(Operator):
         def __init__(self, wires):
             super().__init__(wires=wires)
 
-    class RootB(qp.core.Operator2):
+    class RootB(Operator):
         def __init__(self, wires):
             super().__init__(wires=wires)
 
-    class SharedLeaf(qp.core.Operator2):
+    class SharedLeaf(Operator):
         def __init__(self, wires):
             super().__init__(wires=wires)
 
@@ -1186,7 +1188,7 @@ def test_estimate_decomps_preserves_signatures_and_resources(mocker, adjoint, co
     """Custom rule declarations match definitions, including parameters and modifier operands."""
     from catalyst.decomposition import rule_capture
 
-    class ParameterizedGate(qp.core.Operator2):
+    class ParameterizedGate(Operator):
         dynamic_argnames = ("theta",)
 
         def __init__(self, theta, wires):
@@ -1347,11 +1349,11 @@ def test_estimate_decomps_requires_capture_and_collection(capture, collect_rules
 def test_resource_estimate_uses_declarations(tmp_path, estimate_api):
     """The resource estimator solves a transitive rule graph without compiling any rule bodies."""
 
-    class EstimateRoot(qp.core.Operator2):
+    class EstimateRoot(Operator):
         def __init__(self, wires):
             super().__init__(wires=wires)
 
-    class EstimateMiddle(qp.core.Operator2):
+    class EstimateMiddle(Operator):
         def __init__(self, wires):
             super().__init__(wires=wires)
 

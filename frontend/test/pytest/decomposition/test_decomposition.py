@@ -100,6 +100,8 @@ from catalyst.passes import graph_decomposition
 from catalyst.utils.exceptions import CompileError
 from catalyst.utils.runtime_environment import get_precompiled_manifest_path
 
+Operator = getattr(qp.core, "Operator2", None) or qp.core.Operator
+
 
 class TestGenericUtilities:
     """Tests for common decomposition rule lowering utilities."""
@@ -2566,7 +2568,7 @@ class TestSymbolicRules:
     def test_controlled_rule_is_wired_up_correctly(self):
         """Test a rule registered on ``C(op)`` acts on the wires it was given by executing it."""
 
-        class CtrlWired(qp.core.Operator2):
+        class CtrlWired(Operator):
             """An operator whose controlled form is a CNOT from the control onto its wire."""
 
             def __init__(self, wires):
@@ -2805,7 +2807,7 @@ class TestSymbolicRules:
         """Test a rule registered on ``C(op)`` and lowered for several controls is given all of
         them by executing it and the op must fire only when every control is on."""
 
-        class MultiCtrlWired(qp.core.Operator2):
+        class MultiCtrlWired(Operator):
             """An operator whose controlled form is a Toffoli onto its wire."""
 
             def __init__(self, wires):
@@ -2845,7 +2847,7 @@ class TestSymbolicRules:
         """Test an operator with a zero control value decomposes to the right state, when
         the rule is natively registered on C(gate)"""
 
-        class ZeroCtrl(qp.core.Operator2):
+        class ZeroCtrl(Operator):
             """An operator whose controlled form is a CNOT from the control onto its wire."""
 
             def __init__(self, wires):
@@ -2883,7 +2885,7 @@ class TestSymbolicRules:
         """Test an operator with a zero control value decomposes to the right state, when
         the rule is registered on the base op and the control variant rule is synthesized."""
 
-        class ZeroCtrl(qp.core.Operator2):
+        class ZeroCtrl(Operator):
             """An operator whose controlled form is a CNOT from the control onto its wire."""
 
             def __init__(self, wires):
@@ -2943,7 +2945,7 @@ class TestSymbolicRules:
         wires.
         """
 
-        class DisjointRegisters(qp.core.Operator2):
+        class DisjointRegisters(Operator):
             """An operator that rejects overlapping registers, as QROM does."""
 
             wire_argnames = ("control", "target")
@@ -3344,7 +3346,7 @@ class TestVerboseSolution:
     def _compile(verbose):
         """Compile, all the way to a binary, a circuit whose operator decomposes into Hadamard."""
 
-        class DecomposesToH(qp.core.Operator2):
+        class DecomposesToH(Operator):
             """An operator whose only rule produces a Hadamard."""
 
             def __init__(self, wires):
@@ -3439,15 +3441,15 @@ def test_cyclic_decompositions_find_cheapest_solution(reverse):
     Both root orders should use the cheaper exit through A.
     """
 
-    class A(qp.core.Operator2):
+    class A(Operator):
         def __init__(self, wires):
             super().__init__(wires=wires)
 
-    class B(qp.core.Operator2):
+    class B(Operator):
         def __init__(self, wires):
             super().__init__(wires=wires)
 
-    class Target(qp.core.Operator2):
+    class Target(Operator):
         def __init__(self, wires):
             super().__init__(wires=wires)
 
