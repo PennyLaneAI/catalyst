@@ -23,6 +23,8 @@
 #include "Handshake.hpp"
 #include "WireProtocol.hpp"
 
+#include <arpa/inet.h>
+
 namespace catalyst::transport::common {
 
 namespace {
@@ -43,9 +45,17 @@ void RcLink::connect(const ConnectInfo &info) {
     constexpr QpShape bwd = DEFAULT_QP_SHAPE;
     fwd_cq_ = std::make_shared<CompletionQueue>(ctx_, fwd_shape_.cq_depth);
     bwd_cq_ = std::make_shared<CompletionQueue>(ctx_, bwd.cq_depth);
+    // A CUQR receiver holds one receive request per slot, and its CQ holds their completions.
+    const bool cuqr = ring_.mode == frame::Mode::CUQR;
+    const int recv_cq_depth = side_ == Side::Coprocessor ? fwd_shape_.cq_depth : bwd.cq_depth;
+    TP_CHECK(!cuqr || static_cast<std::uint32_t>(recv_cq_depth) >= ring_.slots,
+             "%s: a %d-entry CQ cannot hold the receive completions of a %u-slot ring", backend_,
+             recv_cq_depth, ring_.slots);
+    const std::uint32_t recv_wr = cuqr ? ring_.slots : 4;
     fwd_qp_ = std::make_shared<QueuePair>(pd_, fwd_cq_, fwd_cq_, fwd_shape_.sq_depth,
-                                          fwd_shape_.inline_max);
-    bwd_qp_ = std::make_shared<QueuePair>(pd_, bwd_cq_, bwd_cq_, bwd.sq_depth, bwd.inline_max);
+                                          fwd_shape_.inline_max, QpType::RC, recv_wr);
+    bwd_qp_ = std::make_shared<QueuePair>(pd_, bwd_cq_, bwd_cq_, bwd.sq_depth, bwd.inline_max,
+                                          QpType::RC, recv_wr);
     fwd_qp_->to_init(PORT);
     bwd_qp_->to_init(PORT);
     active_mtu_ = static_cast<std::uint32_t>(ctx_->port_attr(PORT).active_mtu);
@@ -87,6 +97,11 @@ PeerRef RcLink::exchange(const MemRegion &local) {
     const std::uint32_t mtu = std::min(my.mtu_enum, peer.mtu_enum);
     fwd_qp_->to_rtr(peer.fwd.qpn, peer.fwd.psn, peer.fwd.gid, gid_idx_, PORT, mtu);
     bwd_qp_->to_rtr(peer.bwd.qpn, peer.bwd.psn, peer.bwd.gid, gid_idx_, PORT, mtu);
+    if (ring_.mode == frame::Mode::CUQR) {
+        for (std::uint32_t i = 0; i < ring_.slots; ++i) {
+            post_recv();
+        }
+    }
     fwd_qp_->to_rts(my.fwd.psn);
     bwd_qp_->to_rts(my.bwd.psn);
     return PeerRef{
@@ -112,7 +127,9 @@ template <frame::Mode M> void RcLink::post(std::uint32_t seq) {
     const std::size_t offset = static_cast<std::size_t>(cursor & (ring_.slots - 1)) * ring.stride;
     void *frame = send_frame(); // staged by the caller
     frame::seal<M>(ring, frame, seq);
-    const std::size_t bytes = frame::frame_bytes<M>(ring);
+    // A CUQR frame sends only its header and payload.
+    const std::size_t bytes =
+        M == frame::Mode::CUQR ? frame::wire_bytes(ring, frame) : frame::frame_bytes<M>(ring);
     const bool from_fwd = side_ == Side::Controller;
     // A frame larger than the queue pair's inline capacity goes from the registered buffer.
     const int inline_max = from_fwd ? fwd_shape_.inline_max : DEFAULT_QP_SHAPE.inline_max;
@@ -127,10 +144,13 @@ template <frame::Mode M> void RcLink::post(std::uint32_t seq) {
     ibv_send_wr wr{
         .sg_list = &sge,
         .num_sge = 1,
-        .opcode = IBV_WR_RDMA_WRITE,
+        .opcode = M == frame::Mode::CUQR ? IBV_WR_RDMA_WRITE_WITH_IMM : IBV_WR_RDMA_WRITE,
         .send_flags = static_cast<unsigned>((inline_data ? IBV_SEND_INLINE : 0) |
                                             (signaled ? IBV_SEND_SIGNALED : 0)),
     };
+    if constexpr (M == frame::Mode::CUQR) {
+        wr.imm_data = htonl(cursor & (ring_.slots - 1)); // the slot written
+    }
     wr.wr.rdma.remote_addr = peer_ring_.remote_addr + offset;
     wr.wr.rdma.rkey = peer_ring_.rkey;
     ibv_send_wr *bad = nullptr;
@@ -176,7 +196,32 @@ void RcLink::reap(bool drain) {
     } while (drain && outstanding_ > 0);
 }
 
+bool RcLink::arrived(std::uint32_t &slot) {
+    ibv_wc wc{};
+    const int n = ibv_poll_cq(recv_cq().get(), 1, &wc);
+    if (n == 0) {
+        return false;
+    }
+    TP_CHECK(n > 0, "%s: ibv_poll_cq (receive) rc=%d", backend_, n);
+    TP_CHECK(wc.status == IBV_WC_SUCCESS && wc.opcode == IBV_WC_RECV_RDMA_WITH_IMM,
+             "%s: receive completion %s, opcode %d", backend_, ibv_wc_status_str(wc.status),
+             wc.opcode);
+    slot = frame::cuqr_slot(ntohl(wc.imm_data)) & (ring_.slots - 1);
+    post_recv();
+    return true;
+}
+
+// A write with immediate takes a receive request but lands where the write names, so the request
+// needs no buffer.
+void RcLink::post_recv() {
+    ibv_recv_wr wr{};
+    ibv_recv_wr *bad = nullptr;
+    const int rc = ibv_post_recv(recv_qp().get(), &wr, &bad);
+    TP_CHECK(rc == 0, "%s: ibv_post_recv rc=%d (%s)", backend_, rc, std::strerror(rc));
+}
+
 template void RcLink::post<frame::Mode::BL16>(std::uint32_t);
 template void RcLink::post<frame::Mode::BLV>(std::uint32_t);
+template void RcLink::post<frame::Mode::CUQR>(std::uint32_t);
 
 } // namespace catalyst::transport::common

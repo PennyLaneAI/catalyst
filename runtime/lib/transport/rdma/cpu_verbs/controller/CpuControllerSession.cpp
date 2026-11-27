@@ -128,22 +128,50 @@ void *CpuControllerSession::reply_slot() {
 int CpuControllerSession::collect(void *const *replies, const std::uint64_t *replies_bytes,
                                   std::size_t n) {
     // Blocking wait for this round's reply, which the coprocessor writes into slot next_recv_ of
-    // the local ring, seq last.
+    // the local ring, seq last; a CUQR reply is announced by its receive completion instead.
     void *slot = ring_buf_ + ring_.slot_offset(next_recv_);
     const auto seq = static_cast<std::uint32_t>(next_recv_ + 1);
+    const bool cuqr = ring_.mode == frame::Mode::CUQR;
     frame::FrameView r;
-    while (!frame::poll(ring_, slot, seq, r)) {
-        cpu_relax();
+    if (cuqr) {
+        std::uint32_t got = 0;
+        while (!link_.arrived(got)) {
+            cpu_relax();
+        }
+        // RC delivers in order, so the reply is in this round's slot.
+        TP_CHECK(got == (next_recv_ & (ring_.slots - 1)),
+                 "cpu_verbs: a CUQR reply arrived in slot %u, expected slot %llu", got,
+                 static_cast<unsigned long long>(next_recv_ & (ring_.slots - 1)));
+        TP_CHECK(frame::poll(ring_, slot, seq, r) &&
+                     static_cast<const frame::CuqrHeader *>(slot)->magic == frame::CUQS_MAGIC,
+                 "cpu_verbs: the coprocessor's reply is not a CUQR reply");
+        TP_CHECK(r.request_id == seq, "cpu_verbs: a CUQR reply answers request %u, expected %u",
+                 r.request_id, seq);
+        TP_CHECK(r.status == 0, "cpu_verbs: the coprocessor answered with status %d", r.status);
+    } else {
+        while (!frame::poll(ring_, slot, seq, r)) {
+            cpu_relax();
+        }
     }
     rtt_ns_ = now_ns() - kick_ns_;
     ++next_recv_;
-    if (n > 0 && replies && replies[0] && replies[0] != r.data) {
-        // The coprocessor zero-fills the reply's payload area, so all of `cap` is defined.
+    if (n > 0 && replies && replies[0]) {
         const std::size_t cap = replies_bytes ? replies_bytes[0] : out_bytes_;
         TP_CHECK(cap <= frame::data_capacity(ring_),
                  "reply capacity (%zu) exceeds the %zu B a frame of this session carries", cap,
                  frame::data_capacity(ring_));
-        std::memcpy(replies[0], r.data, cap);
+        if (cuqr) {
+            // A CUQR frame carries only the reply's own bytes, so the rest of the slot may hold an
+            // older frame's: zero it, even for a reply collected in place (reply_slot()).
+            const std::size_t len = std::min<std::size_t>(r.len, cap);
+            if (replies[0] != r.data) {
+                std::memcpy(replies[0], r.data, len);
+            }
+            std::memset(static_cast<std::uint8_t *>(replies[0]) + len, 0, cap - len);
+        } else if (replies[0] != r.data) {
+            // The coprocessor zero-fills the reply's payload area, so all of `cap` is defined.
+            std::memcpy(replies[0], r.data, cap);
+        }
     }
     return 0;
 }

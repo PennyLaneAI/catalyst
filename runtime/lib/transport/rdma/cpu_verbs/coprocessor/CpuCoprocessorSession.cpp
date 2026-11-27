@@ -143,12 +143,15 @@ void CpuCoprocessorSession::stop() {
 // link directly, with no virtual call and no peer or mode check on the hot path.
 void CpuCoprocessorSession::run(std::stop_token st) {
     pin_thread(pin_cpu_, pin_realtime_);
+    const frame::Mode mode = ring_.mode;
     switch (link_->peer()) {
     case Peer::CATALYST:
-        if (ring_.mode == frame::Mode::BL16) {
+        if (mode == frame::Mode::BL16) {
             serve<frame::Mode::BL16>(static_cast<RcLink &>(*link_), st);
-        } else {
+        } else if (mode == frame::Mode::BLV) {
             serve<frame::Mode::BLV>(static_cast<RcLink &>(*link_), st);
+        } else {
+            serve_cuqr(static_cast<RcLink &>(*link_), st);
         }
         break;
     // HSB and BALBOA carry only BL16 frames.
@@ -209,6 +212,54 @@ void CpuCoprocessorSession::serve(Link &link, std::stop_token st) {
         cpu_relax();
         link.idle();
         if ((spin & STOP_CHECK_MASK) == 0 && st.stop_requested()) {
+            break;
+        }
+    }
+    link.drain();
+}
+
+// CUQR: a request has no word written last, so the link reports each arrival from its receive
+// completion queue, with the slot the request landed in. A frame that is not a CUQR request is
+// dropped unanswered, as cudaq-realtime does. A function that fails, or writes more than the reply
+// holds, is answered with status 1 and no result, and serving goes on.
+template <class Link> void CpuCoprocessorSession::serve_cuqr(Link &link, std::stop_token st) {
+    constexpr frame::Mode M = frame::Mode::CUQR;
+    const std::size_t cap = link.reply_capacity();
+    for (std::uint64_t spin = 0;; ++spin) {
+        std::uint32_t slot = 0;
+        frame::FrameView r; // the incoming message
+        if (link.arrived(slot)) {
+            std::uint8_t *req = ring_buf_ + std::size_t{slot} * ring_.stride;
+            if (!frame::poll<M>(ring_, req, 0, r) ||
+                reinterpret_cast<const frame::CuqrHeader *>(req)->magic != frame::CUQR_MAGIC) {
+                continue;
+            }
+            std::uint64_t word = 0;
+            std::memcpy(&word, r.data, std::min<std::size_t>(r.len, sizeof(word)));
+            last_word_.store(word, std::memory_order_relaxed);
+            completed_.fetch_add(1, std::memory_order_release);
+            void *send = link.send_frame();
+            std::uint8_t *reply = frame::data<M>(ring_, send);
+            std::memset(reply, 0, cap);
+            std::size_t nb = std::min<std::size_t>(r.len, cap);
+            if (coproc_fn_) {
+                nb = coproc_fn_(r.data, r.len, r.fn_id, reply, cap, coproc_ctx_);
+                if (nb == COPROCESSOR_FN_ERROR || nb > cap) {
+                    r.status = 1;
+                    nb = 0;
+                    std::memset(reply, 0, cap);
+                }
+            } else {
+                std::memcpy(reply, r.data, nb);
+            }
+            frame::stage<M>(ring_, send, r.fn_id, reply, nb, &r); // a CUQS echoing `r`
+            link.send(r.request_id); // the controller matches the reply by it
+            continue;
+        }
+
+        cpu_relax();
+        link.idle();
+        if ((spin & CQ_STOP_CHECK_MASK) == 0 && st.stop_requested()) {
             break;
         }
     }

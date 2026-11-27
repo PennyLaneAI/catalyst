@@ -18,6 +18,10 @@
   the new `balboa_hwhs` controller backend. Its coprocessors face BALBOA with `peer=balboa`.
   [(#3469)](https://github.com/PennyLaneAI/catalyst/pull/3469)
 
+* Backline's `cpu_verbs` and `gpu_verbs` backends speak cudaq-realtime's RPC format, CUQR.
+  `qp.Backline(..., frame="cuqr")` selects it.
+  [(#3392)](https://github.com/PennyLaneAI/catalyst/pull/3392)
+
 * A new coprocessor function called `catalyst_onnx_coprocessor` has been added, which runs an
   ONNX model on the CPU or a GPU through onnxruntime, and is built with the transport runtime.
   PennyLane's

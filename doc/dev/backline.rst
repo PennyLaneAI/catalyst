@@ -273,8 +273,12 @@ coprocessor's own memory. A ring has ``frame_slots`` slots, 256 unless a node's 
 ``frame_slots=<n>``, a power of two, which the compiler then passes to every node; FPGA controllers
 are only tested with 256. ``hsb_hwhs`` always uses one slot, so the request after a lost one lands
 where the coprocessor polls. Round ``n`` uses slot ``n mod frame_slots``. Over RDMA, ends whose frame
-configs differ fail to connect. Every transport uses the same two frame layouts, and the compiler picks one per placement from its
+configs differ fail to connect. Every transport carries the same two frame layouts, BL16 and BLV, and
+the compiler picks one per placement from its
 message sizes: the 16 B frame, BL16, when requests and replies fit in 8 B, and BLV otherwise.
+``qp.Backline(..., frame=...)`` overrides that choice with ``"bl16"``, ``"blv"`` or ``"cuqr"``,
+cudaq-realtime's RPC format (see `CUQR frames`_), and the compiler checks that the selected backends
+carry it.
 
 .. list-table:: BL16, in 64 B slots
     :header-rows: 1
@@ -342,6 +346,29 @@ its completion word landing last then relies on the NIC placing an RDMA write's 
 which common NICs do but the RDMA specification does not guarantee. The slot count does not change
 with the stride, so memory grows with message size: a 1 MiB message makes each ring 512 MiB at the
 default 256 slots.
+
+CUQR frames
+-----------
+
+CUQR is cudaq-realtime's RPC format, the one an NVQLink FPGA and a cudaq-realtime host exchange.
+``cpu_verbs`` and ``gpu_verbs`` carry it, and ``qp.Backline(..., frame="cuqr")`` selects it;
+``"auto"`` never does.
+
+A request is a 24 B header (magic ``"CUQR"``, ``function_id``, ``arg_len``, ``request_id``,
+``ptp_timestamp``) and the payload, with the ``fn_id`` as its ``function_id``. A reply is a 24 B
+header (magic ``"CUQS"``, ``status``, ``result_len``, and the request's ``request_id`` and
+``ptp_timestamp``) and the result. The controller sets ``request_id`` to the round's sequence number
+and matches the reply by it. A coprocessor function that returns ``COPROCESSOR_FN_ERROR``, or more
+bytes than the reply holds, is answered with ``status`` 1 and no result, and the controller reports
+the status. A message that is not a CUQR request is dropped unanswered, as cudaq-realtime does.
+
+A CUQR frame has no word written last. The sender writes it by RDMA write with immediate, the
+immediate's low 12 bits naming the slot, so a ring has at most 4096 slots. The receiver keeps one
+receive request posted per slot and takes each arrival from its receive completion queue.
+
+**Not optimized on gpu_verbs.** A GPU kernel cannot read a completion queue, so a host thread relays
+each arrival to the kernel through a flag in host memory, adding about 1 µs per round trip on an
+MI210. The kernel takes the slots in order, so on ``gpu_verbs`` a lost request stops the session.
 
 FPGA controllers
 ----------------

@@ -74,7 +74,9 @@ PeerRef GpuCoprocessorSession::exchange_keys(const MemRegion &local) {
 void GpuCoprocessorSession::establish_channel(const ChannelDesc &desc, const MemRegion &local,
                                               const PeerRef &peer) {
     TP_CHECK(desc.transport == "rdma", "gpu_verbs: only transport \"rdma\" supported");
-    handoff_ = gpu_.alloc_handoff(ring_.region_bytes());
+    // CUQR's rx_flags and tx_flags follow the reply ring.
+    const std::size_t flags = cuqr() ? 2 * std::size_t{ring_.slots} * sizeof(std::uint32_t) : 0;
+    handoff_ = gpu_.alloc_handoff(ring_.region_bytes() + flags);
     link_->establish(local, peer);
 }
 
@@ -89,12 +91,15 @@ void GpuCoprocessorSession::set_coprocessor_launcher(CoprocessorLauncherFn fn, v
 // link directly, with no virtual call and no peer or mode check on the hot path.
 void GpuCoprocessorSession::run(std::stop_token st) {
     pin_thread(pin_cpu_, pin_realtime_);
+    const frame::Mode mode = ring_.mode;
     switch (link_->peer()) {
     case Peer::CATALYST:
-        if (ring_.mode == frame::Mode::BL16) {
+        if (mode == frame::Mode::BL16) {
             serve<frame::Mode::BL16>(static_cast<RcLink &>(*link_), st);
-        } else {
+        } else if (mode == frame::Mode::BLV) {
             serve<frame::Mode::BLV>(static_cast<RcLink &>(*link_), st);
+        } else {
+            serve_cuqr(static_cast<RcLink &>(*link_), st);
         }
         break;
     // HSB and BALBOA carry only BL16 frames.
@@ -146,6 +151,61 @@ void GpuCoprocessorSession::serve(Link &link, std::stop_token st) {
     link.drain();
 }
 
+// CUQR: a GPU kernel cannot read a completion queue, so this thread relays each arrival to it
+// through rx_flags and waits for its reply on tx_flags (CoprocLaunchDesc). The kernel takes the
+// slots in order, so a request that lands in another slot, after a lost one, stops the session. A
+// reply longer than the link carries is answered with status 1 and no result.
+template <class Link> void GpuCoprocessorSession::serve_cuqr(Link &link, std::stop_token st) {
+    constexpr frame::Mode M = frame::Mode::CUQR;
+    const std::size_t cap = link.reply_capacity();
+    std::uint64_t spin = 0;
+    // Spin until `ready`, checking now and then for a stop. Returns false once stopped.
+    auto wait = [&](auto ready) {
+        while (!ready()) {
+            cpu_relax();
+            link.idle();
+            if ((++spin & CQ_STOP_CHECK_MASK) == 0 && st.stop_requested()) {
+                return false;
+            }
+        }
+        return true;
+    };
+    for (std::uint64_t n = 0;; ++n) {
+        const auto slot = static_cast<std::uint32_t>(n & (ring_.slots - 1));
+        const auto seq = static_cast<std::uint32_t>(n + 1);
+        std::uint32_t got = 0;
+        if (!wait([&] { return link.arrived(got); })) {
+            break;
+        }
+        TP_CHECK(got == slot, "gpu_verbs: a CUQR request arrived in slot %u, expected slot %u", got,
+                 slot);
+        std::atomic_ref<std::uint32_t>(rx_flags_host()[slot]).store(seq, std::memory_order_release);
+        if (!wait([&] {
+                return std::atomic_ref<std::uint32_t>(tx_flags_host()[slot])
+                           .load(std::memory_order_acquire) == seq;
+            })) {
+            break;
+        }
+        frame::FrameView reply;
+        if (!frame::poll<M>(ring_, handoff_.host + ring_.slot_offset(n), seq, reply)) {
+            continue; // the kernel found no CUQR request: dropped unanswered
+        }
+        if (reply.len > cap) {
+            reply.status = 1;
+            reply.len = 0;
+        }
+        std::int64_t first = 0;
+        std::memcpy(&first, reply.data, std::min<std::size_t>(reply.len, sizeof(first)));
+        last_word_.store(first, std::memory_order_relaxed);
+        void *send = link.send_frame();
+        frame::stage<M>(ring_, send, 0, reply.data, reply.len, &reply); // a CUQS echoing `reply`
+        std::memset(frame::data<M>(ring_, send) + reply.len, 0, cap - reply.len);
+        link.send(reply.request_id); // the controller matches the reply by it
+        completed_.fetch_add(1, std::memory_order_release);
+    }
+    link.drain();
+}
+
 void GpuCoprocessorSession::start() {
     stop();
     failed_.store(false, std::memory_order_relaxed);
@@ -154,6 +214,9 @@ void GpuCoprocessorSession::start() {
     last_word_.store(0, std::memory_order_relaxed);
     if (handoff_.stop_host) {
         *handoff_.stop_host = 0;
+    }
+    if (cuqr()) { // a restarted session counts from message 0 again
+        std::memset(rx_flags_host(), 0, 2 * std::size_t{ring_.slots} * sizeof(std::uint32_t));
     }
     // Launch the persistent kernel once via the bound launcher (nullptr selects
     // the built-in echo launcher). The kernel runs until the stop flag is set
@@ -168,6 +231,10 @@ void GpuCoprocessorSession::start() {
         .stream = gpu_.stream(),
         .frame_mode = static_cast<std::uint32_t>(ring_.mode),
         .slot_stride = ring_.stride,
+        .rx_flags = cuqr() ? handoff_.dev + ring_.region_bytes() : nullptr,
+        .tx_flags = cuqr() ? handoff_.dev + ring_.region_bytes() +
+                                 std::size_t{ring_.slots} * sizeof(std::uint32_t)
+                           : nullptr,
     };
     CoprocessorLauncherFn launch = coproc_launcher_ ? coproc_launcher_ : &default_echo_launcher;
     const int lrc = launch(&L, coproc_ctx_);

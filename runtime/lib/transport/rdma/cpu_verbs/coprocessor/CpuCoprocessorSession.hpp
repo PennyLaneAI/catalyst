@@ -58,6 +58,9 @@ class CpuCoprocessorSession final : public CoprocessorSession {
 
     void set_coprocessor_fn(CoprocessorFn fn, void *ctx) override;
 
+    /// Messages answered since start().
+    std::uint64_t completed() const { return completed_.load(std::memory_order_acquire); }
+
     void set_thread_affinity(int cpu, bool realtime) {
         pin_cpu_ = cpu;
         pin_realtime_ = realtime;
@@ -67,6 +70,7 @@ class CpuCoprocessorSession final : public CoprocessorSession {
     // The engine loop; runs on engine_.
     void run(std::stop_token st);
     template <common::frame::Mode M, class Link> void serve(Link &link, std::stop_token st);
+    template <class Link> void serve_cuqr(Link &link, std::stop_token st);
 
     std::unique_ptr<common::PeerLink> link_;
     common::frame::RingGeometry ring_;

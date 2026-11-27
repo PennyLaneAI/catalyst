@@ -78,6 +78,13 @@ class GpuCoprocessorSession final : public CoprocessorSession {
     // The reply loop; runs on engine_.
     void run(std::stop_token st);
     template <common::frame::Mode M, class Link> void serve(Link &link, std::stop_token st);
+    template <class Link> void serve_cuqr(Link &link, std::stop_token st);
+    bool cuqr() const { return ring_.mode == common::frame::Mode::CUQR; }
+    // CUQR's per-slot arrival and reply flags (CoprocLaunchDesc), after the reply ring.
+    std::uint32_t *rx_flags_host() {
+        return reinterpret_cast<std::uint32_t *>(handoff_.host + ring_.region_bytes());
+    }
+    std::uint32_t *tx_flags_host() { return rx_flags_host() + ring_.slots; }
 
     std::unique_ptr<common::PeerLink> link_;
     common::frame::RingGeometry ring_; // both rings, the request ring and the handoff

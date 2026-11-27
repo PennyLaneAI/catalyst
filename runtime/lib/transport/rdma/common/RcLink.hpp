@@ -18,6 +18,10 @@
  * (controller to coprocessor) and bwd (coprocessor to controller), connected over the out-of-band
  * socket with a HandshakeMsg. Each end owns a ring of frames the other RDMA WRITEs into, round n
  * into slot n with seq n + 1. A coprocessor facing another peer uses another PeerLink.
+ *
+ * A CUQR frame has no word written last, so it goes by RDMA write with immediate, the immediate
+ * naming the slot, and the receiver takes each arrival from its receive completion queue
+ * (arrived()). It holds one receive request per slot.
  */
 
 #pragma once
@@ -61,18 +65,25 @@ class RcLink final : public PeerLink {
     void *send_frame() override { return send_buf_->addr(); }
     /// WRITE the staged frame into slot seq - 1 of the peer's ring, inline when it fits. One send
     /// in SIGNAL_EVERY is signaled, and the completions ready then are reaped.
-    void send(std::uint32_t seq) override {
-        ring_.mode == frame::Mode::BL16 ? post<frame::Mode::BL16>(seq)
-                                        : post<frame::Mode::BLV>(seq);
-    }
+    void send(std::uint32_t seq) override { CATALYST_FRAME_DISPATCH(ring_.mode, post, seq); }
     /// Nothing: send() reaps as it goes.
     void idle() override {}
     /// Wait for the signaled sends still outstanding.
     void drain() override;
 
+    /// CUQR: whether a frame has arrived in the local ring, and if so its `slot`. Takes one
+    /// receive completion and reposts its receive request.
+    bool arrived(std::uint32_t &slot);
+    /// Payload bytes a reply carries.
+    std::size_t reply_capacity() const { return frame::data_capacity(ring_); }
+
   private:
     template <frame::Mode M> void post(std::uint32_t seq);
     void reap(bool drain);
+    void post_recv();
+    // The queue pair the peer writes into: fwd for the coprocessor, bwd for the controller.
+    QueuePair &recv_qp() { return side_ == Side::Coprocessor ? *fwd_qp_ : *bwd_qp_; }
+    CompletionQueue &recv_cq() { return side_ == Side::Coprocessor ? *fwd_cq_ : *bwd_cq_; }
 
     const char *backend_;
     Side side_;

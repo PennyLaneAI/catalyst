@@ -104,5 +104,8 @@ inline void cpu_relax() {
  * @brief How often a coprocessor's spin looks at the stop token: every STOP_CHECK_MASK + 1 spins.
  */
 inline constexpr std::uint64_t STOP_CHECK_MASK = 0xFFFFF;
+/// The same for a spin that polls a completion queue (CUQR), each poll costing far more than a
+/// load.
+inline constexpr std::uint64_t CQ_STOP_CHECK_MASK = 0xFFF;
 
 } // namespace catalyst::transport::common
