@@ -22,6 +22,7 @@ from collections.abc import Callable
 from itertools import compress
 from typing import TYPE_CHECKING
 
+import pennylane as qp
 from pennylane import capture, ops
 from pennylane.ftqc.operations import RotXZX
 from pennylane.measurements import counts, expval, probs, sample, state, var

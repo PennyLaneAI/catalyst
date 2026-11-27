@@ -16,6 +16,7 @@ which collects and maps PennyLane operations and measurements from xDSL."""
 
 from functools import singledispatchmethod
 
+import pennylane as qp
 import xdsl
 from pennylane.measurements import MeasurementProcess
 from xdsl.dialects import builtin, func
@@ -41,6 +42,7 @@ from catalyst.python_interface.dialects.quantum import (
 from .xdsl_conversion import dispatch_wires_extract, xdsl_to_qp_measurement, xdsl_to_qp_op
 
 LegacyOperator = getattr(qp.operation, "LegacyOperator", None) or qp.operation.Operator
+
 
 class QMLCollector:
     """Collects PennyLane ops and measurements from an xDSL module.

@@ -20,6 +20,7 @@ from enum import Enum, auto
 from functools import singledispatch, singledispatchmethod
 from typing import Sequence
 
+import pennylane as qp
 from pennylane.measurements import (
     ExpectationMP,
     MeasurementProcess,
