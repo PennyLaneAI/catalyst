@@ -311,7 +311,9 @@ class CompiledFunction:
         args_data, args_shape = tree_flatten((args, kwargs))
 
         for arg in args_data:
-            numpy_arg = np.asarray(arg)
+            # Compiled code ignores strides, so inputs must be C-contiguous.
+            # order="C" copies only when needed and preserves scalar shapes.
+            numpy_arg = np.asarray(arg, order="C")
             numpy_arg_buffer.append(numpy_arg)
             c_abi_ptr = ctypes.pointer(get_ranked_memref_descriptor(numpy_arg))
             c_abi_args.append(c_abi_ptr)
