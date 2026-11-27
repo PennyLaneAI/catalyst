@@ -44,15 +44,16 @@ func.func @finalize() {
 
 // -----
 
+// CHECK-DAG: llvm.mlir.global internal constant @lightning.qubit("lightning.qubit\00") {addr_space = 0 : i32}
+// CHECK-DAG: llvm.mlir.global internal constant @rtd_lightning.so("rtd_lightning.so\00") {addr_space = 0 : i32}
+// CHECK-DAG: llvm.mlir.global internal constant @"{my_attr: my_attr_value}"("{my_attr: my_attr_value}\00") {addr_space = 0 : i32}
+// CHECK-DAG: llvm.mlir.global internal constant @lightning.kokkos("lightning.kokkos\00") {addr_space = 0 : i32}
+// CHECK-DAG: llvm.mlir.global internal constant @"{my_other_attr: my_other_attr_value}"("{my_other_attr: my_other_attr_value}\00") {addr_space = 0 : i32}
+
 // CHECK: llvm.func @__catalyst__rt__device_init(!llvm.ptr, !llvm.ptr, !llvm.ptr, i64, i1 {llvm.zeroext})
 
 // CHECK-LABEL: @device
 func.func @device() {
-    // CHECKL llvm.mlir.global internal constant @lightning.qubit("lightning.qubit\00") {addr_space = 0 : i32}
-    // CHECKL llvm.mlir.global internal constant @rtd_lightning.so("rtd_lightning.so\00") {addr_space = 0 : i32}
-    // CHECKL llvm.mlir.global internal constant @"{my_attr: my_attr_value}"("{my_attr: my_attr_value}\00") {addr_space = 0 : i32}
-    // CHECKL llvm.mlir.global internal constant @lightning.kokkos("lightning.kokkos\00") {addr_space = 0 : i32}
-    // CHECKL llvm.mlir.global internal constant @"{my_other_attr: my_other_attr_value}"("{my_other_attr: my_other_attr_value}\00") {addr_space = 0 : i32}
 
     // CHECK: [[shots:%.+]] = llvm.mlir.constant(1000 : i64) : i64
     // CHECK: [[d0:%.+]] = llvm.mlir.addressof @rtd_lightning.so : !llvm.ptr
