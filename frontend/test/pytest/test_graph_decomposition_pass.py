@@ -20,7 +20,9 @@ import pennylane as qp
 import pytest
 from pennylane.decomposition import register_resources
 
+from catalyst.passes import graph_decomposition
 from catalyst.passes.builtin_passes import graph_decomposition_setup_inputs
+from catalyst.utils.runtime_environment import PRECOMPILED_BYTECODE_PATH
 
 # Dummy lib paths so building the options dict never hits the environment / installed libraries.
 _DUMMY_LIBS = {"libQPD_path": Path("/dummy/libQPD"), "libpython_path": Path("/dummy/libpython")}
@@ -31,6 +33,31 @@ def _setup(**kwargs):
     just the options dict."""
     _, options = graph_decomposition_setup_inputs({qp.RX}, **_DUMMY_LIBS, **kwargs)
     return options
+
+
+class TestBytecodeRules:
+    """Test resolution of the ``bytecode_rules`` option."""
+
+    @pytest.mark.filterwarnings("ignore:Failed to load precompiled rules")
+    @pytest.mark.parametrize("env_path", [None, "/env/rules.mlirbc"])
+    def test_bytecode_rules_resolved_at_compile_time(self, monkeypatch, env_path):
+        """The pass uses the library selected when compiling, even if the environment variable
+        changes after the QNode is decorated."""
+        monkeypatch.delenv("CATALYST_PRECOMPILED_BYTECODE_PATH", raising=False)
+
+        @qp.qjit(capture=True, target="mlir")
+        @graph_decomposition(gate_set={qp.RX})
+        @qp.qnode(qp.device("null.qubit", wires=1))
+        def circuit(x):
+            qp.RX(x, 0)
+            return qp.state()
+
+        if env_path is not None:
+            monkeypatch.setenv("CATALYST_PRECOMPILED_BYTECODE_PATH", env_path)
+        expected = PRECOMPILED_BYTECODE_PATH if env_path is None else env_path
+
+        circuit.aot_compile(0.5)
+        assert f'"bytecode-rules" = "{expected}"' in str(circuit.mlir_module)
 
 
 class TestRuleRefName:

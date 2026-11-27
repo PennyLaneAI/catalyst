@@ -14,6 +14,8 @@
 
 """Managed state for the decomposition rule discovery and capture mechanism."""
 
+from collections.abc import Iterator
+from contextlib import contextmanager
 from dataclasses import dataclass, field
 from typing import Callable
 
@@ -180,3 +182,36 @@ class DecompositionScope:
     def record_definition(self, traced_rule: TracedRule) -> None:
         """Record a definition once, preserving first-seen order."""
         self.definitions.setdefault(traced_rule.identifier, traced_rule)
+
+    def merge_roots(self, other: "DecompositionScope") -> None:
+        """Record every root (and observed modifier state) of ``other`` in this scope."""
+        for base_id, (request, modifier_states) in other.roots.items():
+            previous = self.roots.get(base_id)
+            if previous is None:
+                self.roots[base_id] = (request, set(modifier_states))
+            else:
+                previous[1].update(modifier_states)
+
+
+_ROOT_COLLECTORS: list[DecompositionScope] = []
+
+
+@contextmanager
+def collect_decomposition_roots() -> Iterator[DecompositionScope]:
+    """Collect the decomposition roots of every kernel traced within this context.
+
+    While active, kernels forward their decomposition roots to the yielded scope instead of
+    capturing and binding the reachable rules themselves. This allows the roots of a whole
+    program to be gathered (e.g., for precompilation) without paying for rule capture.
+    """
+    collector = DecompositionScope()
+    _ROOT_COLLECTORS.append(collector)
+    try:
+        yield collector
+    finally:
+        _ROOT_COLLECTORS.remove(collector)
+
+
+def active_root_collector() -> DecompositionScope | None:
+    """Return the innermost active root collector, if any."""
+    return _ROOT_COLLECTORS[-1] if _ROOT_COLLECTORS else None

@@ -23,7 +23,7 @@ from typing import TypedDict
 from catalyst.decomposition.capture_session import RuleIdentity
 from catalyst.decomposition.type_utils import SerializedGraphOpID
 from catalyst.utils.runtime_environment import (
-    PRECOMPILED_BYTECODE_PATH,
+    get_precompiled_bytecode_path,
     get_precompiled_manifest_path,
 )
 
@@ -109,8 +109,14 @@ def _validate_manifest(manifest: dict, bytecode: bytes) -> frozenset[RuleIdentit
 def load_precompiled_rule_identities(
     _bytecode_path: str | Path | None = None,
 ) -> frozenset[RuleIdentity]:
-    """Validated and load precompiled rules from the precompiled cache."""
-    _bytecode_path = Path(PRECOMPILED_BYTECODE_PATH if _bytecode_path is None else _bytecode_path)
+    """Validate and load precompiled rules from the precompiled cache.
+
+    Defaults to :func:`~.get_precompiled_bytecode_path`, which honours the
+    ``CATALYST_PRECOMPILED_BYTECODE_PATH`` environment variable.
+    """
+    _bytecode_path = Path(
+        get_precompiled_bytecode_path() if _bytecode_path is None else _bytecode_path
+    )
 
     bytecode = _bytecode_path.read_bytes()
     with get_precompiled_manifest_path(_bytecode_path).open(encoding="utf-8") as manifest_file:

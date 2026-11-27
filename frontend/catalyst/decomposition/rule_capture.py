@@ -23,7 +23,12 @@ import jax
 from jax.core import take_current_trace
 
 import catalyst
-from catalyst.decomposition.capture_session import DecompositionScope, RuleIdentity, TracedRule
+from catalyst.decomposition.capture_session import (
+    DecompositionScope,
+    RuleIdentity,
+    TracedRule,
+    active_root_collector,
+)
 from catalyst.decomposition.precompiled_rule_loading import load_precompiled_rule_identities
 from catalyst.decomposition.rule_arguments import rule_call_operands
 from catalyst.decomposition.rule_discovery import walk_reachable_decomp_rule_sets
@@ -145,6 +150,12 @@ def capture_and_bind_kernel_rules(
     """Capture reachable rules and bind definitions, optionally using supplied cache identities."""
     scope = interpreter.decomposition_scope
     if scope is None:
+        return
+
+    collector = active_root_collector()
+    if collector is not None:
+        # Only the roots are requested (e.g., for precompilation); skip rule capture.
+        collector.merge_roots(scope)
         return
 
     with take_current_trace():
