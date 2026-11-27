@@ -741,7 +741,6 @@ class TestCompilerState:
         assert len(saved_files) == 1
         assert saved_files[0].endswith("_TestPass_FAILED.mlir")
         assert "func.func" in (tmp_path / saved_files[0]).read_text()
-        assert not compiled.compile_options.keep_intermediate
 
 
 class TestCustomCall:

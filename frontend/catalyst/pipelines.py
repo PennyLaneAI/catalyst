@@ -158,7 +158,8 @@ class CompileOptions:
             ``_`` for the characters of the pass name other than letters, digits, ``_``, ``-``
             and ``.``, independently of ``keep_intermediate``. The file of a program overwrites
             that of an earlier program with the same name in the directory. For a pass that runs
-            on a single function, the file only has that function. ``None`` by default.
+            on a single function, the file only has that function, and the pass manager that
+            runs it also saves a file with the whole program. ``None`` by default.
     """
 
     verbose: Optional[bool] = False
