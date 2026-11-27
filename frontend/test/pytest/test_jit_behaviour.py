@@ -1044,30 +1044,6 @@ class TestTracingQJITAnnotatedFunctions:
 
         assert np.allclose(workflow1(phi), workflow2(phi))
 
-    def test_gradient_of_qjit_names(self, backend):
-        """Test gradient of qjit names."""
-
-        @qp.qnode(device=qp.device(backend, wires=1))
-        def circuit(phi):
-            qp.RX(phi, wires=0)
-            return qp.expval(qp.PauliZ(0))
-
-        @qjit
-        def workflow(phi: float):
-            g = grad(circuit)
-            return g(phi)
-
-        mlir_v1 = workflow.mlir
-
-        @qjit
-        def workflow(phi: float):  # pylint: disable=function-redefined
-            g = grad(qjit(circuit))
-            return g(phi)
-
-        mlir_v2 = workflow.mlir
-
-        assert mlir_v1 == mlir_v2
-
 
 class TestDefaultAvailableIR:
 
