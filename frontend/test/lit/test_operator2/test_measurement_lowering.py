@@ -17,6 +17,8 @@
 
 import pennylane as qp
 
+Operator = getattr(qp.core, "Operator2", None) or qp.core.Operator
+
 
 class RotatedMeasurement(qp.ops.MidMeasure):
     """A measurement with a dynamic parameter and compilable static data."""
@@ -25,7 +27,7 @@ class RotatedMeasurement(qp.ops.MidMeasure):
     compilable_argnames = ("plane",)
 
     def __init__(self, angle, wires, plane="XY"):
-        qp.core.Operator2.__init__(self, angle, wires=wires, plane=plane)
+        Operator.__init__(self, angle, wires=wires, plane=plane)
 
 
 class BareMeasurement(qp.ops.MidMeasure):
@@ -34,7 +36,7 @@ class BareMeasurement(qp.ops.MidMeasure):
     compilable_argnames = ()
 
     def __init__(self, wires):
-        qp.core.Operator2.__init__(self, wires=wires)
+        Operator.__init__(self, wires=wires)
 
 
 @qp.qjit(capture=True, target="mlir", collect_decomp_rules=False)

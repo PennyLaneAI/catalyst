@@ -40,6 +40,8 @@ from catalyst.device import get_device_capabilities
 from catalyst.device.qjit_device import RUNTIME_OPERATIONS, get_qjit_device_capabilities
 from catalyst.device.verification import validate_measurements, verify_operations
 
+LegacyOperator = getattr(qp.operation, "LegacyOperator", None) or qp.operation.Operator
+
 # pylint: disable = unused-argument, unnecessary-lambda-assignment, unnecessary-lambda
 
 
@@ -136,7 +138,7 @@ class PauliX2(qp.PauliX):
 def test_unsupported_ops_raise_an_error():
     """Test that an unsupported op raises an error"""
 
-    class MyOp(qp.operation.Operator):
+    class MyOp(LegacyOperator):
         """An unsupported operation"""
 
         @property

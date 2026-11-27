@@ -54,3 +54,13 @@ func.func @escaped_name(%q: !quantum.bit) -> (i64, !quantum.bit) {
   %m, %out = quantum.measurement "Quoted \"name\""() qubits(%q) : (i64, !quantum.bit)
   return %m, %out : i64, !quantum.bit
 }
+
+// CHECK-LABEL: @quoted_map_keys
+func.func @quoted_map_keys(%angle: f64, %q0: !quantum.bit, %q1: !quantum.bit)
+    -> (i1, !quantum.bit, !quantum.bit) {
+  // CHECK: quantum.measurement "QuotedKeys"(%{{.*}}: f64) qubits(%{{.*}}, %{{.*}}) param_map = {"my angle" = [0]} qubit_map = {"0" = [0], plain = [1]} : (i1, !quantum.bit, !quantum.bit)
+  %m, %out:2 = quantum.measurement "QuotedKeys"(%angle: f64) qubits(%q0, %q1)
+      param_map = {"my angle" = [0]} qubit_map = {"0" = [0], "plain" = [1]}
+      : (i1, !quantum.bit, !quantum.bit)
+  return %m, %out#0, %out#1 : i1, !quantum.bit, !quantum.bit
+}

@@ -632,6 +632,15 @@ func.func @operator_custom_registers_with_maps(%p0 : f64, %p1 : i64, %r : !quant
 
 // -----
 
+func.func @operator_custom_quoted_map_keys(%p0 : f64, %p1 : i64, %q0 : !quantum.bit, %q1 : !quantum.bit) {
+    %o0, %o1 = quantum.operator "custom_quoted_map_keys"(%p0 : f64, %p1 : i64) qubits(%q0, %q1)
+      param_map = {"my-param" = [0], "1" = [1]}
+      qubit_map = {"wire pair" = [0, 1]}
+    return
+}
+
+// -----
+
 func.func @operator_register_multi_index_entry(%r : !quantum.reg, %idx0 : tensor<2xi64>, %idx1 : tensor<1xi64>) {
     %out = quantum.operator "custom_multi_index_entry"()
       quregs(%r) indices(%idx0 : tensor<2xi64>, %idx1 : tensor<1xi64>)

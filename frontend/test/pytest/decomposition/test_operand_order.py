@@ -27,13 +27,14 @@ from operator2_dummy_gates import HybridOpArgs, hybrid_op_args_decomp
 from pennylane.decomposition import add_decomps, local_decomps, register_resources
 
 from catalyst.decomposition import GraphOpID
-from catalyst.decomposition.decomposition_rules import ordered_kwarg_names
-from catalyst.utils.exceptions import CompileError
+from catalyst.decomposition.rule_arguments import ordered_kwarg_names
+
+Operator = getattr(qp.core, "Operator2", None) or qp.core.Operator
 
 pytestmark = pytest.mark.usefixtures("use_capture")
 
 
-class ZetaAlphaOp(qp.core.Operator2):
+class ZetaAlphaOp(Operator):
     """Dynamic args declared in non-alphabetical order."""
 
     dynamic_argnames = ("zeta", "alpha")
@@ -52,7 +53,7 @@ def _zeta_alpha_rule(zeta, alpha, reg):
 add_decomps(ZetaAlphaOp, _zeta_alpha_rule)
 
 
-class XAOp(qp.core.Operator2):
+class XAOp(Operator):
     """Wire args declared in non-alphabetical order, with a static arg (so the GraphOpID has a UID)."""
 
     wire_argnames = ("x_wires", "a_wires")
@@ -70,7 +71,7 @@ def _xa_rule(x_wires, a_wires, label):  # pylint: disable=unused-argument
 add_decomps(XAOp, _xa_rule)
 
 
-class MySemiAdder(qp.core.Operator2):
+class MySemiAdder(Operator):
     """SemiAdder-like: wire args declared ``x, y, work`` (sorted order is ``work, x, y``)."""
 
     wire_argnames = ("x_wires", "y_wires", "work_wires")
@@ -91,7 +92,7 @@ def _xor_into_rule(x_wires, y_wires, work_wires):
 add_decomps(MySemiAdder, _xor_into_rule)
 
 
-class MyTrotterVibronic(qp.core.Operator2):
+class MyTrotterVibronic(Operator):
     """TrotterVibronic-like: unsorted wire args of distinct lengths, plus a dynamic and a static
     arg (so the GraphOpID carries a UID)."""
 
@@ -126,7 +127,7 @@ def _multi_register_rule(time, electronic_wires, vib_wires, cache_wires, num_ste
 add_decomps(MyTrotterVibronic, _multi_register_rule)
 
 
-class HybridLayoutOp(qp.core.Operator2):
+class HybridLayoutOp(Operator):
     """Every grouping rule at once: unsorted dynamic args, a hybrid wire arg declared between pure
     wire args (lowered after them), an empty pure wire arg, a nested operator (its wires are qubit
     operands) and a numeric hybrid arg (its leaves are params)."""
@@ -183,17 +184,7 @@ class TestExecution:
 
     @pytest.mark.parametrize(
         "collect_decomp_rules",
-        [
-            True,
-            pytest.param(
-                False,
-                marks=pytest.mark.xfail(
-                    reason="On-demand rules use separate JAX contexts and can produce duplicate symbols.",
-                    raises=CompileError,
-                    strict=True,
-                ),
-            ),
-        ],
+        [True, False],
         ids=["eager", "on-demand"],
     )
     def test_semiadder(self, collect_decomp_rules):

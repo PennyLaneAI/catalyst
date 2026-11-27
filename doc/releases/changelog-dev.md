@@ -904,6 +904,10 @@
   `to-ppr` and `catalyst.passes.to_ppr` remain available as deprecated aliases.
   [(#3020)](https://github.com/PennyLaneAI/catalyst/pull/3020)
 
+* Captured operators now use PennyLane's `Operator` class, formerly named `Operator2`, while
+  the legacy operation class is named `LegacyOperator`.
+  [(#3524)](https://github.com/PennyLaneAI/catalyst/pull/3524)
+
 * Catalyst now provides its own :func:`~.polynomial_extrapolate` and
   :func:`~.exponential_extrapolate` functions for use with :func:`~.mitigate_with_zne`, replacing
   ``pennylane.noise.poly_extrapolate`` and ``pennylane.noise.exponential_extrapolate``, which has been removed from PennyLane.
@@ -1573,6 +1577,9 @@
   - `qp.pauli_measure` and `qp.ops.PauliMeasure` bind to `MeasurementOp`, and `MeasurementOp` lowers
     into the PBC dialect via `to_ppr` or directly into the `PauliMeasure` QIR instruction.
     [(#3474)](https://github.com/PennyLaneAI/catalyst/pull/3474)
+  - `DecomposableGate` interface has been renamed to `DecomposableOp` interface, and does not inherit `QuantumGate`. It is a 
+    generic interface to register operations to the graph solver. `MeasurementOp` implements the `DecomposableOp` interface.
+    [(3504)](https://github.com/PennyLaneAI/catalyst/pull/3504)
 
 <h3>Documentation 📝</h3>
 

@@ -42,6 +42,8 @@ from catalyst.utils.callables import CatalystCallable
 from catalyst.utils.exceptions import AutoGraphError
 from catalyst.utils.patching import Patcher
 
+LegacyOperator = getattr(qp.operation, "LegacyOperator", None) or qp.operation.Operator
+
 __all__ = [
     "if_stmt",
     "for_stmt",
@@ -551,7 +553,7 @@ def converted_call(fn, args, kwargs, caller_fn_scope=None, options=None):
                 raise ValueError(f"{fn.__name__} requires at least one argument")
 
             # If first argument is already an operator, pass it through directly
-            if isinstance(args[0], qp.operation.Operator):
+            if isinstance(args[0], LegacyOperator):
                 return ag_converted_call(fn, args, kwargs, caller_fn_scope, options)
 
             # Otherwise, handle the callable case

@@ -49,7 +49,7 @@ from pennylane.measurements import (
     StateMP,
     VarianceMP,
 )
-from pennylane.operation import Operation, Operator, Wires
+from pennylane.operation import Operation, Wires
 from pennylane.ops import Adjoint, Controlled, ControlledOp, ControlledOp2
 
 import catalyst
@@ -118,6 +118,8 @@ from catalyst.jax_primitives import (
 from catalyst.tracing.contexts import EvaluationContext, EvaluationMode
 from catalyst.utils.exceptions import CompileError
 from catalyst.utils.patching import DictPatchWrapper, Patcher
+
+LegacyOperator = getattr(qp.operation, "LegacyOperator", None) or qp.operation.Operator
 
 logger = logging.getLogger(__name__)
 logger.addHandler(logging.NullHandler())
@@ -479,7 +481,7 @@ class HybridOpRegion:
 cached_vars = weakref.WeakKeyDictionary()
 
 
-class HybridOp(Operator):
+class HybridOp(LegacyOperator):
     """A base class for operations carrying nested regions. The class stores the information
     obtained in the process of classical tracing and required for the completion of the quantum
     tracing. The methods of this class describe various aspects of quantum tracing.
@@ -637,7 +639,7 @@ class HybridOp(Operator):
         raise NotImplementedError("HybridOp should implement trace")  # pragma: no cover
 
 
-def has_nested_tapes(op: Operator) -> bool:
+def has_nested_tapes(op: LegacyOperator) -> bool:
     """Detects if the PennyLane operation holds nested quantum tapes or not."""
     return (
         isinstance(op, HybridOp)
@@ -973,14 +975,14 @@ def insert_observable_wires_into_cache(qrp, wires, qubits):
 # pylint: disable=too-many-branches
 @debug_logger
 def trace_observables(
-    obs: Optional[Operator],
+    obs: Optional[LegacyOperator],
     qrp: QRegPromise,
     m_wires: Optional[qp.wires.Wires],
 ) -> Tuple[List[DynamicJaxprTracer], Optional[int]]:
     """Trace observables.
 
     Args:
-        obs (Operator): an observable operator
+        obs (LegacyOperator): an observable operator
         qrp (QRegPromise): Quantum register tracer with cached qubits
         m_wires (Optional[qp.wires.Wires]): the default wires to use for this measurement process
 

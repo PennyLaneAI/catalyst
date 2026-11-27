@@ -32,6 +32,8 @@ from catalyst.decomposition.type_utils import (
 from catalyst.from_plxpr.uid import generate_uid
 from catalyst.jax_extras.lowering import get_mlir_attribute_from_pyval, mlir_build_context
 
+Operator = getattr(qp.core, "Operator2", None) or qp.core.Operator
+
 _SPECIAL_LOWERINGS = {}
 
 # The work wires available to an operator's controls are spelled in its wire and static-data
@@ -77,7 +79,7 @@ def _is_wires(item) -> bool:
 
 def _is_op_or_wires(item) -> bool:
     """Return whether a pytree leaf is a nested operator or a group of wires."""
-    return isinstance(item, qp.core.Operator2) or _is_wires(item)
+    return isinstance(item, Operator) or _is_wires(item)
 
 
 def format_static_data_dict_for_id(static_data):
@@ -218,9 +220,9 @@ class GraphOpID:
 
     The types in the dynamic shape dictionary should be represented as a list of MLIR-style type annotations.
     The UID is computed from the shapes, dtypes and pytree structures of the `hybrid_args` of
-    the Operator2 instance.
+    the Operator instance.
 
-    For example, an Operator2 instance with class name `HybridOpArg`, taking in one float param
+    For example, an Operator instance with class name `HybridOpArg`, taking in one float param
     argument named `angle`, one wire argument named `cwires`, one static data argument
     `label="hello"`, and a computed UID of 10 would be parsed to the following graph op ID:
         HybridOpArg{angle:[tensor<f64>]}{cwires:1}{label = "hello"}[10]
@@ -238,20 +240,20 @@ class GraphOpID:
     will have different decomposition rules.
 
     Note that this function should not be updated without updating the corresponding methods on the
-    DecomposableGate interface in mlir/lib/quantum/IR/QuantumInterfaces.cpp and the corresponding
-    DecomposableGate interface in mlir/include/QRef/IR/QRefInterfaces.h.
+    DecomposableOp interface in mlir/lib/quantum/IR/QuantumInterfaces.cpp and the corresponding
+    DecomposableOp interface in mlir/include/QRef/IR/QRefInterfaces.h.
     """
 
-    def __init__(self, op: qp.core.Operator2):
+    def __init__(self, op: Operator):
         """Create a new GraphOpId."""
         assert isinstance(
-            op, qp.core.Operator2
-        ), f"Graph-based decomposition expects an Operator2 instance, got {op} of type {type(op)}"
+            op, Operator
+        ), f"Graph-based decomposition expects an Operator instance, got {op} of type {type(op)}"
         op, self.modifiers = ModifierState.peel_modifiers(op)
         self.op = op
         self.is_custom_op = self.parse_is_custom_op()
 
-        # Match Operator2 lowering and OperatorRegistry, including when op.name differs.
+        # Match Operator lowering and OperatorRegistry, including when op.name differs.
         self.operator_name = type(op).__name__
         self.dynamic_shape = self.parse_dynamic_shape()
         self.wire_lens = self.parse_wire_lens()
@@ -319,7 +321,7 @@ class GraphOpID:
         }
 
     def parse_extra_data(self):
-        """Return the UID computed from this Operator2 instance."""
+        """Return the UID computed from this Operator instance."""
         if self.op.static_args or self.op.hybrid_args:
             hybrid_lens = []
             hybrid_trees = []
@@ -353,7 +355,7 @@ class GraphOpID:
 
     def parse_is_custom_op(self) -> bool:
         """
-        Return whether the Operator2 instance is considered a custom op in MLIR.
+        Return whether the Operator instance is considered a custom op in MLIR.
 
         Defers to the same :func:`_is_custom_op` the lowering uses, so the two cannot drift. The
         lowering dispatches a special-lowered operator before reaching that check, so the extra
@@ -390,7 +392,7 @@ class GraphOpID:
         distributed over adjoint. They compose with the modifiers the operator carries itself, so
         an already-symbolic operator spells canonically instead of being wrapped twice.
 
-        NOTE: do not modify this method without also modifying the corresponding DecomposableGate
+        NOTE: do not modify this method without also modifying the corresponding DecomposableOp
         interface in MLIR.
         """
         return self._build_id(modifiers.compose(self.modifiers))
