@@ -18,7 +18,6 @@ from functools import singledispatchmethod
 
 import xdsl
 from pennylane.measurements import MeasurementProcess
-from pennylane.operation import LegacyOperator
 from xdsl.dialects import builtin, func
 from xdsl.ir import SSAValue
 
@@ -41,6 +40,7 @@ from catalyst.python_interface.dialects.quantum import (
 
 from .xdsl_conversion import dispatch_wires_extract, xdsl_to_qp_measurement, xdsl_to_qp_op
 
+LegacyOperator = getattr(qp.operation, "LegacyOperator", None) or qp.operation.Operator
 
 class QMLCollector:
     """Collects PennyLane ops and measurements from an xDSL module.

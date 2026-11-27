@@ -28,6 +28,8 @@ from pennylane.ops.op_math.controlled2 import ControlledOp2
 
 from catalyst.decomposition.type_utils import SerializedGraphOpID
 
+Operator = getattr(qp.core, "Operator2", None) or qp.core.Operator
+
 
 @dataclass(frozen=True)
 class ModifierState:
@@ -257,7 +259,7 @@ class ModifierState:
         return SerializedGraphOpID(op_name + op_id[len(prefix) :]), n_ctrl
 
     @staticmethod
-    def peel_modifiers(op: qp.core.Operator) -> tuple[qp.core.Operator, ModifierState]:
+    def peel_modifiers(op: Operator) -> tuple[Operator, ModifierState]:
         """Return the innermost base of ``op`` together with the modifiers wrapping it.
 
         A *generic* symbolic operator (``Adjoint2``/``ControlledOp2``, as opposed to a concrete

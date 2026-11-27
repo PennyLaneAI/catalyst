@@ -29,10 +29,12 @@ from pennylane.decomposition import add_decomps, local_decomps, register_resourc
 from catalyst.decomposition import GraphOpID
 from catalyst.decomposition.rule_arguments import ordered_kwarg_names
 
+Operator = getattr(qp.core, "Operator2", None) or qp.core.Operator
+
 pytestmark = pytest.mark.usefixtures("use_capture")
 
 
-class ZetaAlphaOp(qp.core.Operator):
+class ZetaAlphaOp(Operator):
     """Dynamic args declared in non-alphabetical order."""
 
     dynamic_argnames = ("zeta", "alpha")
@@ -51,7 +53,7 @@ def _zeta_alpha_rule(zeta, alpha, reg):
 add_decomps(ZetaAlphaOp, _zeta_alpha_rule)
 
 
-class XAOp(qp.core.Operator):
+class XAOp(Operator):
     """Wire args declared in non-alphabetical order, with a static arg (so the GraphOpID has a UID)."""
 
     wire_argnames = ("x_wires", "a_wires")
@@ -69,7 +71,7 @@ def _xa_rule(x_wires, a_wires, label):  # pylint: disable=unused-argument
 add_decomps(XAOp, _xa_rule)
 
 
-class MySemiAdder(qp.core.Operator):
+class MySemiAdder(Operator):
     """SemiAdder-like: wire args declared ``x, y, work`` (sorted order is ``work, x, y``)."""
 
     wire_argnames = ("x_wires", "y_wires", "work_wires")
@@ -90,7 +92,7 @@ def _xor_into_rule(x_wires, y_wires, work_wires):
 add_decomps(MySemiAdder, _xor_into_rule)
 
 
-class MyTrotterVibronic(qp.core.Operator):
+class MyTrotterVibronic(Operator):
     """TrotterVibronic-like: unsorted wire args of distinct lengths, plus a dynamic and a static
     arg (so the GraphOpID carries a UID)."""
 
@@ -125,7 +127,7 @@ def _multi_register_rule(time, electronic_wires, vib_wires, cache_wires, num_ste
 add_decomps(MyTrotterVibronic, _multi_register_rule)
 
 
-class HybridLayoutOp(qp.core.Operator):
+class HybridLayoutOp(Operator):
     """Every grouping rule at once: unsorted dynamic args, a hybrid wire arg declared between pure
     wire args (lowered after them), an empty pure wire arg, a nested operator (its wires are qubit
     operands) and a numeric hybrid arg (its leaves are params)."""

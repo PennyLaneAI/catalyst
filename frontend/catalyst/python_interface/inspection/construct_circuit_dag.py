@@ -26,7 +26,6 @@ from pennylane.measurements import (
     ProbabilityMP,
     VarianceMP,
 )
-from pennylane.operation import LegacyOperator
 from pennylane.ops import GlobalPhase
 from xdsl.dialects import builtin, func, scf
 from xdsl.ir import Block, Operation, Region
@@ -38,6 +37,8 @@ from catalyst.python_interface.inspection.xdsl_conversion import (
     xdsl_to_qp_measurement,
     xdsl_to_qp_op,
 )
+
+LegacyOperator = getattr(qp.operation, "LegacyOperator", None) or qp.operation.Operator
 
 # Defines a set of operations from the quantum dialect
 # that are not to be visualized (at the moment)

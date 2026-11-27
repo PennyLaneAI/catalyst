@@ -20,11 +20,13 @@ import jax
 import numpy as np
 import pennylane as qp
 from pennylane.devices.capabilities import DeviceCapabilities, OperatorProperties
-from pennylane.operation import LegacyOperator, Operation
+from pennylane.operation import Operation
 
 from catalyst.api_extensions import MidCircuitMeasure, MidCircuitPauliMeasure
 from catalyst.jax_tracer import HybridOp
 from catalyst.utils.exceptions import DifferentiableCompileError
+
+LegacyOperator = getattr(qp.operation, "LegacyOperator", None) or qp.operation.Operator
 
 EMPTY_PROPERTIES = OperatorProperties()
 

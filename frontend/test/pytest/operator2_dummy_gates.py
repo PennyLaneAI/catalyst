@@ -20,21 +20,23 @@ from collections import Counter
 
 import pennylane as qp
 
+Operator = getattr(qp.core, "Operator2", None) or qp.core.Operator
 
-class NoParams(qp.core.Operator):
+
+class NoParams(Operator):
     wire_argnames = ("reg",)
 
     def __init__(self, reg):
         super().__init__(reg=reg)
 
 
-class NoParamsCustomOp(qp.core.Operator):
+class NoParamsCustomOp(Operator):
 
     def __init__(self, wires):
         super().__init__(wires=wires)
 
 
-class SingleParam(qp.core.Operator):
+class SingleParam(Operator):
 
     dynamic_argnames = ("x",)
     wire_argnames = ("reg",)
@@ -43,7 +45,7 @@ class SingleParam(qp.core.Operator):
         super().__init__(x, reg=reg)
 
 
-class SingleParamCustomOp(qp.core.Operator):
+class SingleParamCustomOp(Operator):
 
     dynamic_argnames = ("x",)
 
@@ -51,7 +53,7 @@ class SingleParamCustomOp(qp.core.Operator):
         super().__init__(x, wires=wires)
 
 
-class CompilableData(qp.core.Operator):
+class CompilableData(Operator):
 
     compilable_argnames = ("a", "b", "thing")
 
@@ -59,7 +61,7 @@ class CompilableData(qp.core.Operator):
         super().__init__(a=a, b=b, thing=thing, wires=wires)
 
 
-class ArrayData(qp.core.Operator):
+class ArrayData(Operator):
 
     compilable_argnames = ("angles",)
 
@@ -67,7 +69,7 @@ class ArrayData(qp.core.Operator):
         super().__init__(angles=angles, wires=wires)
 
 
-class MultipleRegisters(qp.core.Operator):
+class MultipleRegisters(Operator):
 
     wire_argnames = ("reg1", "reg2")
 
@@ -75,7 +77,7 @@ class MultipleRegisters(qp.core.Operator):
         super().__init__(reg1=reg1, reg2=reg2)
 
 
-class MultiParams(qp.core.Operator):
+class MultiParams(Operator):
 
     dynamic_argnames = ("a", "b", "c")
     wire_argnames = ("reg",)
@@ -84,7 +86,7 @@ class MultiParams(qp.core.Operator):
         super().__init__(reg, a, b, c)
 
 
-class MultiParamsCustom(qp.core.Operator):
+class MultiParamsCustom(Operator):
 
     dynamic_argnames = ("a", "b", "c")
 
@@ -92,7 +94,7 @@ class MultiParamsCustom(qp.core.Operator):
         super().__init__(wires, a, b, c)
 
 
-class TestQubitUnitary(qp.core.Operator):
+class TestQubitUnitary(Operator):
 
     dynamic_argnames = ("matrix",)
 
@@ -100,7 +102,7 @@ class TestQubitUnitary(qp.core.Operator):
         super().__init__(matrix, wires)
 
 
-class StaticData(qp.core.Operator):
+class StaticData(Operator):
 
     static_argnames = ("label",)
     wire_argnames = ("reg",)
@@ -109,7 +111,7 @@ class StaticData(qp.core.Operator):
         super().__init__(label=label, reg=reg)
 
 
-class HybridWires(qp.core.Operator):
+class HybridWires(Operator):
 
     hybrid_argnames = ("cwires",)
     wire_argnames = ("cwires",)
@@ -118,7 +120,7 @@ class HybridWires(qp.core.Operator):
         super().__init__(cwires=cwires)
 
 
-class HybridNoOpArg(qp.core.Operator):
+class HybridNoOpArg(Operator):
 
     hybrid_argnames = ("angles",)
 
@@ -126,7 +128,7 @@ class HybridNoOpArg(qp.core.Operator):
         super().__init__(angles, wires)
 
 
-class HybridOpArg(qp.core.Operator):
+class HybridOpArg(Operator):
 
     dynamic_argnames = ("angle",)
     hybrid_argnames = ("op",)
@@ -137,7 +139,7 @@ class HybridOpArg(qp.core.Operator):
         super().__init__(angle, op, cwires, n_iters)
 
 
-class HybridOpArgs(qp.core.Operator):
+class HybridOpArgs(Operator):
     """A sequence of three operator-valued arguments."""
 
     hybrid_argnames = ("first_op", "second_op", "third_op")

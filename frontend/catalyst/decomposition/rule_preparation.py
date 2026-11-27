@@ -26,7 +26,7 @@ from dataclasses import dataclass
 
 import jax.numpy as jnp
 import pennylane as qp
-from pennylane.core.operator import Operator, abstractify
+from pennylane.core.operator import abstractify
 from pennylane.decomposition import DecompositionRule
 from pennylane.decomposition.utils import to_name
 
@@ -50,6 +50,8 @@ from catalyst.decomposition.rule_arguments import (
 from catalyst.decomposition.rule_lowering_warning import RuleLoweringWarning
 from catalyst.decomposition.type_utils import SerializedGraphOpID, _RuleBuilderArgs
 from catalyst.utils.exceptions import CompileError
+
+Operator = getattr(qp.core, "Operator2", None) or qp.core.Operator
 
 _NON_INVERTIBLE_RESOURCE_TYPES = (qp.ops.MidMeasure, qp.ops.PauliMeasure)
 

@@ -25,7 +25,6 @@ from typing import TYPE_CHECKING
 from pennylane import capture, ops
 from pennylane.ftqc.operations import RotXZX
 from pennylane.measurements import counts, expval, probs, sample, state, var
-from pennylane.operation import LegacyOperator
 from pennylane.ops import MidMeasure
 from pennylane.ops import __all__ as ops_all
 from pennylane.ops import measure
@@ -57,6 +56,8 @@ from catalyst.python_interface.dialects.quantum import (
     SetStateOp,
 )
 from catalyst.utils.patching import Patcher
+
+LegacyOperator = getattr(qp.operation, "LegacyOperator", None) or qp.operation.Operator
 
 if TYPE_CHECKING:
     from pennylane.measurements import MeasurementProcess

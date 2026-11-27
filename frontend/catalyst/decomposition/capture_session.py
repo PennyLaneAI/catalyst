@@ -19,12 +19,13 @@ from typing import Callable
 
 import pennylane as qp
 from jax.extend.core import ClosedJaxpr
-from pennylane.core import Operator
 from pennylane.core.operator import abstractify
 
 from catalyst.decomposition.graph_op_id import GraphOpID
 from catalyst.decomposition.modifier_state import ModifierState
 from catalyst.decomposition.type_utils import SerializedGraphOpID
+
+Operator = getattr(qp.core, "Operator2", None) or qp.core.Operator
 
 ResourceEntry = tuple[SerializedGraphOpID, int]
 

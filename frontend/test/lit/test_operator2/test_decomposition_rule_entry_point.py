@@ -36,12 +36,13 @@ from operator2_dummy_gates import (
     StaticData,
     StaticDataMultiReg,
 )
-from pennylane.core import Operator
 from pennylane.typing import Complex, Float, Int, Wire
 
 from catalyst.decomposition.on_demand_rules import (
     compile_on_demand_decomposition_rules,
 )
+
+Operator = getattr(qp.core, "Operator2", None) or qp.core.Operator
 
 
 def test_to_dynamic_argnames():
@@ -985,13 +986,13 @@ test_multiple_rules()
 def test_for_loop():
     """Test when the rule body has a for loop."""
 
-    class LayerRX(qp.core.Operator):
+    class LayerRX(Operator):
         dynamic_argnames = ("angles",)
 
         def __init__(self, angles, wires):
             super().__init__(angles, wires)
 
-    class TestRX(qp.core.Operator):
+    class TestRX(Operator):
         dynamic_argnames = ("theta",)
         wires_argnames = ("wires",)
         arg_specs = {"theta": Float, "wires": Wire[1]}

@@ -49,7 +49,7 @@ from pennylane.measurements import (
     StateMP,
     VarianceMP,
 )
-from pennylane.operation import LegacyOperator, Operation, Wires
+from pennylane.operation import Operation, Wires
 from pennylane.ops import Adjoint, Controlled, ControlledOp, ControlledOp2
 
 import catalyst
@@ -118,6 +118,8 @@ from catalyst.jax_primitives import (
 from catalyst.tracing.contexts import EvaluationContext, EvaluationMode
 from catalyst.utils.exceptions import CompileError
 from catalyst.utils.patching import DictPatchWrapper, Patcher
+
+LegacyOperator = getattr(qp.operation, "LegacyOperator", None) or qp.operation.Operator
 
 logger = logging.getLogger(__name__)
 logger.addHandler(logging.NullHandler())

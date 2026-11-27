@@ -19,9 +19,11 @@ import hashlib
 from functools import singledispatch
 from typing import Any
 
-from pennylane.core import Operator
+import pennylane as qp
 from pennylane.pytrees import PyTreeStructure
 from pennylane.wires import AbstractQubit
+
+Operator = getattr(qp.core, "Operator2", None) or qp.core.Operator
 
 
 def generate_uid(

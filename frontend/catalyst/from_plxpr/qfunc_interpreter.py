@@ -77,6 +77,8 @@ from catalyst.jax_primitives import (
 )
 from catalyst.utils.exceptions import CompileError
 
+LegacyOperator = getattr(qp.operation, "LegacyOperator", None) or qp.operation.Operator
+
 measurement_map = {
     qp.measurements.SampleMP: sample_p,
     qp.measurements.ExpectationMP: expval_p,
@@ -283,7 +285,7 @@ class PLxPRToQuantumJaxprInterpreter(PlxprInterpreter):
         mcm_mv = measurement.mv
         mcm_obs = measurement.obs
         mp_is_on_mcm = (mcm_mv is not None) or (
-            mcm_obs is not None and not isinstance(mcm_obs, qp.operation.LegacyOperator)
+            mcm_obs is not None and not isinstance(mcm_obs, LegacyOperator)
         )
 
         if mp_is_on_mcm:

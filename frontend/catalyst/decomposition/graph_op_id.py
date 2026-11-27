@@ -32,6 +32,8 @@ from catalyst.decomposition.type_utils import (
 from catalyst.from_plxpr.uid import generate_uid
 from catalyst.jax_extras.lowering import get_mlir_attribute_from_pyval, mlir_build_context
 
+Operator = getattr(qp.core, "Operator2", None) or qp.core.Operator
+
 _SPECIAL_LOWERINGS = {}
 
 # The work wires available to an operator's controls are spelled in its wire and static-data
@@ -77,7 +79,7 @@ def _is_wires(item) -> bool:
 
 def _is_op_or_wires(item) -> bool:
     """Return whether a pytree leaf is a nested operator or a group of wires."""
-    return isinstance(item, qp.core.Operator) or _is_wires(item)
+    return isinstance(item, Operator) or _is_wires(item)
 
 
 def format_static_data_dict_for_id(static_data):
@@ -242,10 +244,10 @@ class GraphOpID:
     DecomposableOp interface in mlir/include/QRef/IR/QRefInterfaces.h.
     """
 
-    def __init__(self, op: qp.core.Operator):
+    def __init__(self, op: Operator):
         """Create a new GraphOpId."""
         assert isinstance(
-            op, qp.core.Operator
+            op, Operator
         ), f"Graph-based decomposition expects an Operator instance, got {op} of type {type(op)}"
         op, self.modifiers = ModifierState.peel_modifiers(op)
         self.op = op

@@ -51,6 +51,8 @@ from catalyst.jax_tracer import HybridOpRegion, has_nested_tapes
 from catalyst.tracing.contexts import EvaluationContext
 from catalyst.utils.exceptions import CompileError
 
+LegacyOperator = getattr(qp.operation, "LegacyOperator", None) or qp.operation.Operator
+
 logger = logging.getLogger(__name__)
 logger.addHandler(logging.NullHandler())
 
@@ -269,7 +271,7 @@ def decompose_ops_to_unitary(tape, convert_to_matrix_ops):
 
 
 def catalyst_acceptance(
-    op: qp.operation.LegacyOperator, capabilities: DeviceCapabilities, grad_method: Union[str, None]
+    op: LegacyOperator, capabilities: DeviceCapabilities, grad_method: Union[str, None]
 ) -> Union[str, None]:
     """Check whether an Operator is supported and returns the name of the operation or None."""
 

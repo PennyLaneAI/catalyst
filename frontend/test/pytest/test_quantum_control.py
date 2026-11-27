@@ -38,9 +38,7 @@ from pennylane.core.qscript import QuantumScript
 from pennylane.core.queuing import AnnotatedQueue
 from pennylane.operation import (
     DecompositionUndefinedError,
-    LegacyOperator,
     Operation,
-    Operator,
     Wires,
 )
 from pennylane.ops.op_math.controlled import Controlled
@@ -50,6 +48,8 @@ from catalyst import ctrl as C_ctrl
 from catalyst import measure
 from catalyst.api_extensions.quantum_operators import HybridCtrl
 from catalyst.jax_tracer import HybridOpRegion
+
+LegacyOperator = getattr(qp.operation, "LegacyOperator", None) or qp.operation.Operator
 
 
 def verify_catalyst_ctrl_against_pennylane(
@@ -1582,7 +1582,7 @@ class TestDecomposition:
         base_op = base_cls(*params, wires=base_wires)
         op = C_ctrl(base_op, control=ctrl_wires, control_values=[False] * len(ctrl_wires))
 
-        if isinstance(base_op, Operator):
+        if isinstance(base_op, LegacyOperator):
             expected = [custom_ctrl_op(*params, wires=ctrl_wires + base_wires)]
 
         decomp = op.decomposition()

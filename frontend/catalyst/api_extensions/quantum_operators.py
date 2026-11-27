@@ -34,7 +34,6 @@ from pennylane import QueuingManager
 from pennylane.core.qscript import QuantumScript
 from pennylane.core.queuing import AnnotatedQueue
 from pennylane.decomposition.resources import resolve_work_wire_type
-from pennylane.operation import LegacyOperator, Operator
 from pennylane.ops.op_math.adjoint import create_adjoint_op
 from pennylane.ops.op_math.controlled import create_controlled_op, create_controlled_op2
 
@@ -56,6 +55,9 @@ from catalyst.jax_tracer import (
     trace_quantum_operations,
 )
 from catalyst.tracing.contexts import EvaluationContext
+
+LegacyOperator = getattr(qp.operation, "LegacyOperator", None) or qp.operation.Operator
+Operator = getattr(qp.core, "Operator2", None) or qp.core.Operator
 
 pl_adjoint_module = sys.modules["pennylane.ops.op_math.adjoint"]
 pl_ctrl_module = sys.modules["pennylane.ops.op_math.controlled"]

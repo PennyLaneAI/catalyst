@@ -26,12 +26,13 @@ import jax.numpy as jnp
 import numpy as np
 import pennylane as qp
 from jax import Array
-from pennylane.core.operator import Operator
 from pennylane.wires import Wires
 
 from catalyst.decomposition.graph_op_id import CTRL_WORK_WIRES
 from catalyst.decomposition.type_utils import get_dummy_values_for_dynamic_shape
 from catalyst.utils.exceptions import CompileError
+
+Operator = getattr(qp.core, "Operator2", None) or qp.core.Operator
 
 
 @dataclass(kw_only=True)
