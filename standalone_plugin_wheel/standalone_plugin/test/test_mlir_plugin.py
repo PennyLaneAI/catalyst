@@ -20,127 +20,26 @@ https://github.com/llvm/llvm-project/tree/main/mlir/examples/standalone
 import pennylane as qp
 import pytest
 
-from catalyst import pipeline
-from catalyst.passes import apply_pass, apply_pass_plugin
-
 have_standalone_plugin = True
 
-try:
-    from standalone_plugin import SwitchBarToFoo, getStandalonePluginAbsolutePath
-
-    plugin = getStandalonePluginAbsolutePath()
-except ImportError:
-    have_standalone_plugin = False
+from standalone_plugin import SwitchBarToFoo, getStandalonePluginAbsolutePath
 
 
-@pytest.mark.skipif(not have_standalone_plugin, reason="Standalone Plugin is not installed")
-def test_standalone_plugin():
-    """Generate MLIR for the standalone plugin. Do not execute code.
-    The code execution test is in the lit test. See that test
-    for more information as to why that is the case."""
+@pytest.mark.parametrize("capture", (True, False))
+def test_pass_automatically_adds_to_required_plugins(capture):
+    """Test that applying the pass from the plugin automatically adds
+    to the list of required plugins."""
 
-    @apply_pass("standalone-switch-bar-foo")
-    @qp.qnode(qp.device("lightning.qubit", wires=0))
-    def qnode():
-        return qp.state()
-
-    @qp.qjit(pass_plugins={plugin}, dialect_plugins={plugin}, target="mlir")
-    def module():
-        return qnode()
-
-    # It would be nice if we were able to combine lit tests with pytest
-    assert "standalone-switch-bar-foo" in module.mlir
-
-
-@pytest.mark.skipif(not have_standalone_plugin, reason="Standalone Plugin is not installed")
-def test_standalone_plugin_no_preregistration():
-    """Generate MLIR for the standalone plugin, no need to register the
-    plugin ahead of time in the qjit decorator"""
-
-    @apply_pass_plugin(plugin, "standalone-switch-bar-foo")
-    @qp.qnode(qp.device("lightning.qubit", wires=0))
-    def qnode():
-        return qp.state()
-
-    @qp.qjit(target="mlir")
-    def module():
-        return qnode()
-
-    # It would be nice if we were able to combine lit tests with
-    # pytest
-    assert "standalone-switch-bar-foo" in module.mlir
-
-
-@pytest.mark.skipif(not have_standalone_plugin, reason="Standalone Plugin is not installed")
-def test_standalone_plugin_no_preregistration_run():
-    """Execute the standalone plugin"""
-
-    @apply_pass_plugin(plugin, "standalone-switch-bar-foo")
-    @qp.qnode(qp.device("lightning.qubit", wires=0))
-    def qnode():
-        return qp.state()
-
-    @qp.qjit
-    def module():
-        return qnode()
-
-    module()
-
-    # It would be nice if we were able to combine lit tests with
-    # pytest
-    assert "standalone-switch-bar-foo" in module.mlir
-
-
-@pytest.mark.skipif(not have_standalone_plugin, reason="Standalone Plugin is not installed")
-def test_standalone_entry_point():
-    """Generate MLIR for the standalone plugin via entry-point"""
-
-    @apply_pass("standalone.standalone-switch-bar-foo")
-    @qp.qnode(qp.device("lightning.qubit", wires=0))
-    def qnode():
-        return qp.state()
-
-    @qp.qjit(target="mlir")
-    def module():
-        return qnode()
-
-    # It would be nice if we were able to combine lit tests with
-    # pytest
-    assert "standalone-switch-bar-foo" in module.mlir
-
-
-@pytest.mark.skipif(not have_standalone_plugin, reason="Standalone Plugin is not installed")
-def test_standalone_dictionary():
-    """Generate MLIR for the standalone plugin via entry-point"""
-
-    @pipeline({"standalone.standalone-switch-bar-foo": {}})
-    @qp.qnode(qp.device("lightning.qubit", wires=0))
-    def qnode():
-        return qp.state()
-
-    @qp.qjit(target="mlir")
-    def module():
-        return qnode()
-
-    # It would be nice if we were able to combine lit tests with
-    # pytest
-    assert "standalone-switch-bar-foo" in module.mlir
-
-
-@pytest.mark.skipif(not have_standalone_plugin, reason="Standalone Plugin is not installed")
-def test_standalone_plugin_decorator():
-    """Generate MLIR for the standalone plugin"""
-
+    @qp.qjit(capture=capture)
     @SwitchBarToFoo
-    @qp.qnode(qp.device("lightning.qubit", wires=0))
-    def qnode():
-        return qp.state()
+    @qp.qnode(qp.device("null.qubit", wires=1))
+    def c():
+        return qp.expval(qp.Z(0))
 
-    @qp.qjit(target="mlir")
-    def module():
-        return qnode()
+    assert c.compile_options.pass_plugins == {getStandalonePluginAbsolutePath()}
+    assert c.compile_options.dialect_plugins == {getStandalonePluginAbsolutePath()}
 
-    assert "standalone-switch-bar-foo" in module.mlir
+    assert 'transform.apply_registered_pass "standalone-switch-bar-foo"' in c.mlir
 
 
 if __name__ == "__main__":

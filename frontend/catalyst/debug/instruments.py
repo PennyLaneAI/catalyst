@@ -16,7 +16,6 @@
 Instrumentation module to report Catalyst & program performance.
 """
 
-import copy
 import datetime
 import functools
 import os
@@ -28,6 +27,11 @@ from contextlib import contextmanager
 
 # pylint: disable=f-string-without-interpolation,line-too-long
 # Tested in LIT test suite.
+
+# Column widths of the console output, shared with the compiler driver (mlir/include/Driver/Timer.h)
+# so that the lines printed by both line up.
+NAME_WIDTH = 32
+VALUE_WIDTH = 12
 # pragma: no cover
 
 
@@ -57,7 +61,7 @@ def instrumentation(session_name, filename=None, detailed=False):
     ...     expensive_function(1, 2)
     [DIAGNOSTICS] Running capture                   walltime: 3.299 ms      cputime: 3.294 ms       programsize: 0 lines
     [DIAGNOSTICS] Running generate_ir               walltime: 4.228 ms      cputime: 4.225 ms       programsize: 14 lines
-    [DIAGNOSTICS] Running compile                   walltime: 57.182 ms     cputime: 12.109 ms      programsize: 121 lines
+    [DIAGNOSTICS] Running compile                   walltime: 57.182 ms     cputime: 12.109 ms
     [DIAGNOSTICS] Running run                       walltime: 1.075 ms      cputime: 1.072 ms
 
     We can also write an instrumentation session to a YAML file:
@@ -84,7 +88,6 @@ def instrumentation(session_name, filename=None, detailed=False):
       - compile:
           walltime: 199.249725
           cputime: 38.820425
-          programsize: 121
       - run:
           walltime: 1.053613
           cputime: 1.019584
@@ -131,7 +134,7 @@ def instrument(fn=None, *, size_from=None, has_finegrained=False):
     [DIAGNOSTICS] Running expensive_function        walltime: 1.908 ms      cputime: 1.904 ms
     [DIAGNOSTICS] Running capture                   walltime: 6.691 ms      cputime: 6.686 ms       programsize: 5 lines
     [DIAGNOSTICS] Running generate_ir               walltime: 5.938 ms      cputime: 5.934 ms       programsize: 18 lines
-    [DIAGNOSTICS] Running compile                   walltime: 41.826 ms     cputime: 13.287 ms      programsize: 128 lines
+    [DIAGNOSTICS] Running compile                   walltime: 41.826 ms     cputime: 13.287 ms
     [DIAGNOSTICS] Running run                       walltime: 0.801 ms      cputime: 0.795 ms
     """
     if fn is None:
@@ -146,12 +149,14 @@ def instrument(fn=None, *, size_from=None, has_finegrained=False):
 
         with ResultReporter(stage_name, has_finegrained) as reporter:
             self = args[0]
-            orig = copy.deepcopy(self.compile_options)
+            orig_keep_intermediate = self.compile_options.keep_intermediate
             self.compile_options.keep_intermediate = True
-            fn_results, wall_time, cpu_time = time_function(fn, args, kwargs)
+            try:
+                fn_results, wall_time, cpu_time = time_function(fn, args, kwargs)
+            finally:
+                self.compile_options.keep_intermediate = orig_keep_intermediate
             program_size = measure_program_size(fn_results, size_from)
             reporter.commit_results(wall_time, cpu_time, program_size)
-            self.compile_options = orig
 
         return fn_results
 
@@ -243,14 +248,22 @@ class ResultReporter:
     def print_results(self, wall_time, cpu_time, program_size=None):
         """Print the provided results to console with some minor formatting."""
         if self.enable_finegrained:
-            print(f"[DIAGNOSTICS] > Total {self.stage_name.ljust(23)}", end="\t", file=sys.stderr)
+            print(
+                f"[DIAGNOSTICS] > Total {self.stage_name.ljust(NAME_WIDTH)}",
+                end="\t",
+                file=sys.stderr,
+            )
         else:
-            print(f"[DIAGNOSTICS] Running {self.stage_name.ljust(23)}", end="\t", file=sys.stderr)
+            print(
+                f"[DIAGNOSTICS] Running {self.stage_name.ljust(NAME_WIDTH)}",
+                end="\t",
+                file=sys.stderr,
+            )
 
-        formatted_wall_time = (str(wall_time // 1e3 / 1e3) + " ms").ljust(12)
+        formatted_wall_time = f"{wall_time / 1e6:.3f} ms".ljust(VALUE_WIDTH)
         print(f"walltime: {formatted_wall_time}", end="\t", file=sys.stderr)
 
-        formatted_cpu_time = (str(cpu_time // 1e3 / 1e3) + " ms").ljust(12)
+        formatted_cpu_time = f"{cpu_time / 1e6:.3f} ms".ljust(VALUE_WIDTH)
         print(f"cputime: {formatted_cpu_time}", end="\t", file=sys.stderr)
 
         if program_size is not None:

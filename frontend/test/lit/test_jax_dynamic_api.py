@@ -41,12 +41,13 @@ def test_qnode_dynamic_arg(a):
     """Test passing a dynamic argument to qnode"""
 
     # CHECK:       { lambda ; [[a:.]]:i64[] [[b:.]]:i64[[[a]]]. let
-    # CHECK:         [[c:.]]:i64[InDBIdx(val=0)] = quantum_kernel[
+    # CHECK:         [[c:.]]:f64[] = quantum_kernel[
     # CHECK:                                  ] [[a]] [[b]]
     # CHECK:       in ([[c]],) }
     @qp.qnode(qp.device("lightning.qubit", wires=1))
     def _circuit(a):
-        return a
+        qp.RX(jnp.sum(a), wires=0)
+        return qp.expval(qp.Z(0))
 
     return _circuit(a)
 
@@ -70,7 +71,8 @@ for capture in [True, False]:
 
 
 # CHECK-LABEL: test_qnode_dynamic_result
-@qjit
+# old_frontend: tests classical dynamically shaped QNode returns.
+@qjit(capture=False)
 def test_qnode_dynamic_result(a):
     """Test getting a dynamic result from qnode"""
 

@@ -29,11 +29,25 @@ For every nested `builtin.module` carrying a `catalyst.dispatch` attribute and a
    path.
 3. Erases the nested module from the host after its `catalyst.launch_kernel`s are rewritten.
 
-A `catalyst.custom_call` carrying a `dispatch` entry in its `backend_config` is rewritten into
-an `executor.call` on the resolved executor address.
-
 Session teardown is handled by the runtime, which closes every open session at process exit,
 so no explicit close op is emitted.
 
-The pass is a no-op when no `catalyst.dispatch` modules and no dispatch `catalyst.custom_call`
-ops are present.
+The pass is a no-op when no `catalyst.dispatch` modules are present.
+
+### `-lower-runtime-dispatch`
+
+_Lower dispatched `catalyst.runtime_call` ops to `executor.call`._
+
+Rewrites every `catalyst.runtime_call` carrying a `dispatch` attribute into an
+`executor.call` on that executor, marshalling the operands into the executor's flat wire
+layout on the way:
+
+* a scalar or `ptr` operand becomes a one-element tensor of its declared width,
+* a `str` from `c_strings` becomes a NUL-padded fixed-width constant tensor,
+* the declared result and each `out` buffer become results, the result first.
+
+An empty `dispatch` binds to the program's single executor, taken from the
+`catalyst.dispatch` attribute of the nested target modules.
+
+The pass runs before bufferization so the `executor.call` it emits is bufferized into its
+destination-passing form by one-shot bufferize.

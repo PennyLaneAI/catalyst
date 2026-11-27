@@ -16,30 +16,43 @@
 #include "nanobind/stl/string.h" // for type conversion
 
 #include <cstddef>
+#include <cstdint>
 #include <exception>
 #include <iostream>
 #include <string>
+#include <utility>
 
+#include "llvm/ADT/APFloat.h"
+#include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallString.h"
-#include "llvm/ADT/SmallVector.h"
+#include "llvm/ADT/StringExtras.h"
 #include "llvm/ADT/StringMap.h"
+#include "llvm/ADT/StringMapEntry.h"
 #include "llvm/ADT/StringRef.h"
+#include "llvm/ADT/StringSet.h"
+#include "llvm/ADT/Twine.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/Casting.h"
 #include "llvm/Support/DebugLog.h"
 #include "llvm/Support/raw_ostream.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/BuiltinAttributes.h"
+#include "mlir/IR/BuiltinTypeInterfaces.h"
 #include "mlir/IR/BuiltinTypes.h"
-#include "mlir/IR/TypeRange.h"
+#include "mlir/IR/OperationSupport.h"
 #include "mlir/IR/Types.h"
 #include "mlir/Support/DebugStringHelper.h"
 
 #include "Quantum/IR/QuantumInterfaces.h"
 #include "Quantum/IR/QuantumOps.h"
+#include "Quantum/Transforms/QPDLoader.h"
 
 #include "PythonDriverUtils.hpp"
+#include "StringConstants.h"
+#include "longobject.h"
+#include "pyerrors.h"
+#include "pytypedefs.h"
 
 #define DEBUG_TYPE "[QPD] "
 
@@ -47,42 +60,34 @@ namespace nb = nanobind;
 
 namespace {
 
-static nb::dict
-getPyvalFromDynamicShape(const llvm::StringMap<llvm::SmallVector<mlir::Type>> &map) {
+using catalyst::quantum::DecomposableOp;
+using BaseOperations = llvm::StringMap<DecomposableOp>;
+// The dicts below are built in operand order (Python dicts keep insertion order), which the
+// frontend uses as the operand layout of the rules it compiles. Do not reorder them.
+static nb::dict getPyvalFromDynamicShape(const catalyst::quantum::DynamicShape &dynamicShape) {
     nb::dict name_to_shape;
-    for (const auto &entry : map) {
-        nb::list types;
-        for (auto type : entry.getValue()) {
+    for (const auto &[name, types] : dynamicShape) {
+        nb::list pyTypes;
+        for (auto type : types) {
             if (!type) {
                 continue;
             }
             std::string typestr;
             llvm::raw_string_ostream ss(typestr);
             type.print(ss);
-            types.append(typestr);
+            pyTypes.append(typestr);
         }
-        name_to_shape[nb::str(entry.getKey().str().c_str())] = types;
+        name_to_shape[nb::str(name.c_str())] = pyTypes;
     }
     return name_to_shape;
 }
 
-static nb::dict getPyvalFromWireLens(const llvm::StringMap<size_t> map) {
+static nb::dict getPyvalFromWireLens(const catalyst::quantum::WireLens &wireLens) {
     nb::dict dict;
-    for (const auto &entry : map) {
-        dict[nb::str(entry.getKey().str().c_str())] = entry.getValue();
+    for (const auto &[name, len] : wireLens) {
+        dict[nb::str(name.c_str())] = len;
     }
     return dict;
-}
-
-static nb::object getPyvalFromTypeRange(mlir::TypeRange typerange) {
-    nb::list pyTypes;
-    for (auto type : typerange) {
-        std::string typestr;
-        llvm::raw_string_ostream ss(typestr);
-        type.print(ss);
-        pyTypes.append(typestr);
-    }
-    return pyTypes;
 }
 
 // Read an integer the way MLIR's own printer does, so a value that crosses into the frontend and is
@@ -176,6 +181,10 @@ static nb::object getPyvalFromDenseAttribute(mlir::DenseIntOrFPElementsAttr dens
 // Convert an MLIR attribute into an equivalent Python value. Generally should represent the
 // inverse of `get_mlir_attribute_from_pyval` from the frontend direction.
 static nb::object getPyvalFromMlirAttribute(mlir::Attribute attr) {
+    if (auto typeAttr = llvm::dyn_cast<mlir::TypeAttr>(attr);
+        typeAttr && llvm::isa<mlir::NoneType>(typeAttr.getValue())) {
+        return nb::none();
+    }
     return llvm::TypeSwitch<mlir::Attribute, nb::object>(attr)
         .Case<mlir::DictionaryAttr>([](auto dictAttr) {
             nb::dict outDict;
@@ -207,35 +216,119 @@ static nb::object getPyvalFromMlirAttribute(mlir::Attribute attr) {
         });
 }
 
+// Resource IDs can include modifiers inherited from regions and subroutine callers.
+static const llvm::StringMapEntry<DecomposableOp> &
+findBaseOperation(const std::string &opId, const BaseOperations &baseOps,
+                  const llvm::StringSet<> &opNames, const nb::object &parseId) {
+    for (const auto &name : opNames) {
+        try {
+            nb::tuple parsed(parseId(name.getKey().str(), opId));
+            auto match = baseOps.find(nb::cast<std::string>(parsed[0]));
+            if (match != baseOps.end()) {
+                return *match;
+            }
+        } catch (const nb::python_error &error) {
+            // A modified ID for another base name cannot be unwrapped.
+            if (!error.matches(PyExc_ValueError)) {
+                throw;
+            }
+        }
+    }
+    throw QuantumPythonDecompositions::QPDError("No operation matches resource graph ID " + opId);
+}
+
+static nb::dict getBaseMetadata(DecomposableOp op) {
+    auto dynamicShape = op.getDynamicShape();
+    // Control lowering can promote custom gates to OperatorOp, retaining numeric parameter names.
+    bool positionalParameters =
+        !dynamicShape.empty() && llvm::all_of(dynamicShape, [](const auto &parameter) {
+            return !parameter.first.empty() && llvm::all_of(parameter.first, llvm::isDigit);
+        });
+
+    // Cache only base arguments, independently of which modifier variant came first.
+    auto wireLens = op.getWireLens();
+    llvm::erase_if(wireLens,
+                   [](const auto &entry) { return entry.first == catalyst::CTRL_WORK_WIRES; });
+    mlir::NamedAttrList staticData(op.getStaticData());
+    staticData.erase(catalyst::CTRL_WORK_WIRE_TYPE);
+
+    nb::dict data;
+    data["op_name"] = nb::cast(op.getOperatorName());
+    data["dynamic_shape"] = getPyvalFromDynamicShape(dynamicShape);
+    data["wire_lens"] = getPyvalFromWireLens(wireLens);
+    data["static_data"] = getPyvalFromMlirAttribute(staticData.getDictionary(op->getContext()));
+    data["is_custom_op"] = nb::bool_(isa<catalyst::quantum::CustomOp>(op) || positionalParameters);
+    return data;
+}
+
+static nb::list buildRuleRequests(llvm::ArrayRef<DecomposableOp> ops,
+                                  llvm::ArrayRef<std::string> requestedIds,
+                                  const nb::object &parseId, std::string &tracingContext) {
+    // Index base identities once. The original operations supply operand order, which cannot
+    // be recovered from their sorted graph IDs.
+    BaseOperations baseOps;
+    llvm::StringSet<> opNames;
+    for (auto op : ops) {
+        baseOps.try_emplace(op.getGraphOpIdExplicitModifiers(false, 0, 0, false), op);
+        opNames.insert(op.getOperatorName());
+    }
+
+    llvm::StringMap<nb::dict> metadata;
+    nb::list requests;
+    for (const auto &opId : requestedIds) {
+        tracingContext = opId;
+        const auto &baseOp = findBaseOperation(opId, baseOps, opNames, parseId);
+        auto [entry, inserted] = metadata.try_emplace(baseOp.getKey());
+        if (inserted) {
+            entry->second = getBaseMetadata(baseOp.getValue());
+        }
+        // Modifier variants share cached metadata, but each request retains its full ID.
+        nb::dict request = nb::borrow<nb::dict>(entry->second.attr("copy")());
+        request["op_id"] = nb::cast(opId);
+        requests.append(request);
+    }
+    return requests;
+}
+
 } // namespace
 
-std::string pythonRuleLowering(catalyst::quantum::DecomposableGate op) {
-    QuantumPythonDecompositions::PyInterpreterGuard guard;
-    std::string mlirText = guard.withGil([&] -> std::string {
-        const char *moduleName = "catalyst.decomposition.decomposition_rules";
-        const char *functionName = "compile_reachable_decomposition_rules_wrapper";
+bool pythonRuleLowering(llvm::ArrayRef<catalyst::quantum::DecomposableOp> ops,
+                        llvm::ArrayRef<std::string> requestedIds,
+                        llvm::ArrayRef<mlir::DictionaryAttr> availableRules, std::string &mlirText,
+                        std::string &errorMessage) {
+    try {
+        QuantumPythonDecompositions::PyInterpreterGuard guard;
+        mlirText = guard.withGil([&] -> std::string {
+            const char *moduleName = "catalyst.decomposition.on_demand_rules";
+            const char *functionName = "compile_on_demand_decomposition_rules";
+            std::string tracingContext;
 
-        try {
-            auto tmp = op.getDynamicShape();
-            nb::module_ wrapperModule = nb::module_::import_(moduleName);
-            nb::object wrapperFunction = wrapperModule.attr(functionName);
+            try {
+                nb::module_ wrapperModule = nb::module_::import_(moduleName);
+                nb::object wrapperFunction = wrapperModule.attr(functionName);
 
-            nb::object pythonResult = wrapperFunction(
-                op.getOperatorName(), op.getGraphOpId(),
-                getPyvalFromDynamicShape(op.getDynamicShape()),
-                getPyvalFromWireLens(op.getWireLens()),
-                getPyvalFromMlirAttribute(op.getStaticData()), nb::arg("extra_data") = nb::none(),
-                nb::arg("is_custom_op") = isa<catalyst::quantum::CustomOp>(op));
-            return nb::borrow<nb::str>(pythonResult).c_str();
-        } catch (const nb::python_error &error) {
-            throw QuantumPythonDecompositions::TracingError(moduleName, functionName,
-                                                            op.getGraphOpId(), error.what());
-        } catch (const std::exception &error) {
-            throw;
-        }
-    });
+                nb::module_ modifierModule =
+                    nb::module_::import_("catalyst.decomposition.modifier_state");
+                nb::object parseId = modifierModule.attr("ModifierState").attr("from_graph_op_id");
+                nb::list requests = buildRuleRequests(ops, requestedIds, parseId, tracingContext);
 
-    return mlirText;
+                tracingContext = llvm::join(requestedIds, ", ");
+                nb::list availableEntries;
+                for (auto entry : availableRules) {
+                    availableEntries.append(getPyvalFromMlirAttribute(entry));
+                }
+                nb::object pythonResult = wrapperFunction(requests, availableEntries);
+                return nb::borrow<nb::str>(pythonResult).c_str();
+            } catch (const std::exception &error) {
+                throw QuantumPythonDecompositions::TracingError(moduleName, functionName,
+                                                                tracingContext, error.what());
+            }
+        });
+        return true;
+    } catch (const std::exception &error) {
+        errorMessage = error.what();
+        return false;
+    }
 }
 
 extern "C" __attribute__((visibility("default"))) void *getPythonRuleLoweringFunction() {

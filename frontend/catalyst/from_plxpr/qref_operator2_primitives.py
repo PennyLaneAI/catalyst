@@ -30,13 +30,18 @@ from pennylane.pytrees import unflatten
 # Catalyst's MLIR version and the MLIR version used by JAX. The current JAX version has not
 # yet updated to the latest MLIR, causing compatibility issues. This workaround will be removed
 # once JAX updates to a compatible MLIR version
-from catalyst.decomposition.graph_op_id import _SPECIAL_LOWERINGS, _is_custom_op
+from catalyst.decomposition.graph_op_id import (
+    _SPECIAL_LOWERINGS,
+    _is_custom_op,
+    _is_measurement_op,
+)
 from catalyst.jax_extras.lowering import get_mlir_attribute_from_pyval
 from catalyst.jax_extras.patches import mock_attributes
 from catalyst.jax_primitives import (
     extract_scalar,
     safe_cast_to_f64,
 )
+from catalyst.utils.exceptions import CompileError
 from catalyst.utils.extra_bindings import TensorExtractOp
 from catalyst.utils.patching import Patcher
 
@@ -54,8 +59,10 @@ with Patcher(
     ),
 ):
     from mlir_quantum.dialects.qref import (
+        CtrlOp,
         CustomOp,
         GlobalPhaseOp,
+        MeasurementOp,
         MultiRZOp,
         OperatorOp,
         PauliRotOp,
@@ -201,11 +208,42 @@ def _qref_operator_p_lowering(jax_ctx: mlir.LoweringRuleContext, *args, op_cls, 
     ctx.allow_unregistered_dialects = True
     _general_validation(*args, op_cls=op_cls, **kwargs)
 
+    n_ctrl_work_wires = kwargs.get("n_ctrl_work_wires", 0)
+    if n_ctrl_work_wires:
+        # Use the same qref.ctrl representation as a controlled callable. The compiler therefore
+        # resolves both forms through one path and produces the same quantum.operator wire groups.
+        n_ctrls = kwargs["n_ctrls"]
+        work_qubits = args[-n_ctrl_work_wires:]
+        without_work = args[:-n_ctrl_work_wires]
+        ctrl_qubits = without_work[-2 * n_ctrls : -n_ctrls]
+        ctrl_values = [
+            TensorExtractOp(ir.IntegerType.get_signless(1), val, []).result
+            for val in without_work[-n_ctrls:]
+        ]
+        base_args = without_work[: -2 * n_ctrls]
+        op = CtrlOp(
+            ctrl_qubits=ctrl_qubits,
+            ctrl_values=ctrl_values,
+            work_qubits=work_qubits,
+            work_wire_type=ir.StringAttr.get(kwargs["ctrl_work_wire_type"]),
+        )
+        ctrl_block = op.regions[0].blocks.append()
+        with ir.InsertionPoint(ctrl_block):
+            _qref_operator_p_lowering(
+                jax_ctx,
+                *base_args,
+                op_cls=op_cls,
+                **(kwargs | {"n_ctrls": 0, "n_ctrl_work_wires": 0}),
+            )
+        return []
+
     hybrid_lens = kwargs.pop("hybrid_lens")
     hybrid_trees = kwargs.pop("hybrid_trees")
     forward_mask = kwargs.pop("forward_mask")
     adjoint = kwargs.pop("adjoint")
     n_ctrls = kwargs.pop("n_ctrls")
+    kwargs.pop("n_ctrl_work_wires", 0)
+    kwargs.pop("ctrl_work_wire_type", None)
     wire_lens = kwargs.pop("wire_lens")
 
     repack_static_data = {k: unflatten(*v) for k, v in kwargs.items()}
@@ -269,6 +307,26 @@ def _qref_operator_p_lowering(jax_ctx: mlir.LoweringRuleContext, *args, op_cls, 
     qubits, qubit_map = _process_qubits(
         *args, op_cls=op_cls, wire_lens=wire_lens, hybrid_lens=hybrid_lens
     )
+
+    if _is_measurement_op(op_cls):
+        if adjoint or n_ctrls:
+            raise CompileError(
+                f"Mid-circuit measurement {op_cls.__name__} cannot be adjointed or controlled."
+            )
+        # Operator2 equations applied directly have no classical outputs. Measurement
+        # primitives that return outcomes use their specialized lowerings instead.
+        # MeasurementOp has no UID/forward channel; leave forward_args unused for now.
+        MeasurementOp(
+            mres=[],
+            op_name=name_attr,
+            params=params,
+            qubits=qubits,
+            arr_qubit_indices=[],
+            static_data=get_mlir_attribute_from_pyval(repack_static_data),
+            param_map=param_map,
+            qubit_map=qubit_map,
+        )
+        return []
 
     if op_cls.hybrid_argnames or op_cls.static_argnames:
         uid = generate_uid(

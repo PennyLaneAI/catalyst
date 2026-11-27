@@ -18,9 +18,9 @@ on:
 jobs:
   setup:
     name: Setup the release
-    runs-on:  
+    runs-on:
       group: 'PennyLaneAI-Static-IP-Runners'
-      labels: ['pl-2-core-gh-runner']   
+      labels: ['pl-2-core-gh-runner']
     steps:
     - name: Checkout Catalyst repo
       uses: actions/checkout@v4
@@ -47,7 +47,7 @@ jobs:
     needs: [setup]
     uses: ./.github/workflows/build-wheel-linux-x86_64.yaml
     with:
-      build_dev_package: true
+      build_dev_packages: true
 
   linux-aarch:
     if: ${{ inputs.build-linux-arm }}
@@ -60,7 +60,7 @@ jobs:
     needs: [setup]
     uses: ./.github/workflows/build-wheel-macos-arm64.yaml
     with:
-      build_dev_package: true
+      build_dev_packages: true
 
   upload:
     name: Prepare & Upload wheels to TestPyPI

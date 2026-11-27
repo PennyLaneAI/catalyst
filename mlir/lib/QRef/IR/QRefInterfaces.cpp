@@ -19,7 +19,7 @@
 #include <string>
 
 #include "llvm/ADT/STLExtras.h"
-#include "llvm/ADT/StringMap.h"
+#include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/raw_ostream.h"
 #include "mlir/IR/Attributes.h"
@@ -39,42 +39,46 @@ using namespace catalyst::qref;
 
 namespace {
 
+// Print the entries of a dynamic shape or wire lens sorted by name. The graphOpId is an identity,
+// so it must not depend on the operand order of the entries; it is also never used as a positional
+// order (the entries themselves are in operand order).
 template <typename T, typename PrintFunc>
-void printSortedMap(const llvm::StringMap<T> &map, llvm::raw_string_ostream &ss,
+void printSortedMap(llvm::ArrayRef<std::pair<std::string, T>> entries, llvm::raw_string_ostream &ss,
                     PrintFunc printValue) {
-    llvm::SmallVector<llvm::StringRef> keys;
-    for (const llvm::StringRef key : map.keys()) {
-        keys.push_back(key);
+    llvm::SmallVector<const std::pair<std::string, T> *> sorted;
+    for (const auto &entry : entries) {
+        sorted.push_back(&entry);
     }
-    llvm::sort(keys);
+    llvm::sort(sorted, [](const auto *lhs, const auto *rhs) { return lhs->first < rhs->first; });
 
     ss << "{";
-    for (auto [i, key] : llvm::enumerate(keys)) {
+    for (auto [i, entry] : llvm::enumerate(sorted)) {
         if (i > 0) {
             ss << ",";
         }
-        ss << key << ":";
-        printValue(map.lookup(key), ss);
+        ss << entry->first << ":";
+        printValue(entry->second, ss);
     }
     ss << "}";
 }
 
-void printDynamicShape(const llvm::StringMap<llvm::SmallVector<mlir::Type>> &map,
-                       llvm::raw_string_ostream &ss) {
-    printSortedMap(map, ss, [](const auto &types, llvm::raw_string_ostream &stream) {
-        stream << "[";
-        for (auto [j, type] : llvm::enumerate(types)) {
-            if (j > 0) {
-                stream << ",";
+void printDynamicShape(const DynamicShape &dynamicShape, llvm::raw_string_ostream &ss) {
+    printSortedMap<llvm::SmallVector<mlir::Type>>(
+        dynamicShape, ss, [](const auto &types, llvm::raw_string_ostream &stream) {
+            stream << "[";
+            for (auto [j, type] : llvm::enumerate(types)) {
+                if (j > 0) {
+                    stream << ",";
+                }
+                stream << type;
             }
-            stream << type;
-        }
-        stream << "]";
-    });
+            stream << "]";
+        });
 }
 
-void printWireLens(const llvm::StringMap<size_t> &map, llvm::raw_string_ostream &ss) {
-    printSortedMap(map, ss, [](size_t len, llvm::raw_string_ostream &stream) { stream << len; });
+void printWireLens(const WireLens &wireLens, llvm::raw_string_ostream &ss) {
+    printSortedMap<size_t>(wireLens, ss,
+                           [](size_t len, llvm::raw_string_ostream &stream) { stream << len; });
 }
 
 } // namespace
@@ -87,24 +91,23 @@ namespace catalyst {
 namespace qref {
 
 // Wrap an operator's base name with its op-level modifiers (name-wrap), so that `Op`,
-// `Adjoint(Op)`, `C(Op)`, and nested combinations like `C(Adjoint(Op))` are distinct graph
+// `Adjoint(Op)`, `<n>C(Op)`, and nested combinations like `<n>C(Adjoint(Op))` are distinct graph
 // identities. Modifiers are applied innermost-first in a canonical order (adjoint innermost,
-// control outermost) so a nested op has a single spelling.
+// control outermost) so a nested op has a single spelling. Specific control counts always
+// include the numeric prefix (including `1C`); `C` is reserved for generic control names.
 // An op that is both controlled and adjointed could otherwise be formed as
-// `C(Adjoint(Op))` or `Adjoint(C(Op))` which will produce two ids for one operator,
+// `<n>C(Adjoint(Op))` or `Adjoint(<n>C(Op))` which will produce two ids for one operator,
 // which would split the decomposition graph into two nodes and prevent rules from matching.
 // Always emitting the control-outermost form keeps such ops on a single node. The
 // caller appends the param/wire/static/uid groups. Extend this helper to support future op-level
-// modifiers, preserving the canonical order (mirror the Python side in decomposition_rules.py).
+// modifiers, preserving the canonical order (mirror the Python side in modifier_state.py).
 static std::string wrapModifiers(std::string name, Operation *op) {
     if (op->hasAttr("adjoint")) {
         name = "Adjoint(" + name + ")";
     }
     if (auto gate = mlir::dyn_cast<QuantumGate>(op)) {
         size_t numCtrl = gate.getCtrlQubitOperands().size();
-        if (numCtrl == 1) {
-            name = "C(" + name + ")";
-        } else if (numCtrl > 1) {
+        if (numCtrl > 0) {
             name = std::to_string(numCtrl) + "C(" + name + ")";
         }
     }
@@ -115,17 +118,23 @@ std::string defaultGetGraphOpId(Operation *op) {
     std::string out;
     llvm::raw_string_ostream ss(out);
 
-    DecomposableGate gate = cast<DecomposableGate>(op);
+    DecomposableOp decomposable = cast<DecomposableOp>(op);
 
-    // Fold op-level modifiers into the operator name so that `Op`, `Adjoint(Op)`, `C(Op)`, and
+    // Fold op-level modifiers into the operator name so that `Op`, `Adjoint(Op)`, `<n>C(Op)`, and
     // nested combinations are distinct in the graphOpId. Modifiers wrap only the name; the
-    // param/wire/static/uid groups follow, e.g. `C(Adjoint(Rot)){...}{wires...}`.
-    ss << wrapModifiers(gate.getOperatorName(), op);
-    printDynamicShape(gate.getDynamicShape(), ss);
-    printWireLens(gate.getWireLens(), ss);
-    gate.getStaticData().print(ss);
-    if (gate.getExtraData() != "") {
-        ss << '[' << gate.getExtraData() << ']';
+    // param/wire/static/uid groups follow, e.g. `<n>C(Adjoint(Rot)){...}{wires...}`.
+    // Non-modifiable ops (e.g. measurements) never carry adjoint/control; skip wrapping.
+    std::string name = decomposable.getOperatorName();
+    if (decomposable.isModifiable()) {
+        name = wrapModifiers(name, op);
+    }
+
+    ss << name;
+    printDynamicShape(decomposable.getDynamicShape(), ss);
+    printWireLens(decomposable.getWireLens(), ss);
+    decomposable.getStaticData().print(ss);
+    if (decomposable.getExtraData() != "") {
+        ss << '[' << decomposable.getExtraData() << ']';
     }
     ss.flush();
 

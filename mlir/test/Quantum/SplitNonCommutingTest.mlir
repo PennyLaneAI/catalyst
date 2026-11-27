@@ -273,7 +273,7 @@ module {
 
 // Test that an error is raised when a non-expval measurement is included in the return.
 // The split-to-single-terms sub-pass only supports quantum.expval;
-// all other MeasurementProcess ops cause a compile error.
+// all other TerminalMeasurement ops cause a compile error.
 
 // expected-error @below {{split-to-single-terms pass failed}}
 module {

@@ -1,0 +1,72 @@
+// Copyright 2026 Xanadu Quantum Technologies Inc.
+
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+
+//     http://www.apache.org/licenses/LICENSE-2.0
+
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+#pragma once
+
+#include <memory>
+#include <string>
+
+#include "llvm/ADT/ArrayRef.h"
+#include "llvm/ADT/StringRef.h"
+#include "llvm/ADT/StringSet.h"
+#include "mlir/IR/BuiltinOps.h"
+#include "mlir/IR/OwningOpRef.h"
+#include "mlir/Support/LLVM.h"
+
+#include "DGBuilder.hpp"
+
+namespace catalyst {
+namespace quantum {
+
+namespace GraphPrep {
+
+/**
+ * @brief Options shared by passes that build a decomposition graph.
+ *
+ * Necessary options for the preparation of a decomposition graph.
+ */
+struct PrepOptions {
+    llvm::ArrayRef<std::string> targetGateSetOption;
+    llvm::ArrayRef<std::string> fixedDecompsOption;
+    llvm::ArrayRef<std::string> excludeDecompsOption;
+    llvm::StringRef bytecodeRulesFile;
+    llvm::StringRef libQPDPath;
+    llvm::StringRef libpythonPath;
+};
+
+/**
+ * @brief Prepare a decomposition graph from a module.
+ *
+ * Gathers rules for the target gateset in addition to the passed in opIDs and builds a
+ * DecompositionGraph. Parsed library functions remain in ruleLibrary until the solver selects
+ * which rules to materialize.
+ *
+ * Returns nullptr on failure.
+ */
+std::unique_ptr<DecompGraph::Solver::DecompositionGraph>
+prepareGraph(mlir::ModuleOp module, llvm::ArrayRef<std::string> opIDs, const PrepOptions &opts,
+             mlir::OwningOpRef<mlir::ModuleOp> &ruleLibrary);
+
+/// The name in a graphOpId, with its op-level modifiers, e.g. "2C(RX)" in
+/// "2C(RX){0:[f64]}{wires:1}{}".
+llvm::StringRef getGraphOpName(llvm::StringRef id);
+
+/// Import selected library rules and their transitive function dependencies.
+mlir::LogicalResult materializeSelectedLibraryRules(mlir::ModuleOp module,
+                                                    mlir::ModuleOp ruleLibrary,
+                                                    const llvm::StringSet<> &selectedRules);
+
+} // namespace GraphPrep
+} // namespace quantum
+} // namespace catalyst

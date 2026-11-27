@@ -21,6 +21,7 @@
 #include "MBQC/IR/MBQCDialect.h"
 #include "PBC/IR/PBCDialect.h"
 #include "QRef/IR/QRefDialect.h"
+#include "Quantum/Transforms/PassesEnums.h"
 
 namespace catalyst {
 namespace quantum {

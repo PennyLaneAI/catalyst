@@ -14,33 +14,46 @@
 
 #define DEBUG_TYPE "reference-semantics-conversion"
 #define VALUE_SEMANTICS_GATE_OPS                                                                   \
-    quantum::QuantumOperation, quantum::MeasureOp, pbc::PPMeasurementOp, pbc::PPRotationOp,        \
-        pbc::SelectPPMeasurementOp, mbqc::MeasureInBasisOp
+    quantum::QuantumOperation, quantum::MeasureOp, quantum::MeasurementOp, pbc::PPMeasurementOp,   \
+        pbc::PPRotationOp, pbc::SelectPPMeasurementOp, mbqc::MeasureInBasisOp
 #define VALUE_SEMANTICS_OBSERVABLE_OPS                                                             \
     quantum::ComputationalBasisOp, quantum::HermitianOp, quantum::NamedObsOp
 
 #include "reference_semantics_conversion.h"
 
+#include <cassert>
+#include <cstddef>
 #include <cstdint>
 #include <optional>
 
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SCCIterator.h"
 #include "llvm/ADT/STLExtras.h"
-#include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/TypeSwitch.h"
-#include "llvm/Support/Debug.h"
-#include "llvm/Support/DebugLog.h"
+#include "llvm/Support/Casting.h"
 #include "mlir/Analysis/CallGraph.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
+#include "mlir/IR/Builders.h"
+#include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinTypeInterfaces.h"
+#include "mlir/IR/Location.h"
+#include "mlir/IR/OperationSupport.h"
+#include "mlir/IR/PatternMatch.h"
+#include "mlir/IR/SymbolTable.h"
+#include "mlir/IR/TypeRange.h"
+#include "mlir/IR/Types.h"
 #include "mlir/IR/Value.h"
+#include "mlir/IR/Visitors.h"
 #include "mlir/Pass/Pass.h"
+#include "mlir/Support/LLVM.h"
+#include "mlir/Support/LogicalResult.h"
+#include "mlir/Support/WalkResult.h"
 
 #include "MBQC/IR/MBQCOps.h"
 #include "PBC/IR/PBCOps.h"
+#include "QRef/IR/QRefDialect.h"
 #include "QRef/IR/QRefInterfaces.h"
 #include "QRef/IR/QRefOps.h"
 #include "QRef/IR/QRefTypes.h"
@@ -411,6 +424,14 @@ void handleMeasure(IRRewriter &builder, quantum::MeasureOp vMeasureOp, QubitValu
     erasureWorklist.push_back(vMeasureOp);
 }
 
+void handleMeasurement(IRRewriter &builder, quantum::MeasurementOp op, QubitValueTracker &tracker,
+                       SmallVector<Operation *> &erasureWorklist) {
+    auto refOp = migrateOpToReferenceSemantics<qref::MeasurementOp>(builder, op, tracker);
+    refOp->removeAttr("resultSegmentSizes");
+    builder.replaceAllUsesWith(op.getMres(), refOp.getMres());
+    erasureWorklist.push_back(op);
+}
+
 void handleMeasureInBasis(IRRewriter &builder, mbqc::MeasureInBasisOp vMeasureInBasisOp,
                           QubitValueTracker &tracker, SmallVector<Operation *> &erasureWorklist) {
     OpBuilder::InsertionGuard guard(builder);
@@ -470,11 +491,46 @@ void handlePBCQubitProducer(IRRewriter &builder, VOpTy vProducerOp, QubitValueTr
     erasureWorklist.push_back(vProducerOp);
 }
 
+/// The reference semantics type that the callee of `callOp` expects for each operand. Register
+/// arguments of subroutines are dynamic, see `handleSubroutine`.
+SmallVector<Type> getCalleeRArgTypes(func::CallOp callOp) {
+    auto callee =
+        SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(callOp, callOp.getCalleeAttr());
+    if (!callee) {
+        return {};
+    }
+    MLIRContext *ctx = callOp.getContext();
+    Type dynamicQregType = qref::QuregType::get(
+        ctx, IntegerAttr::get(IntegerType::get(ctx, 64), ShapedType::kDynamic));
+    SmallVector<Type> rArgTypes;
+    for (Type t : callee.getFunctionType().getInputs()) {
+        // Callees still in value semantics are converted after their callers.
+        rArgTypes.push_back(isa<quantum::QuregType>(t) ? dynamicQregType : t);
+    }
+    return rArgTypes;
+}
+
 void handleCall(IRRewriter &builder, func::CallOp callOp, QubitValueTracker &tracker,
                 SmallVector<Operation *> &erasureWorklist) {
     OpBuilder::InsertionGuard guard(builder);
 
+    SmallVector<Type> calleeRArgTypes = getCalleeRArgTypes(callOp);
     auto newCallOp = migrateOpToReferenceSemantics<func::CallOp>(builder, callOp, tracker);
+
+    // A subroutine takes registers of dynamic size, so a register of static size at the call site,
+    // e.g. `!qref.reg<3>`, is cast to the argument type `!qref.reg<?>`. The new call op has the
+    // same operands as the old one, in the same order.
+    {
+        builder.setInsertionPoint(newCallOp);
+        for (OpOperand &operand : newCallOp->getOpOperands()) {
+            Type argType = calleeRArgTypes[operand.getOperandNumber()];
+            Value rQreg = operand.get();
+            if (isa<qref::QuregType>(rQreg.getType()) && isa<qref::QuregType>(argType) &&
+                rQreg.getType() != argType) {
+                operand.set(qref::CastOp::create(builder, newCallOp.getLoc(), argType, rQreg));
+            }
+        }
+    }
 
     SmallVector<Value> oldClassicalResults;
     for (auto v : callOp.getResults()) {
@@ -491,24 +547,27 @@ void handleCall(IRRewriter &builder, func::CallOp callOp, QubitValueTracker &tra
 }
 
 void handleCompbasis(IRRewriter &builder, quantum::ComputationalBasisOp vCompbasisOp,
-                     QubitValueTracker &tracker) {
+                     QubitValueTracker &tracker, SmallVector<Operation *> &erasureWorklist) {
     auto rCompbasisOp =
         migrateOpToReferenceSemantics<qref::ComputationalBasisOp>(builder, vCompbasisOp, tracker);
-    builder.replaceOp(vCompbasisOp, rCompbasisOp);
+    builder.replaceAllOpUsesWith(vCompbasisOp, rCompbasisOp);
+    erasureWorklist.push_back(vCompbasisOp);
 }
 
 void handleNamedObs(IRRewriter &builder, quantum::NamedObsOp vNamedObsOp,
-                    QubitValueTracker &tracker) {
+                    QubitValueTracker &tracker, SmallVector<Operation *> &erasureWorklist) {
     auto rNamedObsOp =
         migrateOpToReferenceSemantics<qref::NamedObsOp>(builder, vNamedObsOp, tracker);
-    builder.replaceOp(vNamedObsOp, rNamedObsOp);
+    builder.replaceAllOpUsesWith(vNamedObsOp, rNamedObsOp);
+    erasureWorklist.push_back(vNamedObsOp);
 }
 
 void handleHermitian(IRRewriter &builder, quantum::HermitianOp vHermitianOp,
-                     QubitValueTracker &tracker) {
+                     QubitValueTracker &tracker, SmallVector<Operation *> &erasureWorklist) {
     auto rHermitianOp =
         migrateOpToReferenceSemantics<qref::HermitianOp>(builder, vHermitianOp, tracker);
-    builder.replaceOp(vHermitianOp, rHermitianOp);
+    builder.replaceAllOpUsesWith(vHermitianOp, rHermitianOp);
+    erasureWorklist.push_back(vHermitianOp);
 }
 
 void handleGraphStatePrep(IRRewriter &builder, mbqc::GraphStatePrepOp vGraphStatePrepOp,
@@ -583,7 +642,12 @@ void handleCtrl(IRRewriter &builder, quantum::CtrlOp vCtrlOp, QubitValueTracker 
     for (auto vCtrlQubit : vCtrlOp.getInCtrlQubits()) {
         rCtrlQubits.push_back(tracker.getRQubit(vCtrlQubit));
     }
-    auto rCtrlOp = qref::CtrlOp::create(builder, loc, rCtrlQubits, vCtrlOp.getInCtrlValues());
+    SmallVector<Value> rWorkQubits;
+    for (auto vWorkQubit : vCtrlOp.getInWorkQubits()) {
+        rWorkQubits.push_back(tracker.getRQubit(vWorkQubit));
+    }
+    auto rCtrlOp = qref::CtrlOp::create(builder, loc, rCtrlQubits, vCtrlOp.getInCtrlValues(),
+                                        rWorkQubits, vCtrlOp.getWorkWireType());
     builder.inlineRegionBefore(vCtrlOp.getRegion(), rCtrlOp.getRegion(), rCtrlOp.getRegion().end());
     handleRegion(builder, rCtrlOp.getRegion(), regionTracker);
     cascadeMapAhead(vCtrlOp, tracker);
@@ -650,6 +714,8 @@ void handleIf(IRRewriter &builder, scf::IfOp ifOp, QubitValueTracker &tracker,
     }
     auto newIfOp = scf::IfOp::create(builder, loc, classicalReturnTypes, ifOp.getCondition(),
                                      /*withElseRegion=*/hasElseRegion);
+    newIfOp->setDiscardableAttrs(ifOp->getDiscardableAttrDictionary());
+
     builder.eraseBlock(newIfOp.thenBlock());
     builder.inlineRegionBefore(ifOp.getThenRegion(), newIfOp.getThenRegion(),
                                newIfOp.getThenRegion().end());
@@ -685,6 +751,7 @@ void handleSwitch(IRRewriter &builder, scf::IndexSwitchOp switchOp, QubitValueTr
     auto newSwitchOp =
         scf::IndexSwitchOp::create(builder, loc, classicalReturnTypes, switchOp.getArg(),
                                    switchOp.getCases(), switchOp.getNumCases());
+    newSwitchOp->setDiscardableAttrs(switchOp->getDiscardableAttrDictionary());
 
     // Handle the default region
     // Cannot just use `cascadeMapAhead` util to update the outside flow, since switch op does not
@@ -757,6 +824,8 @@ void handleFor(IRRewriter &builder, scf::ForOp forOp, QubitValueTracker &tracker
     // Create the new for op and handle
     auto newLoop = scf::ForOp::create(builder, loc, forOp.getLowerBound(), forOp.getUpperBound(),
                                       forOp.getStep(), newIterArgs);
+    newLoop->setDiscardableAttrs(forOp->getDiscardableAttrDictionary());
+
     builder.eraseBlock(newLoop.getBody());
 
     builder.inlineRegionBefore(forOp.getRegion(), newLoop.getRegion(), newLoop.getRegion().end());
@@ -812,6 +881,7 @@ void handleWhile(IRRewriter &builder, scf::WhileOp whileOp, QubitValueTracker &t
 
     // Create the new while op
     auto newLoop = scf::WhileOp::create(builder, loc, newResultTypes, newBeforeArgs);
+    newLoop->setDiscardableAttrs(whileOp->getDiscardableAttrDictionary());
     builder.inlineRegionBefore(whileOp.getBefore(), newLoop.getBefore(), newLoop.getBefore().end());
     builder.inlineRegionBefore(whileOp.getAfter(), newLoop.getAfter(), newLoop.getAfter().end());
 
@@ -870,6 +940,7 @@ std::optional<SmallVector<Operation *>> handleRegion(IRRewriter &builder, Region
     assert(r.hasOneBlock() && "Expected region to have a single block");
     assert(r.front().getTerminator() && "Expected the region body to have a terminator");
 
+    // Do not erase operations during pre-order traversal (without producing a skip result)!
     SmallVector<Operation *> erasureWorklist;
     r.walk<WalkOrder::PreOrder>([&](Operation *op) {
         llvm::TypeSwitch<Operation *, void>(op)
@@ -888,11 +959,15 @@ std::optional<SmallVector<Operation *>> handleRegion(IRRewriter &builder, Region
                 [&](auto o) { handleGate(builder, o, tracker, erasureWorklist); })
             .Case<func::CallOp>([&](auto o) { handleCall(builder, o, tracker, erasureWorklist); })
             .Case<quantum::ComputationalBasisOp>(
-                [&](auto o) { handleCompbasis(builder, o, tracker); })
-            .Case<quantum::NamedObsOp>([&](auto o) { handleNamedObs(builder, o, tracker); })
-            .Case<quantum::HermitianOp>([&](auto o) { handleHermitian(builder, o, tracker); })
+                [&](auto o) { handleCompbasis(builder, o, tracker, erasureWorklist); })
+            .Case<quantum::NamedObsOp>(
+                [&](auto o) { handleNamedObs(builder, o, tracker, erasureWorklist); })
+            .Case<quantum::HermitianOp>(
+                [&](auto o) { handleHermitian(builder, o, tracker, erasureWorklist); })
             .Case<quantum::MeasureOp>(
                 [&](auto o) { handleMeasure(builder, o, tracker, erasureWorklist); })
+            .Case<quantum::MeasurementOp>(
+                [&](auto o) { handleMeasurement(builder, o, tracker, erasureWorklist); })
             .Case<mbqc::MeasureInBasisOp>(
                 [&](auto o) { handleMeasureInBasis(builder, o, tracker, erasureWorklist); })
             .Case<pbc::PPMeasurementOp>(
@@ -969,8 +1044,14 @@ bool funcOpHasValueSemanticsOps(func::FuncOp f) {
     return walkResult.wasInterrupted();
 }
 
-void handleSubroutine(IRRewriter &builder, func::FuncOp f,
-                      const SmallVector<IntegerAttr> &qregSizesAtCallsite) {
+/**
+ * @brief Convert a value semantics subroutine to reference semantics.
+ *
+ * Register arguments become `!qref.reg<?>`: a subroutine can be called with registers of
+ * different sizes, and a function has a single signature. Call sites cast their registers of
+ * static size to `!qref.reg<?>`, see `handleCall`.
+ */
+void handleSubroutine(IRRewriter &builder, func::FuncOp f) {
     MLIRContext *ctx = f.getContext();
     OpBuilder::InsertionGuard guard(builder);
     Location loc = f->getLoc();
@@ -984,7 +1065,6 @@ void handleSubroutine(IRRewriter &builder, func::FuncOp f,
     SmallVector<unsigned> newRargIndices;
     SmallVector<Value> oldVargs;
     size_t numNewArgsAdded = 0;
-    size_t qregSizeIdx = 0;
     for (auto [i, t] : llvm::enumerate(f.getFunctionType().getInputs())) {
         if (!isa<quantum::QubitType, quantum::QuregType>(t)) {
             continue;
@@ -995,11 +1075,8 @@ void handleSubroutine(IRRewriter &builder, func::FuncOp f,
             newRargIndices.push_back(i + (numNewArgsAdded++));
             oldVargs.push_back(f.getBody().front().getArgument(i));
         } else if (isa<quantum::QuregType>(t)) {
-            // Fallback to dynamic if there's no size deducible
-            IntegerAttr qregSize = qregSizeIdx < qregSizesAtCallsite.size()
-                                       ? qregSizesAtCallsite[qregSizeIdx++]
-                                       : builder.getI64IntegerAttr(ShapedType::kDynamic);
-            typesToInsertArgs.push_back(qref::QuregType::get(ctx, qregSize));
+            typesToInsertArgs.push_back(
+                qref::QuregType::get(ctx, builder.getI64IntegerAttr(ShapedType::kDynamic)));
             newRargIndices.push_back(i + (numNewArgsAdded++));
             oldVargs.push_back(f.getBody().front().getArgument(i));
         }
@@ -1035,25 +1112,6 @@ void handleSubroutine(IRRewriter &builder, func::FuncOp f,
         eraseArgsIndices[i] = isa<quantum::QuregType, quantum::QubitType>(argType);
     }
     assert(succeeded(f.eraseArguments(eraseArgsIndices)));
-}
-
-SmallVector<IntegerAttr> collectQregSizesAtCallsite(func::FuncOp subroutine, Operation *mod) {
-    SmallVector<IntegerAttr> qregSizesAtCallsite;
-    auto uses = SymbolTable::getSymbolUses(subroutine, mod);
-    if (uses) {
-        for (auto use : *uses) {
-            Operation *user = use.getUser();
-            if (auto callOp = dyn_cast<func::CallOp>(user)) {
-                for (Type t : callOp.getOperandTypes()) {
-                    if (auto qrefQuregType = dyn_cast<qref::QuregType>(t)) {
-                        qregSizesAtCallsite.push_back(qrefQuregType.getSize());
-                    }
-                }
-                break;
-            }
-        }
-    }
-    return qregSizesAtCallsite;
 }
 
 } // namespace
@@ -1121,16 +1179,15 @@ struct ReferenceSemanticsConversionPass
             subroutinesPostOrder.push_back(subroutine);
         }
 
-        // We want to handle the calls before the subroutines, so we know the register sizes on the
-        // subroutine qreg arg type
+        // Handle the callers before the subroutines: a call op looks up the value semantics
+        // signature of its callee to cast its register operands to the dynamic register arguments.
         // By default, scc iterates call graph in post order (callee before caller), so we reverse
         // the visit order.
         for (func::FuncOp subroutine : llvm::reverse(subroutinesPostOrder)) {
             if (failed(ensureNoScfUnsupportedOps(subroutine))) {
                 return signalPassFailure();
             }
-            QubitValueTracker tracker;
-            handleSubroutine(builder, subroutine, collectQregSizesAtCallsite(subroutine, mod));
+            handleSubroutine(builder, subroutine);
             if (failed(ensureNoValueSemanticsOps(subroutine))) {
                 subroutine.emitOpError(
                     "Detected remaining value semantics operations after conversion");

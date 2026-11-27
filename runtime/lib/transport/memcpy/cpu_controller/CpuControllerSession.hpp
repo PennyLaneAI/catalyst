@@ -20,6 +20,7 @@
 #include <string>
 #include <vector>
 
+#include "Frame.hpp"
 #include "MemcpyLink.hpp"
 #include "Transport.hpp"
 #include "WireProtocol.hpp"
@@ -29,7 +30,7 @@ namespace catalyst::transport::memcpy {
 class CpuControllerSession : public ControllerSession {
   public:
     explicit CpuControllerSession(const std::string &config = {})
-        : pair_key_(parse_pair_key(config)) {}
+        : pair_key_(parse_pair_key(config)), ring_(common::frame::geometry_from_config(config)) {}
     ~CpuControllerSession() override;
 
     // TransportSession
@@ -49,14 +50,18 @@ class CpuControllerSession : public ControllerSession {
     int kick(std::uint32_t work_item_idx = 0) override;
     void *data_slot() override;
     void write_data_slot(const void *src, std::uint64_t bytes, std::uint32_t decoder_id) override;
-    void *reply_slot() override { return local_reply_.addr; }
+    void *reply_slot() override { return reply_.empty() ? nullptr : reply_.data(); }
 
   private:
     std::string pair_key_;
+    /// The frame layout the paired coprocessor's ring uses; it bounds the committed sizes.
+    common::frame::RingGeometry ring_;
     std::shared_ptr<MemcpyLink> link_;
 
-    /// Reply buffer the paired coprocessor writes into during kick().
-    MemRegion local_reply_{};
+    /// Reply buffer the paired coprocessor writes into during kick(). commit_work_item() sizes it
+    /// to the committed out_bytes, and to at least one Payload, which reply_slot() readers may read
+    /// in full. The region provisioned through alloc_memory() and exchange_keys() is not used.
+    std::vector<std::byte> reply_;
 
     /// Owns the buffers backing MemRegions handed out by alloc_memory().
     std::vector<std::unique_ptr<std::byte[]>> caller_memory_regions_;
@@ -69,16 +74,14 @@ class CpuControllerSession : public ControllerSession {
 
     std::uint64_t in_bytes_ = sizeof(common::Payload::value);
     std::uint64_t out_bytes_ = sizeof(common::Payload::value);
-    std::uint64_t staged_bytes_ = 0;
+    /// Bytes write_data_slot() staged for the next kick(), or -1 if the caller wrote data_slot()
+    /// in place, which sends all in_bytes_.
+    std::int64_t staged_bytes_ = -1;
     std::uint64_t reply_bytes_ = 0;
     std::uint32_t decoder_id_ = 0;
 
     std::uint64_t kick_ns_ = 0;
     std::uint64_t rtt_ns_ = 0;
-
-    // Per-session round counter driving `Payload::seq_num`. Matches cpu_verbs's `next_send_`:
-    // the first kick sends seq_num=1, the second sends 2, etc. Reset on start().
-    std::uint64_t next_send_ = 0;
 };
 
 } // namespace catalyst::transport::memcpy

@@ -508,3 +508,39 @@ func.func @main(%i: i64, %j: i64) -> () attributes {quantum.node} {
     qref.dealloc %r3 : !qref.reg<3>
     return
 }
+
+
+// -----
+
+// Casts between register sizes have no counterpart in value semantics: the call sites pass the
+// cast register itself, and its uses after the calls see the updated register.
+
+// CHECK: func.func @test_cast_at_callsite(%arg0: i64, %arg1: !quantum.reg) -> !quantum.reg {
+// CHECK:     [[q:%.+]] = quantum.extract %arg1[%arg0] : !quantum.reg -> !quantum.bit
+// CHECK:     [[x:%.+]] = quantum.custom "PauliX"() [[q]] : !quantum.bit
+// CHECK:     [[r:%.+]] = quantum.insert %arg1[%arg0], [[x]] : !quantum.reg, !quantum.bit
+// CHECK:     return [[r]] : !quantum.reg
+func.func @test_cast_at_callsite(%r: !qref.reg<?>, %i: i64) {
+    %q = qref.get %r[%i] : !qref.reg<?>, i64 -> !qref.bit
+    qref.custom "PauliX"() %q : !qref.bit
+    return
+}
+
+// CHECK: func.func @main(%arg0: i64) -> !quantum.obs attributes {quantum.node} {
+// CHECK-NOT: qref.cast
+// CHECK:     [[r:%.+]] = quantum.alloc( 3) : !quantum.reg
+// CHECK:     [[first_call:%.+]] = call @test_cast_at_callsite(%arg0, [[r]]) : (i64, !quantum.reg) -> !quantum.reg
+// CHECK:     [[second_call:%.+]] = call @test_cast_at_callsite(%arg0, [[first_call]]) : (i64, !quantum.reg) -> !quantum.reg
+// CHECK:     [[obs:%.+]] = quantum.compbasis qreg [[second_call]] : !quantum.obs
+// CHECK:     quantum.dealloc [[second_call]] : !quantum.reg
+// CHECK:     return [[obs]] : !quantum.obs
+func.func @main(%i: i64) -> !quantum.obs attributes {quantum.node} {
+    %r = qref.alloc(3) : !qref.reg<3>
+    %r_dyn = qref.cast %r : !qref.reg<3> to !qref.reg<?>
+    func.call @test_cast_at_callsite(%r_dyn, %i) : (!qref.reg<?>, i64) -> ()
+    %r_dyn2 = qref.cast %r : !qref.reg<3> to !qref.reg<?>
+    func.call @test_cast_at_callsite(%r_dyn2, %i) : (!qref.reg<?>, i64) -> ()
+    %obs = qref.compbasis (qreg %r : !qref.reg<3>) : !quantum.obs
+    qref.dealloc %r : !qref.reg<3>
+    return %obs : !quantum.obs
+}

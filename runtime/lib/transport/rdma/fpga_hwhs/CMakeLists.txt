@@ -22,3 +22,6 @@ add_library(catalyst_transport_hwhs_controller SHARED HwhsBackend.cpp)
 set_target_properties(catalyst_transport_hwhs_controller PROPERTIES PREFIX "lib")
 target_link_libraries(catalyst_transport_hwhs_controller PRIVATE hwhs_controller_session)
 set_property(TARGET catalyst_transport_hwhs_controller PROPERTY POSITION_INDEPENDENT_CODE ON)
+
+# hwhs_controller_session is SHARED, so it has to travel with the controller.
+catalyst_runtime_install(catalyst_transport_hwhs_controller hwhs_controller_session)

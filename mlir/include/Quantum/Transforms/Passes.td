@@ -16,6 +16,17 @@
 #define QUANTUM_PASSES
 
 include "mlir/Pass/PassBase.td"
+include "mlir/IR/EnumAttr.td"
+
+def GridsynthMethod : I32EnumAttr<"GridsynthMethod", "Synthesis method of the gridsynth pass",
+    [
+        I32EnumAttrCase<"Deterministic", 0, "deterministic">,
+        I32EnumAttrCase<"Mixed", 1, "mixed">,
+        I32EnumAttrCase<"MixedFallback", 2, "mixed-fallback">,
+    ]> {
+    let cppNamespace = "catalyst::quantum";
+    let genSpecializedAttr = 0;
+}
 
 def QuantumConversionPass : Pass<"convert-quantum-to-llvm"> {
     let summary = "Perform a dialect conversion from Quantum to LLVM (QIR).";
@@ -145,6 +156,15 @@ def CancelInversesPass : Pass<"cancel-inverses"> {
 
 def GridsynthPass : Pass<"gridsynth"> {
     let summary = "Perform Ross-Selinger/Gridsynth decomposition.";
+    let description = [{
+        Discretizes single-qubit RZ and PhaseShift gates, and PPR-Z rotations with an arbitrary
+        angle, at execution time. The pass fails on controlled RZ and PhaseShift gates, which need
+        to be decomposed into single-qubit rotations first.
+
+        With `method=mixed-fallback`, each rotation allocates an ancilla qubit, measures it and
+        releases it, and applies the fallback sequence inside an `scf.if` on the measurement
+        result.
+    }];
 
     let options = [Option<
         /*C++ var name=*/"epsilon",
@@ -157,7 +177,21 @@ def GridsynthPass : Pass<"gridsynth"> {
         /*CLI name=*/"ppr-basis",
         /*Type=*/"bool",
         /*Default=*/"false",
-        /*Description=*/desc="Whether to decompose into the PPR basis set instead of the standard Clifford+T basis set.">,];
+        /*Description=*/desc="Whether to decompose into the PPR basis set instead of the standard Clifford+T basis set.">,
+        Option<
+        /*C++ var name=*/"method",
+        /*CLI name=*/"method",
+        /*Type=*/"::catalyst::quantum::GridsynthMethod",
+        /*Default=*/"::catalyst::quantum::GridsynthMethod::Deterministic",
+        /*Description=*/desc="Synthesis method. 'mixed' and 'mixed-fallback' are cheaper but match the accuracy of 'deterministic' only on average over samples.",
+        /*Additional flags=*/additionalFlags=[{::llvm::cl::values(
+            clEnumValN(::catalyst::quantum::GridsynthMethod::Deterministic, "deterministic",
+                       "A single Ross-Selinger sequence per rotation."),
+            clEnumValN(::catalyst::quantum::GridsynthMethod::Mixed, "mixed",
+                       "A probabilistic mixture of Ross-Selinger sequences for under- and over-rotations."),
+            clEnumValN(::catalyst::quantum::GridsynthMethod::MixedFallback, "mixed-fallback",
+                       "A probabilistic mixture of projective rotations on an ancilla, with a mixed fallback on failure.")
+        )}]>,];
 
         let dependentDialects = [
         "memref::MemRefDialect",
@@ -187,12 +221,107 @@ def GraphDecompositionPass : Pass<"graph-decomposition", "mlir::ModuleOp"> {
             /*Type*/"std::string",
             /*Description*/"Maps an operator to a decomposition rule that will be applied.">,
         ListOption<
-            /*C++ name*/"altDecompsOption",
-            /*CLI name*/"alt-decomps",
+            /*C++ name*/"excludeDecompsOption",
+            /*CLI name*/"exclude-decomps",
             /*Type*/"std::string",
             /*Description*/
-            "Maps an operator to a list of alternative decomposition rules that will be considered"
-            " alongside any built-in rules for the operator.">,
+            "Maps an operator to a list of decomposition rules to exclude from the graph."
+            " The rules remain available for subsequent passes.">,
+        Option<
+            /*C++ name*/"bytecodeRulesFile",
+            /*CLI name*/"bytecode-rules",
+            /*Type*/"std::string",
+            /*Default*/[{ "" }],
+            /*Description*/"A path to a bytecode file of compiled decomposition rules.">,
+        Option<
+            /*C++ name*/"libQPDPath",
+            /*CLI name*/"libQPD-path",
+            /*Type*/"std::string",
+            /*Default*/[{ "" }],
+            /*Description*/"A path to the QuantumPythonDecompositions dynamic library.">,
+        Option<
+            /*C++ name*/"libpythonPath",
+            /*CLI name*/"libpython-path",
+            /*Type*/"std::string",
+            /*Default*/[{ "" }],
+            /*Description*/"A path to the python shared library.">,
+        Option<
+            /*C++ name*/"verboseOption",
+            /*CLI name*/"verbose",
+            /*Type*/"bool",
+            /*Default*/[{ false }],
+            /*Description*/"Print the decomposition rule chosen for each operator to stderr.">,
+        Option<
+            /*C++ name*/"inlineRuleBody",
+            /*CLI name*/"inline-rule-body",
+            /*Type*/"bool",
+            /*Default*/[{ false }],
+            /*Description*/"Whether to inline the rule body. Defaults to false.">
+    ];
+
+    let dependentDialects = [
+        "memref::MemRefDialect",
+        "func::FuncDialect",
+        "scf::SCFDialect",
+        "LLVM::LLVMDialect",
+        "stablehlo::StablehloDialect",
+        "tensor::TensorDialect",
+        "catalyst::CatalystDialect",
+        "catalyst::qref::QRefDialect",
+        "catalyst::pbc::PBCDialect",
+        "catalyst::mbqc::MBQCDialect",
+    ];
+}
+
+def ResourceEstimatePass : Pass<"resource-estimate", "mlir::ModuleOp"> {
+    let summary = "Estimate resources by projecting gate counts onto a target gate set.";
+    let description = [{
+        Runs resource analysis to collect the graph op ids reached from the entry function, then
+        solves the decomposition graph for the target gate set like `graph-decomposition`, but
+        without applying the chosen rules. In each function's resources (including modifier
+        contexts such as `A_foo` and `2C_foo`), every gate is replaced with the basis gates of its
+        chosen rule, scaled by the gate's count. Function calls, measurements, classical
+        instructions and qubit counts are kept unchanged.
+
+        Basis gates are recorded with -1 wires and params, as these cannot be reliably recovered
+        from a graph op id. Ops without an entry in the solution are counted under their own name.
+
+        Usage:
+            quantum-opt input.mlir -resource-estimate='output-json=True gate-set=RX=1.0,RZ=1.0'
+    }];
+
+    let options = [
+        Option<
+            /*C++ var name=*/"outputJson",
+            /*CLI arg name=*/"output-json",
+            /*type=*/"bool",
+            /*default=*/"false",
+            /*description=*/"Output resource counts as JSON. Prints to stdout unless output-fname is set"
+        >,
+        Option<
+            /*C++ var name=*/"outputFname",
+            /*CLI arg name=*/"output-fname",
+            /*type=*/"std::string",
+            /*default=*/"",
+            /*description=*/"The filename to save the output JSON to (only when output-json is true)"
+        >,
+        ListOption<
+            /*C++ name*/"targetGateSetOption",
+            /*CLI name*/"gate-set",
+            /*Type*/"std::string",
+            /*Description*/"The accepted gates to decompose to.">,
+        ListOption<
+            /*C++ name*/"fixedDecompsOption",
+            /*CLI name*/"fixed-decomps",
+            /*Type*/"std::string",
+            /*Description*/"Maps an operator to a decomposition rule that will be applied.">,
+        ListOption<
+            /*C++ name*/"excludeDecompsOption",
+            /*CLI name*/"exclude-decomps",
+            /*Type*/"std::string",
+            /*Description*/
+            "Maps an operator to a list of decomposition rules to exclude from the graph."
+            " The rules remain available for subsequent passes.">,
         Option<
             /*C++ name*/"bytecodeRulesFile",
             /*CLI name*/"bytecode-rules",

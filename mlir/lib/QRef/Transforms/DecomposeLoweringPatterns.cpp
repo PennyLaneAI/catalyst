@@ -16,6 +16,7 @@
 #include <cstddef>
 #include <string>
 
+#include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/StringMap.h"
 #include "llvm/ADT/StringSet.h"
@@ -27,6 +28,7 @@
 #include "mlir/IR/MLIRContext.h"
 #include "mlir/IR/Operation.h"
 #include "mlir/IR/PatternMatch.h"
+#include "mlir/IR/SymbolTable.h"
 #include "mlir/IR/Types.h"
 #include "mlir/IR/Value.h"
 #include "mlir/IR/ValueRange.h"
@@ -34,6 +36,7 @@
 #include "mlir/Support/LogicalResult.h"
 
 #include "QRef/IR/QRefInterfaces.h"
+#include "QRef/IR/QRefOps.h"
 #include "QRef/IR/QRefTypes.h"
 #include "QRef/Transforms/Patterns.h"
 
@@ -48,12 +51,32 @@ namespace catalyst {
 namespace qref {
 
 /**
+ * @brief Cast the register operands of a rule call to the register types of the rule arguments.
+ *
+ * Calls must match the signature of their callee, but a register of static size, e.g.
+ * `!qref.reg<3>`, is passed to a rule argument of dynamic size, `!qref.reg<?>`. A `qref.cast` is
+ * inserted at the rewriter's insertion point for each such operand.
+ */
+void castQregOperandsToArgTypes(PatternRewriter &rewriter, Location loc,
+                                SmallVector<Value> &operands, TypeRange argTypes) {
+    if (operands.size() != argTypes.size()) {
+        return;
+    }
+    for (auto [operand, argType] : llvm::zip_equal(operands, argTypes)) {
+        if (isa<qref::QuregType>(operand.getType()) && isa<qref::QuregType>(argType) &&
+            operand.getType() != argType) {
+            operand = qref::CastOp::create(rewriter, loc, argType, operand);
+        }
+    }
+}
+
+/**
  * @brief
  * Inline the body of `rule` at `rewriter`'s current insertion point, using `operands` to
  * replace the parameters of `rule` and returning the results. `rewriter`'s insertion point will be
  * moved to the end of the inlined function body.
  */
-void inlineRuleBody(PatternRewriter &rewriter, func::FuncOp rule, ValueRange operands) {
+void inlineRule(PatternRewriter &rewriter, func::FuncOp rule, ValueRange operands) {
     assert(rule.getBlocks().size() == 1);
     Block &body = rule.front();
 
@@ -65,23 +88,69 @@ void inlineRuleBody(PatternRewriter &rewriter, func::FuncOp rule, ValueRange ope
     }
 }
 
-struct DecomposableGatePattern final : public OpInterfaceRewritePattern<DecomposableGate> {
+// Clone a rule function and create a call to the clone
+func::CallOp cloneAndCallRule(PatternRewriter &rewriter, func::FuncOp originalRule,
+                              ValueRange operands, SymbolTable &moduleSymbolTable,
+                              llvm::DenseMap<func::FuncOp, func::FuncOp> &rulesToClonedFuncs) {
+    Location loc = originalRule.getLoc();
+
+    // Already cloned before, just create a call
+    if (rulesToClonedFuncs.contains(originalRule)) {
+        return func::CallOp::create(rewriter, loc, rulesToClonedFuncs[originalRule], operands);
+    }
+
+    // First encounter, need to clone and call
+    func::FuncOp clonedFunc;
+    {
+        // Only the function cloning needs to change insertion point:
+        // the call to the clone needs to happen at where the gate op originally was
+        OpBuilder::InsertionGuard guard(rewriter);
+        auto module = cast<ModuleOp>(moduleSymbolTable.getOp());
+        rewriter.setInsertionPointToEnd(module.getBody());
+
+        // IR modifications in a rewrite pattern must go through the rewriter, so it can
+        // record the changes and rewrite until fixed point
+        // Then, insert into the symbol table to resolve naming collisions
+        clonedFunc = cast<func::FuncOp>(rewriter.clone(*originalRule));
+    }
+
+    // The clones are not rules in the decomp graph: they are just functions to be called
+    // by the main circuit, and must not interfere with potential future graph solutions
+    clonedFunc.setVisibility(SymbolTable::Visibility::Private);
+    clonedFunc->removeAttr("frontend_name");
+    clonedFunc->removeAttr("target_gate");
+    clonedFunc->removeAttr("resources");
+    moduleSymbolTable.insert(clonedFunc);
+
+    rulesToClonedFuncs[originalRule] = clonedFunc;
+    return func::CallOp::create(rewriter, loc, clonedFunc, operands);
+}
+
+struct DecomposableOpPattern final : public OpInterfaceRewritePattern<DecomposableOp> {
   private:
     const llvm::StringMap<func::FuncOp> &decompositionRegistry;
+    bool inlineRuleBody;
     const llvm::StringSet<llvm::MallocAllocator> &targetGateSet;
+    SymbolTable &moduleSymbolTable;
+    mutable llvm::DenseMap<func::FuncOp, func::FuncOp> rulesToClonedFuncs;
 
   public:
-    DecomposableGatePattern(MLIRContext *context, const llvm::StringMap<func::FuncOp> &registry,
-                            const llvm::StringSet<llvm::MallocAllocator> &gateSet)
-        : OpInterfaceRewritePattern<DecomposableGate>(context), decompositionRegistry(registry),
-          targetGateSet(gateSet) {}
+    DecomposableOpPattern(MLIRContext *context, const llvm::StringMap<func::FuncOp> &registry,
+                          bool inlineRule, const llvm::StringSet<llvm::MallocAllocator> &gateSet,
+                          SymbolTable &symbolTable)
+        : OpInterfaceRewritePattern<DecomposableOp>(context), decompositionRegistry(registry),
+          inlineRuleBody(inlineRule), targetGateSet(gateSet), moduleSymbolTable(symbolTable) {};
 
-    LogicalResult matchAndRewrite(DecomposableGate op, PatternRewriter &rewriter) const override {
+    LogicalResult matchAndRewrite(DecomposableOp op, PatternRewriter &rewriter) const override {
         std::string gateName = op.getOperatorName();
 
         // A modified op (adjoint and/or controlled) is a distinct operator from its base gate.
-        bool isModified =
-            op.getOperation()->hasAttr("adjoint") || !op.getCtrlQubitOperands().empty();
+        bool isModified = false;
+        if (op.isModifiable()) {
+            auto qgate = cast<QuantumGate>(op.getOperation());
+            isModified =
+                op.getOperation()->hasAttr("adjoint") || !qgate.getCtrlQubitOperands().empty();
+        }
 
         // Only decompose the op if it is not in the target gate set. A modified op is never treated
         // as a native gate-set member by its base name: `Adjoint(Op)`/`C(Op)` are distinct gates
@@ -97,7 +166,7 @@ struct DecomposableGatePattern final : public OpInterfaceRewritePattern<Decompos
         }
 
         // Find the corresponding decomposition rule for the op
-        // TODO: migration to use the DecomposableGate interface gateID for all decomp rules is not
+        // TODO: migration to use the DecomposableOp interface gateID for all decomp rules is not
         // yet complete. Some rules' target_gate is already gateID, but some other gates' are still
         // the simple gate class name.
         // To maintain legacy compatibility, we fallback to the old pattern, where only the
@@ -114,10 +183,6 @@ struct DecomposableGatePattern final : public OpInterfaceRewritePattern<Decompos
             // Didn't find ID match, try matching gate name. Unmodified ops only: a modified op
             // (`Adjoint(Op)`/`C(Op)`) must match its own rule by id and never fall back to a plain
             // base-name rule (that would apply the unmodified decomposition to the modified op).
-            // TODO: remove multirz's special name editing
-            if (isa<qref::MultiRZOp>(op)) {
-                gateName = gateName + "_" + std::to_string(op.getWireLens()["wires"]);
-            }
             auto it_gateName = decompositionRegistry.find(gateName);
             if (it_gateName != decompositionRegistry.end()) {
                 rule = it_gateName->second;
@@ -149,21 +214,40 @@ struct DecomposableGatePattern final : public OpInterfaceRewritePattern<Decompos
 
         auto enableQreg = llvm::any_of(rule.getFunctionType().getInputs(),
                                        [](mlir::Type t) { return isa<qref::QuregType>(t); });
-        auto analyzer = DecomposableGateSignatureAnalyzer(op, enableQreg);
-        assert(analyzer && "Analyzer should be valid");
+        auto analyzer = createSignatureAnalyzer(op.getOperation(), enableQreg);
+        assert(analyzer && "lowering to decomposition rule not supported for operator");
 
-        auto operands = analyzer.prepareOperands(rule, rewriter, op.getLoc());
-        inlineRuleBody(rewriter, rule, operands);
-        rewriter.eraseOp(op);
+        auto operands = analyzer->prepareOperands(rule, rewriter, op.getLoc());
+        // prepareOperands flags the analyzer invalid (and emits a diagnostic) when the rule's
+        // signature cannot be reconciled with the operator, rather than building a malformed op.
+        assert(*analyzer && "rule signature cannot be reconciled with the operator");
+
+        // The gate may act on a register of static size, e.g. `!qref.reg<3>`, while rules take
+        // registers of dynamic size.
+        castQregOperandsToArgTypes(rewriter, op.getLoc(), operands, rule.getArgumentTypes());
+
+        if (inlineRuleBody) {
+            inlineRule(rewriter, rule, operands);
+            rewriter.eraseOp(op);
+        } else {
+            func::CallOp callOp =
+                cloneAndCallRule(rewriter, rule, operands, moduleSymbolTable, rulesToClonedFuncs);
+
+            // DL is in reference semantics, so only classical results will be returned from the
+            // rules
+            rewriter.replaceOp(op, callOp);
+        }
         return success();
     }
 };
 
-void populateDecomposeLoweringPatterns(
-    RewritePatternSet &patterns, const llvm::StringMap<func::FuncOp> &decompositionRegistry,
-    const llvm::StringSet<llvm::MallocAllocator> &targetGateSet) {
-    patterns.add<DecomposableGatePattern>(patterns.getContext(), decompositionRegistry,
-                                          targetGateSet);
+void populateDecomposeLoweringPatterns(RewritePatternSet &patterns,
+                                       const llvm::StringMap<func::FuncOp> &decompositionRegistry,
+                                       bool inlineRuleBody,
+                                       const llvm::StringSet<llvm::MallocAllocator> &targetGateSet,
+                                       SymbolTable &moduleSymbolTable) {
+    patterns.add<DecomposableOpPattern>(patterns.getContext(), decompositionRegistry,
+                                        inlineRuleBody, targetGateSet, moduleSymbolTable);
 }
 
 } // namespace qref

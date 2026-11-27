@@ -24,13 +24,97 @@ import pennylane as qp
 import pytest
 from jax import numpy as jnp
 
+from catalyst.utils.exceptions import CompileError
+
+
+class TestMeasurementOperatorLowering:
+    """Tests for measurement operators applied directly in a captured circuit."""
+
+    @pytest.mark.parametrize("negative", [False, True])
+    def test_pauli_measure_default_pipeline(self, negative):
+        """Pauli measurements compile and feed control flow without a PBC transform."""
+
+        @qp.qjit(capture=True, collect_decomp_rules=False)
+        @qp.qnode(qp.device("lightning.qubit", wires=3))
+        def circuit():
+            qp.Hadamard(1)
+            if negative:
+                qp.X(0)
+            result = qp.pauli_measure("XZ", (1, 0))
+            qp.cond(result, qp.X)(2)
+            return qp.expval(qp.Z(0)), qp.expval(qp.Z(2)), qp.expval(qp.X(1))
+
+        expected = -1 if negative else 1
+        assert qp.math.allclose(circuit(), (expected, expected, 1))
+
+    def test_pauli_measure_discarded_result(self):
+        """A direct Pauli measurement still collapses the state without a result."""
+
+        @qp.qjit(capture=True, collect_decomp_rules=False)
+        @qp.qnode(qp.device("lightning.qubit", wires=1))
+        def circuit():
+            qp.Hadamard(0)
+            qp.ops.PauliMeasure("Z", (0,))
+            return qp.expval(qp.X(0)), qp.expval(qp.Z(0))
+
+        x, z = circuit()
+        assert qp.math.allclose(x, 0)
+        assert qp.math.allclose(qp.math.abs(z), 1)
+
+    @pytest.mark.parametrize("measurement_cls", [qp.ops.MidMeasure, qp.ops.PauliMeasure])
+    @pytest.mark.parametrize("controlled", [False, True])
+    def test_measurement_modifiers_rejected(self, measurement_cls, controlled):
+        """Generic measurement lowering must not silently discard modifiers."""
+
+        @qp.qjit(
+            capture=True,
+            target="mlir",
+            collect_decomp_rules=False,
+            enable_aot_compilation=False,
+        )
+        @qp.qnode(qp.device("null.qubit", wires=2))
+        def circuit():
+            if measurement_cls is qp.ops.MidMeasure:
+                measurement = measurement_cls(0)
+            else:
+                measurement = measurement_cls("Z", (0,))
+            if controlled:
+                qp.ctrl(measurement, control=1)
+            else:
+                qp.adjoint(measurement)
+            return qp.state()
+
+        with pytest.raises(CompileError, match="cannot be adjointed or controlled"):
+            circuit.aot_compile()
+
+    def test_special_measurement_lowering_takes_precedence(self, monkeypatch):
+        """A registered specialized lowering takes precedence over the fallback."""
+        from catalyst.decomposition.graph_op_id import _SPECIAL_LOWERINGS
+        from catalyst.from_plxpr.qref_jax_primitives import MeasureOp
+        from catalyst.from_plxpr.qref_operator2_primitives import ir
+
+        def specialized_lowering(qubit, **_):
+            MeasureOp(ir.IntegerType.get_signless(1), qubit)
+            return []
+
+        monkeypatch.setitem(_SPECIAL_LOWERINGS, qp.ops.MidMeasure, specialized_lowering)
+
+        @qp.qjit(capture=True, target="mlir", collect_decomp_rules=False)
+        @qp.qnode(qp.device("null.qubit", wires=1))
+        def circuit():
+            qp.ops.MidMeasure(0)
+            return qp.state()
+
+        assert "qref.measure " in circuit.mlir
+        assert "qref.measurement" not in circuit.mlir
+
 
 class TestOperator2Execution:
 
     def test_custom_op_supported(self):
         """Test that Operator2 versions of core ops are supported and can be executed."""
 
-        @qp.qjit(collect_decomp_rules=False, capture=True)
+        @qp.qjit(capture=True)
         @qp.qnode(qp.device("lightning.qubit", wires=3))
         def c(x):
             qp.PauliX(0)
@@ -47,7 +131,7 @@ class TestOperator2Execution:
     def test_MultiRZ(self):
         """Test that MultiRZ can be executed."""
 
-        @qp.qjit(collect_decomp_rules=False, capture=True)
+        @qp.qjit(capture=True)
         @qp.qnode(qp.device("lightning.qubit", wires=3))
         def c(x):
             qp.Hadamard(0)
@@ -64,7 +148,7 @@ class TestOperator2Execution:
     def test_paulirot(self):
         """Test that PauliRot can be executed."""
 
-        @qp.qjit(collect_decomp_rules=False, capture=True)
+        @qp.qjit(capture=True)
         @qp.qnode(qp.device("lightning.qubit", wires=3))
         def c(x):
             qp.Hadamard(2)
@@ -91,7 +175,7 @@ class TestOperator2Execution:
     def test_QubitUnitary(self):
         """Test that QubitUnitary can be executed."""
 
-        @qp.qjit(collect_decomp_rules=False, capture=True)
+        @qp.qjit(capture=True)
         @qp.qnode(qp.device("lightning.qubit", wires=3))
         def c():
             qp.QubitUnitary(jnp.array([[0, 1], [1, 0]]), 0)
@@ -122,7 +206,7 @@ class TestOperator2Execution:
     def test_PCPhase(self, dim, expected):
         """Test that PCPhase can be executed."""
 
-        @qp.qjit(collect_decomp_rules=False, capture=True)
+        @qp.qjit(capture=True)
         @qp.qnode(qp.device("lightning.qubit", wires=2))
         def c(x):
             qp.Hadamard(0)

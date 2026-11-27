@@ -16,6 +16,7 @@
 #include <cassert>
 #include <cstddef>
 #include <iterator>
+#include <memory>
 #include <utility>
 
 #include "llvm/ADT/STLExtras.h"
@@ -26,6 +27,7 @@
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/BuiltinTypes.h"
+#include "mlir/IR/Diagnostics.h"
 #include "mlir/IR/Location.h"
 #include "mlir/IR/Operation.h"
 #include "mlir/IR/PatternMatch.h"
@@ -34,7 +36,10 @@
 #include "mlir/IR/ValueRange.h"
 #include "mlir/Support/LLVM.h"
 
+#include "QRef/IR/QRefInterfaces.h"
 #include "QRef/Utils/QubitIndex.h"
+
+#include "StringConstants.h"
 
 using namespace mlir;
 
@@ -49,6 +54,7 @@ class BaseSignatureAnalyzer {
     bool isValid = true;
 
     llvm::SmallVector<mlir::Value, 4> paramsStorage;
+    llvm::SmallVector<mlir::Value, 4> qubitsStorage;
 
     // Unified Signature Structure: All parameters, regardless of source (params or theta),
     // are stored in a ValueRange for generalized processing.
@@ -67,8 +73,9 @@ class BaseSignatureAnalyzer {
                           mlir::ValueRange inCtrlQubits, mlir::ValueRange inCtrlValues,
                           bool enableQregMode)
         : paramsStorage(params.begin(), params.end()),
+          qubitsStorage(inQubits.begin(), inQubits.end()),
           signature(Signature{.params = mlir::ValueRange(paramsStorage),
-                              .inQubits = inQubits,
+                              .inQubits = mlir::ValueRange(qubitsStorage),
                               .inCtrlQubits = inCtrlQubits,
                               .inCtrlValues = inCtrlValues,
                               .inWireIndices = {},
@@ -81,8 +88,9 @@ class BaseSignatureAnalyzer {
                           mlir::ValueRange outQubits, mlir::ValueRange outCtrlQubits,
                           bool enableQregMode)
         : paramsStorage(mlir::ValueRange(param).begin(), mlir::ValueRange(param).end()),
+          qubitsStorage(inQubits.begin(), inQubits.end()),
           signature(Signature{.params = mlir::ValueRange(paramsStorage),
-                              .inQubits = inQubits,
+                              .inQubits = mlir::ValueRange(qubitsStorage),
                               .inCtrlQubits = inCtrlQubits,
                               .inCtrlValues = inCtrlValues,
                               .inWireIndices = {},
@@ -208,10 +216,24 @@ class BaseSignatureAnalyzer {
         if (values.size() == 1 && values.front().getType() == type) {
             return values.front();
         }
-        if (isa<RankedTensorType>(type)) {
+        if (auto tensorType = dyn_cast<RankedTensorType>(type)) {
+            if (!tensorElementCountMatches(values.size(), tensorType, loc)) {
+                return values.empty() ? Value() : values.front();
+            }
             return tensor::FromElementsOp::create(rewriter, loc, type, values);
         }
         return values.front();
+    }
+
+    bool tensorElementCountMatches(size_t numValues, RankedTensorType tensorType, Location loc) {
+        if (static_cast<int64_t>(numValues) == tensorType.getNumElements()) {
+            return true;
+        }
+        emitError(loc) << "cannot build a " << tensorType << " operand for a decomposition rule "
+                       << "from " << numValues << " value(s): the rule signature is inconsistent "
+                       << "with the operator being decomposed.";
+        isValid = false;
+        return false;
     }
 
     static size_t getElementsCount(Type type) {
@@ -290,6 +312,9 @@ class BaseSignatureAnalyzer {
                 return tensor::EmptyOp::create(rewriter, loc, tensorType.getShape(),
                                                tensorType.getElementType());
             }
+            if (!tensorElementCountMatches(values.size(), tensorType, loc)) {
+                return values.front();
+            }
             return tensor::FromElementsOp::create(rewriter, loc, type, values);
         }
 
@@ -335,18 +360,58 @@ class BaseSignatureAnalyzer {
     }
 };
 
-class DecomposableGateSignatureAnalyzer : public BaseSignatureAnalyzer {
-  public:
-    DecomposableGateSignatureAnalyzer() = delete;
+class QuantumGateSignatureAnalyzer : public BaseSignatureAnalyzer {
+    static SmallVector<Value> getRuleQubits(QuantumGate op) {
+        auto qubits = op.getNonCtrlQubitOperands();
+        if (auto operatorOp = dyn_cast<OperatorOp>(op.getOperation())) {
+            if (!operatorOp.getQreg() && !operatorOp.getQubitMap().empty()) {
+                // Rule capture groups base wires by name, followed by control work wires.
+                // Gather through the map so shared and permuted groups retain their wires.
+                SmallVector<Value> ruleQubits;
+                auto appendGroup = [&](DenseI64ArrayAttr indices) {
+                    for (int64_t index : indices.asArrayRef()) {
+                        ruleQubits.push_back(qubits[index]);
+                    }
+                };
+                for (NamedAttribute group : operatorOp.getQubitMap()) {
+                    if (group.getName().getValue() != catalyst::CTRL_WORK_WIRES) {
+                        appendGroup(cast<DenseI64ArrayAttr>(group.getValue()));
+                    }
+                }
+                // signature_wire_lens in the frontend appends control work wires after the rest of
+                // the wire groups. Keep that order so unpack_rule_operands slices the wire tensor
+                // correctly; qubit_map sorts ctrl_work_wires alphabetically among the wire groups.
+                if (auto ctrlWorkWires = operatorOp.getQubitMap().get(catalyst::CTRL_WORK_WIRES)) {
+                    appendGroup(cast<DenseI64ArrayAttr>(ctrlWorkWires));
+                }
+                return ruleQubits;
+            }
+        }
+        return SmallVector<Value>(qubits.begin(), qubits.end());
+    }
 
-    DecomposableGateSignatureAnalyzer(DecomposableGate op, bool enableQregMode)
+  public:
+    QuantumGateSignatureAnalyzer() = delete;
+
+    QuantumGateSignatureAnalyzer(QuantumGate op, bool enableQregMode)
         : BaseSignatureAnalyzer(op,
                                 isa<ParametrizedGate>(op.getOperation())
                                     ? cast<ParametrizedGate>(op.getOperation()).getAllParams()
                                     : mlir::ValueRange{},
-                                op.getNonCtrlQubitOperands(), op.getCtrlQubitOperands(),
+                                getRuleQubits(op), op.getCtrlQubitOperands(),
                                 op.getCtrlValueOperands(), enableQregMode) {}
 };
+
+/// Select a signature analyzer for an Operation based on its type.
+/// Currently only QuantumGates are supported; other kinds hard-fail.
+inline std::unique_ptr<BaseSignatureAnalyzer> createSignatureAnalyzer(Operation *op,
+                                                                      bool enableQregMode) {
+    if (auto gate = dyn_cast<QuantumGate>(op)) {
+        return std::make_unique<QuantumGateSignatureAnalyzer>(gate, enableQregMode);
+    }
+    op->emitError("decompose-lowering: no signature analyzer for this decomposable op");
+    return nullptr;
+}
 
 } // namespace qref
 } // namespace catalyst

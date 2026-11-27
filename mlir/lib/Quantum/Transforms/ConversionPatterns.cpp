@@ -15,6 +15,7 @@
 #include <cstdint>
 #include <string>
 
+#include "llvm/ADT/STLExtras.h"
 #include "mlir/Dialect/LLVMIR/FunctionCallUtils.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/IR/BuiltinAttributes.h"
@@ -26,6 +27,8 @@
 #include "Quantum/IR/QuantumOps.h"
 #include "Quantum/Transforms/Patterns.h"
 #include "Quantum/Utils/QIRPauliRot.h"
+
+#include "StringConstants.h"
 
 using namespace mlir;
 using namespace catalyst::quantum;
@@ -489,34 +492,76 @@ struct InsertOpArrayBackedPattern : public OpConversionPattern<InsertOp> {
 // Quantum Gates //
 ///////////////////
 
-struct CustomOpPattern : public OpConversionPattern<CustomOp> {
-    using OpConversionPattern::OpConversionPattern;
+// Lowering pattern for CustomOp and OperatorOp
+// Note that param_map and static_data on OperatorOp are currently ignored
+// Work wires on operator op inherited from control regions (i.e. those named after
+// catalyst::CTRL_WORK_WIRES in qubit_map) are also ignored.
+template <typename OpTy> struct QuantumOpPattern : public OpConversionPattern<OpTy> {
+    using OpConversionPattern<OpTy>::OpConversionPattern;
 
-    LogicalResult matchAndRewrite(CustomOp op, CustomOpAdaptor adaptor,
+    LogicalResult matchAndRewrite(OpTy op, typename OpTy::Adaptor adaptor,
                                   ConversionPatternRewriter &rewriter) const override {
-        Location loc = op.getLoc();
-        MLIRContext *ctx = getContext();
+        ArrayRef<int64_t> ctrlWorkWireIndices;
+        if (auto operatorOp = dyn_cast<OperatorOp>(op.getOperation())) {
+            if (operatorOp.getInQreg() || !operatorOp.getArrQubitIndices().empty() ||
+                operatorOp.getArrCtrlIndices() || operatorOp.getArrCtrlValues() ||
+                operatorOp.getUID() || !operatorOp.getForwardArgs().empty()) {
+                return rewriter.notifyMatchFailure(
+                    op, "register operands, UID, and forwarded arguments are not supported");
+            }
+            if (DictionaryAttr qubitMap = operatorOp.getQubitMap()) {
+                if (auto workWires = qubitMap.getAs<DenseI64ArrayAttr>(catalyst::CTRL_WORK_WIRES)) {
+                    ctrlWorkWireIndices = workWires.asArrayRef();
+                }
+            }
+        }
 
-        const TypeConverter *conv = getTypeConverter();
+        Location loc = op.getLoc();
+        MLIRContext *ctx = this->getContext();
+
+        const TypeConverter *conv = this->getTypeConverter();
         auto modifiersPtr = getModifiersPtr(loc, rewriter, conv, op.getAdjointFlag(),
                                             adaptor.getInCtrlQubits(), adaptor.getInCtrlValues());
 
-        // TODO: Might be better to have corresponding attribute for those custom op with variadic
-        // input qubits, so we don't need to explicity check any op gate name here
-        const auto hasVariadicInputQbits = (op.getGateName() == "Identity");
+        SmallVector<Value> params;
+        for (auto [param, convertedParam] : llvm::zip(op.getParams(), adaptor.getParams())) {
+            if (isa<BaseMemRefType>(param.getType())) {
+                // Runtime functions take pointers to memref descriptors.
+                Value descriptor =
+                    catalyst::getStaticAlloca(loc, rewriter, convertedParam.getType(), 1);
+                LLVM::StoreOp::create(rewriter, loc, convertedParam, descriptor);
+                params.push_back(descriptor);
+            } else {
+                params.push_back(convertedParam);
+            }
+        }
 
-        std::string qirName = "__catalyst__qis__" + op.getGateName().str();
+        // Control work wires are only needed for decomposition, not runtime calls.
+        SmallVector<Value> runtimeQubits;
+        for (auto [index, qubit] : llvm::enumerate(adaptor.getInQubits())) {
+            if (!llvm::is_contained(ctrlWorkWireIndices, index)) {
+                runtimeQubits.push_back(qubit);
+            }
+        }
+
+        const std::string gateName = op.getOperatorName();
+        const bool hasVariadicInputQbits = gateName == "Identity" || gateName == "MultiRZ" ||
+                                           gateName == "PCPhase" || gateName == "QubitUnitary";
+
+        std::string qirName = "__catalyst__qis__" + gateName;
         SmallVector<Type> argTypes;
-        argTypes.insert(argTypes.end(), adaptor.getParams().getTypes().begin(),
-                        adaptor.getParams().getTypes().end());
+        for (Value param : params) {
+            argTypes.push_back(param.getType());
+        }
         if (hasVariadicInputQbits) {
             // Since input qubits would be extracted through va_list in C,
             // thus we should add an additional information for number of qubits
             argTypes.insert(argTypes.end(), modifiersPtr.getType());
             argTypes.insert(argTypes.end(), IntegerType::get(ctx, 64));
         } else {
-            argTypes.insert(argTypes.end(), adaptor.getInQubits().getTypes().begin(),
-                            adaptor.getInQubits().getTypes().end());
+            for (Value qubit : runtimeQubits) {
+                argTypes.push_back(qubit.getType());
+            }
             argTypes.insert(argTypes.end(), modifiersPtr.getType());
         }
 
@@ -525,17 +570,16 @@ struct CustomOpPattern : public OpConversionPattern<CustomOp> {
         LLVM::LLVMFuncOp fnDecl = catalyst::ensureFunctionDeclaration<LLVM::LLVMFuncOp>(
             rewriter, op, qirName, qirSignature);
 
-        SmallVector<Value> args;
-        args.insert(args.end(), adaptor.getParams().begin(), adaptor.getParams().end());
+        SmallVector<Value> args(params);
         if (hasVariadicInputQbits) {
-            // get the number of qbuits and place the input qubits at the end of the arguments.
-            int64_t numQubits = op.getOutQubits().size();
+            // Get the number of runtime qubits and place them at the end of the arguments.
+            int64_t numQubits = runtimeQubits.size();
             args.insert(args.end(), modifiersPtr);
             args.insert(args.end(), LLVM::ConstantOp::create(
                                         rewriter, loc, rewriter.getI64IntegerAttr(numQubits)));
-            args.insert(args.end(), adaptor.getInQubits().begin(), adaptor.getInQubits().end());
+            args.insert(args.end(), runtimeQubits.begin(), runtimeQubits.end());
         } else {
-            args.insert(args.end(), adaptor.getInQubits().begin(), adaptor.getInQubits().end());
+            args.insert(args.end(), runtimeQubits.begin(), runtimeQubits.end());
             args.insert(args.end(), modifiersPtr);
         }
 
@@ -900,6 +944,76 @@ struct HamiltonianOpPattern : public OpConversionPattern<HamiltonianOp> {
 // Measurements //
 //////////////////
 
+struct MeasurementOpPattern : public OpConversionPattern<MeasurementOp> {
+    using OpConversionPattern::OpConversionPattern;
+
+    LogicalResult matchAndRewrite(MeasurementOp op, OpAdaptor adaptor,
+                                  ConversionPatternRewriter &rewriter) const override {
+        if (op.getOpName() != "PauliMeasure") {
+            return failure();
+        }
+        if (!op.getParams().empty() || op.getInQreg() || !op.getArrQubitIndices().empty()) {
+            return rewriter.notifyMatchFailure(op, "expected explicit qubits and no parameters");
+        }
+        auto results = op.getMres();
+        if (results.size() > 1 || (!results.empty() && !results.front().getType().isInteger(1))) {
+            return rewriter.notifyMatchFailure(op, "expected at most one i1 measurement result");
+        }
+
+        auto staticData = op.getStaticData();
+        auto pauliWord = staticData.getAs<StringAttr>("pauli_word");
+        if (!pauliWord || pauliWord.getValue().size() != op.getInQubits().size()) {
+            return rewriter.notifyMatchFailure(op,
+                                               "expected a Pauli word matching the qubit count");
+        }
+        for (char pauli : pauliWord.getValue()) {
+            if (pauli != 'I' && pauli != 'X' && pauli != 'Y' && pauli != 'Z') {
+                return rewriter.notifyMatchFailure(op, "invalid Pauli word");
+            }
+        }
+        // PPM has no postselection. The frontend represents an unset value as None.
+        if (auto postselect = staticData.get("postselect")) {
+            auto none = dyn_cast<TypeAttr>(postselect);
+            if (!(none && isa<NoneType>(none.getValue()))) {
+                return rewriter.notifyMatchFailure(op, "postselection is not supported by PPM");
+            }
+        }
+
+        Location loc = op.getLoc();
+        MLIRContext *ctx = getContext();
+        ModuleOp mod = op->getParentOfType<ModuleOp>();
+        std::string word = pauliWord.getValue().str();
+        Value pauliWordPtr = getGlobalString(loc, rewriter, "pauli_word_" + word,
+                                             StringRef(word.c_str(), word.size() + 1), mod);
+        Value negated = LLVM::ConstantOp::create(rewriter, loc, rewriter.getBoolAttr(false));
+        Value selectSwitch = LLVM::ConstantOp::create(rewriter, loc, rewriter.getBoolAttr(true));
+
+        Type ptrType = LLVM::LLVMPointerType::get(ctx);
+        Type qirSignature = LLVM::LLVMFunctionType::get(
+            getTypeConverter()->convertType(ResultType::get(ctx)),
+            {ptrType, rewriter.getI1Type(), ptrType, rewriter.getI1Type(), rewriter.getI1Type(),
+             rewriter.getI64Type()},
+            /*isVarArg=*/true);
+        auto fnDecl = catalyst::ensureFunctionDeclaration<LLVM::LLVMFuncOp>(
+            rewriter, op, "__catalyst__qis__PauliMeasure", qirSignature);
+        Value numQubits = LLVM::ConstantOp::create(
+            rewriter, loc, rewriter.getI64IntegerAttr(adaptor.getInQubits().size()));
+        SmallVector<Value> args = {pauliWordPtr, negated,      pauliWordPtr,
+                                   negated,      selectSwitch, numQubits};
+        llvm::append_range(args, adaptor.getInQubits());
+        Value resultPtr = LLVM::CallOp::create(rewriter, loc, fnDecl, args).getResult();
+
+        SmallVector<Value> replacements;
+        if (!results.empty()) {
+            replacements.push_back(
+                LLVM::LoadOp::create(rewriter, loc, rewriter.getI1Type(), resultPtr));
+        }
+        llvm::append_range(replacements, adaptor.getInQubits());
+        rewriter.replaceOp(op, replacements);
+        return success();
+    }
+};
+
 struct MeasureOpPattern : public OpConversionPattern<MeasureOp> {
     using OpConversionPattern::OpConversionPattern;
 
@@ -1226,12 +1340,14 @@ void populateQIRConversionPatterns(TypeConverter &typeConverter, RewritePatternS
     } else {
         patterns.add<InsertOpDefaultPattern>(typeConverter, patterns.getContext());
     }
-    patterns.add<CustomOpPattern>(typeConverter, patterns.getContext());
+    patterns.add<QuantumOpPattern<CustomOp>, QuantumOpPattern<OperatorOp>>(typeConverter,
+                                                                           patterns.getContext());
     patterns.add<MultiRZOpPattern>(typeConverter, patterns.getContext());
     patterns.add<PauliRotOpPattern>(typeConverter, patterns.getContext());
     patterns.add<PCPhaseOpPattern>(typeConverter, patterns.getContext());
     patterns.add<GlobalPhaseOpPattern>(typeConverter, patterns.getContext());
     patterns.add<QubitUnitaryOpPattern>(typeConverter, patterns.getContext());
+    patterns.add<MeasurementOpPattern>(typeConverter, patterns.getContext());
     patterns.add<MeasureOpPattern>(typeConverter, patterns.getContext());
     patterns.add<ComputationalBasisOpPattern>(typeConverter, patterns.getContext());
     patterns.add<NamedObsOpPattern>(typeConverter, patterns.getContext());

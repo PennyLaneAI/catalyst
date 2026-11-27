@@ -24,8 +24,13 @@
 namespace {
 catalyst::transport::ControllerSession *make_cpu_controller(const std::string &config) {
     const auto cfg = catalyst::transport::common::parse_backend_config(config);
-    return new catalyst::transport::cpu_verbs::CpuControllerSession(cfg.dev, cfg.gid);
+    return new catalyst::transport::cpu_verbs::CpuControllerSession(
+        cfg.dev, cfg.gid, catalyst::transport::common::frame::geometry_from_config(config));
 }
 } // namespace
 
 GENERATE_TRANSPORT_CONTROLLER_FACTORY(CatalystTransportController, make_cpu_controller)
+CATALYST_TRANSPORT_BACKEND_CAPS("cpu_verbs", CATALYST_TRANSPORT_ROLE_BIT_CONTROLLER,
+                                CATALYST_TRANSPORT_MEM_BIT(CpuRam),
+                                CATALYST_TRANSPORT_FRAME_BL16 | CATALYST_TRANSPORT_FRAME_BLV, 0,
+                                UINT32_MAX, UINT32_MAX, 1)

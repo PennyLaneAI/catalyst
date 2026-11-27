@@ -22,23 +22,31 @@
 #include <string>
 #include <thread>
 
-#include "CompletionQueue.hpp"
-#include "Context.hpp"
+#include "Frame.hpp"
 #include "GpuRuntime.hpp"
 #include "MemoryRegion.hpp"
-#include "OobSocket.hpp"
-#include "ProtectionDomain.hpp"
+#include "PeerLink.hpp"
 #include "QueuePair.hpp"
 #include "Transport.hpp"
-#include "WireProtocol.hpp"
 
 namespace catalyst::transport::gpu_verbs {
 using namespace catalyst::transport;
-using namespace catalyst::transport::coproc; // GpuRuntime, HandoffSlot, launchers
+using namespace catalyst::transport::coproc; // GpuRuntime, launchers
 
-class GpuCoprocessorSession : public CoprocessorSession {
+// The controller writes each request into a ring in GPU memory, a persistent kernel decodes it
+// and writes the reply frame into a ring the host maps, and a pinned CPU thread sends the reply.
+// The link connects the session to its controller (PeerLink.hpp).
+class GpuCoprocessorSession final : public CoprocessorSession {
   public:
-    GpuCoprocessorSession(std::string dev, int gid_idx, int gpu_device);
+    // The coprocessor only receives on an RC link's fwd queue pair (the controller writes into its
+    // ring), so that queue pair needs almost no send queue and no inline capacity.
+    static constexpr common::QpShape FWD_QP_SHAPE{.sq_depth = 16, .cq_depth = 256, .inline_max = 0};
+
+    /// Facing a catalyst controller over RC, with `ring` the frames both ends agree on.
+    GpuCoprocessorSession(std::string dev, int gid_idx, int gpu_device,
+                          common::frame::RingGeometry ring = common::frame::BL16_RING);
+    /// Facing the peer `link` connects to (common::make_coprocessor_link, with FWD_QP_SHAPE).
+    GpuCoprocessorSession(int gpu_device, std::unique_ptr<common::PeerLink> link);
     ~GpuCoprocessorSession() override { stop(); }
 
     GpuCoprocessorSession(const GpuCoprocessorSession &) = delete;
@@ -67,38 +75,20 @@ class GpuCoprocessorSession : public CoprocessorSession {
     MemKind preferred_mem_kind() const override { return MemKind::GpuHbm; }
 
   private:
-    void run_coprocessor(std::stop_token st);
-    // Fill the reply + post one inline RDMA_WRITE. Returns true if this send
-    // was signaled (selective signalling: 1 in SIGNAL_EVERY), so the caller can
-    // track the signaled-completion count.
-    bool post_inline(std::uint64_t cursor);
-    // Non-blocking batch reap of the bwd CQ; decrements `outstanding` per CQE.
-    // With drain=true, keeps polling until `outstanding` hits 0 (teardown).
-    void reap_bwd(int &outstanding, bool drain);
+    // The reply loop; runs on engine_.
+    void run(std::stop_token st);
+    template <common::frame::Mode M, class Link> void serve(Link &link, std::stop_token st);
 
-    std::string dev_name_;
-    int gid_idx_;
-    ibv_gid mygid_{};              // local GID, cached in connect() for exchange_keys()
-    std::uint32_t active_mtu_ = 0; // local active_mtu enum, cached in connect()
-    std::shared_ptr<common::Context> ctx_;
-    std::shared_ptr<common::ProtectionDomain> pd_;
-    std::shared_ptr<common::CompletionQueue> fwd_cq_, bwd_cq_;
-    std::shared_ptr<common::QueuePair> fwd_qp_, bwd_qp_;
-    common::FdGuard oob_fd_;
-
-    GpuRuntime gpu_;                // HIP wrapper: owns GPU mem/stream/sync; the decode
-                                    // kernel itself is launched by the bound CoprocessorFn
-    GpuRuntime::HbmRing hbm_{};     // the HBM receive-ring buffer itself (device
-                                    // ptr + size + dma-buf fd)
-    GpuRuntime::Handoff handoff_{}; // host-mapped GPU->CPU ring: kernel writes
-                                    // {correction,seq}, CPU reads
+    std::unique_ptr<common::PeerLink> link_;
+    common::frame::RingGeometry ring_; // both rings, the request ring and the handoff
+    GpuRuntime gpu_;                   // HIP wrapper: owns GPU mem/stream/sync; the decode
+                                       // kernel itself is launched by the bound CoprocessorFn
+    GpuRuntime::HbmRing hbm_{};        // the HBM receive-ring buffer itself (device
+                                       // ptr + size + dma-buf fd)
+    GpuRuntime::Handoff handoff_{};    // host-mapped GPU->CPU ring of reply frames
     std::optional<common::MemoryRegion>
         hbm_ring_; // ibverbs dma-buf MR registering hbm_ (gives the rkey)
-    std::optional<common::MemoryRegion> reply_buf_; // host RAM inline reply source
 
-    MemRegion local_{};
-    PeerRef peer_{};
-    ChannelDesc desc_{};
     // Launcher used by start() to launch the on-device decode kernel (one-shot,
     // not per-message); nullptr selects the built-in echo launcher.
     CoprocessorLauncherFn coproc_launcher_ = nullptr;

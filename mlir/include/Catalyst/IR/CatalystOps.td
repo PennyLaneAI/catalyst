@@ -22,6 +22,7 @@ include "mlir/Interfaces/InferTypeOpInterface.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
 include "mlir/IR/SymbolInterfaces.td"
 include "mlir/IR/BuiltinAttributes.td"
+include "mlir/IR/CommonAttrConstraints.td"
 include "mlir/IR/OpBase.td"
 
 include "Catalyst/IR/CatalystDialect.td"
@@ -119,6 +120,56 @@ def CustomCallOp: Catalyst_Op<"custom_call",
     `fn` `(`$call_target_name`)` `(` $inputs `)`
       attr-dict `:` functional-type(operands, results)
   }];
+}
+
+def RuntimeCallOp : Catalyst_Op<"runtime_call",
+    [AttrSizedOperandSegments, AttrSizedResultSegments,
+     DeclareOpInterfaceMethods<MemoryEffectsOpInterface>]> {
+  let summary = "Invoke a declared runtime symbol through its C signature.";
+  let description = [{
+    Call the runtime symbol `callee`, described by the C parameter kinds in
+    `c_params` and the C result kind in `c_result`.
+
+    * Without `dispatch`, the call is local. `buf`/`out` are bufferized and the op becomes an
+      `llvm.call` using the symbol's native C ABI.
+    * With `dispatch`, the call runs on that executor. The
+      `lower-runtime-dispatch` pass marshals the operands into the executor's
+      flat wire layout and rewrites the op into an `executor.call`.
+  }];
+
+  let arguments = (ins
+    Variadic<AnyType>:$inputs,
+    Variadic<AnyMemRef>:$dest_buffers,
+    StrAttr:$callee,
+    StrArrayAttr:$c_params,
+    StrAttr:$c_result,
+    OptionalAttr<StrArrayAttr>:$c_strings,
+    OptionalAttr<StrAttr>:$dispatch
+  );
+
+  let results = (outs
+    Variadic<AnyType>:$scalar_result,
+    Variadic<AnyRankedTensor>:$out_tensors
+  );
+
+  let assemblyFormat = [{
+    `fn` `(` $callee `)` `(` $inputs `)`
+    ( `in` `(` $dest_buffers^ `:` type($dest_buffers) `)` )?
+    attr-dict
+    ( `:` `(` type($inputs)^ `)` )?
+    ( `->` `(` type($scalar_result)^ `)` )?
+    ( `outs` `(` type($out_tensors)^ `)` )?
+  }];
+
+  let extraClassDeclaration = [{
+    /// Whether this call runs on an executor
+    bool isDispatched() { return getDispatchAttr() != nullptr; }
+
+    /// Whether `buf`/`out` have been replaced by their memref destinations.
+    bool isBufferized() { return getOutTensors().empty() && !getDestBuffers().empty(); }
+  }];
+
+  let hasVerifier = 1;
 }
 
 def CallbackOp : Catalyst_Op<"callback",

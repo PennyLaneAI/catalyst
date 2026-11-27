@@ -45,6 +45,12 @@ struct StubController : ControllerSession {
     void *reply_slot() override { return &reply; }
 };
 
+// A controller that issues its own rounds, as a backend with a hardware pacer does.
+struct StubPacedController : StubController {
+    bool self_paced() const override { return true; }
+    int run_paced() override { return 0; }
+};
+
 struct StubCoprocessor : CoprocessorSession {
     int connect(const ConnectInfo &) override { return 0; }
     MemRegion alloc_memory(std::size_t, MemKind) override { return {}; }
@@ -70,7 +76,11 @@ struct StubLaunchOnceCoprocessor : StubCoprocessor {
 
 } // namespace
 
-extern "C" ControllerSession *CatalystTransportControllerFactory(const char *) {
+extern "C" ControllerSession *CatalystTransportControllerFactory(const char *config) {
+    const std::string cfg = config ? config : "";
+    if (cfg == "paced") {
+        return new StubPacedController();
+    }
     return new StubController();
 }
 
@@ -81,3 +91,34 @@ extern "C" CoprocessorSession *CatalystTransportCoprocessorFactory(const char *c
     }
     return new StubCoprocessor();
 }
+
+// Built four ways (tests/CMakeLists.txt): without STUB_ABI_VERSION, a backend of this runtime's
+// version; with 1, one predating versioning; with 2, a version-2 controller-only backend; with a
+// larger value, one built for a newer ABI.
+#if !defined(STUB_ABI_VERSION)
+CATALYST_TRANSPORT_BACKEND_CAPS("stub",
+                                CATALYST_TRANSPORT_ROLE_BIT_CONTROLLER |
+                                    CATALYST_TRANSPORT_ROLE_BIT_COPROCESSOR,
+                                CATALYST_TRANSPORT_MEM_BIT(CpuRam), CATALYST_TRANSPORT_FRAME_BL16,
+                                0, 8, 8, 1)
+#elif STUB_ABI_VERSION == 2
+extern "C" uint32_t CatalystTransportAbiVersion() { return 2; }
+extern "C" const CatalystTransportCaps *CatalystTransportQueryCaps() {
+    static const CatalystTransportCaps caps = {
+        2,
+        CATALYST_TRANSPORT_ROLE_BIT_CONTROLLER,
+        CATALYST_TRANSPORT_MEM_BIT(CpuRam),
+        CATALYST_TRANSPORT_FRAME_BL16,
+        8,
+        CATALYST_TRANSPORT_ORDER_IN_ORDER,
+        "stub",
+        8,
+        0,
+        1,
+        0,
+        [](void *s) { delete static_cast<TransportSession *>(s); }};
+    return &caps;
+}
+#elif STUB_ABI_VERSION > 2
+extern "C" uint32_t CatalystTransportAbiVersion() { return STUB_ABI_VERSION; }
+#endif

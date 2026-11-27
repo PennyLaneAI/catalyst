@@ -14,7 +14,8 @@
 
 #include "Executor/IR/ExecutorDialect.h"
 
-#include "llvm/ADT/TypeSwitch.h"           // needed for generated type parser
+#include "llvm/ADT/TypeSwitch.h" // needed for generated type parser
+#include "mlir/Dialect/Bufferization/IR/BufferizableOpInterface.h"
 #include "mlir/IR/DialectImplementation.h" // needed for generated type parser
 
 #include "Executor/IR/ExecutorOps.h"
@@ -38,6 +39,8 @@ void catalyst::executor::ExecutorDialect::initialize() {
 #define GET_OP_LIST
 #include "Executor/IR/ExecutorOps.cpp.inc"
         >();
+
+    declarePromisedInterfaces<mlir::bufferization::BufferizableOpInterface, CallOp>();
 }
 
 //===----------------------------------------------------------------------===//

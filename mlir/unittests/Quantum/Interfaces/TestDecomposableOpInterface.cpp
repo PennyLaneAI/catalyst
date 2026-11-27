@@ -1,0 +1,705 @@
+// Copyright 2026 Xanadu Quantum Technologies Inc.
+
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+
+//     http://www.apache.org/licenses/LICENSE-2.0
+
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+#include <cstddef>
+#include <string>
+
+#include "gtest/gtest.h"
+#include "llvm/ADT/SmallVector.h"
+#include "llvm/Support/Format.h" // for gtest printing on failure
+#include "mlir/Dialect/Arith/IR/Arith.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
+#include "mlir/IR/AsmState.h"
+#include "mlir/IR/Attributes.h"
+#include "mlir/IR/BuiltinAttributes.h"
+#include "mlir/IR/BuiltinOps.h"
+#include "mlir/IR/BuiltinTypeInterfaces.h"
+#include "mlir/IR/BuiltinTypes.h"
+#include "mlir/IR/DialectRegistry.h"
+#include "mlir/IR/MLIRContext.h"
+#include "mlir/IR/OwningOpRef.h"
+#include "mlir/IR/TypeRange.h"
+#include "mlir/IR/Types.h"
+#include "mlir/Parser/Parser.h"
+
+#include "Quantum/IR/QuantumDialect.h"
+#include "Quantum/IR/QuantumInterfaces.h"
+#include "Quantum/IR/QuantumOps.h"
+
+using namespace mlir;
+using namespace catalyst::quantum;
+
+/// The upstream MLIR Test dialect does not have a header we can include
+/// We must declare the registration function, and link to the corresponding upstream target
+/// in CMake.
+namespace test {
+void registerTestDialect(mlir::DialectRegistry &);
+} // namespace test
+
+TEST(DecomposableOpInterfaceTests, CustomOp) {
+    std::string moduleStr = R"mlir(
+module {
+  %angle = arith.constant 3.1 : f64
+  %q0 = quantum.alloc_qb : !quantum.bit
+  %q1 = quantum.alloc_qb : !quantum.bit
+  %oq0, %oq1 = quantum.custom "RX"(%angle) %q0, %q1 : !quantum.bit, !quantum.bit
+}
+    )mlir";
+
+    // Parsing boilerplate
+    DialectRegistry registry;
+    registry.insert<mlir::arith::ArithDialect, QuantumDialect>();
+    MLIRContext context(registry);
+    ParserConfig config(&context, /*verifyAfterParse=*/false);
+    OwningOpRef<ModuleOp> module = parseSourceString<ModuleOp>(moduleStr, config);
+
+    DecomposableOp customOp = *module->getOps<CustomOp>().begin();
+
+    ASSERT_EQ(customOp.getOperatorName(), "RX");
+    ASSERT_TRUE(customOp.isModifiable());
+
+    catalyst::quantum::DynamicShape expectedDynamicShape = {{"0", {Float64Type::get(&context)}}};
+    ASSERT_EQ(customOp.getDynamicShape(), expectedDynamicShape);
+
+    catalyst::quantum::WireLens expectedWires = {{"wires", 2}};
+    ASSERT_EQ(customOp.getWireLens(), expectedWires);
+
+    ASSERT_EQ(customOp.getStaticData().size(), 0);
+
+    ASSERT_EQ(customOp.getGraphOpId(), "RX{0:[f64]}{wires:2}{}");
+    ASSERT_EQ(customOp.getGraphOpIdExplicitModifiers(false, 0, 0, false), "RX{0:[f64]}{wires:2}{}");
+}
+
+TEST(DecomposableOpInterfaceTests, MultiControlledCustomOp) {
+    std::string moduleStr = R"mlir(
+module {
+  %true = arith.constant true
+  %q0 = quantum.alloc_qb : !quantum.bit
+  %c0 = quantum.alloc_qb : !quantum.bit
+  %c1 = quantum.alloc_qb : !quantum.bit
+  %oq, %oc:2 = quantum.custom "PauliX"() %q0 ctrls(%c0, %c1) ctrlvals(%true, %true) : !quantum.bit ctrls !quantum.bit, !quantum.bit
+}
+    )mlir";
+
+    DialectRegistry registry;
+    registry.insert<mlir::arith::ArithDialect, QuantumDialect>();
+    MLIRContext context(registry);
+    ParserConfig config(&context, /*verifyAfterParse=*/false);
+    OwningOpRef<ModuleOp> module = parseSourceString<ModuleOp>(moduleStr, config);
+
+    DecomposableOp op = *module->getOps<CustomOp>().begin();
+
+    ASSERT_TRUE(op.isModifiable());
+    // Two control wires fold as `2C(...)`
+    ASSERT_EQ(op.getGraphOpId(), "2C(PauliX){}{wires:1}{}");
+    ASSERT_EQ(op.getGraphOpIdExplicitModifiers(false, 2, 0, false), "2C(PauliX){}{wires:1}{}");
+}
+
+TEST(DecomposableOpInterfaceTests, ControlledAdjointCustomOp) {
+    std::string moduleStr = R"mlir(
+module {
+  %true = arith.constant true
+  %angle = arith.constant 0.1 : f64
+  %q0 = quantum.alloc_qb : !quantum.bit
+  %c0 = quantum.alloc_qb : !quantum.bit
+  %oq, %oc = quantum.custom "RX"(%angle) %q0 adj ctrls(%c0) ctrlvals(%true) : !quantum.bit ctrls !quantum.bit
+}
+    )mlir";
+
+    DialectRegistry registry;
+    registry.insert<mlir::arith::ArithDialect, QuantumDialect>();
+    MLIRContext context(registry);
+    ParserConfig config(&context, /*verifyAfterParse=*/false);
+    OwningOpRef<ModuleOp> module = parseSourceString<ModuleOp>(moduleStr, config);
+
+    DecomposableOp op = *module->getOps<CustomOp>().begin();
+
+    ASSERT_TRUE(op.isModifiable());
+    // Modifiers fold control-outermost
+    ASSERT_EQ(op.getGraphOpId(), "1C(Adjoint(RX)){0:[f64]}{wires:1}{}");
+    ASSERT_EQ(op.getGraphOpIdExplicitModifiers(true, 1, 0, false),
+              "1C(Adjoint(RX)){0:[f64]}{wires:1}{}");
+}
+
+TEST(DecomposableOpInterfaceTests, MultiControlledAdjointCustomOp) {
+    std::string moduleStr = R"mlir(
+module {
+  %true = arith.constant true
+  %angle = arith.constant 0.1 : f64
+  %q0 = quantum.alloc_qb : !quantum.bit
+  %c0 = quantum.alloc_qb : !quantum.bit
+  %c1 = quantum.alloc_qb : !quantum.bit
+  %oq, %oc:2 = quantum.custom "RX"(%angle) %q0 adj ctrls(%c0, %c1) ctrlvals(%true, %true) : !quantum.bit ctrls !quantum.bit, !quantum.bit
+}
+    )mlir";
+
+    DialectRegistry registry;
+    registry.insert<mlir::arith::ArithDialect, QuantumDialect>();
+    MLIRContext context(registry);
+    ParserConfig config(&context, /*verifyAfterParse=*/false);
+    OwningOpRef<ModuleOp> module = parseSourceString<ModuleOp>(moduleStr, config);
+
+    DecomposableOp op = *module->getOps<CustomOp>().begin();
+
+    ASSERT_TRUE(op.isModifiable());
+    // Controls + Adjoint folding
+    ASSERT_EQ(op.getGraphOpId(), "2C(Adjoint(RX)){0:[f64]}{wires:1}{}");
+    ASSERT_EQ(op.getGraphOpIdExplicitModifiers(true, 2, 0, false),
+              "2C(Adjoint(RX)){0:[f64]}{wires:1}{}");
+}
+
+TEST(DecomposableOpInterfaceTests, MultiRZOp) {
+    std::string moduleStr = R"mlir(
+module {
+  %angle = arith.constant 3.1 : f64
+  %q0 = quantum.alloc_qb : !quantum.bit
+  %q1 = quantum.alloc_qb : !quantum.bit
+  %q2 = quantum.alloc_qb : !quantum.bit
+  %mrz:3 = quantum.multirz(%angle) %q0, %q1, %q2 : !quantum.bit, !quantum.bit, !quantum.bit
+}
+    )mlir";
+
+    // Parsing boilerplate
+    DialectRegistry registry;
+    registry.insert<mlir::arith::ArithDialect, QuantumDialect>();
+    MLIRContext context(registry);
+    ParserConfig config(&context, /*verifyAfterParse=*/false);
+    OwningOpRef<ModuleOp> module = parseSourceString<ModuleOp>(moduleStr, config);
+
+    DecomposableOp multiRZ = *module->getOps<MultiRZOp>().begin();
+
+    ASSERT_EQ(multiRZ.getOperatorName(), "MultiRZ");
+    ASSERT_TRUE(multiRZ.isModifiable());
+
+    catalyst::quantum::DynamicShape expectedDynamicShape = {
+        {"theta", {Float64Type::get(&context)}}};
+    ASSERT_EQ(multiRZ.getDynamicShape(), expectedDynamicShape);
+
+    catalyst::quantum::WireLens expectedWires = {{"wires", 3}};
+    ASSERT_EQ(multiRZ.getWireLens(), expectedWires);
+
+    ASSERT_EQ(multiRZ.getStaticData().size(), 0);
+
+    ASSERT_EQ(multiRZ.getGraphOpId(), "MultiRZ{theta:[f64]}{wires:3}{}");
+    ASSERT_EQ(multiRZ.getGraphOpIdExplicitModifiers(false, 0, 0, false),
+              "MultiRZ{theta:[f64]}{wires:3}{}");
+}
+
+TEST(DecomposableOpInterfaceTests, PauliRotOp) {
+    std::string moduleStr = R"mlir(
+module {
+  %angle = arith.constant 3.1 : f64
+  %q0 = quantum.alloc_qb : !quantum.bit
+  %q1 = quantum.alloc_qb : !quantum.bit
+  %q2 = quantum.alloc_qb : !quantum.bit
+  %0:3 = quantum.paulirot ["X", "Y", "Z"] (%angle) %q0, %q1, %q2 : !quantum.bit, !quantum.bit, !quantum.bit
+}
+    )mlir";
+
+    // Parsing boilerplate
+    DialectRegistry registry;
+    registry.insert<mlir::arith::ArithDialect, QuantumDialect>();
+    MLIRContext context(registry);
+    ParserConfig config(&context, /*verifyAfterParse=*/false);
+    OwningOpRef<ModuleOp> module = parseSourceString<ModuleOp>(moduleStr, config);
+
+    DecomposableOp paulirot = *module->getOps<PauliRotOp>().begin();
+
+    ASSERT_EQ(paulirot.getOperatorName(), "PauliRot");
+    ASSERT_TRUE(paulirot.isModifiable());
+
+    catalyst::quantum::DynamicShape expectedDynamicShape = {
+        {"theta", {Float64Type::get(&context)}}};
+    ASSERT_EQ(paulirot.getDynamicShape(), expectedDynamicShape);
+
+    catalyst::quantum::WireLens expectedWires = {{"wires", 3}};
+    ASSERT_EQ(paulirot.getWireLens(), expectedWires);
+
+    mlir::NamedAttribute entry(mlir::StringAttr::get(&context, "pauli_word"),
+                               mlir::StringAttr::get(&context, "XYZ"));
+    mlir::DictionaryAttr expectedStaticData = mlir::DictionaryAttr::get(&context, {entry});
+    ASSERT_EQ(paulirot.getStaticData(), expectedStaticData);
+
+    ASSERT_EQ(paulirot.getGraphOpId(), "PauliRot{theta:[f64]}{wires:3}{pauli_word = \"XYZ\"}");
+    ASSERT_EQ(paulirot.getGraphOpIdExplicitModifiers(false, 0, 0, false),
+              "PauliRot{theta:[f64]}{wires:3}{pauli_word = \"XYZ\"}");
+}
+
+TEST(DecomposableOpInterfaceTests, PCPhaseOP) {
+    std::string moduleStr = R"mlir(
+module {
+  %theta = arith.constant 3.7 : f64
+  %q0 = quantum.alloc_qb : !quantum.bit
+  %q1 = quantum.alloc_qb : !quantum.bit
+  %q2 = quantum.alloc_qb : !quantum.bit
+  %oq0, %oq1, %oq2 = quantum.pcphase(%theta, dim : 0) %q0, %q1 ctrls(%q2) : !quantum.bit, !quantum.bit ctrls !quantum.bit
+}
+    )mlir";
+
+    // Parsing boilerplate
+    DialectRegistry registry;
+    registry.insert<mlir::arith::ArithDialect, QuantumDialect>();
+    MLIRContext context(registry);
+    ParserConfig config(&context, /*verifyAfterParse=*/false);
+    OwningOpRef<ModuleOp> module = parseSourceString<ModuleOp>(moduleStr, config);
+
+    DecomposableOp pcphase = *module->getOps<PCPhaseOp>().begin();
+
+    ASSERT_EQ(pcphase.getOperatorName(), "PCPhase");
+    ASSERT_TRUE(pcphase.isModifiable());
+
+    catalyst::quantum::DynamicShape expectedDynamicShape = {{"phi", {Float64Type::get(&context)}}};
+    ASSERT_EQ(pcphase.getDynamicShape(), expectedDynamicShape);
+
+    // Controls are not part of the gate wires considered by the decomp interface
+    catalyst::quantum::WireLens expectedWires = {{"wires", 2}};
+    ASSERT_EQ(pcphase.getWireLens(), expectedWires);
+
+    mlir::NamedAttribute entry(mlir::StringAttr::get(&context, "dim"),
+                               mlir::IntegerAttr::get(mlir::IntegerType::get(&context, 64), 0));
+    mlir::DictionaryAttr expectedStaticData = mlir::DictionaryAttr::get(&context, {entry});
+    ASSERT_EQ(pcphase.getStaticData(), expectedStaticData);
+
+    // The op carries one control wire, folded into the id (control-outermost).
+    ASSERT_EQ(pcphase.getGraphOpId(), "1C(PCPhase){phi:[f64]}{wires:2}{dim = 0 : i64}");
+    ASSERT_EQ(pcphase.getGraphOpIdExplicitModifiers(false, 1, 0, false),
+              "1C(PCPhase){phi:[f64]}{wires:2}{dim = 0 : i64}");
+}
+
+TEST(DecomposableOpInterfaceTests, GlobalPhaseOp) {
+    std::string moduleStr = R"mlir(
+module {
+  %angle = arith.constant 3.1 : f64
+  quantum.gphase(%angle)
+}
+    )mlir";
+
+    // Parsing boilerplate
+    DialectRegistry registry;
+    registry.insert<mlir::arith::ArithDialect, QuantumDialect>();
+    MLIRContext context(registry);
+    ParserConfig config(&context, /*verifyAfterParse=*/false);
+    OwningOpRef<ModuleOp> module = parseSourceString<ModuleOp>(moduleStr, config);
+
+    DecomposableOp gphase = *module->getOps<GlobalPhaseOp>().begin();
+
+    ASSERT_EQ(gphase.getOperatorName(), "GlobalPhase");
+    ASSERT_TRUE(gphase.isModifiable());
+
+    catalyst::quantum::DynamicShape expectedDynamicShape = {
+        {"phi", {mlir::Float64Type::get(&context)}}};
+    ASSERT_EQ(gphase.getDynamicShape(), expectedDynamicShape);
+
+    catalyst::quantum::WireLens expectedWires = {};
+    ASSERT_EQ(gphase.getWireLens(), expectedWires);
+
+    ASSERT_EQ(gphase.getStaticData().size(), 0);
+
+    ASSERT_EQ(gphase.getGraphOpId(), "GlobalPhase{phi:[f64]}{}{}");
+    ASSERT_EQ(gphase.getGraphOpIdExplicitModifiers(false, 0, 0, false),
+              "GlobalPhase{phi:[f64]}{}{}");
+}
+
+TEST(DecomposableOpInterfaceTests, ControlledGlobalPhaseOp) {
+    std::string moduleStr = R"mlir(
+module {
+  %angle = arith.constant 3.1 : f64
+  %true = arith.constant true
+  %q0 = quantum.alloc_qb : !quantum.bit
+  %oq = quantum.gphase(%angle) ctrls (%q0) ctrlvals (%true) : ctrls !quantum.bit
+}
+    )mlir";
+
+    // Parsing boilerplate
+    DialectRegistry registry;
+    registry.insert<mlir::arith::ArithDialect, QuantumDialect>();
+    MLIRContext context(registry);
+    ParserConfig config(&context, /*verifyAfterParse=*/false);
+    OwningOpRef<ModuleOp> module = parseSourceString<ModuleOp>(moduleStr, config);
+
+    DecomposableOp gphase = *module->getOps<GlobalPhaseOp>().begin();
+
+    ASSERT_EQ(gphase.getOperatorName(), "GlobalPhase");
+    ASSERT_TRUE(gphase.isModifiable());
+
+    catalyst::quantum::DynamicShape expectedDynamicShape = {
+        {"phi", {mlir::Float64Type::get(&context)}}};
+    ASSERT_EQ(gphase.getDynamicShape(), expectedDynamicShape);
+
+    catalyst::quantum::WireLens expectedWires = {};
+    ASSERT_EQ(gphase.getWireLens(), expectedWires);
+
+    ASSERT_EQ(gphase.getStaticData().size(), 0);
+
+    // Controlled global phase: the control wire is folded into the id as `1C(GlobalPhase)`,
+    // which a rule maps to `PhaseShift`/`ControlledPhaseShift`.
+    ASSERT_EQ(gphase.getGraphOpId(), "1C(GlobalPhase){phi:[f64]}{}{}");
+    ASSERT_EQ(gphase.getGraphOpIdExplicitModifiers(false, 1, 0, false),
+              "1C(GlobalPhase){phi:[f64]}{}{}");
+}
+
+TEST(DecomposableOpInterfaceTests, QubitUnitaryOp) {
+    std::string moduleStr = R"mlir(
+module {
+  %matrix = "test.op"() : () -> tensor<4x4xcomplex<f64>>
+  %q0 = quantum.alloc_qb : !quantum.bit
+  %q1 = quantum.alloc_qb : !quantum.bit
+  %q2 = quantum.alloc_qb : !quantum.bit
+  %oq0, %oq1, %oq2 = quantum.unitary(%matrix : tensor<4x4xcomplex<f64>>) %q0, %q1 ctrls(%q2) : !quantum.bit, !quantum.bit ctrls !quantum.bit
+}
+    )mlir";
+
+    // Parsing boilerplate
+    DialectRegistry registry;
+    registry.insert<mlir::arith::ArithDialect, QuantumDialect>();
+    test::registerTestDialect(registry);
+    MLIRContext context(registry);
+    ParserConfig config(&context, /*verifyAfterParse=*/false);
+    OwningOpRef<ModuleOp> module = parseSourceString<ModuleOp>(moduleStr, config);
+
+    DecomposableOp unitary = *module->getOps<QubitUnitaryOp>().begin();
+
+    ASSERT_EQ(unitary.getOperatorName(), "QubitUnitary");
+    ASSERT_TRUE(unitary.isModifiable());
+
+    catalyst::quantum::DynamicShape expectedDynamicShape = {
+        {"U",
+         {mlir::RankedTensorType::get({4, 4},
+                                      mlir::ComplexType::get(mlir::Float64Type::get(&context)))}}};
+    ASSERT_EQ(unitary.getDynamicShape(), expectedDynamicShape);
+
+    catalyst::quantum::WireLens expectedWires = {{"wires", 2}};
+    ASSERT_EQ(unitary.getWireLens(), expectedWires);
+
+    ASSERT_EQ(unitary.getStaticData().size(), 0);
+
+    ASSERT_EQ(unitary.getGraphOpId(), "1C(QubitUnitary){U:[tensor<4x4xcomplex<f64>>]}{wires:2}{}");
+    ASSERT_EQ(unitary.getGraphOpIdExplicitModifiers(false, 1, 0, false),
+              "1C(QubitUnitary){U:[tensor<4x4xcomplex<f64>>]}{wires:2}{}");
+}
+
+TEST(DecomposableOpInterfaceTests, OperatorOpQubits) {
+    std::string moduleStr = R"mlir(
+module {
+  %angle = arith.constant 3.1 : f64
+  %flag = arith.constant 0 : i1
+  %index = arith.constant 5 : i64
+  %q0 = quantum.alloc_qb : !quantum.bit
+  %q1 = quantum.alloc_qb : !quantum.bit
+  %0:2 = quantum.operator "testInterfaceOp"(%flag: i1, %angle: f64, %index: i64) qubits(%q0, %q1) static_data = {"myStaticArray"=[1,2,3], "myStaticString"="Test", "myStaticInt"=4} param_map = {flag = [0], angle = [1], index = [2]} qubit_map = {wire1 = [1], wire2 = [0, 1], empty = []}
+}
+    )mlir";
+
+    // Parsing boilerplate
+    DialectRegistry registry;
+    registry.insert<mlir::arith::ArithDialect, QuantumDialect>();
+    MLIRContext context(registry);
+    ParserConfig config(&context, /*verifyAfterParse=*/false);
+    OwningOpRef<ModuleOp> module = parseSourceString<ModuleOp>(moduleStr, config);
+
+    auto operators = module->getOps<OperatorOp>();
+    DecomposableOp op = *operators.begin();
+
+    ASSERT_EQ(op.getOperatorName(), "testInterfaceOp");
+    ASSERT_TRUE(op.isModifiable());
+
+    catalyst::quantum::DynamicShape expectedDynamicShape = {
+        {"flag", {mlir::IntegerType::get(&context, 1)}},
+        {"angle", {mlir::Float64Type::get(&context)}},
+        {"index", {mlir::IntegerType::get(&context, 64)}}};
+    ASSERT_EQ(op.getDynamicShape(), expectedDynamicShape);
+
+    catalyst::quantum::WireLens expectedWires = {{"empty", 0}, {"wire1", 1}, {"wire2", 2}};
+    ASSERT_EQ(op.getWireLens(), expectedWires);
+
+    IntegerType i64 = IntegerType::get(&context, 64);
+    llvm::SmallVector<mlir::Attribute> arr({
+        mlir::IntegerAttr::get(i64, 1),
+        mlir::IntegerAttr::get(i64, 2),
+        mlir::IntegerAttr::get(i64, 3),
+    });
+    mlir::NamedAttribute arrAttr(mlir::StringAttr::get(&context, "myStaticArray"),
+                                 mlir::ArrayAttr::get(&context, arr));
+
+    mlir::NamedAttribute stringAttr(mlir::StringAttr::get(&context, "myStaticString"),
+                                    mlir::StringAttr::get(&context, "Test"));
+
+    mlir::NamedAttribute intAttr(mlir::StringAttr::get(&context, "myStaticInt"),
+                                 mlir::IntegerAttr::get(i64, 4));
+    mlir::DictionaryAttr expectedStaticData =
+        mlir::DictionaryAttr::get(&context, {arrAttr, stringAttr, intAttr});
+    ASSERT_EQ(op.getStaticData(), expectedStaticData);
+
+    ASSERT_EQ(op.getGraphOpId(),
+              "testInterfaceOp{angle:[f64],flag:[i1],index:[i64]}{empty:0,wire1:1,wire2:2}{"
+              "myStaticArray = [1, 2, 3], myStaticInt = 4 : i64, myStaticString = \"Test\"}");
+    ASSERT_EQ(op.getGraphOpIdExplicitModifiers(false, 0, 0, false),
+              "testInterfaceOp{angle:[f64],flag:[i1],index:[i64]}{empty:0,wire1:1,wire2:2}{"
+              "myStaticArray = [1, 2, 3], myStaticInt = 4 : i64, myStaticString = \"Test\"}");
+}
+
+TEST(DecomposableOpInterfaceTests, OperatorOpDistinguishesGenericAndControlWorkWires) {
+    std::string moduleStr = R"mlir(
+module {
+  %true = arith.constant true
+  %q0 = quantum.alloc_qb : !quantum.bit
+  %generic_work = quantum.alloc_qb : !quantum.bit
+  %ctrl_work = quantum.alloc_qb : !quantum.bit
+  %ctrl = quantum.alloc_qb : !quantum.bit
+  %oq:3, %oc = quantum.operator "MultiControlledX"() qubits(%q0, %generic_work, %ctrl_work)
+      ctrls(%ctrl) ctrl_vals(%true)
+      static_data = {ctrl_work_wire_type = "zeroed", work_wire_type = "borrowed"}
+      param_map = {}
+      qubit_map = {ctrl_work_wires = [2], wires = [0], work_wires = [1]}
+}
+    )mlir";
+
+    DialectRegistry registry;
+    registry.insert<mlir::arith::ArithDialect, QuantumDialect>();
+    MLIRContext context(registry);
+    ParserConfig config(&context, /*verifyAfterParse=*/false);
+    OwningOpRef<ModuleOp> module = parseSourceString<ModuleOp>(moduleStr, config);
+
+    auto operatorOp = *module->getOps<OperatorOp>().begin();
+    DecomposableOp op = operatorOp;
+    catalyst::quantum::WireLens expectedWires = {
+        {"ctrl_work_wires", 1}, {"wires", 1}, {"work_wires", 1}};
+
+    ASSERT_EQ(op.getWireLens(), expectedWires);
+    ASSERT_EQ(cast<QuantumGate>(op.getOperation()).getNonCtrlQubitOperands().size(), 3u);
+    ASSERT_TRUE(op.isModifiable());
+    ASSERT_EQ(op.getGraphOpId(),
+              "1C(MultiControlledX){}{ctrl_work_wires:1,wires:1,work_wires:1}{"
+              "ctrl_work_wire_type = \"zeroed\", work_wire_type = \"borrowed\"}");
+
+    ASSERT_EQ(op.getGraphOpIdExplicitModifiers(false, 1, 1, false),
+              "1C(MultiControlledX){}{ctrl_work_wires:1,wires:1,work_wires:1}{"
+              "ctrl_work_wire_type = \"zeroed\", work_wire_type = \"borrowed\"}");
+}
+
+TEST(DecomposableOpInterfaceTests, OperatorOpQureg) {
+    std::string moduleStr = R"mlir(
+func.func @testfunc(%first : tensor<1xi64>, %secondthird : tensor<2xi64>) {
+  %angle = arith.constant 3.1 : f64
+  %flag = arith.constant 0 : i1
+  %index = arith.constant 5 : i64
+
+  %reg = quantum.alloc(4) : !quantum.reg
+
+  %0 = quantum.operator "testOperatorQureg"(%flag: i1, %angle: f64, %index: i64) quregs(%reg) indices(%first: tensor<1xi64>, %secondthird: tensor<2xi64>) static_data={"myStaticArray"=[4,2.4,4], "myStaticString"="string", "myStaticInt"=8} param_map = {angle=[1], index=[2], flag=[0]} qubit_map = {a_reg=[1], empty=[], z_reg=[0, 1]}
+  return
+}
+    )mlir";
+
+    // Parsing boilerplate
+    DialectRegistry registry;
+    registry.insert<mlir::func::FuncDialect, mlir::arith::ArithDialect, QuantumDialect>();
+    MLIRContext context(registry);
+    ParserConfig config(&context, /*verifyAfterParse=*/false);
+    OwningOpRef<ModuleOp> module = parseSourceString<ModuleOp>(moduleStr, config);
+
+    DecomposableOp op;
+    module->walk([&](OperatorOp walkOp) { op = walkOp; });
+
+    ASSERT_EQ(op.getOperatorName(), "testOperatorQureg");
+    ASSERT_TRUE(op.isModifiable());
+
+    catalyst::quantum::DynamicShape expectedDynamicShape = {
+        {"flag", {mlir::IntegerType::get(&context, 1)}},
+        {"angle", {mlir::Float64Type::get(&context)}},
+        {"index", {mlir::IntegerType::get(&context, 64)}}};
+    ASSERT_EQ(op.getDynamicShape(), expectedDynamicShape);
+
+    catalyst::quantum::WireLens expectedWires = {{"a_reg", 2}, {"empty", 0}, {"z_reg", 3}};
+    ASSERT_EQ(op.getWireLens(), expectedWires);
+
+    IntegerType i64 = IntegerType::get(&context, 64);
+    Float64Type f64 = mlir::Float64Type::get(&context);
+    llvm::SmallVector<mlir::Attribute> arr({
+        mlir::IntegerAttr::get(i64, 4),
+        mlir::FloatAttr::get(f64, 2.4),
+        mlir::IntegerAttr::get(i64, 4),
+    });
+    mlir::NamedAttribute arrAttr(mlir::StringAttr::get(&context, "myStaticArray"),
+                                 mlir::ArrayAttr::get(&context, arr));
+
+    mlir::NamedAttribute stringAttr(mlir::StringAttr::get(&context, "myStaticString"),
+                                    mlir::StringAttr::get(&context, "string"));
+
+    mlir::NamedAttribute intAttr(mlir::StringAttr::get(&context, "myStaticInt"),
+                                 mlir::IntegerAttr::get(i64, 8));
+    mlir::DictionaryAttr expectedStaticData =
+        mlir::DictionaryAttr::get(&context, {arrAttr, stringAttr, intAttr});
+    ASSERT_EQ(op.getStaticData(), expectedStaticData);
+
+    ASSERT_EQ(op.getGraphOpId(),
+              "testOperatorQureg{angle:[f64],flag:[i1],index:[i64]}{a_reg:2,empty:0,z_reg:3}{"
+              "myStaticArray = [4, 2.400000e+00, 4], myStaticInt = 8 : i64, "
+              "myStaticString = \"string\"}");
+    ASSERT_EQ(op.getGraphOpIdExplicitModifiers(false, 0, 0, false),
+              "testOperatorQureg{angle:[f64],flag:[i1],index:[i64]}{a_reg:2,empty:0,z_reg:3}{"
+              "myStaticArray = [4, 2.400000e+00, 4], myStaticInt = 8 : i64, "
+              "myStaticString = \"string\"}");
+}
+
+TEST(DecomposableOpInterfaceTests, OperatorOpUID) {
+    std::string moduleStr = R"mlir(
+func.func @testfunc(%first : tensor<1xi64>, %secondthird : tensor<2xi64>, %arg1 : tensor<i1>, %arg2: tensor<f64>, %arg3: tensor<i64>) {
+
+  %reg = quantum.alloc(4) : !quantum.reg
+  %q0 = quantum.extract %reg[0] : !quantum.reg -> !quantum.bit
+
+    // testOperatorUID(angle=float, index=[bool, int])
+  %0 = quantum.operator "testOperatorUID"(%arg1: tensor<i1>, %arg2: tensor<f64>, %arg3: tensor<i64>)
+    UID(248) quregs(%reg) indices(%first: tensor<1xi64>, %secondthird: tensor<2xi64>) param_map = {angle=[1], index=[0, 2]} qubit_map = {reg=[0, 1]}
+  return
+}
+    )mlir";
+
+    // Parsing boilerplate
+    DialectRegistry registry;
+    registry.insert<mlir::func::FuncDialect, mlir::arith::ArithDialect, QuantumDialect>();
+    MLIRContext context(registry);
+    ParserConfig config(&context, /*verifyAfterParse=*/false);
+    OwningOpRef<ModuleOp> module = parseSourceString<ModuleOp>(moduleStr, config);
+
+    DecomposableOp op;
+    module->walk([&](OperatorOp walkOp) { op = walkOp; });
+
+    ASSERT_EQ(op.getOperatorName(), "testOperatorUID");
+    ASSERT_TRUE(op.isModifiable());
+
+    catalyst::quantum::DynamicShape expectedDynamicShape = {
+        {"index",
+         {mlir::RankedTensorType::get({}, mlir::IntegerType::get(&context, 1)),
+          mlir::RankedTensorType::get({}, mlir::IntegerType::get(&context, 64))}},
+        {"angle", {mlir::RankedTensorType::get({}, mlir::Float64Type::get(&context))}}};
+    ASSERT_EQ(op.getDynamicShape(), expectedDynamicShape);
+
+    catalyst::quantum::WireLens expectedWires = {{"reg", 3}};
+    ASSERT_EQ(op.getWireLens(), expectedWires);
+
+    ASSERT_EQ(op.getStaticData(), mlir::DictionaryAttr::get(&context, {}));
+
+    ASSERT_EQ(op.getGraphOpId(), "testOperatorUID{angle:[tensor<f64>],index:["
+                                 "tensor<i1>,tensor<i64>]}{reg:3}{}[248]");
+    ASSERT_EQ(op.getGraphOpIdExplicitModifiers(false, 0, 0, false),
+              "testOperatorUID{angle:[tensor<f64>],index:["
+              "tensor<i1>,tensor<i64>]}{reg:3}{}[248]");
+    // TODO: better separate these tests to unittests
+}
+
+TEST(DecomposableOpInterfaceTests, MeasurementOpQubits) {
+    std::string moduleStr = R"mlir(
+module {
+  %q0 = quantum.alloc_qb : !quantum.bit
+  %q1 = quantum.alloc_qb : !quantum.bit
+  %m, %out:2 = quantum.measurement "PauliMeasure"() qubits(%q0, %q1)
+      static_data = {pauli_word = "XY"}
+      qubit_map = {wires = [0, 1]}
+      : (i1, !quantum.bit, !quantum.bit)
+}
+    )mlir";
+
+    DialectRegistry registry;
+    registry.insert<QuantumDialect>();
+    MLIRContext context(registry);
+    ParserConfig config(&context, /*verifyAfterParse=*/false);
+    OwningOpRef<ModuleOp> module = parseSourceString<ModuleOp>(moduleStr, config);
+
+    DecomposableOp op = *module->getOps<MeasurementOp>().begin();
+
+    ASSERT_EQ(op.getOperatorName(), "PauliMeasure");
+    ASSERT_FALSE(op.isModifiable());
+    ASSERT_EQ(op.getExtraData(), "");
+
+    ASSERT_TRUE(op.getDynamicShape().empty());
+
+    catalyst::quantum::WireLens expectedWires = {{"wires", 2}};
+    ASSERT_EQ(op.getWireLens(), expectedWires);
+
+    mlir::NamedAttribute pauliWord(mlir::StringAttr::get(&context, "pauli_word"),
+                                   mlir::StringAttr::get(&context, "XY"));
+    ASSERT_EQ(op.getStaticData(), mlir::DictionaryAttr::get(&context, {pauliWord}));
+
+    ASSERT_EQ(op.getGraphOpId(), "PauliMeasure{}{wires:2}{pauli_word = \"XY\"}");
+}
+
+TEST(DecomposableOpInterfaceTests, MeasurementOpMultiParams) {
+    std::string moduleStr = R"mlir(
+module {
+  %angle = arith.constant 3.1 : f64
+  %flag = arith.constant 0 : i1
+  %index = arith.constant 5 : i64
+  %q0 = quantum.alloc_qb : !quantum.bit
+  %q1 = quantum.alloc_qb : !quantum.bit
+  %m, %out:2 = quantum.measurement "MeasureMultiParams"(%flag: i1, %angle: f64, %index: i64) qubits(%q0, %q1)
+      param_map = {flag = [0], angle = [1], index = [2]} qubit_map = {wires = [0, 1]}
+      : (i1, !quantum.bit, !quantum.bit)
+}
+    )mlir";
+
+    DialectRegistry registry;
+    registry.insert<mlir::arith::ArithDialect, QuantumDialect>();
+    MLIRContext context(registry);
+    ParserConfig config(&context, /*verifyAfterParse=*/false);
+    OwningOpRef<ModuleOp> module = parseSourceString<ModuleOp>(moduleStr, config);
+
+    DecomposableOp op = *module->getOps<MeasurementOp>().begin();
+
+    ASSERT_EQ(op.getOperatorName(), "MeasureMultiParams");
+    ASSERT_FALSE(op.isModifiable());
+
+    catalyst::quantum::DynamicShape expectedDynamicShape = {
+        {"flag", {mlir::IntegerType::get(&context, 1)}},
+        {"angle", {mlir::Float64Type::get(&context)}},
+        {"index", {mlir::IntegerType::get(&context, 64)}}};
+    ASSERT_EQ(op.getDynamicShape(), expectedDynamicShape);
+
+    catalyst::quantum::WireLens expectedWires = {{"wires", 2}};
+    ASSERT_EQ(op.getWireLens(), expectedWires);
+
+    ASSERT_EQ(op.getGraphOpId(),
+              "MeasureMultiParams{angle:[f64],flag:[i1],index:[i64]}{wires:2}{}");
+}
+
+TEST(DecomposableOpInterfaceTests, MeasurementOpQureg) {
+    std::string moduleStr = R"mlir(
+func.func @testfunc(%wires : tensor<2xi64>) {
+  %reg = quantum.alloc(4) : !quantum.reg
+  %m, %out = quantum.measurement "MeasureQreg"() quregs(%reg) indices(%wires: tensor<2xi64>)
+      qubit_map = {wires = [0]}
+      : (i1, !quantum.reg)
+  return
+}
+    )mlir";
+
+    DialectRegistry registry;
+    registry.insert<mlir::func::FuncDialect, QuantumDialect>();
+    MLIRContext context(registry);
+    ParserConfig config(&context, /*verifyAfterParse=*/false);
+    OwningOpRef<ModuleOp> module = parseSourceString<ModuleOp>(moduleStr, config);
+
+    DecomposableOp op;
+    module->walk([&](MeasurementOp walkOp) { op = walkOp; });
+
+    ASSERT_EQ(op.getOperatorName(), "MeasureQreg");
+    ASSERT_FALSE(op.isModifiable());
+    ASSERT_EQ(op.getExtraData(), "");
+
+    catalyst::quantum::WireLens expectedWires = {{"wires", 2}};
+    ASSERT_EQ(op.getWireLens(), expectedWires);
+
+    ASSERT_EQ(op.getGraphOpId(), "MeasureQreg{}{wires:2}{}");
+}

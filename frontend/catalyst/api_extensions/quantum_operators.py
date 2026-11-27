@@ -31,11 +31,12 @@ from jax._src.tree_util import tree_flatten
 from jax.api_util import debug_info
 from jax.core import get_aval
 from pennylane import QueuingManager
+from pennylane.core.qscript import QuantumScript
+from pennylane.core.queuing import AnnotatedQueue
 from pennylane.decomposition.resources import resolve_work_wire_type
 from pennylane.operation import Operator, Operator2
 from pennylane.ops.op_math.adjoint import create_adjoint_op
 from pennylane.ops.op_math.controlled import create_controlled_op, create_controlled_op2
-from pennylane.tape import QuantumTape
 
 from catalyst.api_extensions.control_flow import cond
 from catalyst.jax_extras import (
@@ -243,7 +244,7 @@ def pauli_measure(
     return m
 
 
-def adjoint(f: Union[Callable, Operator], lazy=True) -> Union[Callable, Operator]:
+def adjoint(f: Union[Callable, Operator]) -> Union[Callable, Operator]:
     """A :func:`~.qjit` compatible adjoint transformer for PennyLane/Catalyst.
 
     Returns a quantum function or operator that applies the adjoint of the
@@ -257,11 +258,6 @@ def adjoint(f: Union[Callable, Operator], lazy=True) -> Union[Callable, Operator
     Args:
         f (Callable or Operator): A PennyLane operation or a Python function
                                   containing PennyLane quantum operations.
-        lazy (bool): Whether to delay the computation of the Hermitian conjugate until a later time
-                     (typically during decomposition or compilation). The default is ``True``,
-                     whereas ``False`` will immediately produce a new operator implementing the
-                     adjoint. Note that ``False`` is only supported when the adjoint is applied to
-                     a single Operator, rather than a quantum function.
 
     Returns:
         If an Operator is provided, returns an Operator that is the adjoint. If
@@ -312,7 +308,7 @@ def adjoint(f: Union[Callable, Operator], lazy=True) -> Union[Callable, Operator
     [1.00000000e+00 7.39557099e-32]
     """
 
-    adj = AdjointCallable(f, lazy=lazy)
+    adj = AdjointCallable(f)
 
     # Return an instantiated version of the Adjoint class if we receive an operator instance.
     return adj() if isinstance(f, Operator) else adj
@@ -482,9 +478,8 @@ class MidCircuitPauliMeasure(HybridOp):
 class AdjointCallable:
     """Callable wrapper to produce an adjoint instance."""
 
-    def __init__(self, target, lazy):
+    def __init__(self, target):
         self.target = target
-        self.lazy = lazy
 
         if isinstance(target, Operator):
             # Case 1: User passed an already instantiated operation, e.g. adjoint(qp.Hadamard(0))
@@ -507,27 +502,11 @@ class AdjointCallable:
     def __call__(self, *args, **kwargs):
         if self.single_op:
             base_op = self.target if self.instantiated else self.target(*args, **kwargs)
-            return create_adjoint_op(base_op, self.lazy)
-
-        if not self.lazy:
-            return self._expand_adjoint_callable(args, kwargs)
+            return create_adjoint_op(base_op)
 
         tracing_artifacts = self.trace_body(args, kwargs)
         dbg = tracing_artifacts[3]
         return HybridAdjoint(*tracing_artifacts[0:3], debug_info=dbg)
-
-    def _expand_adjoint_callable(self, args, kwargs):
-        """Expand a callable into individual ops, then reverse and adjoint each one."""
-        with QueuingManager.stop_recording(), QuantumTape() as tape:
-            self.target(*args, **kwargs)
-
-        for op in reversed(tape.operations):
-            # For Adjoint of HybridAdjoint, we still create the HybridAdjoint of HybridAdjoint, so
-            # that the MLIR adjoint-lowering pass can handle the reversal.
-            if isinstance(op, HybridOp):
-                AdjointCallable(lambda bound_op=op: qp.apply(bound_op) and None, lazy=True)()
-            else:
-                create_adjoint_op(op, lazy=False)
 
     def trace_body(self, args, kwargs):
         """Generate a HybridOpRegion for use by Catalyst."""
@@ -537,10 +516,10 @@ class AdjointCallable:
         # Allow the creation of HybridAdjoint instances outside of any contexts.
         # Don't create a JAX context here as otherwise we could be dealing with escaped tracers.
         if not EvaluationContext.is_tracing():
-            # QuantumTapes can themselves appear in queuing records.
-            with QueuingManager.stop_recording(), QuantumTape() as quantum_tape:
+            with QueuingManager.stop_recording(), AnnotatedQueue() as queue:
                 self.target(*args, **kwargs)
 
+            quantum_tape = QuantumScript.from_queue(queue)
             adjoint_region = HybridOpRegion(None, quantum_tape, [], [])
 
             return [], [], [adjoint_region], dbg
@@ -552,7 +531,7 @@ class AdjointCallable:
             arg_classical_tracers = _input_type_to_tracers(
                 partial(inner_trace.new_arg, source_info=current_source_info()), in_avals
             )
-            with QueuingManager.stop_recording(), QuantumTape() as quantum_tape:
+            with QueuingManager.stop_recording(), AnnotatedQueue() as queue:
                 # FIXME: move all to_jaxpr_tracer calls into a separate function
                 res_classical_tracers = [
                     inner_trace.to_jaxpr_tracer(t, source_info=current_source_info())
@@ -560,6 +539,7 @@ class AdjointCallable:
                     if isinstance(t, DynamicJaxprTracer)
                 ]
 
+            quantum_tape = QuantumScript.from_queue(queue)
             _check_no_measurements(quantum_tape)
 
             adjoint_region = HybridOpRegion(
@@ -629,10 +609,7 @@ class HybridAdjoint(HybridOp):
             for op in self.regions[0].quantum_tape.operations
         ), "Cannot decompose Adjoint(HybridOp) in PennyLane"
 
-        return [
-            create_adjoint_op(op, lazy=True)
-            for op in reversed(self.regions[0].quantum_tape.operations)
-        ]
+        return [create_adjoint_op(op) for op in reversed(self.regions[0].quantum_tape.operations)]
 
 
 class CtrlCallable:
@@ -696,18 +673,19 @@ class CtrlCallable:
         # Allow the creation of HybridCtrl instances outside of any contexts.
         # Don't create a JAX context here as otherwise we could be dealing with escaped tracers.
         if not EvaluationContext.is_tracing():
-            # QuantumTapes can themselves appear in queuing records.
-            with QueuingManager.stop_recording(), QuantumTape() as quantum_tape:
+            with QueuingManager.stop_recording(), AnnotatedQueue() as queue:
                 self.target(*args, **kwargs)
 
+            quantum_tape = QuantumScript.from_queue(queue)
             ctrl_region = HybridOpRegion(None, quantum_tape, [], [])
 
             return [], [], [ctrl_region]
 
         # Create a nested jaxpr scope for the body of the adjoint.
         in_classical_tracers, _ = tree_flatten((args, kwargs))
-        with QueuingManager.stop_recording(), QuantumTape() as quantum_tape:
+        with QueuingManager.stop_recording(), AnnotatedQueue() as queue:
             res = self.target(*args, **kwargs)
+        quantum_tape = QuantumScript.from_queue(queue)
         out_classical_tracers, _ = tree_flatten(res)
 
         _check_no_measurements(quantum_tape)
@@ -794,19 +772,19 @@ class HybridCtrl(HybridOp):
         new_ops = []
         for op in self.regions[0].quantum_tape.operations:
             new_ops.append(op.map_wires(wire_map))
-        self.regions[0].quantum_tape = QuantumTape(new_ops, [])
+        self.regions[0].quantum_tape = QuantumScript(new_ops, [])
         self._control_wires = [wire_map.get(wire, wire) for wire in self._control_wires]
         self._work_wires = [wire_map.get(wire, wire) for wire in self._work_wires]
         return self
 
 
 def ctrl_distribute(
-    tape: QuantumTape,
+    tape: QuantumScript,
     control_wires: List[Any],
     control_values: List[Any],
     work_wires: Optional[List[Any]] = None,
     work_wire_type: str = "borrowed",
-) -> QuantumTape:
+) -> QuantumScript:
     """Distribute the quantum control operation, described by ``control_wires`` and
     ``control_values``, over all the operations on the nested quantum tape.
     """
@@ -861,7 +839,7 @@ def ctrl_distribute(
                             work_wires,
                             work_wire_type,
                         )
-                        region.quantum_tape = QuantumTape(
+                        region.quantum_tape = QuantumScript(
                             nested_ops, region.quantum_tape.measurements
                         )
                 new_ops.append(op)
@@ -874,7 +852,7 @@ def ctrl_distribute(
                 work_wires=work_wires,
                 work_wire_type=work_wire_type,
             )
-            new_ops.append(create_adjoint_op(ctrl_op, lazy=True))
+            new_ops.append(create_adjoint_op(ctrl_op))
         else:
             if isinstance(op, Operator2):
                 ctrl_op = create_controlled_op2(
@@ -897,7 +875,7 @@ def ctrl_distribute(
 
 
 ## PRIVATE ##
-def _check_no_measurements(tape: QuantumTape) -> None:
+def _check_no_measurements(tape: QuantumScript) -> None:
     """Check the nested quantum tape for the absense of quantum measurements of any kind"""
 
     if len(tape.measurements) > 0:

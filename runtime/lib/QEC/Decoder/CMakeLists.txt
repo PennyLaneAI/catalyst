@@ -8,3 +8,5 @@ target_include_directories(rt_decoder
 )
 
 set_property(TARGET rt_decoder PROPERTY POSITION_INDEPENDENT_CODE ON)
+
+catalyst_runtime_install(rt_decoder)

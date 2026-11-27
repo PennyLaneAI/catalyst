@@ -187,9 +187,11 @@ class ExecutorConfig:
     sudo: bool = False
     """Run the executor as root, for a target whose devices are not world-accessible."""
 
-    sudo_password: str | None = None
-    """Password piped to ``sudo -S``; unneeded with passwordless sudo. Supplying one drops the SSH
-    TTY, so closing the session no longer signals the executor and teardown falls to ``pkill``."""
+    sudo_password_env: str | None = None
+    """Name of the local environment variable holding the password to pipe to ``sudo -S``, read
+    only if the target's sudo asks for one. Unset, or naming an unset variable, prompts
+    instead; unneeded with passwordless sudo. A password drops the SSH TTY, so closing the session
+    no longer signals the executor and teardown falls to ``pkill``."""
 
     executor_bin: str | None = None
     """Command that starts the executor, for wrapping it in something like ``numactl``. Defaults to
@@ -239,7 +241,7 @@ class Executor:
         ready_timeout: float = 60.0,
         name: str = "executor",
         sudo: bool = False,
-        sudo_password: str | None = None,
+        sudo_password_env: str | None = None,
         executor_bin: str | None = None,
         triple: str | None = None,
         env: dict[str, str] | None = None,
@@ -257,7 +259,7 @@ class Executor:
             deploy=deploy,
             ready_timeout=ready_timeout,
             sudo=sudo,
-            sudo_password=sudo_password,
+            sudo_password_env=sudo_password_env,
             executor_bin=executor_bin,
             triple=triple,
             env=env,
@@ -361,7 +363,9 @@ class Executor:
         user, host, workspace = self._remote_target()
         ws_pinned = self._cfg.workspace is not None  # pinned dirs are left in place on teardown
         sudo_pw = (
-            RemoteOps.resolve_sudo(user, host, self._cfg.sudo_password) if self._cfg.sudo else None
+            RemoteOps.resolve_sudo(user, host, self._cfg.sudo_password_env)
+            if self._cfg.sudo
+            else None
         )
         RemoteOps.mkdir(user, host, workspace)  # the launch command cd's into it
         self._deploy_sources(user, host, workspace)

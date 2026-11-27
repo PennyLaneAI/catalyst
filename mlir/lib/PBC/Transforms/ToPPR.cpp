@@ -20,6 +20,7 @@
 
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/STLForwardCompat.h"
+#include "llvm/ADT/StringSwitch.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/BuiltinAttributes.h"
@@ -57,6 +58,7 @@ enum class GateEnum {
     S,
     T,
     CNOT,
+    CY,
     CZ,
     X,
     Y,
@@ -82,6 +84,8 @@ GateEnum hashGate(CustomOp op) {
         return GateEnum::T;
     } else if (gateName == "CNOT") {
         return GateEnum::CNOT;
+    } else if (gateName == "CY") {
+        return GateEnum::CY;
     } else if (gateName == "CZ") {
         return GateEnum::CZ;
     } else if (gateName == "PauliX" || gateName == "X") {
@@ -274,6 +278,11 @@ LogicalResult convertCNOTGate(CustomOp op, ConversionPatternRewriter &rewriter) 
     return controlledConversion(op, "Z", "X", rewriter);
 }
 
+LogicalResult convertCYGate(CustomOp op, ConversionPatternRewriter &rewriter) {
+    applyGlobalPhase(op->getLoc(), llvm::numbers::pi / 4, rewriter);
+    return controlledConversion(op, "Z", "Y", rewriter);
+}
+
 LogicalResult convertCZGate(CustomOp op, ConversionPatternRewriter &rewriter) {
     applyGlobalPhase(op->getLoc(), llvm::numbers::pi / 4, rewriter);
     return controlledConversion(op, "Z", "Z", rewriter);
@@ -430,11 +439,35 @@ LogicalResult convertPauliRotGate(PauliRotOp op, ConversionPatternRewriter &rewr
                                    op.getAdjoint(), rewriter);
 }
 
-LogicalResult convertPPROperator(OperatorOp op, ConversionPatternRewriter &rewriter) {
-    assert(op.getAllParams().empty() && "PPR operator does not support dynamic parameters");
+// The PPR_k operators (k = 2, 4, 8) carry their angle denominator in the op name.
+std::optional<int8_t> getPPROperatorDenominator(OperatorOp op) {
+    return llvm::StringSwitch<std::optional<int8_t>>(op.getOpName())
+        .Case("PPR_2", 2)
+        .Case("PPR_4", 4)
+        .Case("PPR_8", 8)
+        .Default(std::nullopt);
+}
+
+LogicalResult convertPPROperator(OperatorOp op, int8_t denominator,
+                                 ConversionPatternRewriter &rewriter) {
+    if (!op.getAllParams().empty()) {
+        return op.emitError("PPR operators do not support dynamic parameters");
+    }
 
     DictionaryAttr staticData = op.getStaticData();
-    auto pauliWordAttr = staticData.getAs<StringAttr>("pauli_word");
+    StringAttr pauliWordAttr = staticData ? staticData.getAs<StringAttr>("pauli_word") : nullptr;
+    IntegerAttr signAttr = staticData ? staticData.getAs<IntegerAttr>("sign") : nullptr;
+    // A boolean sign is stored as an i1 attribute, which must not be read as +-1.
+    if (!pauliWordAttr || !signAttr || signAttr.getType().isInteger(1)) {
+        return op.emitError("PPR operators require static_data with a string 'pauli_word' and an "
+                            "integer 'sign'");
+    }
+    // don't use getInt, since it asserts signless (cannot handle signed data)
+    int64_t sign = signAttr.getValue().getSExtValue();
+    if (sign != 1 && sign != -1) {
+        return op.emitError("PPR operators require a sign of 1 or -1, but got ") << sign;
+    }
+
     StringRef pauliWord = pauliWordAttr.getValue();
     SmallVector<Attribute> pauliCharacters;
     pauliCharacters.reserve(pauliWord.size());
@@ -443,9 +476,7 @@ LogicalResult convertPPROperator(OperatorOp op, ConversionPatternRewriter &rewri
     }
     ArrayAttr pauliProduct = rewriter.getArrayAttr(pauliCharacters);
 
-    auto denominatorAttr = staticData.getAs<IntegerAttr>("angle_denominator");
-    // don't use getInt, since it asserts signless (cannot handle signed data)
-    int8_t rotationKind = static_cast<int8_t>(denominatorAttr.getValue().getSExtValue());
+    int8_t rotationKind = static_cast<int8_t>(sign * denominator);
     if (op.getAdjoint()) {
         rotationKind = -rotationKind;
     }
@@ -465,8 +496,9 @@ struct PBCGateLowering : public OpInterfaceConversionPattern<QuantumOperation> {
 
     LogicalResult matchAndRewrite(QuantumOperation operation, ArrayRef<Value> operands,
                                   ConversionPatternRewriter &rewriter) const final {
-        StringRef supportedGates = "Supported gates: H, S, T, X, Y, Z, S†, T†, I, CNOT, CZ, PPR,"
-                                   "RX, RY, RZ, IsingXX, IsingYY, IsingZZ, MultiRZ, and PauliRot.";
+        StringRef supportedGates =
+            "Supported gates: H, S, T, X, Y, Z, S†, T†, I, CNOT, CY, CZ, PPR_2, PPR_4, PPR_8, "
+            "RX, RY, RZ, IsingXX, IsingYY, IsingZZ, MultiRZ, and PauliRot.";
         Operation *op = operation.getOperation();
 
         if (auto gateLikeOp = dyn_cast<QuantumGate>(op)) {
@@ -491,6 +523,8 @@ struct PBCGateLowering : public OpInterfaceConversionPattern<QuantumOperation> {
                 return convertZGate(originOp, rewriter);
             case GateEnum::CNOT:
                 return convertCNOTGate(originOp, rewriter);
+            case GateEnum::CY:
+                return convertCYGate(originOp, rewriter);
             case GateEnum::CZ:
                 return convertCZGate(originOp, rewriter);
             case GateEnum::I:
@@ -515,8 +549,8 @@ struct PBCGateLowering : public OpInterfaceConversionPattern<QuantumOperation> {
         } else if (auto originOp = dyn_cast<PauliRotOp>(op)) {
             return convertPauliRotGate(originOp, rewriter);
         } else if (auto originOp = dyn_cast<OperatorOp>(op)) {
-            if (originOp.getOpName() == "PPR") {
-                return convertPPROperator(originOp, rewriter);
+            if (auto denominator = getPPROperatorDenominator(originOp)) {
+                return convertPPROperator(originOp, *denominator, rewriter);
             }
         }
 
@@ -533,6 +567,56 @@ struct PBCMeasureLowering : public OpConversionPattern<MeasureOp> {
     }
 };
 
+struct PBCPauliMeasureLowering : public OpConversionPattern<MeasurementOp> {
+    using OpConversionPattern::OpConversionPattern;
+
+    LogicalResult matchAndRewrite(MeasurementOp op, OpAdaptor adaptor,
+                                  ConversionPatternRewriter &rewriter) const final {
+        if (op.getOpName() != "PauliMeasure") {
+            return failure();
+        }
+        if (!op.getParams().empty() || op.getInQreg() || !op.getArrQubitIndices().empty()) {
+            return rewriter.notifyMatchFailure(op, "expected explicit qubits and no parameters");
+        }
+        auto results = op.getMres();
+        if (results.size() > 1 || (!results.empty() && !results.front().getType().isInteger(1))) {
+            return rewriter.notifyMatchFailure(op, "expected at most one i1 measurement result");
+        }
+
+        auto staticData = op.getStaticData();
+        auto pauliWord = staticData.getAs<StringAttr>("pauli_word");
+        if (!pauliWord || pauliWord.getValue().size() != op.getInQubits().size()) {
+            return rewriter.notifyMatchFailure(op,
+                                               "expected a Pauli word matching the qubit count");
+        }
+        if (auto postselect = staticData.get("postselect");
+            postselect && !isa<TypeAttr>(postselect)) {
+            return op.emitOpError("postselection is not supported by PBC conversion");
+        }
+        for (NamedAttribute entry : staticData) {
+            StringRef key = entry.getName();
+            if (key != "pauli_word" && key != "postselect" && key != "meas_uid") {
+                return op.emitOpError()
+                       << "static_data entry '" << key << "' is not supported by PBC conversion";
+            }
+        }
+
+        SmallVector<Attribute> paulis;
+        for (char pauli : pauliWord.getValue()) {
+            paulis.push_back(rewriter.getStringAttr(StringRef(&pauli, 1)));
+        }
+        auto ppm = PPMeasurementOp::create(rewriter, op.getLoc(), rewriter.getArrayAttr(paulis),
+                                           op.getInQubits());
+        SmallVector<Value> replacements;
+        if (!results.empty()) {
+            replacements.push_back(ppm.getMres());
+        }
+        llvm::append_range(replacements, ppm.getOutQubits());
+        rewriter.replaceOp(op, replacements);
+        return success();
+    }
+};
+
 } // namespace
 
 namespace catalyst {
@@ -541,6 +625,7 @@ namespace pbc {
 void populateToPPRPatterns(RewritePatternSet &patterns) {
     patterns.add<PBCGateLowering>(patterns.getContext());
     patterns.add<PBCMeasureLowering>(patterns.getContext());
+    patterns.add<PBCPauliMeasureLowering>(patterns.getContext());
 }
 
 } // namespace pbc

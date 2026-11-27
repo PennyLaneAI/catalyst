@@ -19,7 +19,9 @@ with the compiler and device.
 
 from typing import Any, Callable, List, Sequence
 
+import pennylane as qp
 from pennylane import transform
+from pennylane.core.qscript import QuantumScript
 from pennylane.devices.capabilities import DeviceCapabilities, OperatorProperties
 from pennylane.measurements import (
     ExpectationMP,
@@ -43,7 +45,6 @@ from pennylane.ops import (
     StatePrep,
     SymbolicOp,
 )
-from pennylane.tape import QuantumTape
 
 from catalyst.api_extensions import Cond, ForLoop, HybridAdjoint, HybridCtrl, Switch, WhileLoop
 from catalyst.device.op_support import (
@@ -118,7 +119,7 @@ EMPTY_PROPERTIES = OperatorProperties()
 
 
 @transform
-def verify_no_state_variance_returns(tape: QuantumTape) -> None:
+def verify_no_state_variance_returns(tape: QuantumScript) -> None:
     """Verify that no measuremnts contain state or variance."""
 
     if any(isinstance(m, (StateMP, VnEntropyMP, MutualInfoMP)) for m in tape.measurements):
@@ -131,7 +132,7 @@ def verify_no_state_variance_returns(tape: QuantumTape) -> None:
 
 
 @transform
-def verify_operations(tape: QuantumTape, grad_method, qjit_device):
+def verify_operations(tape: QuantumScript, grad_method, qjit_device):
     """verify the quantum program against Catalyst requirements. This transform makes no
     transformations.
 
@@ -210,6 +211,14 @@ def verify_operations(tape: QuantumTape, grad_method, qjit_device):
         # we can't use isinstance(op, Controlled).
         if type(op) in _CONTROLLED_WRAPPER_TYPES or isinstance(op, Adjoint):
             pass
+        elif isinstance(op, (qp.allocation.Allocate, qp.allocation.Deallocate)):
+            # TODO: validate unsupported allocate state/restored combinations here
+            # once they are exposed on tape ops during verification.
+            if not qjit_device.capabilities.dynamic_qubit_management:
+                raise CompileError(
+                    f"Dynamic qubit allocation is not supported on "
+                    f"'{qjit_device.original_device.name}' device"
+                )
         elif not op.name in supported_ops:
             raise CompileError(
                 f"{op.name} is not supported on '{qjit_device.original_device.name}' device"
@@ -241,7 +250,7 @@ def verify_operations(tape: QuantumTape, grad_method, qjit_device):
 
 
 @transform
-def validate_observables_parameter_shift(tape: QuantumTape):
+def validate_observables_parameter_shift(tape: QuantumScript):
     """Validate that the observables on the tape support parameter shift"""
 
     # ToDo: add verification support for Composite and Symbolic op
@@ -261,7 +270,7 @@ def validate_observables_parameter_shift(tape: QuantumTape):
 
 
 @transform
-def validate_observables_adjoint_diff(tape: QuantumTape, qjit_device):
+def validate_observables_adjoint_diff(tape: QuantumScript, qjit_device):
     """Validate that the observables on the tape support adjoint differentiation"""
 
     def _obs_checker(obs):
@@ -280,19 +289,19 @@ def validate_observables_adjoint_diff(tape: QuantumTape, qjit_device):
 
 @transform
 def validate_measurements(
-    tape: QuantumTape, capabilities: DeviceCapabilities, name: str, shots: ShotsLike = None
-) -> (Sequence[QuantumTape], Callable):
+    tape: QuantumScript, capabilities: DeviceCapabilities, name: str, shots: ShotsLike = None
+) -> (Sequence[QuantumScript], Callable):
     """Validates the observables and measurements for a circuit against the capabilites
     from the TOML file.
 
     Args:
-        tape (QuantumTape or QNode or Callable): a quantum circuit.
+        tape (QuantumScript or QNode or Callable): a quantum circuit.
         capabilities (DeviceCapabilities): specifies the capabilities of the qjitted device
         name: the name of the device to use in error messages
         shots: the shots on the device to use in error messages
 
     Returns:
-        qnode (QNode) or quantum function (Callable) or tuple[List[.QuantumTape], function]:
+        qnode (QNode) or quantum function (Callable) or tuple[List[.QuantumScript], function]:
         The unaltered input circuit.
 
     Raises:

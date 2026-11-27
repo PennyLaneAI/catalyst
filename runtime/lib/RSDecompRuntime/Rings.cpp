@@ -40,6 +40,24 @@ ZSqrtTwo::ZSqrtTwo(INT_TYPE a, INT_TYPE b) : a(a), b(b) {}
 bool ZSqrtTwo::operator==(const ZSqrtTwo &other) const { return a == other.a && b == other.b; }
 
 /**
+ * @brief Exact sign of a + b * sqrt(2) as -1, 0 or 1.
+ */
+int ZSqrtTwo::sign() const {
+    int sign_a = (a > 0) - (a < 0);
+    int sign_b = (b > 0) - (b < 0);
+    if (sign_a == sign_b || sign_b == 0) {
+        return sign_a != 0 ? sign_a : sign_b;
+    }
+    if (sign_a == 0) {
+        return sign_b;
+    }
+    // a and b have opposite signs, so the term with the larger magnitude wins.
+    INT_TYPE a2 = a * a;
+    INT_TYPE b2 = 2 * b * b;
+    return a2 > b2 ? sign_a : sign_b;
+}
+
+/**
  * @brief Addition operator for ZSqrtTwo elements.
  */
 ZSqrtTwo ZSqrtTwo::operator+(const ZSqrtTwo &other) const {

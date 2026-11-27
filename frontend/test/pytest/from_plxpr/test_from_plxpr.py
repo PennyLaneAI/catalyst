@@ -25,6 +25,7 @@ from pennylane.capture.primitives import (
     for_loop_prim,
     while_loop_prim,
 )
+from pennylane.testing import find_eqns
 
 import catalyst
 from catalyst.from_plxpr import from_plxpr
@@ -444,9 +445,8 @@ class TestAdjointCtrl:
 
         # Located by primitive rather than position: decomposition-rule definitions are appended
         # to the end of the kernel, so the operator is not at a fixed offset from it.
-        op_eqns = [eqn for eqn in qfunc_xpr.eqns if eqn.primitive == qref_operator_p]
-        assert len(op_eqns) == 1
-        assert op_eqns[0].params == {
+        [op_eqn] = find_eqns(qfunc_xpr, qref_operator_p)
+        assert op_eqn.params == {
             "adjoint": num_adjoints % 2 == 1,
             "forward_mask": (),
             "hybrid_lens": (),
@@ -496,6 +496,62 @@ class TestAdjointCtrl:
         assert eqn.invars[6].val == True
         assert eqn.invars[7].val == False
 
+    @pytest.mark.parametrize("work_wire_type", ("zeroed", "borrowed"))
+    def test_ctrl_op_work_wires(self, work_wire_type):
+        """Test the work wires of a controlled operator trail its control values."""
+
+        qp.capture.enable()
+
+        @qp.qnode(qp.device("lightning.qubit", wires=4))
+        def c(x):
+            qp.ctrl(qp.RX(x, 0), (1, 2), work_wires=[3], work_wire_type=work_wire_type)
+            return qp.state()
+
+        plxpr = jax.make_jaxpr(c)(0.5)
+        catalyst_xpr = from_plxpr(plxpr)(0.5)
+
+        qfunc_xpr = catalyst_xpr.eqns[0].params["call_jaxpr"]
+        eqn = qfunc_xpr.eqns[6]  # dev, qreg, four allocations
+        assert eqn.primitive == qref_operator_p
+        assert eqn.params == {
+            "hybrid_lens": (),
+            "hybrid_trees": (),
+            "forward_mask": (),
+            "adjoint": False,
+            "n_ctrls": 2,
+            "n_ctrl_work_wires": 1,
+            "ctrl_work_wire_type": work_wire_type,
+            "op_cls": qp.RX,
+            "wire_lens": (1,),
+        }
+        assert eqn.invars[0] is qfunc_xpr.invars[0]
+        assert eqn.invars[1] is qfunc_xpr.eqns[2].outvars[0]
+        assert eqn.invars[2] is qfunc_xpr.eqns[3].outvars[0]
+        assert eqn.invars[3] is qfunc_xpr.eqns[4].outvars[0]
+        assert eqn.invars[4].val == True
+        assert eqn.invars[5].val == True
+        assert eqn.invars[6] is qfunc_xpr.eqns[5].outvars[0]
+
+    def test_ctrl_op_work_wires_lowering(self):
+        """Test lowering consumes the work wires of a controlled operator rather than mistaking
+        them for its control or target qubits."""
+
+        @qp.qjit(capture=True, target="mlir")
+        @qp.qnode(qp.device("null.qubit", wires=4))
+        def circuit():
+            qp.ctrl(qp.RX(0.5, 0), (1, 2), work_wires=[3], work_wire_type="zeroed")
+            qp.ctrl(qp.MultiRZ(0.5, [0, 1]), 2, work_wires=[3])
+            return qp.state()
+
+        qnode = circuit.mlir.split("quantum.node} {", 1)[1].split("func.func", 1)[0]
+        assert (
+            "qref.ctrl(%2, %3) ctrlvals(%true, %true) work_wires(%4) "
+            'attributes {work_wire_type = "zeroed"} {' in qnode
+        )
+        assert 'qref.custom "RX"(%cst) %1 : !qref.bit' in qnode
+        assert "qref.ctrl(%7) ctrlvals(%true) work_wires(%8) {" in qnode
+        assert "qref.multirz(%cst) %5, %6 : !qref.bit, !qref.bit" in qnode
+
     def test_qfunc_ctrl_operator2_preserves_control_context(self):
         """Test that a qfunc control lowers to a qref.ctrl region wrapping the Operator2 body."""
 
@@ -513,12 +569,68 @@ class TestAdjointCtrl:
         eqn = qfunc_xpr.eqns[3]
         assert eqn.primitive == ctrl_transform_prim
         assert eqn.params["n_control"] == 1
-        assert eqn.params["control_values"] == (False,)
-        assert eqn.invars[-1] is qfunc_xpr.eqns[2].outvars[0]
+        assert "control_values" not in eqn.params
+        assert eqn.invars[-2] is qfunc_xpr.eqns[2].outvars[0]
+        assert not eqn.invars[-1].val
         body_xpr = eqn.params["jaxpr"]
         s_eqn = body_xpr.eqns[1]
         assert s_eqn.primitive == qref_operator_p
         assert s_eqn.params["n_ctrls"] == 0
+
+    @pytest.mark.usefixtures("use_capture")
+    @pytest.mark.parametrize("work_wire_type", ("zeroed", "borrowed"))
+    @pytest.mark.parametrize("work_wires", ((), (2,), (2, 3)))
+    def test_qfunc_ctrl_work_wire_type(self, work_wire_type, work_wires):
+        """Work-wire operands become qubit references and retain their type."""
+
+        @qp.qnode(qp.device("lightning.qubit", wires=4))
+        def circuit():
+            qp.ctrl(qp.S, control=1, work_wires=work_wires, work_wire_type=work_wire_type)(0)
+            return qp.state()
+
+        plxpr = jax.make_jaxpr(circuit)()
+        catalyst_xpr = from_plxpr(plxpr)()
+        qfunc_xpr = catalyst_xpr.eqns[0].params["call_jaxpr"]
+
+        eqn = next(e for e in qfunc_xpr.eqns if e.primitive == ctrl_transform_prim)
+        assert "work_wires" not in eqn.params
+        assert eqn.params["n_work_wires"] == len(work_wires)
+        work_gets = [
+            e.outvars[0]
+            for e in qfunc_xpr.eqns
+            if e.primitive == qref_get_p and e.invars[1].val in work_wires
+        ]
+        assert eqn.invars[len(eqn.invars) - len(work_wires) :] == work_gets
+        assert eqn.params["work_wire_type"] == work_wire_type
+
+    @pytest.mark.parametrize("work_wire_type", ("zeroed", "borrowed"))
+    def test_nested_qfunc_dynamic_work_wires(self, work_wire_type):
+        """A nested control lowers a traced work wire into the control region."""
+
+        @qp.qjit(capture=True, target="mlir", collect_decomp_rules=False)
+        @qp.qnode(qp.device("null.qubit", wires=4))
+        def circuit(angle: float, work: int):
+            def body(theta):
+                qp.ctrl(
+                    qp.RX,
+                    control=1,
+                    control_values=[False],
+                    work_wires=[work],
+                    work_wire_type=work_wire_type,
+                )(theta, 0)
+
+            qp.ctrl(body, control=2)(angle)
+            return qp.state()
+
+        kernel = circuit.jaxpr.eqns[0].params["call_jaxpr"]
+        [outer] = find_eqns(kernel, ctrl_transform_prim)
+        [inner] = find_eqns(outer.params["jaxpr"], ctrl_transform_prim)
+        assert outer.params["n_work_wires"] == 0
+        assert inner.params["n_work_wires"] == 1
+        assert inner.params["work_wire_type"] == work_wire_type
+        assert "work_wires(" in circuit.mlir
+        if work_wire_type == "zeroed":
+            assert 'work_wire_type = "zeroed"' in circuit.mlir
 
     @pytest.mark.parametrize("as_qfunc", (True, False))
     def test_doubly_ctrl(self, as_qfunc):
@@ -544,11 +656,13 @@ class TestAdjointCtrl:
             outer = qfunc_xpr.eqns[3]
             assert outer.primitive == ctrl_transform_prim
             assert outer.params["n_control"] == 1
-            assert outer.params["control_values"] == (False,)
+            assert "control_values" not in outer.params
+            assert not outer.invars[-1].val
             inner = outer.params["jaxpr"].eqns[1]
             assert inner.primitive == ctrl_transform_prim
             assert inner.params["n_control"] == 1
-            assert inner.params["control_values"] == (True,)
+            assert "control_values" not in inner.params
+            assert inner.invars[-1].val
             s_eqn = inner.params["jaxpr"].eqns[1]
             assert s_eqn.primitive == qref_operator_p
             assert s_eqn.params["n_ctrls"] == 0
@@ -636,8 +750,9 @@ class TestAdjointCtrl:
             eqn = qfunc_xpr.eqns[6]
             assert eqn.primitive == ctrl_transform_prim
             assert eqn.params["n_control"] == 1
-            assert eqn.params["control_values"] == (True,)
-            assert eqn.invars[-1] is qfunc_xpr.eqns[5].outvars[0]
+            assert "control_values" not in eqn.params
+            assert eqn.invars[-2] is qfunc_xpr.eqns[5].outvars[0]
+            assert eqn.invars[-1].val
             t_eqn = eqn.params["jaxpr"].eqns[1]
             assert t_eqn.primitive == qref_operator_p
             assert t_eqn.params["n_ctrls"] == 0
@@ -689,7 +804,8 @@ class TestAdjointCtrl:
         ctrl_eqn = qfunc_xpr.eqns[4]
         assert ctrl_eqn.primitive == ctrl_transform_prim
         assert ctrl_eqn.params["n_control"] == 2
-        assert ctrl_eqn.params["control_values"] == (True, True)
+        assert "control_values" not in ctrl_eqn.params
+        assert [var.val for var in ctrl_eqn.invars[-2:]] == [True, True]
 
         for_loop_eqn = ctrl_eqn.params["jaxpr"].eqns[0]
         for_loop_xpr = for_loop_eqn.params["jaxpr_body_fn"]

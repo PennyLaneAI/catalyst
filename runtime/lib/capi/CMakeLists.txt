@@ -32,3 +32,5 @@ if(NOT APPLE)
 else()
     set_property(TARGET rt_capi APPEND PROPERTY BUILD_RPATH @loader_path)
 endif()
+
+catalyst_runtime_install(rt_capi)

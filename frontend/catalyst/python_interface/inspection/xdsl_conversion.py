@@ -47,6 +47,7 @@ from catalyst.python_interface.dialects.quantum import (
     CustomOp,
     ExtractOp,
     GlobalPhaseOp,
+    MeasurementOp,
     MeasureOp,
     MultiRZOp,
     NamedObsOp,
@@ -107,7 +108,8 @@ def get_mlir_module(workflow: QJIT, args, kwargs) -> Module:
 
     if (mlir_module := getattr(workflow, "mlir_module", None)) is not None:
         value_semantics_mlir = _quantum_opt_stderr(
-            '--catalyst-pipeline="pipe(canonicalize;symbol-dce;convert-to-value-semantics;canonicalize;resolve-state-prep-operator)"',
+            '--catalyst-pipeline="pipe(canonicalize;convert-to-value-semantics;'
+            'canonicalize;resolve-state-prep-operator)"',
             "--mlir-print-op-generic",
             stdin=str(mlir_module),
         )
@@ -119,7 +121,8 @@ def get_mlir_module(workflow: QJIT, args, kwargs) -> Module:
             mlir_module = workflow.generate_ir()
 
         value_semantics_mlir = _quantum_opt_stderr(
-            '--catalyst-pipeline="pipe(canonicalize;symbol-dce;convert-to-value-semantics;canonicalize;resolve-state-prep-operator)"',
+            '--catalyst-pipeline="pipe(canonicalize;convert-to-value-semantics;'
+            'canonicalize;resolve-state-prep-operator)"',
             "--mlir-print-op-generic",
             stdin=str(mlir_module),
         )
@@ -413,11 +416,15 @@ def resolve_constant_wire(ssa: SSAValue) -> float | int | str:
 
         case CtrlOp():
             # A `quantum.ctrl` result threads through from its matching input operand:
-            # out_ctrl_qubits[i] <- in_ctrl_qubits[i], and results[j] <- args[j].
+            # out_ctrl_qubits[i] <- in_ctrl_qubits[i], out_work_qubits[k] <- in_work_qubits[k],
+            # and results[j] <- args[j].
             num_ctrl = len(op.in_ctrl_qubits)
+            num_work = len(op.in_work_qubits)
             if ssa.index < num_ctrl:
                 return resolve_constant_wire(op.in_ctrl_qubits[ssa.index])
-            return resolve_constant_wire(op.args[ssa.index - num_ctrl])
+            if ssa.index < num_ctrl + num_work:
+                return resolve_constant_wire(op.in_work_qubits[ssa.index - num_ctrl])
+            return resolve_constant_wire(op.args[ssa.index - num_ctrl - num_work])
 
         case ExtractOp():
             return dispatch_wires_extract(op)
@@ -430,6 +437,8 @@ def resolve_constant_wire(ssa: SSAValue) -> float | int | str:
             # subtract one as the first ssa index is the result,
             # %res, %q0, ... = pbc.ppm [PAULI_WORD] %q0, ...
             return resolve_constant_wire(op.operands[ssa.index - 1])
+        case MeasurementOp():
+            return resolve_constant_wire(op.in_qubits[ssa.index - len(op.mres)])
         case _:
             raise NotImplementedError(f"Cannot resolve wire for op: {op}")
 

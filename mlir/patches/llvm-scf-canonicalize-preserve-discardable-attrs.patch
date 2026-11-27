@@ -1,0 +1,76 @@
+diff --git a/mlir/lib/Dialect/SCF/IR/SCF.cpp b/mlir/lib/Dialect/SCF/IR/SCF.cpp
+index 652414f..bea8546 100644
+--- a/mlir/lib/Dialect/SCF/IR/SCF.cpp
++++ b/mlir/lib/Dialect/SCF/IR/SCF.cpp
+@@ -2447,6 +2447,7 @@ struct RemoveUnusedResults : public OpRewritePattern<IfOp> {
+     // Create a replacement operation with empty then and else regions.
+     auto newOp =
+         IfOp::create(rewriter, op.getLoc(), newTypes, op.getCondition());
++    newOp->setDiscardableAttrs(op->getDiscardableAttrDictionary());
+     rewriter.createBlock(&newOp.getThenRegion());
+     rewriter.createBlock(&newOp.getElseRegion());
+
+@@ -2511,6 +2512,7 @@ struct ConvertTrivialIfToSelect : public OpRewritePattern<IfOp> {
+
+     IfOp replacement = IfOp::create(rewriter, op.getLoc(), nonHoistable, cond,
+                                     /*withElseRegion=*/false);
++    replacement->setDiscardableAttrs(op->getDiscardableAttrDictionary());
+     if (replacement.thenBlock())
+       rewriter.eraseBlock(replacement.thenBlock());
+     replacement.getThenRegion().takeBody(op.getThenRegion());
+@@ -3789,6 +3803,7 @@ struct WhileMoveIfDown : public OpRewritePattern<scf::WhileOp> {
+
+     auto newWhileOp =
+         scf::WhileOp::create(rewriter, loc, newResultTypes, op.getInits());
++    newWhileOp->setDiscardableAttrs(op->getDiscardableAttrDictionary());
+
+     rewriter.modifyOpInPlace(newWhileOp, [&] {
+       newWhileOp.getBefore().takeBody(op.getBefore());
+@@ -4004,6 +4019,7 @@ struct RemoveLoopInvariantArgsFromBeforeBlock
+
+     auto newWhile = WhileOp::create(rewriter, op.getLoc(), op.getResultTypes(),
+                                     newInitArgs);
++    newWhile->setDiscardableAttrs(op->getDiscardableAttrDictionary());
+
+     Block &newBeforeBlock = *rewriter.createBlock(
+         &newWhile.getBefore(), /*insertPt*/ {},
+@@ -4127,6 +4143,7 @@ struct RemoveLoopInvariantValueYielded : public OpRewritePattern<WhileOp> {
+
+     auto newWhile = WhileOp::create(rewriter, op.getLoc(), newAfterBlockType,
+                                     op.getOperands());
++    newWhile->setDiscardableAttrs(op->getDiscardableAttrDictionary());
+
+     Block &newAfterBlock =
+         *rewriter.createBlock(&newWhile.getAfter(), /*insertPt*/ {},
+@@ -4233,6 +4250,7 @@ struct WhileUnusedResult : public OpRewritePattern<WhileOp> {
+
+     auto newWhile =
+         WhileOp::create(rewriter, op.getLoc(), newResultTypes, op.getInits());
++    newWhile->setDiscardableAttrs(op->getDiscardableAttrDictionary());
+
+     Block &newAfterBlock = *rewriter.createBlock(
+         &newWhile.getAfter(), /*insertPt*/ {}, newResultTypes, newArgLocs);
+@@ -4363,6 +4381,7 @@ struct WhileRemoveUnusedArgs : public OpRewritePattern<WhileOp> {
+     auto newWhileOp =
+         WhileOp::create(rewriter, loc, op.getResultTypes(), newInits,
+                         /*beforeBody*/ nullptr, /*afterBody*/ nullptr);
++    newWhileOp->setDiscardableAttrs(op->getDiscardableAttrDictionary());
+     Block &newBeforeBlock = *newWhileOp.getBeforeBody();
+     Block &newAfterBlock = *newWhileOp.getAfterBody();
+
+@@ -4413,6 +4432,7 @@ struct WhileRemoveDuplicatedResults : public OpRewritePattern<WhileOp> {
+         scf::WhileOp::create(rewriter, loc, argsRange.getTypes(), op.getInits(),
+                              /*beforeBody*/ nullptr,
+                              /*afterBody*/ nullptr);
++    newWhileOp->setDiscardableAttrs(op->getDiscardableAttrDictionary());
+     Block &newBeforeBlock = *newWhileOp.getBeforeBody();
+     Block &newAfterBlock = *newWhileOp.getAfterBody();
+
+@@ -4509,6 +4529,7 @@ struct WhileOpAlignBeforeArgs : public OpRewritePattern<WhileOp> {
+     auto newLoop = WhileOp::create(
+         rewriter, loop.getLoc(), newResultTypes, loop.getInits(),
+         /*beforeBuilder=*/nullptr, /*afterBuilder=*/nullptr);
++    newLoop->setDiscardableAttrs(loop->getDiscardableAttrDictionary());
+     auto *newBefore = newLoop.getBeforeBody();
+     auto *newAfter = newLoop.getAfterBody();
+

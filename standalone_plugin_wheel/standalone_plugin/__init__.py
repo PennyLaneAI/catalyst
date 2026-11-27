@@ -17,9 +17,7 @@
 import platform
 from pathlib import Path
 
-import pennylane as qp
-
-from catalyst.passes import PassPlugin
+from pennylane.core import transform
 
 
 def getStandalonePluginAbsolutePath():
@@ -35,43 +33,4 @@ def name2pass(_name):
     return getStandalonePluginAbsolutePath(), "standalone-switch-bar-foo"
 
 
-def SwitchBarToFoo(*flags, **valued_options):
-    """Applies the "standalone-switch-bar-foo" pass"""
-
-    def add_pass_to_pipeline(**kwargs):
-        pass_pipeline = kwargs.get("pass_pipeline", [])
-        pass_pipeline.append(
-            PassPlugin(
-                getStandalonePluginAbsolutePath(),
-                "standalone-switch-bar-foo",
-                *flags,
-                **valued_options,
-            )
-        )
-        return pass_pipeline
-
-    def decorator(qnode):
-        if not isinstance(qnode, qp.QNode):
-            # Technically, this apply pass is general enough that it can apply to
-            # classical functions too. However, since we lack the current infrastructure
-            # to denote a function, let's limit it to qnodes
-            raise TypeError(f"A QNode is expected, got the classical function {qnode}")
-
-        def qnode_call(*args, **kwargs):
-            kwargs["pass_pipeline"] = add_pass_to_pipeline(**kwargs)
-            return qnode(*args, **kwargs)
-
-        return qnode_call
-
-    # When the decorator is used without ()
-    if len(flags) == 1 and isinstance(flags[0], qp.QNode):
-        qnode = flags[0]
-
-        def qnode_call(*args, **kwargs):
-            kwargs["pass_pipeline"] = add_pass_to_pipeline(**kwargs)
-            return qnode(*args, **kwargs)
-
-        return qnode_call
-
-    # When the decorator is used with ()
-    return decorator
+SwitchBarToFoo = transform(pass_name="standalone.standalone-switch-bar-foo")

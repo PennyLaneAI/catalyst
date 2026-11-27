@@ -19,11 +19,35 @@ from typing import Callable
 
 import pennylane as qp
 from jax.extend.core import ClosedJaxpr
+from pennylane.core import Operator2
 from pennylane.core.operator import abstractify
 
 from catalyst.decomposition.graph_op_id import GraphOpID
+from catalyst.decomposition.modifier_state import ModifierState
+from catalyst.decomposition.type_utils import SerializedGraphOpID
 
-ModifierState = tuple[bool, int]
+ResourceEntry = tuple[SerializedGraphOpID, int]
+
+
+@dataclass(frozen=True)
+class RuleIdentity:
+    """Dataclass with information needed to distinguish unique decomposition rules.
+
+    Attributes:
+        target_gate: The GraphOpID of the gate this decomposition rule applies to
+        frontend_name: the name used to identify this decomposition rule in the frontend
+        resources: sorted pairs of GraphOpIDs and integer resource counts for the rule.
+    """
+
+    target_gate: SerializedGraphOpID
+    frontend_name: str
+    resources: tuple[ResourceEntry, ...]
+
+    def __post_init__(self) -> None:
+        """Require canonical resource ordering for cache lookup and deduplication."""
+        assert self.resources == tuple(
+            sorted(self.resources)
+        ), "RuleIdentity resources must be sorted for correctness."
 
 
 @dataclass(frozen=True)
@@ -34,21 +58,22 @@ class OpDecompRequest:
         base_id: Canonical GraphOpID of the unmodified base operator. Used as the traversal key and
             as the starting point for adjoint/control target IDs. Intentionally excludes modifiers.
         op_name: Frontend operator name used to query PennyLane's decomposition registry.
-        op_cls: Concrete Operator2 class used to rebuild the base for registered symbolic rules.
-            It is unavailable for the on-demand pathway.
-        dynamic_shape: Non-hybrid dynamic argument names mapped to MLIR-style type spellings.
-        wire_lens: Non-hybrid wire argument names mapped to their lengths.
+        op_cls: Concrete Operator2 class used for registry lookup and to rebuild the base for
+            registered symbolic rules.
+        dynamic_shape: Non-hybrid dynamic argument names mapped to MLIR-style type spellings, in
+            operand order.
+        wire_lens: Qubit argument names (wire arguments and qubit-carrying hybrid arguments)
+            mapped to their lengths, in operand order.
         static_data: Compiler-known static/compilable arguments used by applicability, resource
             computation, and rule bodies.
         extra_data: Abstract hybrid-argument pytrees used to reconstruct rule arguments without
             retaining values or tracers from a specific program instance.
         is_custom_op: Whether the operator uses the positional, scalar-f64 signature of qref.custom.
-        adjoint: Whether the encountered operation is adjointed, including from region contexts.
-        control_count: Controls carried by the encountered operation, including ambient control
-            transform context.
+        modifier_state: Modifiers carried by the encountered operation, including those of the
+            adjoint and control transform regions around it.
     """
 
-    base_id: str
+    base_id: SerializedGraphOpID
     op_name: str
     op_cls: type | None
     dynamic_shape: dict
@@ -56,14 +81,13 @@ class OpDecompRequest:
     static_data: dict
     extra_data: dict
     is_custom_op: bool
-    adjoint: bool = False
-    control_count: int = 0
+    modifier_state: ModifierState = ModifierState()
 
     @classmethod
     def from_operation(
         cls,
-        op,
-        modifier_context: ModifierState = (False, 0),
+        op: Operator2,
+        modifier_context: ModifierState = ModifierState(),
     ) -> "OpDecompRequest":
         """Build a request from a settled captured Operator2 instance.
 
@@ -72,12 +96,11 @@ class OpDecompRequest:
         properties by removing tracers (no leaks) and giving shapes/dtypes to Python constants.
 
         Ambient modifiers compose with symbolic wrappers already carried by ``op``: adjoints
-        cancel pairwise and control counts add.
+        cancel pairwise, while control counts and work wires add.
         """
         with qp.capture.pause():
             op = abstractify(op)
 
-        ambient_adjoint, ambient_control_count = modifier_context
         graph_op_id = GraphOpID(op)
         base = graph_op_id.op
         static_data = {
@@ -92,23 +115,12 @@ class OpDecompRequest:
                 for name, types in graph_op_id.dynamic_shape.items()
                 if name not in base.hybrid_argnames
             },
-            wire_lens={
-                name: length
-                for name, length in graph_op_id.wire_lens.items()
-                if name not in base.hybrid_argnames
-            },
+            wire_lens=dict(graph_op_id.wire_lens),
             static_data=static_data,
             extra_data=base.hybrid_args,
             is_custom_op=graph_op_id.is_custom_op,
-            adjoint=graph_op_id.adjoint != ambient_adjoint,
-            control_count=graph_op_id.num_controls + ambient_control_count,
+            modifier_state=modifier_context.compose(graph_op_id.modifiers),
         )
-
-    @property
-    def modifier_state(self) -> ModifierState:
-        """Return the modifier state represented by this request."""
-
-        return self.adjoint, self.control_count
 
 
 @dataclass
@@ -119,27 +131,25 @@ class TracedRule:
     more than once while preserving distinct alternatives with identical resource counts.
 
     Attributes:
-        pyfun: Python callable retained for naming and lowering the function.
-        closed_jaxpr: Converted Catalyst JAXPR containing the rule body.
+        prepared_rule_fn: Adapted rule callable retained for naming and lowering the function.
+        closed_jaxpr: Converted Catalyst JAXPR containing the rule body, or an empty JAXPR
+            retaining only its signature when body compilation is skipped.
         target_gate: Full GraphOpID of the operation decomposed by the rule.
         resources: GraphOpID-to-multiplicity mapping produced by the rule.
         frontend_name: PennyLane rule name used for fixed and alternative rule selection.
     """
 
-    pyfun: Callable
+    prepared_rule_fn: Callable[..., None]
     closed_jaxpr: ClosedJaxpr
-    target_gate: str
-    resources: dict[str, int]
+    target_gate: SerializedGraphOpID
+    resources: dict[SerializedGraphOpID, int]
     frontend_name: str
 
     @property
-    def identifier(self) -> tuple:
+    def identifier(self) -> RuleIdentity:
         """Rule identifier for deduplication."""
-
-        return (
-            self.target_gate,
-            self.frontend_name,
-            tuple(sorted(self.resources.items())),
+        return RuleIdentity(
+            self.target_gate, self.frontend_name, tuple(sorted(self.resources.items()))
         )
 
 
@@ -150,14 +160,17 @@ class DecompositionScope:
     Attributes:
         roots: Map of (base) GraphOpID to a request object and observed modifier states.
         definitions: Map of rule identifiers to traced rules, in first-seen order.
+        estimate_decomps: Whether to prepare rules for resource estimation without tracing bodies.
     """
 
-    roots: dict[str, tuple[OpDecompRequest, set[ModifierState]]] = field(default_factory=dict)
-    definitions: dict[tuple, TracedRule] = field(default_factory=dict)
+    roots: dict[SerializedGraphOpID, tuple[OpDecompRequest, set[ModifierState]]] = field(
+        default_factory=dict
+    )
+    definitions: dict[RuleIdentity, TracedRule] = field(default_factory=dict)
+    estimate_decomps: bool = False
 
     def record_root(self, request: OpDecompRequest) -> None:
         """Record root nodes for later decomp rule capture, which are explored recursively."""
-
         previous = self.roots.get(request.base_id)
         if previous is None:
             self.roots[request.base_id] = (request, {request.modifier_state})
@@ -166,5 +179,4 @@ class DecompositionScope:
 
     def record_definition(self, traced_rule: TracedRule) -> None:
         """Record a definition once, preserving first-seen order."""
-
         self.definitions.setdefault(traced_rule.identifier, traced_rule)

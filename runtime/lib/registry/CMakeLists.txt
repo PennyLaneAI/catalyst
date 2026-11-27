@@ -31,3 +31,6 @@ set_target_properties(catalyst_callback_registry PROPERTIES SUFFIX ".so")
 target_compile_definitions(rt_capi PUBLIC -DLIBREGISTRY=\"$<TARGET_FILE_NAME:catalyst_callback_registry>\")
 
 target_include_directories(catalyst_callback_registry PUBLIC ${runtime_includes})
+
+# Shipped even though nothing links it: rt_capi dlopen()s it by name at run time.
+catalyst_runtime_install(catalyst_callback_registry)

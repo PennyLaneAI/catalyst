@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// RUN: catalyst --tool=opt --pass-pipeline='builtin.module(graph-decomposition{gate-set=testRX=2.0,testRY=1.0,testRZ=1.0 })' %s | FileCheck %s
+// RUN: catalyst --tool=opt --pass-pipeline='builtin.module(graph-decomposition{inline-rule-body gate-set=testRX=2.0,testRY=1.0,testRZ=1.0 })' %s | FileCheck %s
 
 func.func @circuit() {
     %q = quantum.alloc_qb : !quantum.bit
@@ -22,7 +22,7 @@ func.func @circuit() {
     // CHECK: testRX
     %qout = quantum.custom "testHadamard"() %q : !quantum.bit
     quantum.dealloc_qb %qout : !quantum.bit
-    return 
+    return
 }
 
 // CHECK-LABEL: @fixed_decomp
@@ -30,7 +30,7 @@ func.func @circuit() {
 // CHECK-SAME: operations
 // CHECK-SAME: testRX
 // CHECK-SAME: testRZ
-func.func @fixed_decomp(%q0 : !quantum.bit) -> !quantum.bit attributes {target_gate = "testHadamard{}{wires:1}{}", frontend_name = "fixed_decomp" } {
+func.func private @fixed_decomp(%q0 : !quantum.bit) -> !quantum.bit attributes {target_gate = "testHadamard{}{wires:1}{}", frontend_name = "fixed_decomp" } {
     %cst = arith.constant 1.5707963267948966 : f64
     %q1 = quantum.custom "testRX"(%cst) %q0 : !quantum.bit
     %q2 = quantum.custom "testRZ"(%cst) %q1 : !quantum.bit

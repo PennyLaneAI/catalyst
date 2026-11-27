@@ -1,5 +1,5 @@
 add_catalyst_unittest(CatalystQuantumInterfaceTests
-    TestDecomposableGateInterface.cpp
+    TestDecomposableOpInterface.cpp
 )
 
 get_property(dialect_libs GLOBAL PROPERTY MLIR_DIALECT_LIBS)

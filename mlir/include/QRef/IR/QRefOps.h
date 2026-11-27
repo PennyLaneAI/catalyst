@@ -27,6 +27,9 @@
 #include "QRef/IR/QRefDialect.h"
 #include "QRef/IR/QRefInterfaces.h"
 #include "Quantum/IR/QuantumDialect.h"
+#include "Quantum/IR/QuantumInterfaces.h"
+
+#include "StringConstants.h"
 
 //===----------------------------------------------------------------------===//
 // QRef ops declarations.
