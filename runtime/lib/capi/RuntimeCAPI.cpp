@@ -92,6 +92,7 @@ auto getQuantumDevicePtr() -> const std::unique_ptr<QuantumDevice> & {
  * @brief The active device's extension table `name`, or null.
  */
 template <typename Table> auto queryTable(const char *name) -> const Table * {
+    RT_FAIL_IF(!RTD_PTR, "Invalid use of a device extension without an active device");
     return static_cast<const Table *>(RTD_PTR->queryInterface(name, 1));
 }
 

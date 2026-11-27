@@ -21,9 +21,12 @@
 #include <vector>
 
 #include "DataView.hpp"
-#include "DeviceExtensions.h"
 #include "Exception.hpp"
 #include "Types.h"
+
+/// The device ABI: 1 adds `<Name>DeviceAbiVersion` and `QuantumDevice::QueryInterface`. Later
+/// device features are extension tables (`DeviceExtensions.h`), and the vtable stays fixed.
+#define CATALYST_DEVICE_ABI_VERSION 1u
 
 // A helper template macro to generate the <IDENTIFIER>Factory function by
 // calling <CONSTRUCTOR>(kwargs), and the <IDENTIFIER>DeviceAbiVersion function

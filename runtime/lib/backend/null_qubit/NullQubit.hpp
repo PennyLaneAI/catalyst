@@ -27,6 +27,7 @@
 #include <vector>
 
 #include "DataView.hpp"
+#include "DeviceExtensions.h"
 #include "QuantumDevice.hpp"
 #include "QubitManager.hpp"
 #include "ResourceTracker.hpp"

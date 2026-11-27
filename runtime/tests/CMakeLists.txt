@@ -52,9 +52,15 @@ if(ENABLE_CODE_COVERAGE)
     endif()
 endif()
 
+# Device libraries that the device ABI tests load, beside null.qubit.
+add_library(stub_extension_device SHARED stubs/stub_extension_device.cpp)
+target_include_directories(stub_extension_device PRIVATE ${runtime_includes})
+set_property(TARGET stub_extension_device PROPERTY POSITION_INDEPENDENT_CODE ON)
+
 add_executable(runner_tests_qir_runtime)
 target_sources(runner_tests_qir_runtime PRIVATE
     Test_DataView.cpp
+    Test_DeviceExtensions.cpp
     Test_NullQubit.cpp
     Test_ResourceTracker.cpp
     Test_SharedLibraryManager.cpp
@@ -79,7 +85,9 @@ endif()
 
 target_compile_definitions(runner_tests_qir_runtime PRIVATE
     RTD_NULL_QUBIT_LIB="$<TARGET_FILE:rtd_null_qubit>"
+    RTD_STUB_EXTENSION_DEVICE_LIB="$<TARGET_FILE:stub_extension_device>"
 )
+add_dependencies(runner_tests_qir_runtime stub_extension_device)
 
 catch_discover_tests(runner_tests_qir_runtime)
 

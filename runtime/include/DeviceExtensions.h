@@ -16,9 +16,10 @@
  * @file DeviceExtensions.h
  * Optional, versioned device extensions, as plain C function tables.
  *
- * A device library built against this header exports `<Name>DeviceAbiVersion`
- * (emitted by `GENERATE_DEVICE_FACTORY`). A device without that symbol is
- * version 0, and the runtime never queries it for tables.
+ * A device library built against device ABI 1 or later exports
+ * `<Name>DeviceAbiVersion` (emitted by `GENERATE_DEVICE_FACTORY`, see
+ * `QuantumDevice.hpp`). A device without that symbol is version 0, and the
+ * runtime never queries it for tables.
  *
  * From version 1, `QuantumDevice::QueryInterface(name, min_version)` returns a
  * table, or null. Every table opens with `CatalystDeviceTableHeader`. Rules for
@@ -31,6 +32,10 @@
  * - A breaking change is a new table name, such as "Delegated2".
  *
  * Every table describes semantics any target can implement, hardware included.
+ *
+ * This header is plain C, so that a device can be written without C++. A
+ * result is `bool *` (the runtime's `RESULT *`), and a wire is `intptr_t` (the
+ * runtime's `QubitIdType`).
  */
 
 #pragma once
@@ -41,14 +46,9 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#include "Types.h"
-
 #ifdef __cplusplus
 extern "C" {
 #endif
-
-/// The device ABI this header describes.
-#define CATALYST_DEVICE_ABI_VERSION 1u
 
 typedef struct {
     /// The version of this table the device fills, at least 1.
@@ -88,21 +88,24 @@ typedef enum {
 typedef struct {
     CatalystDeviceTableHeader header;
     void (*begin_program)(void *self, uint32_t postselect_mode);
-    void (*push_predicate)(void *self, RESULT *condition);
+    void (*push_predicate)(void *self, bool *condition);
     void (*pop_predicate)(void *self);
-    RESULT *(*result_constant)(void *self, bool value);
-    RESULT *(*result_xor)(void *self, RESULT *a, RESULT *b);
-    RESULT *(*result_not)(void *self, RESULT *a);
+    bool *(*result_constant)(void *self, bool value);
+    bool *(*result_xor)(void *self, bool *a, bool *b);
+    bool *(*result_not)(void *self, bool *a);
     /// `if_true` on shots where `condition` holds, `if_false` on the others.
-    RESULT *(*result_select)(void *self, RESULT *condition, RESULT *if_true, RESULT *if_false);
+    bool *(*result_select)(void *self, bool *condition, bool *if_true, bool *if_false);
     /// Compiled code holds `result` no longer.
-    void (*release_result)(void *self, RESULT *result);
+    void (*release_result)(void *self, bool *result);
     /// Measure the Pauli word, negated if asked. `postselect` is 0, 1 or CATALYST_NO_POSTSELECT.
-    RESULT *(*pauli_measure)(void *self, const char *word, const QubitIdType *wires,
-                             size_t num_wires, bool negated, int32_t postselect);
+    /// The runtime calls it for every Pauli measurement while the device is active; before
+    /// `begin_program`, it returns a readable bit with the sign applied. May be null: the runtime
+    /// then calls `QuantumDevice::PauliMeasure` and applies the sign itself.
+    bool *(*pauli_measure)(void *self, const char *word, const intptr_t *wires, size_t num_wires,
+                           bool negated, int32_t postselect);
     /// Outcomes of `results` in every shot, bit-packed: shot s is row s of `row_bytes` bytes, and
     /// result i is bit (i % 8) of byte (i / 8). May be null.
-    void (*result_samples)(void *self, RESULT *const *results, size_t num_results, uint8_t *out,
+    void (*result_samples)(void *self, bool *const *results, size_t num_results, uint8_t *out,
                            size_t num_shots, size_t row_bytes);
 } CatalystDelegatedTable;
 
@@ -130,13 +133,19 @@ typedef enum {
  */
 typedef struct {
     CatalystDeviceTableHeader header;
-    void (*begin_gadget)(void *self, const char *word, const QubitIdType *wires, size_t num_wires,
+    void (*begin_gadget)(void *self, const char *word, const intptr_t *wires, size_t num_wires,
                          double theta, uint32_t verdict);
     void (*end_gadget)(void *self);
 } CatalystGadgetTable;
 
 #ifdef __cplusplus
 } // extern "C"
+
+#include <type_traits>
+
+#include "Types.h"
+static_assert(std::is_same_v<RESULT, bool> && std::is_same_v<QubitIdType, intptr_t>,
+              "DeviceExtensions.h spells RESULT and QubitIdType as C types");
 #endif
 
 #endif // DEVICE_EXTENSIONS_H
