@@ -19,7 +19,6 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 import pennylane as qp
-import pennylane.numpy as pnp
 import pytest
 from numpy.testing import assert_allclose
 from pennylane import adjoint, cond, for_loop, qjit, while_loop
@@ -1225,7 +1224,7 @@ class TestMatrix:
 
     def test_batching_support(self):
         """Test that adjoint matrix has batching support."""
-        x = qp.numpy.array([0.1, 0.2, 0.3])
+        x = np.array([0.1, 0.2, 0.3])
         base = qp.RX(x, wires=0)
         op = adjoint(base)
         mat = op.matrix()
@@ -1284,7 +1283,7 @@ def test_sparse_matrix():
     op = adjoint(base)
 
     base_sparse_mat = base.sparse_matrix()
-    base_conj_T = qp.numpy.conj(qp.numpy.transpose(base_sparse_mat))
+    base_conj_T = np.conj(np.transpose(base_sparse_mat))
     op_sparse_mat = op.sparse_matrix()
 
     assert isinstance(op_sparse_mat, csr_matrix)
@@ -1390,13 +1389,13 @@ class TestIntegration:
             adjoint(qp.RX(x, wires=0))
             return qp.expval(qp.PauliY(0))
 
-        x = pnp.array(1.2345, requires_grad=True)
+        x = jnp.array(1.2345)
 
         res = circuit(x)
         expected = np.sin(x)
         assert qp.math.allclose(res, expected)
 
-        grad = qp.grad(circuit)(x)
+        grad = jax.grad(circuit)(x)
         expected_grad = np.cos(x)
 
         assert qp.math.allclose(grad, expected_grad)
@@ -1410,7 +1409,7 @@ class TestIntegration:
             adjoint(qp.RX(x, wires=0))
             return qp.expval(qp.PauliY(0))
 
-        x = qp.numpy.array([1.234, 2.34, 3.456])
+        x = np.array([1.234, 2.34, 3.456])
         res = circuit(x)
 
         expected = np.sin(x)

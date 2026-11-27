@@ -549,7 +549,7 @@ def test_finite_diff(inp, backend, grad_fn, capture_mode):
     def interpretted_grad_default(x):
         device = qp.device("default.qubit", wires=1)
         g = qp.QNode(f, device, diff_method="finite-diff")
-        h = qp.grad(g, argnums=0)
+        h = jax.grad(g, argnums=0)
         return h(x)
 
     assert np.allclose(compiled_grad_default(inp), interpretted_grad_default(inp))
@@ -572,7 +572,7 @@ def test_finite_diff_mul(inp, backend, capture_mode):
     def interpretted_grad_default(x):
         device = qp.device("default.qubit", wires=1)
         g = qp.QNode(f, device, diff_method="finite-diff")
-        h = qp.grad(g, argnums=0)
+        h = jax.grad(g, argnums=0)
         return h(x)
 
     assert np.allclose(compiled_grad_default(inp), interpretted_grad_default(inp))
@@ -599,7 +599,7 @@ def test_finite_diff_in_loop(inp, backend, capture_mode):
     def interpretted_grad_default(x):
         device = qp.device("default.qubit", wires=1)
         g = qp.QNode(f, device, diff_method="finite-diff")
-        h = qp.grad(g, argnums=0)
+        h = jax.grad(g, argnums=0)
         return h(x)
 
     expected = interpretted_grad_default(inp)
@@ -624,7 +624,7 @@ def test_adj(inp, backend, capture_mode):
     def interpreted(x):
         device = qp.device("default.qubit", wires=1)
         g = qp.QNode(f, device, diff_method="backprop")
-        h = qp.grad(g, argnums=0)
+        h = jax.grad(g, argnums=0)
         return h(x)
 
     assert np.allclose(compiled(inp), interpreted(inp))
@@ -647,7 +647,7 @@ def test_adj_mult(inp, backend, capture_mode):
     def interpreted(x):
         device = qp.device("default.qubit", wires=1)
         g = qp.QNode(f, device, diff_method="backprop")
-        h = qp.grad(g, argnums=0)
+        h = jax.grad(g, argnums=0)
         return h(x)
 
     assert np.allclose(compiled(inp), interpreted(inp))
@@ -674,7 +674,7 @@ def test_adj_in_loop(inp, backend, capture_mode):
     def interpretted_grad_default(x):
         device = qp.device("default.qubit", wires=1)
         g = qp.QNode(f, device, diff_method="backprop")
-        h = qp.grad(g, argnums=0)
+        h = jax.grad(g, argnums=0)
         return h(x)
 
     expected = interpretted_grad_default(inp)
@@ -698,7 +698,7 @@ def test_ps(inp, backend, capture_mode):
     def interpreted(x):
         device = qp.device("default.qubit", wires=1)
         g = qp.QNode(f, device, diff_method="backprop")
-        h = qp.grad(g, argnums=0)
+        h = jax.grad(g, argnums=0)
         return h(x)
 
     assert np.allclose(compiled(inp), interpreted(inp))
@@ -736,7 +736,7 @@ def test_ps_conditionals(inp, backend, capture_mode):
     def interpreted(x, y):
         device = qp.device("default.qubit", wires=1)
         g = qp.QNode(f_interpreted, device, diff_method="backprop")
-        h = qp.grad(g, argnums=0)
+        h = jax.grad(g, argnums=0)
         return h(x, y)
 
     expected0 = interpreted(inp, 0.0)
@@ -772,7 +772,7 @@ def test_ps_for_loops(inp, backend, capture_mode):
     def interpreted(x, y):
         device = qp.device("default.qubit", wires=1)
         g = qp.QNode(f_interpreted, device, diff_method="backprop")
-        h = qp.grad(g, argnums=0)
+        h = jax.grad(g, argnums=0)
         return h(x, y)
 
     expected1 = interpreted(inp, 1)
@@ -819,7 +819,7 @@ def test_ps_for_loops_entangled(inp, backend, capture_mode):
     def interpreted(x, y, z):
         device = qp.device("default.qubit", wires=3)
         g = qp.QNode(f_interpreted, device, diff_method="backprop")
-        h = qp.grad(g, argnums=0)
+        h = jax.grad(g, argnums=0)
         return h(x, y, z)
 
     expected11 = interpreted(inp, 1, 1)
@@ -880,7 +880,7 @@ def test_ps_qft(inp, backend, capture_mode):
     def interpreted(x, y, z):
         device = qp.device("default.qubit", wires=3)
         g = qp.QNode(qft_interpreted, device, diff_method="backprop")
-        h = qp.grad(g, argnums=0)
+        h = jax.grad(g, argnums=0)
         return h(x, y, z)
 
     expected = interpreted(inp, 2, 2)
@@ -903,7 +903,7 @@ def test_ps_probs(backend, capture_mode):
         return qp.jacobian(func, method="auto")(p)
 
     result = workflow(0.5)
-    reference = qp.jacobian(func, argnums=0)(0.5)
+    reference = jax.jacobian(func, argnums=0)(jnp.array(0.5))
     print(result, reference)
     assert np.allclose(result, reference)
 
@@ -925,7 +925,7 @@ def test_ps_four_term_rule(backend, gate_n_inputs):
         return qp.grad(f)(x)
 
     result = main(0.1)
-    reference = main.original_function(qp.numpy.array(0.1))
+    reference = jax.grad(f)(jnp.array(0.1))
 
     assert np.allclose(result, reference)
 
@@ -947,7 +947,7 @@ def test_finite_diff_h(inp, backend, capture_mode):
     def interpretted_grad_h(x):
         device = qp.device("default.qubit", wires=1)
         g = qp.QNode(f, device, diff_method="finite-diff", gradient_kwargs={"h": 0.1})
-        h = qp.grad(g, argnums=0)
+        h = jax.grad(g, argnums=0)
         return h(x)
 
     assert np.allclose(compiled_grad_h(inp), interpretted_grad_h(inp))
@@ -970,7 +970,7 @@ def test_finite_diff_argnum(inp, backend, capture_mode):
     def interpretted_grad_argnum(x):
         device = qp.device("default.qubit", wires=1)
         g = qp.QNode(f2, device, diff_method="finite-diff")
-        h = qp.grad(g, argnums=1)
+        h = jax.grad(g, argnums=1)
         return h(x, 2.0)
 
     assert np.allclose(compiled_grad_argnum(inp), interpretted_grad_argnum(inp))
@@ -993,7 +993,7 @@ def test_finite_diff_argnum_list(inp, backend, capture_mode):
     def interpretted_grad_argnum_list(x):
         device = qp.device("default.qubit", wires=1)
         g = qp.QNode(f2, device, diff_method="finite-diff")
-        h = qp.grad(g, argnums=[1])
+        h = jax.grad(g, argnums=[1])
         # Slightly different behaviour. If argnums is a list
         # it doesn't matter if it is a single number,
         # the return value will be a n-tuple of size of the
@@ -1020,7 +1020,7 @@ def test_finite_grad_range_change(inp, backend, capture_mode):
     def interpretted_grad_range_change(x):
         device = qp.device("default.qubit", wires=1)
         g = qp.QNode(f2, device, diff_method="finite-diff")
-        h = qp.grad(g, argnums=[0, 1])
+        h = jax.grad(g, argnums=[0, 1])
         return h(x, 2.0)
 
     assert np.allclose(compiled_grad_range_change(inp), interpretted_grad_range_change(inp))
@@ -1043,7 +1043,7 @@ def test_ps_grad_range_change(inp, backend, capture_mode):
     def interpretted_grad_range_change(x):
         device = qp.device("default.qubit", wires=1)
         g = qp.QNode(f2, device, diff_method="backprop")
-        h = qp.grad(g, argnums=[0, 1])
+        h = jax.grad(g, argnums=[0, 1])
         return h(x, 2.0)
 
     assert np.allclose(compiled_grad_range_change(inp), interpretted_grad_range_change(inp))
@@ -1066,7 +1066,7 @@ def test_ps_tensorinp(inp, backend, capture_mode):
     def interpretted(x):
         device = qp.device("default.qubit", wires=1)
         g = qp.QNode(f2, device, diff_method="backprop")
-        h = qp.grad(g, argnums=[0, 1])
+        h = jax.grad(g, argnums=[0, 1])
         return h(x, 2.0)
 
     for dydx_c, dydx_i in zip(compiled(jnp.array([inp])), interpretted(np.array([inp]))):
@@ -1090,7 +1090,7 @@ def test_adjoint_grad_range_change(inp, backend, capture_mode):
     def interpretted_grad_range_change(x):
         device = qp.device("default.qubit", wires=1)
         g = qp.QNode(f2, device, diff_method="backprop")
-        h = qp.grad(g, argnums=[0, 1])
+        h = jax.grad(g, argnums=[0, 1])
         return h(x, 2.0)
 
     assert np.allclose(compiled_grad_range_change(inp), interpretted_grad_range_change(inp))
@@ -1196,8 +1196,8 @@ def test_finite_diff_higher_order(inp, backend, capture_mode):
     def interpretted_grad2_default(x):
         device = qp.device("default.qubit", wires=1)
         g = qp.QNode(f, device, diff_method="backprop", max_diff=2)
-        h = qp.grad(g, argnums=0)
-        i = qp.grad(h, argnums=0)
+        h = jax.grad(g, argnums=0)
+        i = jax.grad(h, argnums=0)
         return i(x)
 
     expected = interpretted_grad2_default(inp)
@@ -1401,7 +1401,7 @@ def test_loop_with_dyn_wires(backend, diff_method, capture_mode):
 
     arg = 0.75
     result = qjit(qp.grad(cat), capture=capture_mode)(arg)
-    expected = qp.grad(pl, argnums=0)(arg)
+    expected = jax.grad(pl, argnums=0)(jnp.array(arg))
 
     assert np.allclose(result, expected)
 
@@ -1647,7 +1647,7 @@ def test_adj_qubitunitary(inp, backend):
     def interpreted(x):
         device = qp.device("default.qubit", wires=1)
         g = qp.QNode(f, device, diff_method="backprop")
-        h = qp.grad(g, argnums=0)
+        h = jax.grad(g, argnums=0)
         return h(x)
 
     assert np.allclose(compiled(inp), interpreted(inp))
