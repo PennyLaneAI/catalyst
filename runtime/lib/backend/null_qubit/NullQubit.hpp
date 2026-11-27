@@ -22,10 +22,12 @@
 #include <optional>
 #include <random>
 #include <string>
+#include <string_view>
 #include <unordered_map>
 #include <vector>
 
 #include "DataView.hpp"
+#include "DeviceExtensions.h"
 #include "QuantumDevice.hpp"
 #include "QubitManager.hpp"
 #include "ResourceTracker.hpp"
@@ -561,6 +563,27 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
     }
 
     /**
+     * @brief The "Delegated" and "Gadget" extension tables.
+     *
+     * The null device follows any feed-forward handed to it as data: every result handle
+     * reads as false, except a negated Pauli measurement, which reads as true as it does without
+     * the table. Gadget brackets are ignored.
+     */
+    auto QueryInterface(const char *name, uint32_t min_version) -> const void * {
+        if (min_version > 1) {
+            return nullptr;
+        }
+        const std::string_view table{name};
+        if (table == "Delegated") {
+            return &delegated_table_;
+        }
+        if (table == "Gadget") {
+            return &gadget_table_;
+        }
+        return nullptr;
+    }
+
+    /**
      * @brief No-op implementation for gradient computation
      *
      * The null device doesn't maintain quantum state or support gradient computation.
@@ -642,5 +665,36 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
 
     // static constants for RESULT values
     static constexpr bool GLOBAL_RESULT_FALSE_CONST = false;
+    static constexpr bool GLOBAL_RESULT_TRUE_CONST = true;
+
+    static auto falseResult() -> RESULT * { return const_cast<Result>(&GLOBAL_RESULT_FALSE_CONST); }
+
+    const CatalystDelegatedTable delegated_table_{
+        .header = {.abi_version = 1, .reserved = 0, .self = this},
+        .begin_program = [](void *, uint32_t) {},
+        .push_predicate = [](void *, RESULT *) {},
+        .pop_predicate = [](void *) {},
+        .result_constant = [](void *, bool) { return falseResult(); },
+        .result_xor = [](void *, RESULT *, RESULT *) { return falseResult(); },
+        .result_not = [](void *, RESULT *) { return falseResult(); },
+        .result_select = [](void *, RESULT *, RESULT *, RESULT *) { return falseResult(); },
+        .release_result = [](void *, RESULT *) {},
+        .pauli_measure = [](void *self, const char *word, const QubitIdType *wires,
+                            size_t num_wires, bool negated, int32_t) -> RESULT * {
+            RESULT *res = static_cast<NullQubit *>(self)->PauliMeasure(
+                word, std::vector<QubitIdType>(wires, wires + num_wires));
+            return negated ? const_cast<Result>(&GLOBAL_RESULT_TRUE_CONST) : res;
+        },
+        .result_samples =
+            [](void *, RESULT *const *, size_t, uint8_t *out, size_t num_shots, size_t row_bytes) {
+                std::fill(out, out + num_shots * row_bytes, uint8_t{0});
+            },
+    };
+
+    const CatalystGadgetTable gadget_table_{
+        .header = {.abi_version = 1, .reserved = 0, .self = this},
+        .begin_gadget = [](void *, const char *, const QubitIdType *, size_t, double, uint32_t) {},
+        .end_gadget = [](void *) {},
+    };
 };
 } // namespace Catalyst::Runtime::Devices

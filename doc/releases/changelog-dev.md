@@ -2,6 +2,19 @@
 
 <h3>New features since last release</h3>
 
+* Device libraries now have a versioned ABI. `GENERATE_DEVICE_FACTORY` emits
+  `<Name>DeviceAbiVersion`, and a device can provide optional, append-only C function tables
+  through the new `QuantumDevice::QueryInterface` (`DeviceExtensions.h`). Existing devices keep
+  working unchanged.
+  [(#3527)](https://github.com/PennyLaneAI/catalyst/pull/3527)
+
+  - The "Delegated" table lets a device take mid-circuit feed-forward as data: result handles,
+    predicates and result ops, and a Pauli measurement that applies its own sign.
+  - The "Gadget" table brackets a span of ops that implements one Pauli rotation.
+  - `__catalyst__rt__device_require` fails at load, naming the table, the version and the device,
+    when the device does not provide a table the program needs.
+  - `null.qubit` provides both tables.
+
 * The new `CompileOptions(estimate_decomps=True)` setting prepares reachable decomposition rules for
   resource estimation using their registered resource counts, without tracing or compiling
   their implementations. `qp.estimate` can use these rules even when their implementations
