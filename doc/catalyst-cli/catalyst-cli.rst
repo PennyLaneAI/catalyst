@@ -127,6 +127,16 @@ intermediate files are saved.
 Keep intermediate files after each pipeline in the compilation. By default, no intermediate files
 are saved. Using ``--keep-intermediate`` is equivalent to using ``--save-ir-after-each=pipeline``.
 
+``--save-ir-on-failure=<dir>``
+""""""""""""""""""""""""""""""
+
+Save the IR at a pass that fails in the given directory, as ``<module name>_<pass name>_FAILED.mlir``
+(with ``_`` for the characters of the pass name other than letters, digits, ``_``, ``-`` and ``.``),
+independently of ``--keep-intermediate`` and ``--save-ir-after-each``. The file of a module
+overwrites that of an earlier module with the same name in the directory. For a pass that runs on a
+single function, the file only has that function, and the pass manager that runs it also saves a
+file with the whole module. By default, it is not saved.
+
 ``--use-nameloc-as-prefix[=<true|false>]``
 """"""""""""""""""""""""""""""""""""""""""
 

@@ -393,6 +393,9 @@ def _options_to_cli_flags(options):
         case _:
             pass
 
+    if options.save_ir_on_failure:
+        extra_args += [("--save-ir-on-failure", os.path.abspath(options.save_ir_on_failure))]
+
     if options.use_nameloc:
         extra_args += ["--use-nameloc-as-prefix"]
 

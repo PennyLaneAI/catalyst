@@ -352,6 +352,11 @@ int QuantumDriverMainFromCL(int argc, char **argv) {
     cl::opt<bool> DumpModuleScope("dump-module-scope",
                                   cl::desc("Print the whole module in intermediate files"),
                                   cl::init(true), cl::cat(CatalystCat));
+    cl::opt<std::string> SaveIROnFailure(
+        "save-ir-on-failure",
+        cl::desc("Directory in which to save the IR at a pass that fails, independently of "
+                 "keep-intermediate"),
+        cl::init(""), cl::cat(CatalystCat));
 
     // Create dialect registry
     mlir::DialectRegistry registry;
@@ -426,7 +431,8 @@ int QuantumDriverMainFromCL(int argc, char **argv) {
                             .checkpointStage = CheckpointStage,
                             .loweringAction = LoweringAction,
                             .dumpPassPipeline = DumpPassPipeline,
-                            .shouldEmitBytecode = config.shouldEmitBytecode()};
+                            .shouldEmitBytecode = config.shouldEmitBytecode(),
+                            .saveIROnFailure = SaveIROnFailure};
 
     mlir::LogicalResult result = QuantumDriverMain(options, *output, registry);
 

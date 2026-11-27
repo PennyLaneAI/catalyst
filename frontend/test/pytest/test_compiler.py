@@ -725,6 +725,23 @@ class TestCompilerState:
 
         assert stack_trace_pattern in e.value.args[0]
 
+    def test_save_ir_on_failure(self, tmp_path):
+        """Test that the IR at a pass that fails is saved without keeping intermediate files."""
+
+        @qp.qnode(qp.device("lightning.qubit", wires=1))
+        def circuit():
+            return qp.state()
+
+        test_pipelines = [("PipelineA", ["canonicalize"]), ("PipelineB", ["test"])]
+        with pytest.raises(CompileError, match="While processing 'TestPass' pass"):
+            compiled = qjit(circuit, pipelines=test_pipelines, save_ir_on_failure=tmp_path)
+            compiled()
+
+        saved_files = [f.name for f in tmp_path.iterdir()]
+        assert len(saved_files) == 1
+        assert saved_files[0].endswith("_TestPass_FAILED.mlir")
+        assert "func.func" in (tmp_path / saved_files[0]).read_text()
+
 
 class TestCustomCall:
     """Test compilation of `lapack_dsyevd` via lowering to `stablehlo.custom_call`."""
