@@ -6,7 +6,7 @@
   `<Name>DeviceAbiVersion`, and a device can provide optional, append-only C function tables
   through the new `QuantumDevice::QueryInterface` (`DeviceExtensions.h`). Existing devices keep
   working unchanged.
-  [(#XXXX)](https://github.com/PennyLaneAI/catalyst/pull/XXXX)
+  [(#3527)](https://github.com/PennyLaneAI/catalyst/pull/3527)
 
   - The "Delegated" table lets a device take mid-circuit feed-forward as data: result handles,
     predicates and result ops, and a Pauli measurement that applies its own sign.
