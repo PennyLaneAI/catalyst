@@ -164,7 +164,7 @@ def test_captured_rules_are_used_before_symbol_cleanup(as_mod, mocker):
 
     # keep precompiled rules out of the way
     mocker.patch(
-        "catalyst.from_plxpr.qfunc_interpreter.load_precompiled_rule_identities",
+        "catalyst.decomposition.rule_capture.load_precompiled_rule_identities",
         return_value=frozenset(),
     )
 

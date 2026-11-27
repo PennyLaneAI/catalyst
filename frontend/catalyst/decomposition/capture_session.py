@@ -58,8 +58,8 @@ class OpDecompRequest:
         base_id: Canonical GraphOpID of the unmodified base operator. Used as the traversal key and
             as the starting point for adjoint/control target IDs. Intentionally excludes modifiers.
         op_name: Frontend operator name used to query PennyLane's decomposition registry.
-        op_cls: Concrete Operator2 class used to rebuild the base for registered symbolic rules.
-            It is unavailable for the on-demand pathway.
+        op_cls: Concrete Operator2 class used for registry lookup and to rebuild the base for
+            registered symbolic rules.
         dynamic_shape: Non-hybrid dynamic argument names mapped to MLIR-style type spellings, in
             operand order.
         wire_lens: Qubit argument names (wire arguments and qubit-carrying hybrid arguments)

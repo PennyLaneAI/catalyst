@@ -27,8 +27,7 @@ from operator2_dummy_gates import HybridOpArgs, hybrid_op_args_decomp
 from pennylane2.decomposition import add_decomps, local_decomps, register_resources
 
 from catalyst.decomposition import GraphOpID
-from catalyst.decomposition.decomposition_rules import ordered_kwarg_names
-from catalyst.utils.exceptions import CompileError
+from catalyst.decomposition.rule_arguments import ordered_kwarg_names
 
 pytestmark = pytest.mark.usefixtures("use_capture")
 
@@ -183,17 +182,7 @@ class TestExecution:
 
     @pytest.mark.parametrize(
         "collect_decomp_rules",
-        [
-            True,
-            pytest.param(
-                False,
-                marks=pytest.mark.xfail(
-                    reason="On-demand rules use separate JAX contexts and can produce duplicate symbols.",
-                    raises=CompileError,
-                    strict=True,
-                ),
-            ),
-        ],
+        [True, False],
         ids=["eager", "on-demand"],
     )
     def test_semiadder(self, collect_decomp_rules):

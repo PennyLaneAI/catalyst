@@ -31,6 +31,7 @@ from pennylane2.transforms import decompose as pl_decompose
 
 from catalyst.backline import device_pass_pipeline, remote_device_lib
 from catalyst.decomposition.capture_session import DecompositionScope
+from catalyst.decomposition.rule_capture import capture_and_bind_kernel_rules
 from catalyst.device import extract_backend_info
 from catalyst.device.qjit_device import is_dynamic_wires
 from catalyst.from_plxpr.qref_jax_primitives import (
@@ -47,10 +48,7 @@ from catalyst.jax_primitives import (
 from catalyst.utils.patching import Patcher
 
 from .device_utils import create_device_preprocessing_pipeline
-from .qfunc_interpreter import (
-    PLxPRToQuantumJaxprInterpreter,
-    capture_and_bind_kernel_rules,
-)
+from .qfunc_interpreter import PLxPRToQuantumJaxprInterpreter
 
 # dummy hop (higher order primitive) is used to just return a jaxpr
 # produced inside of a another jaxpr
