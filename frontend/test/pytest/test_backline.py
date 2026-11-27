@@ -792,7 +792,7 @@ class TestBacklineDemoIntegration:
         @qp.qnode(dev)
         def echo():
             payload = jnp.arange(64, dtype=jnp.uint8)
-            reply = qp.backline.decode(payload, bitpack=False)
+            reply = qp.backline.decode(payload)
             qp.cond(jnp.all(reply == payload), qp.X)(wires=0)
             return qp.expval(qp.Z(0))
 
