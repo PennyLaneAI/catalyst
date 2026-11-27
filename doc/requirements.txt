@@ -34,4 +34,4 @@ lxml_html_clean
 --extra-index-url https://test.pypi.org/simple/
 pennylane-lightning-kokkos==0.46.0-dev41
 pennylane-lightning==0.46.0-dev41
-pennylane @ git+https://github.com/PennyLaneAI/pennylane.git@29c10a939c4383f668158773e6d24b4e7674b1a5
+pennylane==0.46.0-dev161
