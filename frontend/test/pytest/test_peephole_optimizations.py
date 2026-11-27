@@ -19,7 +19,6 @@ import pennylane as qp
 import pytest
 from operator2_dummy_gates import NoParams, NoParamsCustomOp
 from pennylane.decomposition import add_decomps, local_decomps, register_resources
-from pennylane.transforms import to_ppr as qp_to_ppr
 from pennylane.typing import Wire
 
 from catalyst import qjit
@@ -31,6 +30,7 @@ from catalyst.passes import (
     merge_ppr_ppm,
     merge_rotations,
     ppr_to_ppm,
+    to_pbc,
     to_ppr,
 )
 from catalyst.utils.exceptions import CompileError
@@ -190,7 +190,7 @@ def test_convert_clifford_to_ppr():
     pipe = [("pipe", ["quantum-compilation-stage"])]
 
     @qjit(pipelines=pipe, target="mlir")
-    @to_ppr
+    @to_pbc
     @qp.qnode(qp.device("lightning.qubit", wires=2))
     def test_convert_clifford_to_ppr_workflow():
         qp.H(0)
@@ -198,9 +198,9 @@ def test_convert_clifford_to_ppr():
         qp.T(0)
         qp.CNOT([0, 1])
 
-    assert 'transform.apply_registered_pass "to-ppr"' in test_convert_clifford_to_ppr_workflow.mlir
+    assert 'transform.apply_registered_pass "to-pbc"' in test_convert_clifford_to_ppr_workflow.mlir
     optimized_ir = test_convert_clifford_to_ppr_workflow.mlir_opt
-    assert 'transform.apply_registered_pass "to-ppr"' not in optimized_ir
+    assert 'transform.apply_registered_pass "to-pbc"' not in optimized_ir
     assert "pbc.ppr" in optimized_ir
 
     ppm_specs_output = qp.analyze(test_convert_clifford_to_ppr_workflow, level=1)().resources
@@ -213,6 +213,24 @@ def test_convert_clifford_to_ppr():
     assert ppm_specs_output.qubit_disjoint_depth == 6
 
 
+def test_deprecated_to_ppr_alias():
+
+    pipe = [("pipe", ["quantum-compilation-stage"])]
+
+    with pytest.warns(DeprecationWarning, match="catalyst.passes.to_ppr is deprecated"):
+
+        @qjit(pipelines=pipe, target="mlir")
+        @to_ppr
+        @qp.qnode(qp.device("lightning.qubit", wires=1))
+        def workflow():
+            qp.S(0)
+
+    assert 'transform.apply_registered_pass "to-ppr"' in workflow.mlir
+    optimized_ir = workflow.mlir_opt
+    assert 'transform.apply_registered_pass "to-ppr"' not in optimized_ir
+    assert 'pbc.ppr ["Z"](4)' in optimized_ir
+
+
 def test_convert_cz_to_ppr():
 
     pipe = [("pipe", ["quantum-compilation-stage"])]
@@ -220,16 +238,16 @@ def test_convert_cz_to_ppr():
     @qjit(pipelines=pipe, target="mlir")
     def test_convert_cz_to_ppr_workflow():
 
-        @to_ppr
+        @to_pbc
         @qp.qnode(qp.device("lightning.qubit", wires=2))
         def f():
             qp.CZ(wires=[0, 1])
 
         return f()
 
-    assert 'transform.apply_registered_pass "to-ppr"' in test_convert_cz_to_ppr_workflow.mlir
+    assert 'transform.apply_registered_pass "to-pbc"' in test_convert_cz_to_ppr_workflow.mlir
     optimized_ir = test_convert_cz_to_ppr_workflow.mlir_opt
-    assert 'transform.apply_registered_pass "to-ppr"' not in optimized_ir
+    assert 'transform.apply_registered_pass "to-pbc"' not in optimized_ir
     assert 'pbc.ppr ["Z", "Z"](4)' in optimized_ir
     assert 'pbc.ppr ["Z"](-4)' in optimized_ir
     assert "quantum.custom" not in optimized_ir
@@ -241,7 +259,7 @@ def test_commute_ppr():
 
     @qjit(pipelines=pipe, target="mlir", skip_preprocess=True)
     @commute_ppr
-    @to_ppr
+    @to_pbc
     @qp.qnode(qp.device("lightning.qubit", wires=2))
     def test_commute_ppr_workflow():
         qp.H(0)
@@ -275,7 +293,7 @@ def test_merge_ppr_ppm():
 
     @qjit(pipelines=pipe, target="mlir", skip_preprocess=True)
     @merge_ppr_ppm
-    @to_ppr
+    @to_pbc
     @qp.qnode(qp.device("lightning.qubit", wires=2))
     def test_merge_ppr_ppm_workflow():
         qp.H(0)
@@ -305,7 +323,7 @@ def test_ppr_to_ppm_auto_corrected():
 
     @qjit(pipelines=pipe, target="mlir", skip_preprocess=True)
     @ppr_to_ppm(decompose_method="auto-corrected")
-    @to_ppr
+    @to_pbc
     @qp.qnode(qp.device("lightning.qubit", wires=2))
     def test_ppr_to_ppm_workflow():
         qp.H(0)
@@ -334,7 +352,7 @@ def test_ppr_to_ppm_inject_magic_state():
 
     @qjit(pipelines=pipe, target="mlir", skip_preprocess=True)
     @ppr_to_ppm(decompose_method="clifford-corrected", avoid_y_measure=True)
-    @to_ppr
+    @to_pbc
     @qp.qnode(qp.device("lightning.qubit", wires=2))
     def test_ppr_to_ppm_workflow():
         qp.H(0)
@@ -363,7 +381,7 @@ def test_ppr_to_ppm_pauli_corrected():
 
     @qjit(pipelines=pipe, target="mlir", skip_preprocess=True)
     @ppr_to_ppm(decompose_method="pauli-corrected")
-    @to_ppr
+    @to_pbc
     @qp.qnode(qp.device("lightning.qubit", wires=2))
     def test_ppr_to_ppm_workflow():
         qp.H(0)
@@ -393,7 +411,7 @@ def test_commute_ppr_and_merge_ppr_ppm_with_max_pauli_size():
     @qjit(pipelines=pipe, target="mlir", skip_preprocess=True)
     @merge_ppr_ppm
     @commute_ppr(max_pauli_size=2)
-    @to_ppr
+    @to_pbc
     @qp.qnode(device)
     def f_workflow():
         qp.CNOT([0, 2])
@@ -404,7 +422,7 @@ def test_commute_ppr_and_merge_ppr_ppm_with_max_pauli_size():
     @qjit(pipelines=pipe, target="mlir", skip_preprocess=True)
     @merge_ppr_ppm(max_pauli_size=1)
     @commute_ppr
-    @to_ppr
+    @to_pbc
     @qp.qnode(device)
     def g_workflow():
         qp.CNOT([0, 2])
@@ -446,7 +464,7 @@ def test_merge_rotation_ppr():
     @qp.qjit(pipelines=my_pipeline, target="mlir", capture=True, collect_decomp_rules=False)
     def test_merge_rotation_ppr_workflow():
         @qp.transforms.merge_rotations  # have to use qp to be capture-compatible
-        @qp_to_ppr
+        @to_pbc
         @qp.qnode(qp.device("lightning.qubit", wires=3))
         def circuit():
             qp.PauliRot(np.pi / 2, pauli_word="XYZ", wires=[0, 1, 2])
@@ -470,7 +488,7 @@ def test_merge_rotation_arbitrary_angle_ppr():
     @qp.qjit(pipelines=my_pipeline, target="mlir", capture=True, collect_decomp_rules=False)
     def test_merge_rotation_ppr_workflow():
         @qp.transforms.merge_rotations
-        @qp_to_ppr
+        @to_pbc
         @qp.qnode(qp.device("lightning.qubit", wires=2))
         def circuit(x, y):
             qp.PauliRot(x, pauli_word="ZY", wires=[0, 1])
@@ -500,17 +518,17 @@ def test_clifford_to_ppm():
             qp.T(idx + 1)
         return [qp.expval(qp.PauliZ(idx)) for idx in range(5)]
 
-    to_ppr_transform = qp.transform(pass_name="to-ppr")
+    to_pbc_transform = qp.transform(pass_name="to-pbc")
     ppr_to_ppm_transform = qp.transform(pass_name="ppr-to-ppm")
-    to_ppr_cir = to_ppr_transform(cir)
+    to_pbc_cir = to_pbc_transform(cir)
 
-    auto_corrected_cir = ppr_to_ppm_transform(decompose_method="auto-corrected")(to_ppr_cir)
+    auto_corrected_cir = ppr_to_ppm_transform(decompose_method="auto-corrected")(to_pbc_cir)
 
     clifford_corrected_cir = ppr_to_ppm_transform(
         decompose_method="clifford-corrected", avoid_y_measure=True
-    )(to_ppr_cir)
+    )(to_pbc_cir)
 
-    pauli_corrected_cir = ppr_to_ppm_transform(decompose_method="pauli-corrected")(to_ppr_cir)
+    pauli_corrected_cir = ppr_to_ppm_transform(decompose_method="pauli-corrected")(to_pbc_cir)
 
     auto_qjit_cir = qp.qjit(auto_corrected_cir, capture=True, collect_decomp_rules=False)
     clifford_qjit_cir = qp.qjit(clifford_corrected_cir, capture=True, collect_decomp_rules=False)
@@ -533,7 +551,7 @@ def test_decompose_arbitrary_ppr():
     @qp.qjit(pipelines=my_pipeline, target="mlir", capture=True, collect_decomp_rules=False)
     def test_decompose_arbitrary_ppr_workflow():
         @qp.transform(pass_name="decompose-arbitrary-ppr")
-        @qp.transform(pass_name="to-ppr")
+        @qp.transform(pass_name="to-pbc")
         @qp.qnode(qp.device("lightning.qubit", wires=3))
         def circuit():
             qp.PauliRot(0.123, pauli_word="XYZ", wires=[0, 1, 2])
@@ -578,19 +596,19 @@ class TestLowerPBCInitOps:
                 qp.expval(qp.PauliZ(0)),
             )
 
-        to_ppr_circuit = qp.transform(pass_name="to-ppr")(baseline_circuit)
-        lowered_circuit = qp.transform(pass_name="ppr-to-ppm")(to_ppr_circuit)
+        to_pbc_circuit = qp.transform(pass_name="to-pbc")(baseline_circuit)
+        lowered_circuit = qp.transform(pass_name="ppr-to-ppm")(to_pbc_circuit)
 
         baseline_circuit = qp.qjit(baseline_circuit, capture=True)
-        to_ppr_circuit = qp.qjit(to_ppr_circuit, capture=True)
+        to_pbc_circuit = qp.qjit(to_pbc_circuit, capture=True)
         lowered_circuit = qp.qjit(lowered_circuit, capture=True)
 
         baseline_result = baseline_circuit()
-        to_ppr_result = to_ppr_circuit()
+        to_pbc_result = to_pbc_circuit()
         lowered_result = lowered_circuit()
 
-        assert np.allclose(baseline_result, to_ppr_result)
-        assert np.allclose(to_ppr_result, lowered_result)
+        assert np.allclose(baseline_result, to_pbc_result)
+        assert np.allclose(to_pbc_result, lowered_result)
 
 
 if __name__ == "__main__":

@@ -894,6 +894,16 @@
 
 <h3>Breaking changes 💔</h3>
 
+* The `to-ppr` pass (`catalyst.passes.to_ppr`) has been renamed to `to-pbc`
+  (`catalyst.passes.to_pbc`) and restructured as a full dialect conversion from the Quantum
+  dialect to the PBC dialect. Before conversion, it runs `modifiers-lowering` to lower
+  `quantum.adjoint` and `quantum.ctrl` modifier regions to op-level modifiers, and only allows
+  Quantum runtime/device operations, qubit/register management, uncontrolled global phase,
+  observables, and terminal measurement processes to remain. All mid-circuit measurements,
+  including every `quantum.measurement` op, must be converted to PBC operations.
+  `to-ppr` and `catalyst.passes.to_ppr` remain available as deprecated aliases.
+  [(#3020)](https://github.com/PennyLaneAI/catalyst/pull/3020)
+
 * Captured operators now use PennyLane's `Operator` class, formerly named `Operator2`, while
   the legacy operation class is named `LegacyOperator`.
   [(#3524)](https://github.com/PennyLaneAI/catalyst/pull/3524)
@@ -1560,7 +1570,7 @@
   to project those resource counts in the target gate-set for `qp.estimate(..., target=gate_set)`.
   [(#3351)](https://github.com/PennyLaneAI/catalyst/pull/3351)
 
-* A generic mid-circuit measurement operator with classical results: `MeasurementOp` has been added to 
+* A generic mid-circuit measurement operator with classical results: `MeasurementOp` has been added to
   the `quantum` and `qref` dialects that support qubit and register modes, as well as static and dynamic data. Terminal circuit
   result extraction operators implement the `TerminalMeasurement` instead.
   [(#3439)](https://github.com/PennyLaneAI/catalyst/pull/3439)

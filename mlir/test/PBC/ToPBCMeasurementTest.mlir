@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// RUN: quantum-opt --to-ppr %s | FileCheck %s
+// RUN: quantum-opt --to-pbc --split-input-file --verify-diagnostics %s | FileCheck %s
 
 // CHECK-LABEL: @pauli_measurement
 // CHECK-SAME: ([[Q0:%.+]]: !quantum.bit, [[Q1:%.+]]: !quantum.bit)
@@ -37,9 +37,11 @@ func.func @discarded_measurement_result(%q0: !quantum.bit) -> !quantum.bit {
   return %out : !quantum.bit
 }
 
-// CHECK-LABEL: @other_measurements
-func.func @other_measurements(%q0: !quantum.bit) -> (i1, !quantum.bit) {
-  // CHECK: quantum.measurement "OtherMeasurement"()
+// -----
+
+func.func @unsupported_measurement(%q0: !quantum.bit) -> (i1, !quantum.bit) {
+  // expected-error @+2 {{failed to legalize operation 'quantum.measurement' that was explicitly marked illegal}}
+  // expected-error @+1 {{'quantum.measurement' op measurement "OtherMeasurement" is not supported by PBC conversion, only "PauliMeasure" can be converted}}
   %m, %out = quantum.measurement "OtherMeasurement"() qubits(%q0)
       : (i1, !quantum.bit)
   return %m, %out : i1, !quantum.bit
