@@ -19,12 +19,14 @@ Internal API for the device module.
 from catalyst.device.qjit_device import (
     BackendInfo,
     QJITDevice,
+    RecordDeviceCalls,
     extract_backend_info,
     get_device_capabilities,
 )
 
 __all__ = (
     "QJITDevice",
+    "RecordDeviceCalls",
     "BackendInfo",
     "extract_backend_info",
     "get_device_capabilities",

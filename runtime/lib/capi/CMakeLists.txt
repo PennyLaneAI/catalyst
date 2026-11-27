@@ -2,18 +2,21 @@
 # Shared Lib rt_capi #
 ######################
 
-add_library(rt_capi SHARED RuntimeCAPI.cpp)
+add_library(rt_capi SHARED RuntimeCAPI.cpp RecordingQuantumDevice.cpp)
 
 target_include_directories(rt_capi
     PUBLIC
     ${runtime_includes}
     PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}
+    ${PROJECT_SOURCE_DIR}/lib/backend/common
+    ${PROJECT_SOURCE_DIR}/lib/backend/null_qubit
     ${MLIR_INCLUDE_DIRS}                      # CRunnerUtils.h
     ${PROJECT_SOURCE_DIR}/../mlir/include/   # "Driver/Timer.hpp"
 )
 
-target_link_libraries(rt_capi PRIVATE
+target_link_libraries(rt_capi
+    PRIVATE
     ${CMAKE_DL_LIBS}  # dlopen
     pthread
 )
